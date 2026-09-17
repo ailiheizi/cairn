@@ -1,0 +1,44 @@
+/* Viewer integration.
+
+How the content viewer and its thumbnails sit inside the inspector and the
+result tiles. The viewer component itself keeps its own stylesheet next to it. */
+
+.details > .preview-section { order: 2; }
+.preview-section .rw-content-preview { margin-top: 2px; }
+.result-list .file-icon:has(.rw-content-preview__thumb-image) > svg { position: absolute; opacity: 0; }
+.result-list .file-icon .rw-content-preview__thumb-image {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.result-list .file-icon .rw-content-preview__thumb-note {
+  position: absolute; right: 8px; bottom: 8px; left: 8px;
+  padding: 5px 7px; border-radius: 10px;
+  border-color: rgba(208, 161, 82, 0.34); color: var(--gold); background: rgba(208, 161, 82, 0.1);
+}
+.result-list .file-icon .rw-content-preview__thumb-note > span {
+  display: -webkit-box; overflow: hidden;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+/* A tiny source image is an accurate rendering, not a broken asset. */
+.result-list .file-icon .rw-content-preview__thumb-size {
+  position: absolute; right: 6px; bottom: 6px;
+  border-color: var(--hairline-strong); background: rgb(16 18 20 / 84%); color: var(--muted);
+}
+.result-list .file-icon .rw-content-preview__thumb-image--tiny {
+  /* Small source images keep their pixel look but grow with the tile so a
+     sparse library does not read as a broken image. */
+  inset: auto; top: 50%; left: 50%; width: 40%; height: 40%; max-width: 104px; max-height: 104px;
+  transform: translate(-50%, -50%);
+  object-fit: contain; image-rendering: pixelated;
+}
+@media (prefers-color-scheme: light) {
+  .result-list .result-row.selected .file-icon,
+  .result-list .result-row.selected .file-icon.is-image {
+    color: #386483; background-color: var(--surface-raised);
+  }
+  /* The tiny-image badge and the unavailable-reason note keep the same
+     contrast contract in both themes. */
+  .result-list .file-icon .rw-content-preview__thumb-size { border-color: var(--hairline-strong); background: rgb(252 253 253 / 88%); color: var(--muted); }
+  .result-list .file-icon .rw-content-preview__thumb-note { border-color: rgba(152, 98, 28, 0.4); background: rgba(152, 98, 28, 0.08); }
+}
+.result-list.list-mode .file-icon .rw-content-preview__thumb-image--tiny { width: 28px; height: 28px; }
+.result-list.list-mode .file-icon .rw-content-preview__thumb-size { display: none; }

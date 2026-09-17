@@ -1,0 +1,303 @@
+import { useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import type { Translator } from "../i18n";
+import { command } from "./command";
+import { operations } from "../lib/operations";
+import { looksLikeRemoteLocator } from "../lib/format";
+import type { LibraryFlow } from "./useLibrary";
+import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceProjection, SourceSummary } from "../lib/types";
+
+// The configured sources surface and the add/recheck drawer.
+//
+// Planning is read-only and reviewable: `plan.ingest` records a plan, and only
+// `plan.apply` on the exact plan digest writes bytes. A plan whose outcome is
+// unknown is never made executable again by this flow.
+
+export type SourcesFlow = {
+  sources: SourceSummary[];
+  setSources: (value: SourceSummary[]) => void;
+  sourceProjection: SourceProjection;
+  setSourceProjection: (value: SourceProjection) => void;
+  source: string;
+  setSource: (value: string) => void;
+  changeSourceInput: (value: string) => void;
+  recheckSourceRef: string;
+  setRecheckSourceRef: (value: string) => void;
+  plan: any;
+  planAction: PlanActionState;
+  planCheckBusy: boolean;
+  sourceLooksRemote: boolean;
+  pathSuggestions: PathSuggestion[];
+  sourceBarState: ActionBarState;
+  sourceBarReason: string;
+  sourceSaveLabel: string;
+  sourcePreviewDisabled: boolean;
+  sourcePlanBusy: boolean;
+  sourceSaveDisabled: boolean;
+  sourceSuggestionDisabled: boolean;
+  loadSources: (activeWorkspaceID: string, refreshGeneration?: number) => Promise<void>;
+  makePlan: (event?: FormEvent) => void;
+  runIngestPlan: (rootPath: string) => Promise<void>;
+  pickSuggestedPath: (suggestion: PathSuggestion) => void;
+  checkPlanStatus: () => Promise<void>;
+  applyPlan: () => Promise<void>;
+  viewSource: (sourceItem: SourceSummary) => Promise<void>;
+  openAdd: (sourceItem?: SourceSummary, trigger?: EventTarget | null) => void;
+  closeAdd: () => void;
+  resetSourceProjection: () => void;
+};
+
+export function useSources({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify, refresh, refreshGenerationRef, lastPlannedSource, rememberLastSourcePath, canLeaveSettings, rememberDrawerTrigger, closeDrawers, setAddOpen, library, rememberWorkspace }: {
+  t: Translator;
+  workspaceID: string;
+  isConnected: boolean;
+  coreStorageReady: boolean;
+  coreStorageMessage: string;
+  isUnavailable: boolean;
+  busy: boolean;
+  setBusy: (value: boolean) => void;
+  notify: (notice: Notice | undefined) => void;
+  refresh: () => Promise<void>;
+  refreshGenerationRef: { current: number };
+  lastPlannedSource: string;
+  rememberLastSourcePath: (path: string) => void;
+  canLeaveSettings: () => boolean;
+  rememberDrawerTrigger: (trigger?: EventTarget | null) => void;
+  closeDrawers: () => void;
+  setAddOpen: (value: boolean) => void;
+  library: LibraryFlow;
+  rememberWorkspace: (value: unknown) => void;
+}): SourcesFlow {
+  const [sources, setSources] = useState<SourceSummary[]>([]);
+  const [sourceProjection, setSourceProjection] = useState<SourceProjection>({ state: "READY" });
+  const [source, setSource] = useState("");
+  const [recheckSourceRef, setRecheckSourceRef] = useState("");
+  const [plan, setPlan] = useState<any>();
+  const [planAction, setPlanAction] = useState<PlanActionState>("IDLE");
+  const [planCheckBusy, setPlanCheckBusy] = useState(false);
+  const planRequestRef = useRef(0);
+
+  // One-tap path suggestions use only data the client already has: the
+  // configured source locators and the last path planned in this browser.
+  // There is no host-filesystem browser and no extra operation behind them.
+  const pathSuggestions = useMemo(() => {
+    const suggestions: PathSuggestion[] = [];
+    const seen = new Set<string>();
+    for (const item of sources) {
+      const path = item.locator?.trim();
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+      suggestions.push({ key: `source:${item.source_ref ?? path}`, path, sourceRef: item.source_ref?.trim() ?? "", kind: "source" });
+    }
+    const recent = lastPlannedSource.trim();
+    if (recent && !seen.has(recent)) suggestions.push({ key: `recent:${recent}`, path: recent, sourceRef: "", kind: "recent" });
+    return suggestions.slice(0, 6);
+  }, [lastPlannedSource, sources]);
+
+  async function loadSources(activeWorkspaceID: string, refreshGeneration = refreshGenerationRef.current) {
+    try {
+      const response = await command(operations.source.list, { workspace_id: activeWorkspaceID });
+      if (refreshGenerationRef.current !== refreshGeneration) return;
+      setSources((response.data?.sources ?? []) as SourceSummary[]);
+      setSourceProjection({ state: "READY" });
+    } catch {
+      if (refreshGenerationRef.current !== refreshGeneration) return;
+      // Source management is a secondary projection; an unavailable projection
+      // must not hide the content library or imply that saved bytes are gone.
+      // Drop the old cards so a failed refresh cannot leave actions bound to a
+      // stale source projection.
+      setSources([]);
+      setSourceProjection({ state: "DEGRADED" });
+    }
+  }
+  // Preview and suggestion taps share one ingest runner so Enter in the path
+  // field, the sticky bar's preview action, and a suggestion chip all produce
+  // exactly the same recorded plan.
+  function makePlan(event?: FormEvent) {
+    event?.preventDefault();
+    void runIngestPlan(source);
+  }
+  async function runIngestPlan(rootPath: string) {
+    const root = rootPath.trim();
+    if (!root) return;
+    if (!coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
+    if (looksLikeRemoteLocator(root)) {
+      notify({ kind: "warning", text: t("Web addresses are not supported here. Mount remote storage on the RestoreWeave host, then enter its server path.") });
+      return;
+    }
+    if (planAction === "INSPECTING" || planAction === "PROTECTING") return;
+    const request = ++planRequestRef.current;
+    setPlan(undefined); setPlanAction("INSPECTING"); setBusy(true); notify(undefined);
+    try { const response = await command(operations.plan.ingest, { root }); if (request !== planRequestRef.current) return; setPlan(response.data); rememberWorkspace(response.data?.workspace_id); rememberLastSourcePath(root); notify({ kind: response.data?.executable ? "success" : "warning", text: response.data?.executable ? t("Storage plan is ready to review.") : t("This source has blocked entries and cannot be saved yet.") }); }
+    catch (error) { setPlanAction("IDLE"); notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not create storage plan") }); }
+    finally { setBusy(false); setPlanAction("IDLE"); }
+  }
+  // A suggestion that names a configured source is a recheck of that source,
+  // not a fresh add: the drawer copy, the recorded plan, and the sticky bar all
+  // keep that distinction honest.
+  function pickSuggestedPath(suggestion: PathSuggestion) {
+    if (planAction === "INSPECTING" || planAction === "PROTECTING" || planCheckBusy) return;
+    setSource(suggestion.path);
+    setRecheckSourceRef(suggestion.sourceRef);
+    void runIngestPlan(suggestion.path);
+  }
+  async function checkPlanStatus() {
+    if (!plan?.plan_id || !plan?.plan_digest || planCheckBusy) return;
+    const request = planRequestRef.current;
+    const targetPlanID = plan.plan_id;
+    const targetPlanDigest = plan.plan_digest;
+    const targetWorkspaceID = plan.workspace_id;
+    setPlanCheckBusy(true);
+    try {
+      const response = await command(operations.plan.get, { workspace_id: targetWorkspaceID, plan_id: targetPlanID });
+      if (request !== planRequestRef.current || plan?.plan_id !== targetPlanID || plan?.plan_digest !== targetPlanDigest) return;
+      const data = response.data;
+      if (data?.plan_id !== targetPlanID || data?.plan_digest !== targetPlanDigest) throw new Error(t("The protection plan changed. Review a fresh plan before continuing."));
+      if (data.applied === true) {
+        setPlan({ ...plan, ...data, state: "SUCCEEDED", executable: false, awaiting_confirmation: false });
+        setPlanAction("SUCCEEDED");
+        notify({ kind: "success", text: t("Content saved. Exact bytes are now in the repository.") });
+        try { await refresh(); } catch { notify({ kind: "warning", text: t("Content saved. Refresh the library to update its list.") }); }
+      } else {
+        setPlan({ ...plan, ...data, awaiting_confirmation: true, executable: false });
+        notify({ kind: "warning", text: t("Protection is not confirmed yet. Keep this plan and check again later.") });
+      }
+    } catch (error) { notify({ kind: "warning", text: error instanceof Error ? error.message : t("Could not verify protection result.") }); }
+    finally { setPlanCheckBusy(false); }
+  }
+  async function applyPlan() {
+    if (planAction === "INSPECTING" || planAction === "PROTECTING") return;
+    if (!plan?.plan_id || !plan?.plan_digest) return;
+    if (!coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
+    setPlanAction("PROTECTING"); setBusy(true);
+    try {
+      const response = await command(operations.plan.apply, { workspace_id: plan.workspace_id, plan_id: plan.plan_id, plan_digest: plan.plan_digest });
+      const appliedState = response.data?.state;
+      if (appliedState !== "SUCCEEDED" && response.data?.already_applied !== true) {
+        setPlan({ ...plan, ...response.data, state: "UNKNOWN", executable: false, awaiting_confirmation: true });
+        setPlanAction("IDLE");
+        notify({ kind: "warning", text: t("Protection result needs verification. Check the plan status before trying again.") });
+        return;
+      }
+      setPlan({ ...plan, ...response.data, state: appliedState === "SUCCEEDED" ? appliedState : "SUCCEEDED", executable: false, awaiting_confirmation: false });
+      rememberWorkspace(response.data?.workspace_id ?? plan.workspace_id);
+      const degraded = response.status === "DEGRADED" || (response.data?.warnings?.length ?? 0) > 0;
+      setPlanAction("SUCCEEDED");
+      notify({ kind: degraded ? "warning" : "success", text: t(degraded ? "Exact bytes saved, but derived processing is unavailable." : "Content saved. Exact bytes are now in the repository.") });
+      try { await refresh(); } catch { notify({ kind: "warning", text: t("Content saved. Refresh the library to update its list.") }); }
+    } catch (error) {
+      setPlanAction("IDLE");
+      setPlan((current: any) => current ? { ...current, executable: false, awaiting_confirmation: true } : current);
+      notify({ kind: "warning", text: error instanceof Error ? error.message : t("Protection outcome is unknown. Check the plan status before trying again.") });
+    } finally { setBusy(false); }
+  }
+  async function viewSource(sourceItem: SourceSummary) {
+    if (!workspaceID) return;
+    setBusy(true);
+    try {
+      if (sourceItem.latest_namespace_root_id) {
+        await library.loadNamespace(workspaceID, sourceItem.latest_namespace_root_id);
+      } else {
+        await library.loadContentLibrary(workspaceID, refreshGenerationRef.current, true);
+      }
+    } catch (error) {
+      notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not open source content") });
+    } finally { setBusy(false); }
+  }
+  function openAdd(sourceItem?: SourceSummary, trigger?: EventTarget | null) {
+    if (!isConnected || !coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
+    if (!canLeaveSettings()) return;
+    rememberDrawerTrigger(trigger);
+    closeDrawers();
+    planRequestRef.current += 1; setPlanCheckBusy(false); setSource(sourceItem?.locator?.trim() ?? ""); setPlan(undefined); setPlanAction("IDLE");
+    setRecheckSourceRef(sourceItem?.source_ref?.trim() ?? "");
+    setAddOpen(true); notify(undefined);
+  }
+  // Editing the path invalidates the plan being reviewed: a plan describes one
+  // exact root, so the stale plan is dropped instead of being saved later.
+  function changeSourceInput(value: string) {
+    planRequestRef.current += 1;
+    setSource(value);
+    setPlan(undefined);
+    setPlanAction("IDLE");
+  }
+  function closeAdd() {
+    if (planAction === "INSPECTING" || planAction === "PROTECTING") { notify({ kind: "warning", text: t("This operation is still running. Keep this panel open until it finishes.") }); return; }
+    setAddOpen(false); setRecheckSourceRef("");
+  }
+  function resetSourceProjection() {
+    setPlan(undefined);
+    setSources([]);
+  }
+
+  const sourceLooksRemote = looksLikeRemoteLocator(source);
+  // The sticky action bar is the drawer's single next step. It performs exactly
+  // one action per state, never offers a save that cannot run, and leaves the
+  // review evidence (files, bytes, warnings, per-file decisions) in the card
+  // above it.
+  const sourcePlanApplied = plan?.state === "SUCCEEDED";
+  const sourcePlanAwaiting = Boolean(plan?.awaiting_confirmation) && !sourcePlanApplied;
+  const sourceBarState: ActionBarState = !plan
+    ? "PREVIEW"
+    : sourcePlanApplied
+      ? "SAVED"
+      : sourcePlanAwaiting
+        ? "AWAITING"
+        : !plan.executable
+          ? "BLOCKED"
+          : Number(plan.new_bytes ?? 0) <= 0 ? "UP_TO_DATE" : "READY";
+  const sourceBlockedCount = Number(plan?.blocked_entries?.length ?? 0);
+  const sourceFileCount = Number(plan?.files ?? 0);
+  const sourceBarReason = sourceBarState === "AWAITING"
+    ? t("Result not confirmed yet. Check the plan status before saving again.")
+    : sourceBarState === "BLOCKED"
+      ? t(sourceBlockedCount > 0 ? "Resolve blocked entries before confirming." : "This plan is no longer executable.")
+      : sourceBarState === "UP_TO_DATE"
+        ? t("Already up to date. Nothing new to add from this source.")
+        : "";
+  const sourceSaveLabel = sourceFileCount > 0
+    ? `${t("Confirm save")} · ${t("{{count}} files", { count: sourceFileCount })}`
+    : t("Confirm save");
+  const sourceActionBusy = busy || planAction !== "IDLE" || planCheckBusy;
+  const sourcePreviewDisabled = sourceActionBusy || isUnavailable || !coreStorageReady || !source.trim() || sourceLooksRemote;
+  // The save and suggestion actions stay scoped to this drawer's own plan
+  // operation, exactly as the plan-card button did, so an unrelated background
+  // read can never pretend the save is unavailable.
+  const sourcePlanBusy = planAction !== "IDLE" || planCheckBusy;
+  const sourceSaveDisabled = sourcePlanBusy || isUnavailable || !coreStorageReady;
+  const sourceSuggestionDisabled = sourcePlanBusy || isUnavailable || !coreStorageReady;
+
+  return {
+    sources,
+    setSources,
+    sourceProjection,
+    setSourceProjection,
+    source,
+    setSource,
+    changeSourceInput,
+    recheckSourceRef,
+    setRecheckSourceRef,
+    plan,
+    planAction,
+    planCheckBusy,
+    sourceLooksRemote,
+    pathSuggestions,
+    sourceBarState,
+    sourceBarReason,
+    sourceSaveLabel,
+    sourcePreviewDisabled,
+    sourcePlanBusy,
+    sourceSaveDisabled,
+    sourceSuggestionDisabled,
+    loadSources,
+    makePlan,
+    runIngestPlan,
+    pickSuggestedPath,
+    checkPlanStatus,
+    applyPlan,
+    viewSource,
+    openAdd,
+    closeAdd,
+    resetSourceProjection,
+  };
+}

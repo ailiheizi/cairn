@@ -715,6 +715,11 @@ func TestStableSubjectContinuityUsesCommittedSamePathAndKeepsLegacyIDs(t *testin
 	}
 }
 
+// stableSubjectMigrationVersion is the migration this test upgrades through.
+// The fixture builds the catalog as it existed immediately before it, so the
+// cutoff is pinned by version instead of by the migration list's tail length.
+const stableSubjectMigrationVersion = 22
+
 func TestStableSubjectMigrationPreservesLegacyRowsAndStartsRefreshFromLatest(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "legacy-v21.sqlite")
@@ -734,7 +739,10 @@ CREATE TABLE schema_migrations (
 ) STRICT`); err != nil {
 		t.Fatal(err)
 	}
-	for _, item := range migrations[:len(migrations)-2] {
+	for _, item := range migrations {
+		if item.version >= stableSubjectMigrationVersion {
+			break
+		}
 		if _, err := db.ExecContext(ctx, item.sql); err != nil {
 			t.Fatalf("apply legacy migration %d: %v", item.version, err)
 		}

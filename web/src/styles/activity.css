@@ -1,0 +1,256 @@
+/* The activity surface (components/ActivitySurface.tsx).
+ *
+ * Owner: the activity surface. Imported last by styles/index.css so the
+ * workspace view can be styled without touching library.css or drawer.css;
+ * never reorder the imports in styles/index.css.
+ *
+ * Rule: the state string carries the meaning and colour only accompanies it.
+ * A state this build cannot source reads `UNKNOWN — not reported by this
+ * build` in the muted colour; no row may look healthy because a field is
+ * missing.
+ */
+
+.activity-surface { min-width: 0; }
+
+.activity-note,
+.activity-read-at {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.activity-read-at { margin: 12px 0 0; }
+
+.activity-surface .result-count[data-summary-source="status.get"] {
+  max-width: min(520px, 46vw);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.activity-loading { margin: 18px 0 0; color: var(--muted); font-size: 12px; }
+
+.activity-blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid rgba(221, 169, 82, 0.28);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--gold);
+  background: rgba(61, 45, 20, 0.3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.activity-blocked svg { flex: 0 0 auto; margin-top: 1px; }
+.activity-blocked > div { min-width: 0; display: grid; gap: 3px; }
+.activity-blocked strong { color: var(--ink); font-size: 12px; }
+.activity-blocked small { overflow-wrap: anywhere; font-size: 11px; }
+
+.activity-empty { margin-top: 12px; }
+
+.activity-rows {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.activity-row {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 9px 11px 10px;
+  background: var(--surface-container-low);
+}
+
+.activity-row[data-state="RUNNING"] { border-left-color: var(--blue); }
+.activity-row[data-state="WAITING_APPROVAL"] { border-left-color: var(--gold); }
+.activity-row[data-state="SUCCEEDED"] { border-left-color: var(--health); }
+.activity-row[data-state="FAILED"] { border-left-color: var(--coral); }
+.activity-row[data-state="CANCELLED"] { border-left-color: var(--gold); }
+.activity-row[data-state="NEEDS_RECONCILIATION"] { border-left-color: var(--gold); }
+.activity-row[data-state="UNKNOWN"] { border-left-color: var(--line-strong); }
+
+.activity-row-header { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.activity-row-toggle {
+  flex: 1 1 320px;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 6px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-row-toggle:hover { background: var(--surface-soft); }
+.activity-row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.activity-row-chevron { flex: 0 0 auto; color: var(--quiet); transition: transform 150ms ease; }
+.activity-row-toggle[aria-expanded="true"] .activity-row-chevron { transform: rotate(90deg); }
+
+.activity-state { min-width: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 800; letter-spacing: 0.01em; }
+.activity-state[data-state="QUEUED"] { color: var(--muted); }
+.activity-state[data-state="RUNNING"] { color: var(--blue); }
+.activity-state[data-state="WAITING_APPROVAL"] { color: var(--gold); }
+.activity-state[data-state="SUCCEEDED"] { color: var(--health); }
+.activity-state[data-state="FAILED"] { color: var(--coral); }
+.activity-state[data-state="CANCELLED"] { color: var(--gold); }
+.activity-state[data-state="NEEDS_RECONCILIATION"] { color: var(--gold); }
+.activity-state[data-state="UNKNOWN"] { color: var(--muted); }
+
+.activity-kind {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.activity-job-id {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--quiet);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-row-actions { flex: 0 0 auto; margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+
+.activity-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.activity-row-facts > span { min-width: 0; overflow-wrap: anywhere; }
+.activity-row-facts > span + span { border-left: 1px solid var(--line); padding-left: 12px; }
+
+.activity-running-note,
+.activity-unknown-state,
+.activity-cancellation,
+.activity-cancel-error {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.activity-running-note { color: var(--muted); }
+.activity-unknown-state { color: var(--muted); }
+.activity-cancellation { color: var(--gold); font-weight: 700; }
+.activity-cancel-error { color: var(--coral); }
+
+.activity-reconciliation {
+  display: grid;
+  gap: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.activity-reconciliation-note { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+.activity-plan-read {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.activity-plan-read > span { min-width: 0; overflow-wrap: anywhere; }
+
+.activity-plan-error { margin: 0; overflow-wrap: anywhere; color: var(--coral); font-size: 10px; line-height: 1.5; }
+
+.activity-log {
+  display: grid;
+  gap: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.activity-log-heading { margin: 0; color: var(--ink); font-size: 11px; font-weight: 800; }
+.activity-log-loading,
+.activity-log-empty { margin: 0; color: var(--muted); font-size: 10px; }
+.activity-log-failed { margin: 0; overflow-wrap: anywhere; color: var(--coral); font-size: 10px; line-height: 1.5; }
+
+.activity-log-state { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.activity-log-state[data-state="RUNNING"] { color: var(--blue); }
+.activity-log-state[data-state="FAILED"] { color: var(--coral); }
+.activity-log-state[data-state="CANCELLED"],
+.activity-log-state[data-state="NEEDS_RECONCILIATION"] { color: var(--gold); }
+.activity-log-state[data-state="SUCCEEDED"] { color: var(--health); }
+.activity-log-state[data-state="UNKNOWN"] { color: var(--muted); }
+
+.activity-log-events { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+
+.activity-log-event {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(100px, max-content) minmax(0, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: var(--muted);
+  background: var(--surface-dim);
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.activity-log-sequence { color: var(--quiet); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.activity-log-time { color: var(--quiet); }
+.activity-log-action { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+.activity-log-outcome { color: var(--muted); }
+.activity-log-details {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--quiet);
+  background: transparent;
+  font-size: 10px;
+  white-space: pre-wrap;
+}
+
+.activity-log-tail { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .activity-surface .result-count[data-summary-source="status.get"] { max-width: 100%; text-align: left; }
+  .activity-row-toggle { flex: 1 1 100%; }
+  .activity-row-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+  .activity-log-event { grid-template-columns: 1fr; }
+}
+
+@media (prefers-color-scheme: light) {
+  .activity-row { background: var(--surface); }
+  .activity-kind { background: var(--surface-raised); }
+  .activity-log-event { background: var(--surface-raised); }
+  .activity-blocked { background: rgba(221, 169, 82, 0.1); }
+}

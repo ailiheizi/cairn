@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/ailiheizi/restoreweave/client/command"
@@ -21,6 +22,75 @@ type jobCancelInput struct {
 	WorkspaceID string `json:"workspace_id"`
 	JobID       string `json:"job_id"`
 	JobRef      string `json:"job_ref"`
+}
+
+type jobListInput struct {
+	WorkspaceID string `json:"workspace_id,omitempty"`
+	Limit       int    `json:"limit,omitempty"`
+}
+
+// handleJobList is the bounded read of durable job rows. It reuses the same
+// newest-first projection as status.get and never mutates a job. A workspace
+// filter narrows the newest rows selected by limit; it never widens the bound.
+func (d *Dispatcher) handleJobList(ctx context.Context, env command.Envelope, started time.Time) command.Result {
+	var input jobListInput
+	if len(env.Input) > 0 {
+		if err := decodeInput(env.Input, &input); err != nil {
+			return invalidInputResult(env, started, err)
+		}
+	}
+	if strings.TrimSpace(input.WorkspaceID) != "" {
+		if err := requireStableID("workspace_id", input.WorkspaceID); err != nil {
+			return invalidInputResult(env, started, err)
+		}
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = 20
+	}
+	if limit < 1 || limit > 100 {
+		return invalidInputResult(env, started, errString("limit must be between 1 and 100"))
+	}
+	jobs, err := d.store.ListRecentJobs(ctx, limit)
+	if err != nil {
+		return catalogErrorResult(env, started, err)
+	}
+	summaries := make([]command.JobSummary, 0, len(jobs))
+	for _, job := range jobs {
+		if input.WorkspaceID != "" && job.WorkspaceID != input.WorkspaceID {
+			continue
+		}
+		summaries = append(summaries, projectJobSummary(job))
+	}
+	return succeeded(env, started, command.JobListData{Jobs: summaries})
+}
+
+// projectJobSummary projects only recorded job columns. An absent error_code
+// stays absent: it is not a claim that the job succeeded.
+func projectJobSummary(job sqlite.Job) command.JobSummary {
+	return command.JobSummary{
+		JobID:             job.ID,
+		WorkspaceID:       job.WorkspaceID,
+		PlanID:            job.PlanID,
+		Kind:              job.Kind,
+		State:             string(job.State),
+		Attempt:           job.Attempt,
+		MaxAttempts:       job.MaxAttempts,
+		ErrorCode:         job.ErrorCode,
+		CheckpointPresent: jobCheckpointPresent(job.Checkpoint),
+		UpdatedAt:         job.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// jobCheckpointPresent is a hint only. The catalog normalizes an absent
+// checkpoint to an empty object, so nothing beyond that default is reported
+// as recorded progress.
+func jobCheckpointPresent(checkpoint json.RawMessage) bool {
+	switch strings.TrimSpace(string(checkpoint)) {
+	case "", "{}", "null":
+		return false
+	}
+	return true
 }
 
 func (d *Dispatcher) handleJobEvents(ctx context.Context, env command.Envelope, started time.Time) command.Result {

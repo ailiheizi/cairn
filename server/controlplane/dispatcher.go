@@ -242,6 +242,7 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		command.OpPlanAbandon:        true,
 		command.OpJobEvents:          true,
 		command.OpJobCancel:          true,
+		command.OpJobList:            true,
 		command.OpDescriptionList:    true,
 		command.OpDescriptionGet:     true,
 		command.OpDescriptionCreate:  true,
@@ -421,6 +422,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleJobEvents(ctx, env, started)
 	case command.OpJobCancel:
 		return d.handleJobCancel(ctx, env, started)
+	case command.OpJobList:
+		return d.handleJobList(ctx, env, started)
 	case command.OpDescriptionList:
 		return d.handleDescriptionList(ctx, env, started)
 	case command.OpDescriptionGet:
@@ -504,13 +507,23 @@ func (d *Dispatcher) handleStatusGet(ctx context.Context, env command.Envelope, 
 	if err := d.store.Ping(ctx); err != nil {
 		catalogOK = false
 	}
+	catalog := command.CatalogStatus{
+		Path: d.catalogPath,
+		OK:   catalogOK,
+	}
+	// The schema ledger is read unconditionally: an unreachable catalog
+	// reports UNKNOWN with the read error instead of an omitted fact that
+	// could be mistaken for a healthy schema.
+	schema := d.store.SchemaStatus(ctx)
+	catalog.SchemaVersion = schema.Version
+	catalog.SchemaMigration = schema.Name
+	catalog.SchemaState = schema.State
+	catalog.SchemaReason = schema.Reason
+	catalog.SchemaBinaryVersion = schema.BinaryVersion
 	data := command.StatusData{
 		Controller:   "restoreweaved",
 		ConfigDigest: d.configDigest,
-		Catalog: command.CatalogStatus{
-			Path: d.catalogPath,
-			OK:   catalogOK,
-		},
+		Catalog:      catalog,
 		Identify: command.IdentifyStatus{
 			ID:          IdentifyBuiltinID,
 			RulesDigest: identify.RulesDigest(),
@@ -544,16 +557,27 @@ func (d *Dispatcher) handleStatusGet(ctx context.Context, env command.Envelope, 
 	if jobs, err := d.store.ListRecentJobs(ctx, 8); err == nil {
 		recent := make([]command.JobSummary, 0, len(jobs))
 		for _, job := range jobs {
-			recent = append(recent, command.JobSummary{
-				JobID:       job.ID,
-				WorkspaceID: job.WorkspaceID,
-				PlanID:      job.PlanID,
-				Kind:        job.Kind,
-				State:       string(job.State),
-				UpdatedAt:   job.UpdatedAt.UTC().Format(time.RFC3339),
-			})
+			recent = append(recent, projectJobSummary(job))
 		}
 		data.RecentJobs = recent
+	}
+	// Index states are read-only projections of rebuildable generations. A
+	// workspace without a published generation stays NOT_BUILT or UNAVAILABLE;
+	// it is never folded into a catalog-wide healthy claim.
+	if workspaces, err := d.store.ListWorkspaces(ctx); err == nil {
+		index := make([]command.IndexStatusData, 0, len(workspaces))
+		for _, workspace := range workspaces {
+			states := d.indexDimensionStates(ctx, workspace.ID)
+			index = append(index, command.IndexStatusData{
+				WorkspaceID:    workspace.ID,
+				Lexical:        states.lexicalState,
+				Semantic:       states.semanticState,
+				SemanticReason: states.semanticReason,
+			})
+		}
+		if len(index) > 0 {
+			data.Index = index
+		}
 	}
 	if d.sessions != nil {
 		data.ReapedHandles = d.sessions.sweep(time.Now())
@@ -581,6 +605,13 @@ func (d *Dispatcher) handleStatusGet(ctx context.Context, env command.Envelope, 
 				repo.CapacityReason = healthErr.Error()
 			}
 		}
+		// Writability is a live zero-byte probe over the repository root. It
+		// is deliberately separate from repository.OK: an exact read or
+		// restore can still succeed against a read-only repository.
+		writability := probeRepositoryWritability(d.exact.Repo.Root(), d.now())
+		repo.Writable = writability.State
+		repo.WritableReason = writability.Reason
+		repo.WritableCheckedAt = writability.CheckedAt.Format(time.RFC3339)
 		if manifests, err := d.exact.ListSnapshots(ctx); err != nil {
 			repo.OK = false
 		} else {
@@ -746,41 +777,65 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 	})
 }
 
-// contentIndexStatuses reads only rebuildable projections. It never creates
-// or updates index state, and a missing projection is reported explicitly.
-func (d *Dispatcher) contentIndexStatuses(ctx context.Context, workspaceID string, entries []sqlite.NamespaceEntry) (map[string]*command.ContentIndexStatus, error) {
-	statuses := make(map[string]*command.ContentIndexStatus, len(entries))
-	lexicalBySubject := map[string]struct{}{}
-	lexicalState := "NOT_BUILT"
+// indexDimensionStates computes the lexical and semantic discovery state for
+// one workspace. Per-item index status and the status.get index summary share
+// this one implementation so they cannot drift apart. A missing generation
+// stays NOT_BUILT and a broken or failed provider stays UNAVAILABLE with its
+// recorded reason; neither is ever folded into READY.
+type indexDimensionStates struct {
+	lexicalBySubject  map[string]struct{}
+	lexicalState      string
+	semanticBySubject map[string]struct{}
+	semanticState     string
+	semanticReason    string
+}
+
+func (d *Dispatcher) indexDimensionStates(ctx context.Context, workspaceID string) indexDimensionStates {
+	states := indexDimensionStates{
+		lexicalBySubject:  map[string]struct{}{},
+		lexicalState:      "NOT_BUILT",
+		semanticBySubject: map[string]struct{}{},
+		semanticState:     "UNAVAILABLE",
+	}
 	if d.search != nil && d.search.LexicalUnavailableForWorkspace(workspaceID) {
-		lexicalState = "UNAVAILABLE"
+		states.lexicalState = "UNAVAILABLE"
 	} else if generation, generationErr := d.store.LatestIndexGeneration(ctx, workspaceID, search.DimensionLexical); generationErr == nil {
 		if covered, err := search.LexicalSubjectCoverage(ctx, generation); err == nil {
-			lexicalBySubject, lexicalState = covered, "READY"
+			states.lexicalBySubject, states.lexicalState = covered, "READY"
 		} else {
-			lexicalState = "UNAVAILABLE"
+			states.lexicalState = "UNAVAILABLE"
 		}
 	} else if !errors.Is(generationErr, sqlite.ErrNotFound) {
-		lexicalState = "UNAVAILABLE"
+		states.lexicalState = "UNAVAILABLE"
 	}
-	semanticBySubject := map[string]struct{}{}
-	semanticState := "UNAVAILABLE"
 	if d.search != nil {
 		if covered, err := d.search.SemanticSubjectCoverage(ctx, workspaceID); err == nil {
-			semanticBySubject, semanticState = covered, "READY"
+			states.semanticBySubject, states.semanticState = covered, "READY"
 		} else if errors.Is(err, sqlite.ErrNotFound) {
 			// The provider/backend is present, but no generation has been
 			// published yet. Keep this distinct from a broken or unavailable
 			// provider so the operator can tell "not analysed" from "failed".
-			if strings.TrimSpace(d.search.SemanticFailure()) != "" {
-				semanticState = "UNAVAILABLE"
+			if failure := strings.TrimSpace(d.search.SemanticFailure()); failure != "" {
+				states.semanticState = "UNAVAILABLE"
+				states.semanticReason = failure
 			} else {
-				semanticState = "NOT_BUILT"
+				states.semanticState = "NOT_BUILT"
 			}
 		} else {
-			semanticState = "UNAVAILABLE"
+			states.semanticState = "UNAVAILABLE"
+			states.semanticReason = err.Error()
 		}
 	}
+	return states
+}
+
+// contentIndexStatuses reads only rebuildable projections. It never creates
+// or updates index state, and a missing projection is reported explicitly.
+func (d *Dispatcher) contentIndexStatuses(ctx context.Context, workspaceID string, entries []sqlite.NamespaceEntry) (map[string]*command.ContentIndexStatus, error) {
+	statuses := make(map[string]*command.ContentIndexStatus, len(entries))
+	states := d.indexDimensionStates(ctx, workspaceID)
+	lexicalBySubject, lexicalState := states.lexicalBySubject, states.lexicalState
+	semanticBySubject, semanticState := states.semanticBySubject, states.semanticState
 	annotations, err := d.store.ListAnnotations(ctx, workspaceID, "", false)
 	if err != nil {
 		return nil, err

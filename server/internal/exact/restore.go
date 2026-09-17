@@ -299,5 +299,6 @@ func requireLocallyRestorable(manifest Manifest) error {
 	if len(unavailable) > 3 {
 		preview = strings.Join(unavailable[:3], ", ") + fmt.Sprintf(" and %d more", len(unavailable)-3)
 	}
-	return fmt.Errorf("%w: snapshot has %d file(s) without local exact recovery: %s", ErrBlocked, len(unavailable), preview)
+	return fmt.Errorf("%w: %w: snapshot has %d file(s) without local exact recovery: %s",
+		ErrBlocked, ErrVerificationUnavailable, len(unavailable), preview)
 }

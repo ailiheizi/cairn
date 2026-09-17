@@ -1,6 +1,6 @@
 # Remaining Work and Closed Decisions
 
-> **Status:** Informative checkout record, updated 2026-08-25. The normative
+> **Status:** Informative checkout record, updated 2026-09-17. The normative
 > requirements and [Core MVP Execution Plan](core-mvp-execution-plan.md) remain
 > authoritative. This file summarizes the current frontier; it cannot add
 > scope, qualify a release, or select a repository engine.
@@ -96,9 +96,10 @@ MVP work; reachability stays `NON_DESTRUCTIVE_ONLY`.
 host-provided key references, wrong/missing-key rejection, encrypted readback,
 relocation, and key-rotation copy-forward evidence. A real pre-publication
 process-crash test now proves target non-publication, retry, independent
-source/target clean-reader reopening, and old/wrong-key rejection. It is not
-admitted by the persisted config or daemon, and does not close encryption
-release qualification.
+source/target clean-reader reopening, and old/wrong-key rejection. Persisted
+config and the daemon now name-reject this profile rather than treating it as a
+generic unknown tuple. It is not admitted and does not close encryption release
+qualification.
 
 ## 5. Near-term release work
 
@@ -113,8 +114,9 @@ release qualification.
    repair, relocation, migration, rollback, clean-reader, capacity, and net
    savings gates pass. The qualification runner now accepts a reviewed,
    operator-supplied corpus manifest and verifies every path, length, and
-   SHA-256 before an engine is opened; the checkout still has no representative
-   operator corpus or cross-platform evidence.
+   SHA-256 before an engine is opened. The same manifest can now bind both
+   in-tree raw/zstd measurements to identical input bytes; the checkout still
+   has no representative operator corpus or cross-platform evidence.
 3. **Complete operator experience:** expose configuration, diagnostics,
    SavedViews, ExportManifests, backup, upgrade, and recovery guidance without
    requiring internal IDs in the ordinary browser flow.
@@ -171,3 +173,63 @@ indexes into the current default profile.
 
 A fixture, interface, test handshake, or provisioned local component is not a
 supported installer or a production-qualified release by itself.
+
+## 9. Deferred external integration boundary (informative)
+
+This section is informative only. It records a boundary the operator raised; it
+adds no MVP scope, reorders no phase, authorizes no LinkGroup or adapter work,
+and awards no completion credit.
+
+Operators have asked for RestoreWeave content to reach Salt Player, common NAS
+playback surfaces, Kazumi, and Animeko. These are external tools, not core
+scope. [docs/README.md](../README.md) states the governing rule verbatim:
+"External tools may present a materialized export or authorized read stream;
+they are not RestoreWeave storage or plugin interface families." The excluded
+surfaces already recorded in section 7 above (lines 157-158: embedded players,
+readers, or media applications; automatic external reacquisition or autonomous
+source deletion) and in the `AGENTS.md` excluded-surface list apply unchanged.
+
+Such a tool may only consume a materialized export or an authorized read
+stream. RestoreWeave MUST NOT grow a media server, DLNA/UPnP, SMB/NFS/WebDAV/S3
+gateway, transcoder, embedded player, scraper, torrent, or automatic
+reacquisition surface to serve one.
+
+Any external handoff depends on three prerequisites that are not closed by
+recording this note:
+
+1. **Durable, digest-stable sidecar policy.** The frozen `ExportManifest`
+   digest already covered the requested sidecar policy, but the catalog
+   projection did not persist it, so a manifest planned with a non-empty policy
+   failed later apply and verify with a conflicting digest. That persistence
+   defect is fixed: the policy is stored, read back on every manifest path, and
+   passed into the rebuilt manifest, so the digest now survives a store reopen.
+   The frozen digest field set is unchanged.
+2. **Minimal file-only `LinkGroup`.** Per the Core MVP Execution Plan, Phase 6
+   supplies the minimal `LinkGroup`, and per `AGENTS.md` it may not be
+   implemented before the Phase 4 and Phase 5 gates close. An album or series
+   handoff is maintainable only when it follows a stable group membership that
+   is frozen into a fresh manifest as the group changes, instead of a one-shot
+   ad-hoc selection that a later rescan cannot reproduce.
+3. **Explicit export output-naming and collision policy.** The reviewed policy
+   now exists for the legacy flat-output export v1 path. `export.plan` honors a
+   supplied `output_name` when the frozen set is exactly one regular file (the
+   value is trimmed and must already be a safe single destination-relative
+   component; a blank, separated, or traversal value fails as `invalid_input`),
+   rejects a single `output_name` for a multi-file selection with an explicit
+   reason instead of silently ignoring it, and disambiguates repeated base
+   names deterministically as `clip.mkv`, `clip (2).mkv`, `clip (3).mkv` (or
+   `notes`, `notes (2)`) in ascending subject-reference order, so planning the
+   same set always freezes the same names and the same frozen item set.
+   Collision grouping is case-insensitive because destination filesystems
+   (macOS, Windows, and most NAS SMB shares) may not be able to hold
+   `Clip.mkv` and `clip.mkv` at once. Unicode NFC/NFD normalization is still
+   out of scope and remains a recorded limitation, and the policy stays
+   single-component and snapshot-local, so it does not anticipate the Phase 6
+   `ExportManifest` successor. An external tool that must place dozens of files
+   predictably can now rely on the frozen layout, but this closes only the
+   naming prerequisite; the LinkGroup and qualified-repository prerequisites
+   above remain open.
+
+Season/episode or album/artist hierarchies are richer Collections. They remain
+deferred and are not the minimal `LinkGroup`; they require a separately
+admitted profile.

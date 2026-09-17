@@ -1,0 +1,184 @@
+import type { Locale, Translator } from "../i18n";
+import type { BrowseRoot, SearchHit, SearchSegment, SortDirection, SortField } from "./types";
+
+// Pure presentation and listing helpers.
+//
+// Everything here is a deterministic function of its arguments: no daemon
+// call, no browser storage, no React state. Surfaces call these to render or
+// order a value; none of the rules below belong to a single surface.
+
+export function formatBytes(value: number) {
+  if (!value) return "0 B";
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let scaled = value;
+  let unit = -1;
+  while (scaled >= 1024 && unit < units.length - 1) { scaled /= 1024; unit += 1; }
+  return `${scaled.toFixed(1)} ${units[unit]}`;
+}
+
+export function formatNoteDate(value: string | undefined, locale: Locale, t: Translator) { if (!value) return t("Saved"); const date = new Date(value); return Number.isNaN(date.getTime()) ? t("Saved") : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date); }
+export function formatDateTime(value: string, locale: Locale, t: Translator) { const date = new Date(value); return Number.isNaN(date.getTime()) ? t("Not recorded") : new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date); }
+
+export function formatEntryType(value: string | undefined, t: Translator) { return t(value ? value.replaceAll("_", " ") : "FILE"); }
+export function formatDedupFacet(value: string, t: Translator) { return t(value === "DUPLICATE" ? "Duplicate content" : "Unique content"); }
+export function looksLikeRemoteLocator(value: string) { return /^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()); }
+
+// Search provenance can contain extracted or generated text close to the
+// backend's payload limit. Keep the browser projection small while retaining
+// the complete segment in the API response and its immutable identifiers.
+export const MATCHED_TEXT_PREVIEW_CODE_POINTS = 280;
+export function previewUnicodeText(value: string | undefined, limit = MATCHED_TEXT_PREVIEW_CODE_POINTS) {
+  const text = value?.trim() ?? "";
+  const codePointLimit = Math.max(1, Math.floor(limit));
+  const codePoints = Array.from(text);
+  return codePoints.length > codePointLimit ? `${codePoints.slice(0, codePointLimit).join("")}…` : text;
+}
+
+export function descriptionKindLabel(kind: string | undefined, t: Translator) {
+  const normalized = kind?.trim().toUpperCase();
+  const labels: Record<string, string> = {
+    USER: "User note",
+    IMPORTED: "Imported note",
+    EXTRACTED: "Extracted note",
+    AI_SUMMARY: "AI note",
+    AI_ANALYSIS: "AI note",
+  };
+  if (normalized && labels[normalized]) return t(labels[normalized]);
+  return normalized ? `${t("Unknown note type")}: ${normalized}` : t("Note source unavailable");
+}
+
+export function searchSegmentSourceLabel(segment: SearchSegment, t: Translator) {
+  const sourceType = segment.source_type?.trim().toUpperCase();
+  const kind = segment.kind?.trim().toUpperCase();
+  if (sourceType === "ANNOTATION" && kind === "NOTE") return t("User note");
+  if (sourceType === "ARTIFACT" && kind === "EXTRACT") return t("Extracted content");
+  if (sourceType === "DESCRIPTION") return descriptionKindLabel(kind, t);
+  if (sourceType === "FILENAME" || kind === "FILENAME") return t("Filename");
+  const rawLabel = [segment.source_type?.trim(), segment.kind?.trim()].filter(Boolean).join(" / ");
+  return rawLabel || t("Matched segment");
+}
+
+export function searchSegmentMetadata(segment: SearchSegment, t: Translator) {
+  const metadata: string[] = [];
+  if (segment.producer?.trim()) metadata.push(`${t("Producer")}: ${segment.producer.trim()}`);
+  if (segment.language?.trim()) metadata.push(`${t("Language")}: ${segment.language.trim()}`);
+  if (typeof segment.accepted === "boolean") metadata.push(segment.accepted ? t("Accepted") : t("Not accepted"));
+  return metadata;
+}
+
+export function formatFacetValue(hit: SearchHit) {
+  if (hit.entry_type === "DIRECTORY" || hit.entry_type === "SYMLINK") return "";
+  const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "";
+}
+
+export function exactIdentityKey(hit: SearchHit) {
+  const contentID = hit.content_id?.trim();
+  return contentID && hit.logical_size != null ? JSON.stringify([contentID, hit.logical_size]) : "";
+}
+
+export function dedupFacetValue(hit: SearchHit, identityCounts: Map<string, number>) {
+  const key = exactIdentityKey(hit);
+  if (!key) return "";
+  return (identityCounts.get(key) ?? 0) > 1 ? "DUPLICATE" : "UNIQUE";
+}
+
+// The library listing already contains the complete publication set, so the
+// whole ordering happens here instead of asking the daemon for a sort. Unknown
+// logical sizes (folders, unmeasured entries) sort after every known size in
+// both directions, and equal keys fall back to the locale-aware name order so
+// the rendered order is deterministic.
+export function sortableName(hit: SearchHit) { return hit.name?.trim() || hit.path?.split(/[\\/]/).at(-1)?.trim() || ""; }
+export function sortableSize(hit: SearchHit) { return typeof hit.logical_size === "number" && Number.isSafeInteger(hit.logical_size) && hit.logical_size >= 0 ? hit.logical_size : null; }
+
+export function sortLibraryHits(hits: SearchHit[], field: SortField, direction: SortDirection, locale: Locale) {
+  const collator = (left: string, right: string) => left.localeCompare(right, locale, { numeric: true, sensitivity: "base" });
+  const comparePrimary = (left: SearchHit, right: SearchHit) => {
+    if (field === "size") {
+      const leftSize = sortableSize(left);
+      const rightSize = sortableSize(right);
+      // Entries without a logical size stay last in both directions.
+      if (leftSize === null || rightSize === null) return leftSize === rightSize ? 0 : leftSize === null ? 1 : -1;
+      return leftSize === rightSize ? 0 : leftSize < rightSize ? -1 : 1;
+    }
+    const value = (hit: SearchHit) => field === "name" ? sortableName(hit) : field === "type" ? (hit.entry_type ?? "") : (hit.path?.trim() || sortableName(hit));
+    return collator(value(left), value(right));
+  };
+  return [...hits].sort((left, right) => {
+    const primary = comparePrimary(left, right);
+    if (primary !== 0) return direction === "asc" ? primary : -primary;
+    // Equal keys keep a deterministic, locale-aware name order that follows the
+    // requested direction, so toggling it always visibly reorders the tiles.
+    const byName = collator(sortableName(left), sortableName(right));
+    return direction === "asc" ? byName : -byName;
+  });
+}
+
+// Arrow Up/Down move by one visual row, and the grid is fluid: the rendered
+// column count is measured from the tiles themselves rather than assumed. List
+// mode renders one tile per row, so the same measurement returns one.
+export function renderedColumnCount(container: HTMLElement | null) {
+  if (!container) return 1;
+  const tiles = Array.from(container.querySelectorAll<HTMLElement>("[data-result-index]"));
+  if (tiles.length < 2) return 1;
+  const firstRowTop = tiles[0].offsetTop;
+  return Math.max(1, tiles.filter((tile) => tile.offsetTop === firstRowTop).length);
+}
+
+export function formatSourceKind(value: string | undefined, t: Translator) { return t(value === "LOCAL_TREE" ? "Local folder" : value || "Source"); }
+export function formatSourceState(value: string | undefined, t: Translator) {
+  const labels: Record<string, string> = { ACTIVE: "Active", DECOMMISSIONED: "Decommissioned", LOST: "Lost", QUARANTINED: "Quarantined", PLANNED: "Planned" };
+  return t(labels[value ?? ""] ?? "Not recorded");
+}
+export function formatReachability(value: string | undefined, t: Translator) { return t(value === "AVAILABLE" ? "Available now" : value === "UNAVAILABLE" ? "Not reachable now" : "Access unknown"); }
+export function formatReachabilityMessage(value: string, t: Translator) {
+  const known: Record<string, string> = {
+    "source path is not accessible": "Source path is not accessible.",
+    "source path is not a directory": "Source path is not a directory.",
+  };
+  return t(known[value] ?? "Source access could not be checked.");
+}
+export function formatScanState(value: string | undefined, t: Translator) {
+  const labels: Record<string, string> = { PLANNED: "Scan planned", RUNNING: "Scan in progress", COMPLETE: "Scan complete", INCOMPLETE: "Scan incomplete", FAILED: "Scan failed", CANCELLED: "Scan cancelled" };
+  return t(labels[value ?? ""] ?? "No scan recorded");
+}
+
+// A path root is labelled by its name, and only duplicate names are
+// disambiguated by the shortest unique trailing path suffix.
+export function sourceButtonLabel(root: BrowseRoot, roots: BrowseRoot[], t: Translator) {
+  const name = root.name?.trim() || t("Source path");
+  const duplicateRoots = roots.filter((other) => (other.name?.trim() || t("Source path")) === name);
+  const duplicateName = duplicateRoots.length > 1;
+  if (!duplicateName) return name;
+  const path = root.source_path?.trim();
+  if (!path) return `${name} · ${t("Source path")}`;
+  const parts = path.split(/[\\/]+/).filter(Boolean);
+  for (let depth = 2; depth <= parts.length; depth += 1) {
+    const suffix = parts.slice(-depth).join("/");
+    const matches = duplicateRoots.filter((other) => {
+      const otherParts = other.source_path?.trim().split(/[\\/]+/).filter(Boolean) ?? [];
+      return otherParts.slice(-depth).join("/") === suffix;
+    });
+    if (matches.length === 1) return suffix;
+  }
+  return path;
+}
+
+export function deriveSystemTags(hit: SearchHit) {
+  const result: string[] = [];
+  if (hit.entry_type) result.push(`type:${hit.entry_type.toLowerCase()}`);
+  const name = hit.name || hit.path?.split("/").at(-1) || "";
+  const dot = name.lastIndexOf(".");
+  if (dot > 0 && dot < name.length - 1) result.push(`format:${name.slice(dot + 1).toLowerCase()}`);
+  return result;
+}
+
+// A frozen manifest id stays fully available through the row title and
+// aria-label; the visible form only shortens the stable-id payload.
+export function shortManifestID(value: string | undefined) {
+  const id = (value ?? "").trim();
+  if (!id) return "—";
+  return id.length > 24 ? `${id.slice(0, 22)}…` : id;
+}

@@ -28,9 +28,10 @@ The core owns durable identity, policy, transactions, provenance, verification, 
 12. [Remaining Work and Closed Decisions](technical/remaining-work-and-closed-decisions.md) records current status and decisions that must not be reopened.
 13. [Implementation Completion Plan](technical/implementation-completion-plan.md) is a host/platform and repository-qualification record; it cannot reorder the core plan.
 14. [NAS Vertical Slice Implementation Plan](technical/nas-vertical-slice-implementation-plan.md) preserves earlier slice detail but cannot reorder the core plan.
-15. [Experience Completion Plan](technical/experience-completion-plan.md), [Index Dimension Plan](technical/index-dimension-plan.md), [Foreign App Jobs](technical/foreign-app-jobs.md), and [Tool-Core Wedge Plan](technical/tool-core-wedge-plan.md) are optional adapter, fixture, or ecosystem history. They do not add requirements or completion credit.
-16. [Whole-Architecture Open-Source Reference](technical/architecture-open-source-reference.md) records how each layer may consume open source without changing durable contracts.
-17. [Ecosystem and Vertical Applications](requirements/ecosystem-and-vertical-apps.md) and [Ecosystem App Interface](technical/ecosystem-app-interface.md) define later bounded domain experiences over the same data plane.
+15. [WebUI Architecture](technical/webui-architecture.md) is the informative module map, ownership rules, and surface checklist of the browser client. It cannot add product scope or a daemon operation.
+16. [Experience Completion Plan](technical/experience-completion-plan.md), [Index Dimension Plan](technical/index-dimension-plan.md), [Foreign App Jobs](technical/foreign-app-jobs.md), and [Tool-Core Wedge Plan](technical/tool-core-wedge-plan.md) are optional adapter, fixture, or ecosystem history. They do not add requirements or completion credit.
+17. [Whole-Architecture Open-Source Reference](technical/architecture-open-source-reference.md) records how each layer may consume open source without changing durable contracts.
+18. [Ecosystem and Vertical Applications](requirements/ecosystem-and-vertical-apps.md) and [Ecosystem App Interface](technical/ecosystem-app-interface.md) define later bounded domain experiences over the same data plane.
 
 ## MVP-defining requirements
 

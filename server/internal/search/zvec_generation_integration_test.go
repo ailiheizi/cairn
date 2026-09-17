@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,6 +27,10 @@ func TestZvecGenerationLifecycle(t *testing.T) {
 	digest := sha256.Sum256(payload)
 	spec := ZvecGenerationSpec{Path: filepath.Join(t.TempDir(), "generation"), LibraryPath: libraryPath, LibraryDigest: "sha256:" + hex.EncodeToString(digest[:]), Manifest: manifest, ProfileDigest: manifest.CanonicalDigest()}
 	driver := NewZvecGenerationDriver(libraryPath)
+	readiness, ok := driver.(ZvecGenerationReadiness)
+	if !ok || !readiness.ZvecReady(libraryPath, spec.LibraryDigest, manifest) {
+		t.Fatal("native zvec readiness probe failed")
+	}
 	segments := []ZvecSegment{
 		{SubjectID: "subject-a", SegmentID: "segment-a", Vector: []float32{1, 0, 0, 0}},
 		{SubjectID: "subject-b", SegmentID: "segment-b", Vector: []float32{0, 1, 0, 0}},
@@ -129,6 +134,54 @@ func TestZvecGenerationLifecycle(t *testing.T) {
 	relocated.Path = relocatedPath
 	if _, err := driver.Open(context.Background(), relocated); !errors.Is(err, ErrZvecUnavailable) {
 		t.Fatalf("relocated path error = %v, want ErrZvecUnavailable", err)
+	}
+}
+
+func TestZvecReadinessBindsExplicitLibraryBeforeAmbientLoad(t *testing.T) {
+	const helperEnv = "RESTOREWEAVE_ZVEC_EXPLICIT_BINDING_HELPER"
+	libraryPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	if libraryPath == "" {
+		t.Skip("RESTOREWEAVE_ZVEC_LIBRARY is required for the opt-in native test")
+	}
+	if os.Getenv(helperEnv) != "1" {
+		payload, err := os.ReadFile(libraryPath)
+		if err != nil {
+			t.Fatalf("read native library: %v", err)
+		}
+		ambient := filepath.Join(t.TempDir(), "ambient-zvec.dylib")
+		if err := os.WriteFile(ambient, payload, 0o500); err != nil {
+			t.Fatalf("write ambient native library: %v", err)
+		}
+		cmd := exec.Command(os.Args[0], "-test.run", "^TestZvecReadinessBindsExplicitLibraryBeforeAmbientLoad$", "-test.v")
+		env := make([]string, 0, len(os.Environ())+2)
+		for _, value := range os.Environ() {
+			if strings.HasPrefix(value, "ZVEC_LIBRARY_PATH=") {
+				continue
+			}
+			env = append(env, value)
+		}
+		env = append(env, helperEnv+"=1", "ZVEC_LIBRARY_PATH="+ambient)
+		cmd.Env = env
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("explicit binding subprocess: %v\n%s", err, output)
+		}
+		return
+	}
+	manifest := testZvecManifest()
+	payload, err := os.ReadFile(libraryPath)
+	if err != nil {
+		t.Fatalf("read native library in helper: %v", err)
+	}
+	digest := sha256.Sum256(payload)
+	spec := ZvecGenerationSpec{Path: filepath.Join(t.TempDir(), "generation"), LibraryPath: libraryPath, LibraryDigest: "sha256:" + hex.EncodeToString(digest[:]), Manifest: manifest, ProfileDigest: manifest.CanonicalDigest()}
+	driver := NewZvecGenerationDriver(libraryPath)
+	readiness, ok := driver.(ZvecGenerationReadiness)
+	if !ok || !readiness.ZvecReady(libraryPath, spec.LibraryDigest, manifest) {
+		t.Fatal("explicit native zvec readiness probe failed with ambient candidate")
+	}
+	if _, err := driver.Build(context.Background(), spec, []ZvecSegment{{SubjectID: "subject-explicit", SegmentID: "segment-explicit", Vector: []float32{1, 0, 0, 0}}}); err != nil {
+		t.Fatalf("build after explicit readiness probe: %v", err)
 	}
 }
 

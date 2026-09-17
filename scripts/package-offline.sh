@@ -94,7 +94,7 @@ hash_file() {
 # semantic archive is placed beside it. Go BuildInfo provides an auditable
 # admission check for the build tag, pinned dependency, and target platform.
 go_cmd="$(command -v go || true)"
-[[ -n "$go_cmd" ]] || { echo "error: Go is required to inspect daemon BuildInfo" >&2; exit 2; }
+[[ -n "$go_cmd" ]] || { echo "error: Go is required to inspect binary BuildInfo" >&2; exit 2; }
 daemon_build_info="$($go_cmd version -m "$daemon_bin" 2>/dev/null)" || { echo "error: daemon has no readable Go BuildInfo" >&2; exit 2; }
 daemon_main_path="$(printf '%s\n' "$daemon_build_info" | awk '$1 == "path" { print $2; exit }')"
 [[ "$daemon_main_path" == "github.com/ailiheizi/restoreweave/server/cmd/restoreweaved" ]] || { echo "error: daemon BuildInfo main path is not restoreweaved" >&2; exit 2; }
@@ -115,6 +115,26 @@ daemon_goarch="$(printf '%s\n' "$daemon_build_info" | awk -F= '$1 ~ /\tbuild\tGO
 [[ "$daemon_goos" =~ ^[A-Za-z0-9._+-]+$ && "$daemon_goarch" =~ ^[A-Za-z0-9._+-]+$ ]] || { echo "error: daemon platform metadata is not a safe token" >&2; exit 2; }
 [[ "$daemon_goos" == "$target_os" && "$daemon_goarch" == "$target_arch" ]] || {
   echo "error: daemon platform ${daemon_goos}/${daemon_goarch} does not match requested ${target_os}/${target_arch}" >&2
+  exit 2
+}
+
+# Validate the companion CLI independently: an executable bit alone also
+# admits scripts, unrelated programs, and binaries for a different host.
+# Inspect BuildInfo without executing an input binary on the packaging host.
+cli_build_info="$($go_cmd version -m "$rw_bin" 2>/dev/null)" || { echo "error: CLI has no readable Go BuildInfo" >&2; exit 2; }
+cli_main_path="$(printf '%s\n' "$cli_build_info" | awk '$1 == "path" { print $2; exit }')"
+[[ "$cli_main_path" == "github.com/ailiheizi/restoreweave/client/cmd/rw" ]] || { echo "error: CLI BuildInfo main path is not rw" >&2; exit 2; }
+cli_go_version="$(printf '%s\n' "$cli_build_info" | sed -n '1s/.*: //p')"
+[[ "$cli_go_version" =~ ^go[0-9]+\.[0-9]+(\.[0-9]+)?([a-z0-9._+-]*)$ ]] || { echo "error: CLI Go version is not a safe token" >&2; exit 2; }
+cli_goos="$(printf '%s\n' "$cli_build_info" | awk -F= '$1 ~ /\tbuild\tGOOS/ { print $2; exit }')"
+cli_goarch="$(printf '%s\n' "$cli_build_info" | awk -F= '$1 ~ /\tbuild\tGOARCH/ { print $2; exit }')"
+[[ "$cli_goos" =~ ^[A-Za-z0-9._+-]+$ && "$cli_goarch" =~ ^[A-Za-z0-9._+-]+$ ]] || { echo "error: CLI platform metadata is not a safe token" >&2; exit 2; }
+[[ "$cli_goos" == "$target_os" && "$cli_goarch" == "$target_arch" ]] || {
+  echo "error: CLI platform ${cli_goos}/${cli_goarch} does not match requested ${target_os}/${target_arch}" >&2
+  exit 2
+}
+[[ "$cli_goos" == "$daemon_goos" && "$cli_goarch" == "$daemon_goarch" ]] || {
+  echo "error: CLI platform ${cli_goos}/${cli_goarch} does not match daemon ${daemon_goos}/${daemon_goarch}" >&2
   exit 2
 }
 
@@ -151,6 +171,7 @@ cat >"$root/manifest.json" <<EOF
   "version": "${version}",
   "platform": {"os": "${target_os}", "arch": "${target_arch}"},
   "daemon_build": {"main_path": "${daemon_main_path}", "go_version": "${daemon_go_version}", "goos": "${daemon_goos}", "goarch": "${daemon_goarch}", "build_tags": "${daemon_tags}", "zvec_go": {"module": "${zvec_module}", "version": "${zvec_version}", "sum": "${zvec_sum}", "commit": "${zvec_commit}"}},
+  "cli_build": {"main_path": "${cli_main_path}", "go_version": "${cli_go_version}", "goos": "${cli_goos}", "goarch": "${cli_goarch}"},
   "semantic_archive_sha256": "sha256:${archive_digest}",
   "layout": {"daemon": "bin/restoreweaved", "cli": "bin/rw", "web": "web/dist", "semantic": "semantic/semantic-bundle.tar.gz"}
 }

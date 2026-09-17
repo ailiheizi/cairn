@@ -1,0 +1,265 @@
+/* The search operators surface (components/TopBar.tsx, app/useSearch.ts).
+ *
+ * Owner: the search surface. Imported by styles/index.css after the other
+ * surface files; never reorder the imports there.
+ *
+ * Rule: the field text is the only source of truth. The predicate row is a
+ * projection of it, so every chip names the daemon input it really writes
+ * (`entry_type`, `tags`, `loaded results`, ...) and never looks like a
+ * stronger filter than the request it produces. An operator the daemon cannot
+ * express is an error in this row, never a silently different query. */
+
+/* The predicate row is a second line of the header card: it takes its own
+   flex line on the desktop bar and its own grid row on the phone bar, so the
+   search field keeps its width and nothing overflows. It is ordered after the
+   top actions, which stay on the first line beside the field. */
+.topbar { flex-wrap: wrap; }
+
+.search-ops {
+  order: 1;
+  flex: 1 0 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.search-ops-heading {
+  flex: 0 0 auto;
+  color: var(--quiet);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.search-ops-chips {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-ops-chip {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 999px;
+  padding: 2px 6px 2px 9px;
+  background: var(--surface-container-high);
+}
+
+.search-ops-chip.negated { border-left-color: var(--gold); }
+.search-ops-chip.loaded { border-left-color: var(--muted); border-style: dashed; }
+
+.search-ops-chip-edit-trigger {
+  min-width: 0;
+  max-width: 42vw;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 4px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.search-ops-chip-edit-trigger:hover { color: var(--accent); background: var(--accent-soft); }
+.search-ops-chip-edit-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.search-ops-chip-edit {
+  min-width: 90px;
+  max-width: 42vw;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--ink);
+  background: var(--surface-dim);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.search-ops-chip-wire {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--quiet);
+  background: var(--surface-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.search-ops-chip-remove {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--quiet);
+  background: transparent;
+  cursor: pointer;
+}
+
+.search-ops-chip-remove:hover,
+.search-ops-chip-remove:focus-visible { border-color: var(--line-strong); color: var(--coral); background: rgba(244, 119, 107, 0.1); }
+
+.search-ops-free {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+}
+
+.search-ops-free > span { color: var(--quiet); font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.search-ops-free > b { min-width: 0; overflow: hidden; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
+
+.search-ops-error,
+.search-ops-hint,
+.search-ops-limits {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.search-ops-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--coral);
+}
+
+.search-ops-error svg { flex: 0 0 auto; }
+.search-ops-hint { color: var(--quiet); }
+
+.search-ops-limits {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  color: var(--gold);
+  list-style: none;
+}
+
+/* --- the operator autocomplete ------------------------------------------- */
+
+.global-search .search-suggest {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 7;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  max-height: min(52vh, 380px);
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface-container-high);
+  box-shadow: var(--shadow-soft);
+}
+
+.global-search .search-suggest-note {
+  margin: 0 0 2px;
+  color: var(--quiet);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.global-search .search-suggest-entry {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(64px, max-content) minmax(0, 1fr) max-content;
+  align-items: baseline;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 7px 9px;
+  color: var(--ink);
+  background: transparent;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.global-search .search-suggest-entry:hover,
+.global-search .search-suggest-entry.active,
+.global-search .search-suggest-entry:focus-visible { border-color: var(--line-strong); background: var(--accent-soft); }
+.global-search .search-suggest-entry > b { color: var(--ink); font-size: 12px; font-weight: 780; }
+.global-search .search-suggest-entry > span { min-width: 0; color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.45; }
+.global-search .search-suggest-entry > code {
+  color: var(--quiet);
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* --- the result-set caption for client-side predicates -------------------- */
+
+.search-ops-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--gold);
+  background: var(--surface-container-low);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.search-ops-notice svg { flex: 0 0 auto; margin-top: 1px; }
+.search-ops-notice > div { min-width: 0; display: grid; gap: 3px; }
+.search-ops-notice strong { color: var(--ink); font-size: 12px; }
+.search-ops-notice small { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+
+@media (max-width: 640px) {
+  /* The phone bar is a grid: the predicate row takes its own full-width row
+     under the search field. */
+  .search-ops { grid-column: 1 / -1; }
+  .search-ops-chip { padding: 1px 5px 1px 8px; }
+  .search-ops-chip-edit-trigger,
+  .search-ops-chip-edit { max-width: 60vw; }
+  .global-search .search-suggest-entry { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-color-scheme: light) {
+  .search-ops-chip { background: var(--surface); }
+  .search-ops-chip-wire { background: var(--surface-container-low); }
+  .global-search .search-suggest { background: var(--surface); }
+  .search-ops-notice { background: rgba(221, 169, 82, 0.1); }
+}

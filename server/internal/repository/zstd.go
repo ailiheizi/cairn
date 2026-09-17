@@ -229,6 +229,13 @@ func (repo *ZstdDir) place(ctx context.Context, expectedID string, body io.Reade
 	if body == nil {
 		return Receipt{}, errors.New("placement body is required")
 	}
+	if expectedID != "" && repo.encryption == nil {
+		if _, err := os.Lstat(blobPath(repo.root, expectedID)); err == nil {
+			return repo.reuseExact(ctx, expectedID, body)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Receipt{}, err
+		}
+	}
 	temp, err := os.CreateTemp(filepath.Join(repo.root, tmpDirName), "place-*.zst")
 	if err != nil {
 		return Receipt{}, fmt.Errorf("create placement tempfile: %w", err)
@@ -304,6 +311,54 @@ func (repo *ZstdDir) place(ctx context.Context, expectedID string, body io.Reade
 		return Receipt{}, fmt.Errorf("commit zstd blob: %w", err)
 	}
 	return receipt, nil
+}
+
+// reuseExact avoids compression and temporary writes for an existing
+// unencrypted object. Both complete logical streams must independently match
+// the expected digest and each other's length before the placement is reused.
+func (repo *ZstdDir) reuseExact(ctx context.Context, contentID string, body io.Reader) (Receipt, error) {
+	digest := sha256.New()
+	written, err := io.Copy(digest, &contextReader{ctx: ctx, reader: body})
+	if err != nil {
+		return Receipt{}, fmt.Errorf("read duplicate placement: %w", err)
+	}
+	got := AlgorithmSHA256 + ":" + hex.EncodeToString(digest.Sum(nil))
+	if got != contentID {
+		return Receipt{}, fmt.Errorf("%w: got %s, want %s", ErrDigestMismatch, got, contentID)
+	}
+	existing, err := repo.Open(ctx, contentID)
+	if err != nil {
+		return Receipt{}, err
+	}
+	digest.Reset()
+	logical, readErr := io.Copy(digest, &contextReader{ctx: ctx, reader: existing})
+	closeErr := existing.Close()
+	if readErr != nil {
+		return Receipt{}, fmt.Errorf("read duplicate object: %w", readErr)
+	}
+	if closeErr != nil {
+		return Receipt{}, closeErr
+	}
+	got = AlgorithmSHA256 + ":" + hex.EncodeToString(digest.Sum(nil))
+	if got != contentID || logical != written {
+		return Receipt{}, fmt.Errorf("%w: duplicate readback identity or length", ErrDigestMismatch)
+	}
+	physical, err := openRepositoryFile(repo.root, blobPath(repo.root, contentID))
+	if err != nil {
+		return Receipt{}, err
+	}
+	info, statErr := physical.Stat()
+	closeErr = physical.Close()
+	if statErr != nil {
+		return Receipt{}, statErr
+	}
+	if closeErr != nil {
+		return Receipt{}, closeErr
+	}
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
+	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: info.Size(), Existed: true}, nil
 }
 
 func (repo *ZstdDir) Open(ctx context.Context, contentID string) (io.ReadCloser, error) {

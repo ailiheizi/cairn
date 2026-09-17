@@ -20,6 +20,13 @@ var (
 	// non-executable plan because one or more source entries could not be
 	// captured authoritatively.
 	ErrIngestPlanBlocked = errors.New("ingest plan contains blocked source entries")
+	// ErrVerificationUnavailable means the requested verification level cannot
+	// run against this snapshot's recorded protection, for example LINK_ONLY
+	// content without local exact bytes. It is not a content mismatch: a run
+	// that reaches this state has attempted verification and found the scope
+	// unavailable. The error keeps ErrBlocked in its chain so existing reason
+	// mapping stays unchanged.
+	ErrVerificationUnavailable = errors.New("requested verification is unavailable for this snapshot")
 )
 
 const defaultWorkspaceName = "default"

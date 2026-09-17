@@ -98,9 +98,6 @@ func withExplicitZvecLibrary(path, digest string, fn func() error) error {
 	if puregoZvecLoadedDigest != "" && puregoZvecLoadedDigest != digest {
 		return fmt.Errorf("%w: native library digest changed from %q to %q", ErrZvecUnavailable, puregoZvecLoadedDigest, digest)
 	}
-	if zvec.IsInitialized() && puregoZvecLoadedDigest == "" {
-		return fmt.Errorf("%w: zvec was initialized outside the staged library binding", ErrZvecUnavailable)
-	}
 	verifyLoadedPath := puregoZvecLoadedDigest == ""
 	old, had := os.LookupEnv("ZVEC_LIBRARY_PATH")
 	if err := os.Setenv("ZVEC_LIBRARY_PATH", path); err != nil {
@@ -113,6 +110,12 @@ func withExplicitZvecLibrary(path, digest string, fn func() error) error {
 			_ = os.Unsetenv("ZVEC_LIBRARY_PATH")
 		}
 	}()
+	// IsInitialized calls zvec-go's lazy loader. Set the explicit path first so
+	// a stale ambient ZVEC_LIBRARY_PATH cannot load another native image before
+	// the host has applied its digest-checked binding.
+	if zvec.IsInitialized() && puregoZvecLoadedDigest == "" {
+		return fmt.Errorf("%w: zvec was initialized outside the staged library binding", ErrZvecUnavailable)
+	}
 	if err := fn(); err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ package qualify
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -393,6 +394,177 @@ func TestSavingsReportHeterogeneousProfileMeasuresBothInTreeProfiles(t *testing.
 			}
 		}
 	}
+	assertGeneratedOperatorCorpusBinding(t, work)
+}
+
+func TestSavingsReportSmallGeneratedCorpusBindsBothInTreeProfiles(t *testing.T) {
+	repoRoot := qualificationRepoRoot(t)
+	work := filepath.Join(t.TempDir(), "work")
+	command := exec.Command("bash", filepath.Join(repoRoot, "scripts", "savings-report.sh"),
+		"--profile", "both", "--work-dir", work)
+	command.Dir = repoRoot
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("small generated savings report: %v\n%s", err, output)
+	}
+	if _, err := os.Stat(filepath.Join(work, "generated-corpus.qualification.json")); !os.IsNotExist(err) {
+		t.Fatalf("small generated corpus wrote a qualification sidecar: %v", err)
+	}
+	assertGeneratedOperatorCorpusBinding(t, work)
+}
+
+func TestSavingsReportRejectsChangedGeneratedCorpusBeforeRepositoryOpen(t *testing.T) {
+	repoRoot := qualificationRepoRoot(t)
+	root := t.TempDir()
+	corpus := filepath.Join(root, "corpus")
+	qualificationManifest := filepath.Join(root, "generated-corpus.qualification.json")
+	generateCommand := exec.Command("go", "run", "-tags=savingsreport", "./server/internal/repository/savingsreport",
+		"-generate-corpus", corpus,
+		"-generate-seed", "restoreweave-phase5-heterogeneous-v1",
+		"-manifest-out", qualificationManifest)
+	generateCommand.Dir = repoRoot
+	if output, err := generateCommand.CombinedOutput(); err != nil {
+		t.Fatalf("generate corpus: %v\n%s", err, output)
+	}
+	operatorManifest := filepath.Join(root, "generated-corpus.operator.manifest.json")
+	manifestCommand := exec.Command("go", "run", "-tags=savingsreport", "./server/internal/repository/savingsreport",
+		"-manifest-only", "-corpus", corpus, "-manifest-out", operatorManifest)
+	manifestCommand.Dir = repoRoot
+	if output, err := manifestCommand.CombinedOutput(); err != nil {
+		t.Fatalf("build generated operator manifest: %v\n%s", err, output)
+	}
+	changed := filepath.Join(corpus, "docs", "readme.txt")
+	if err := os.WriteFile(changed, []byte("changed after generated operator manifest"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	work := filepath.Join(root, "work")
+	command := exec.Command("bash", filepath.Join(repoRoot, "scripts", "savings-report.sh"),
+		"--corpus-dir", corpus, "--corpus-manifest", operatorManifest, "--profile", "raw", "--work-dir", work)
+	command.Dir = repoRoot
+	output, err := command.CombinedOutput()
+	if err == nil {
+		t.Fatalf("changed generated corpus was accepted:\n%s", output)
+	}
+	if !strings.Contains(string(output), "verify corpus manifest") {
+		t.Fatalf("unexpected changed generated-corpus failure: %v\n%s", err, output)
+	}
+	if _, statErr := os.Lstat(filepath.Join(work, "raw-repo")); !os.IsNotExist(statErr) {
+		t.Fatalf("repository opened before generated operator manifest rejection: %v", statErr)
+	}
+}
+
+func TestSavingsReportReviewedManifestBindsBothInTreeProfiles(t *testing.T) {
+	repoRoot := qualificationRepoRoot(t)
+	root := t.TempDir()
+	corpus := filepath.Join(root, "corpus")
+	if err := os.Mkdir(corpus, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corpus, "alpha.txt"), []byte("reviewed alpha"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corpus, "copy.txt"), []byte("reviewed alpha"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(root, "reviewed.manifest.json")
+	manifestCommand := exec.Command("go", "run", "-tags=savingsreport", "./server/internal/repository/savingsreport",
+		"-manifest-only", "-corpus", corpus, "-manifest-out", manifest)
+	manifestCommand.Dir = repoRoot
+	if output, err := manifestCommand.CombinedOutput(); err != nil {
+		t.Fatalf("build reviewed manifest: %v\n%s", err, output)
+	}
+
+	work := filepath.Join(root, "work")
+	command := exec.Command("bash", filepath.Join(repoRoot, "scripts", "savings-report.sh"),
+		"--corpus-dir", corpus, "--corpus-manifest", manifest, "--profile", "both", "--work-dir", work, "--keep")
+	command.Dir = repoRoot
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("reviewed savings report: %v\n%s", err, output)
+	}
+	reviewed := mustCandidateCorpusDigest(t, manifest)
+	for _, name := range []string{"raw.candidate-evidence.json", "zstd.candidate-evidence.json"} {
+		if got := mustCandidateCorpusDigest(t, filepath.Join(work, name)); got != reviewed {
+			t.Fatalf("%s corpus digest = %q, want reviewed %q", name, got, reviewed)
+		}
+	}
+}
+
+func TestSavingsReportRejectsChangedReviewedCorpusBeforeRepositoryOpen(t *testing.T) {
+	repoRoot := qualificationRepoRoot(t)
+	root := t.TempDir()
+	corpus := filepath.Join(root, "corpus")
+	if err := os.Mkdir(corpus, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(corpus, "item.txt")
+	if err := os.WriteFile(path, []byte("before review"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(root, "reviewed.manifest.json")
+	manifestCommand := exec.Command("go", "run", "-tags=savingsreport", "./server/internal/repository/savingsreport",
+		"-manifest-only", "-corpus", corpus, "-manifest-out", manifest)
+	manifestCommand.Dir = repoRoot
+	if output, err := manifestCommand.CombinedOutput(); err != nil {
+		t.Fatalf("build reviewed manifest: %v\n%s", err, output)
+	}
+	if err := os.WriteFile(path, []byte("changed after review"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	work := filepath.Join(root, "work")
+	command := exec.Command("bash", filepath.Join(repoRoot, "scripts", "savings-report.sh"),
+		"--corpus-dir", corpus, "--corpus-manifest", manifest, "--profile", "raw", "--work-dir", work, "--keep")
+	command.Dir = repoRoot
+	output, err := command.CombinedOutput()
+	if err == nil {
+		t.Fatalf("changed reviewed corpus was accepted:\n%s", output)
+	}
+	if !strings.Contains(string(output), "verify corpus manifest") {
+		t.Fatalf("unexpected changed-corpus failure: %v\n%s", err, output)
+	}
+	if _, statErr := os.Lstat(filepath.Join(work, "raw-repo")); !os.IsNotExist(statErr) {
+		t.Fatalf("repository opened before reviewed manifest rejection: %v", statErr)
+	}
+}
+
+func assertGeneratedOperatorCorpusBinding(t *testing.T, work string) {
+	t.Helper()
+	operatorManifest := filepath.Join(work, "generated-corpus.operator.manifest.json")
+	operatorBody, err := os.ReadFile(operatorManifest)
+	if err != nil {
+		t.Fatalf("generated operator corpus manifest: %v", err)
+	}
+	if !bytes.Contains(operatorBody, []byte(`"schema": "restoreweave.corpus-manifest.v1"`)) {
+		t.Fatalf("generated operator corpus manifest omitted corpus-manifest.v1: %s", operatorBody)
+	}
+	operatorDigest := mustCandidateCorpusDigest(t, operatorManifest)
+	for _, name := range []string{"raw.candidate-evidence.json", "zstd.candidate-evidence.json"} {
+		if got := mustCandidateCorpusDigest(t, filepath.Join(work, name)); got != operatorDigest {
+			t.Fatalf("%s corpus digest = %q, want generated operator %q", name, got, operatorDigest)
+		}
+	}
+}
+
+func mustCandidateCorpusDigest(t *testing.T, path string) string {
+	t.Helper()
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(payload, &document); err != nil {
+		t.Fatal(err)
+	}
+	if corpus, ok := document["corpus"].(map[string]any); ok {
+		if digest, ok := corpus["digest"].(string); ok && digest != "" {
+			return digest
+		}
+	}
+	if digest, ok := document["digest"].(string); ok && digest != "" {
+		return digest
+	}
+	t.Fatalf("%s has no corpus digest", path)
+	return ""
 }
 
 func qualificationRepoRoot(t *testing.T) string {

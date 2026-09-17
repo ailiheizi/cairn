@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -320,6 +321,10 @@ func (d *Dispatcher) handleExportPlan(ctx context.Context, env command.Envelope,
 	if len(input.Subjects) > 0 && (strings.TrimSpace(input.ViewID) != "" || strings.TrimSpace(input.Name) != "") {
 		return invalidInputResult(env, started, errString("view_id and subjects cannot both be set"))
 	}
+	requestedOutput, err := requestedExportOutputName(input.OutputName)
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	if d.exact == nil || d.exact.Repo == nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "exact repository is unavailable; export planning cannot freeze subject bytes"))
 	}
@@ -327,7 +332,7 @@ func (d *Dispatcher) handleExportPlan(ctx context.Context, env command.Envelope,
 	if err != nil {
 		return exportPlanErrorResult(env, started, err)
 	}
-	items, err := d.freezeExportItems(ctx, subjects)
+	items, err := d.freezeExportItems(ctx, subjects, requestedOutput)
 	if err != nil {
 		return exportPlanErrorResult(env, started, err)
 	}
@@ -355,8 +360,9 @@ func (d *Dispatcher) handleExportPlan(ctx context.Context, env command.Envelope,
 	manifest.ManifestDigest = digest
 	stored := sqlite.ExportManifest{
 		ManifestID: manifest.ManifestID, ManifestDigest: digest, ViewID: manifest.ViewID,
-		Representation: manifest.Representation, Target: manifest.Target,
-		SubjectCount: len(manifest.Items), Items: exportItemsToStrings(manifest.Items),
+		Representation: manifest.Representation, Sidecars: manifest.Sidecars,
+		Target: manifest.Target, SubjectCount: len(manifest.Items),
+		Items: exportItemsToStrings(manifest.Items),
 	}
 	persisted, err := d.store.InsertExportManifest(ctx, stored)
 	if err != nil {
@@ -434,8 +440,11 @@ func (d *Dispatcher) lookupSubjectAcrossWorkspaces(ctx context.Context, subjectR
 // regular files freeze; directories, symlinks, and non-exact subjects are
 // skipped. Output names are single destination-relative components derived
 // from the display name, with the stable subject ref as the collision-proof
-// fallback. A subject set with no exact-eligible file fails closed.
-func (d *Dispatcher) freezeExportItems(ctx context.Context, entries []sqlite.NamespaceEntry) ([]exact.ExportItem, error) {
+// fallback. A caller-supplied requestedName (already validated, "" when the
+// caller supplied none) is honored only for a single frozen file; repeated or
+// case-only-repeated derived names are disambiguated deterministically. A
+// subject set with no exact-eligible file fails closed.
+func (d *Dispatcher) freezeExportItems(ctx context.Context, entries []sqlite.NamespaceEntry, requestedName string) ([]exact.ExportItem, error) {
 	items := make([]exact.ExportItem, 0, len(entries))
 	for _, entry := range entries {
 		if entry.EntryType != sqlite.EntryFile {
@@ -458,8 +467,146 @@ func (d *Dispatcher) freezeExportItems(ctx context.Context, entries []sqlite.Nam
 	if len(items) == 0 {
 		return nil, errString("the frozen subject set contains no regular file")
 	}
+	if requestedName != "" {
+		if len(items) > 1 {
+			return nil, exportNamingError(fmt.Sprintf(
+				"output_name %q cannot apply to a multi-file selection of %d frozen files; omit output_name or plan the files separately",
+				requestedName, len(items)))
+		}
+		items[0].OutputName = requestedName
+	}
+	if err := disambiguateExportOutputNames(items); err != nil {
+		return nil, err
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].OutputName < items[j].OutputName })
 	return items, nil
+}
+
+// exportNamingError marks an output-naming or collision-policy failure caused
+// by the export.plan input. It surfaces as invalid_input: the caller asked for
+// a name the daemon cannot use, so no manifest may be frozen for it.
+type exportNamingError string
+
+func (err exportNamingError) Error() string { return string(err) }
+
+// requestedExportOutputName validates the export.plan input's optional
+// output_name. An omitted or empty value returns "" and keeps the derived
+// name. A supplied value is never silently repaired into a different name:
+// path separators, traversal components, names that resolve to "." or "..",
+// and blank values all fail as invalid_input, because a caller that set
+// output_name must not later believe a file was written under a name that was
+// never used. The check runs the same single-component sanitization the
+// derived-name path applies and requires it to be a no-op.
+func requestedExportOutputName(value string) (string, error) {
+	if value == "" {
+		return "", nil
+	}
+	name := strings.TrimSpace(value)
+	if name == "" {
+		return "", exportNamingError("output_name must not be blank; omit it to derive the name from the display name")
+	}
+	if name == "." || name == ".." {
+		return "", exportNamingError(fmt.Sprintf("output_name %q is not a safe destination-relative name", name))
+	}
+	if cleaned := filepathBaseClean(name); cleaned == "" || cleaned != name {
+		return "", exportNamingError(fmt.Sprintf(
+			"output_name %q must be a single destination-relative name without path separators or traversal", name))
+	}
+	return name, nil
+}
+
+// disambiguateExportOutputNames rewrites the frozen items in place so every
+// output name is a unique, deterministic, safe single component.
+//
+// Names are grouped with a CASE-INSENSITIVE comparison because destination
+// filesystems are frequently case-insensitive: the default macOS APFS/HFS+
+// configuration, Windows NTFS, and most NAS SMB shares would let "Clip.mkv"
+// and "clip.mkv" overwrite each other, so a case-only difference is a
+// collision and must be disambiguated rather than trusted. Unicode NFC/NFD
+// normalization is deliberately NOT applied: it would require dragging in
+// golang.org/x/text, and a composed/decomposed pair can therefore still
+// collide on a normalizing filesystem. That limitation is recorded, not
+// hidden.
+//
+// Within one group the plain name goes to the lowest frozen subject reference
+// (the snapshot-local entry handle in ExportManifest v1, which this slice does
+// not change) and each following item gets a readable numeric suffix before
+// its extension (clip.mkv, clip (2).mkv, clip (3).mkv; notes, notes (2)).
+// Subjects are ordered by that reference, never by arrival order, so planning
+// the same set twice produces the same names and the same frozen item set. The
+// manifest's own uniqueness validation stays in place as the last line of
+// defense; this policy is what keeps it from being the failure path.
+func disambiguateExportOutputNames(items []exact.ExportItem) error {
+	if len(items) == 0 {
+		return errString("the frozen subject set contains no regular file")
+	}
+	groups := make(map[string][]int, len(items))
+	for index := range items {
+		key := strings.ToLower(items[index].OutputName)
+		groups[key] = append(groups[key], index)
+	}
+	keys := make([]string, 0, len(groups))
+	for key := range groups {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	taken := make(map[string]struct{}, len(items))
+	for _, key := range keys {
+		indices := groups[key]
+		sort.Slice(indices, func(left, right int) bool {
+			return items[indices[left]].SubjectRef < items[indices[right]].SubjectRef
+		})
+		base := items[indices[0]].OutputName
+		for position, index := range indices {
+			name := base
+			suffix := position + 1
+			if position > 0 {
+				name = suffixedOutputName(base, suffix)
+			}
+			// A name produced for one group can equal the plain name of
+			// another group (base "clip" plus a literal "clip (2)"), so keep
+			// stepping the suffix until the name is globally free.
+			for {
+				if _, exists := taken[strings.ToLower(name)]; !exists {
+					break
+				}
+				suffix++
+				name = suffixedOutputName(base, suffix)
+			}
+			if err := validateProducedOutputName(name); err != nil {
+				return err
+			}
+			items[index].OutputName = name
+			taken[strings.ToLower(name)] = struct{}{}
+		}
+	}
+	return nil
+}
+
+// suffixedOutputName inserts a readable numeric suffix before the extension:
+// clip.mkv -> clip (2).mkv, notes -> notes (2). A leading-dot name such as
+// .gitignore has no stem before its dot, so its whole name is the stem.
+func suffixedOutputName(name string, ordinal int) string {
+	suffix := " (" + strconv.Itoa(ordinal) + ")"
+	extension := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, extension)
+	if stem == "" {
+		return name + suffix
+	}
+	return stem + suffix + extension
+}
+
+// validateProducedOutputName mirrors the manifest's own per-item name rules so
+// a disambiguated name that cannot be made safe fails closed here with a clear
+// reason instead of surfacing as a catalog error from manifest validation.
+func validateProducedOutputName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return exportNamingError("the disambiguated export output name is empty")
+	}
+	if name != filepath.Base(name) || name == "." || name == ".." {
+		return exportNamingError(fmt.Sprintf("export output name %q is not a safe single destination-relative component", name))
+	}
+	return nil
 }
 
 func outputNameFor(displayName, subjectRef string) string {
@@ -611,9 +758,9 @@ func (d *Dispatcher) loadFrozenManifest(ctx context.Context, manifestID, manifes
 }
 
 // rebuildFrozenManifest reconstructs the full frozen manifest from the stored
-// projection and the immutable catalog. The subject list, output names, and
-// auxiliary fields come from the stored record; content identity and
-// exactness are re-read from the catalog, and the canonical digest is
+// projection and the immutable catalog. The subject list, output names, sidecar
+// policy, and auxiliary fields come from the stored record; content identity
+// and exactness are re-read from the catalog, and the canonical digest is
 // re-derived and compared against the frozen digest.
 func (d *Dispatcher) rebuildFrozenManifest(ctx context.Context, stored sqlite.ExportManifest) (exact.ExportManifest, error) {
 	frozenItems, err := exportItemsFromStrings(stored.Items)
@@ -622,7 +769,8 @@ func (d *Dispatcher) rebuildFrozenManifest(ctx context.Context, stored sqlite.Ex
 	}
 	manifest := exact.ExportManifest{
 		Schema: exact.ExportManifestSchemaV1, ManifestID: stored.ManifestID,
-		ViewID: stored.ViewID, Representation: stored.Representation, Target: stored.Target,
+		ViewID: stored.ViewID, Representation: stored.Representation,
+		Sidecars: stored.Sidecars, Target: stored.Target,
 		ConfigDigest:        d.effectiveConfigDigest(),
 		TargetProfileDigest: exact.DescribeExportManifestProfile(d.exact.Repo),
 	}
@@ -716,7 +864,8 @@ func isStableIDError(err error) bool {
 }
 
 func exportPlanErrorResult(env command.Envelope, started time.Time, err error) command.Result {
-	if isStableIDError(err) || errors.Is(err, errString("view_id and subjects cannot both be set")) ||
+	var naming exportNamingError
+	if errors.As(err, &naming) || isStableIDError(err) || errors.Is(err, errString("view_id and subjects cannot both be set")) ||
 		errors.Is(err, errString("view_id or subjects is required")) {
 		return invalidInputResult(env, started, err)
 	}

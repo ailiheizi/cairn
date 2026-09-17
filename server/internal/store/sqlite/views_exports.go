@@ -27,12 +27,13 @@ type SavedView struct {
 }
 
 // ExportManifest is a frozen set of subjects, selected representations, output
-// names, target profile, and a canonical digest.
+// names, sidecar policy, target profile, and a canonical digest.
 type ExportManifest struct {
 	ManifestID     string
 	ManifestDigest string
 	ViewID         string
 	Representation string
+	Sidecars       string
 	Target         string
 	SubjectCount   int
 	CreatedAtNS    int64
@@ -238,24 +239,28 @@ func (s *Store) InsertExportManifest(ctx context.Context, manifest ExportManifes
 	}
 	manifest.CreatedAtNS = s.now().UTC().UnixNano()
 	err = s.Update(ctx, func(tx *Tx) error {
-		var existingDigest string
+		var existingDigest, existingSidecars string
 		err := tx.tx.QueryRowContext(ctx,
-			`SELECT manifest_digest FROM export_manifests WHERE manifest_id = ?`, manifest.ManifestID).Scan(&existingDigest)
+			`SELECT manifest_digest, sidecars FROM export_manifests WHERE manifest_id = ?`, manifest.ManifestID).Scan(&existingDigest, &existingSidecars)
 		if errors.Is(err, sql.ErrNoRows) {
 			_, err = tx.tx.ExecContext(ctx, `
 INSERT INTO export_manifests(
-    manifest_id, manifest_digest, view_id, representation, target,
+    manifest_id, manifest_digest, view_id, representation, sidecars, target,
     subject_count, created_at_ns, items_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				manifest.ManifestID, manifest.ManifestDigest, manifest.ViewID,
-				manifest.Representation, manifest.Target, manifest.SubjectCount,
-				manifest.CreatedAtNS, string(itemsJSON))
+				manifest.Representation, manifest.Sidecars, manifest.Target,
+				manifest.SubjectCount, manifest.CreatedAtNS, string(itemsJSON))
 			return err
 		}
 		if err != nil {
 			return err
 		}
-		if existingDigest != manifest.ManifestDigest {
+		// The digest covers the frozen field set, sidecar policy included. A
+		// repeated id is idempotent only when the stored sidecar policy still
+		// matches the supplied one; a caller that varies it under the same id
+		// and digest fails closed instead of leaving a divergent projection.
+		if existingDigest != manifest.ManifestDigest || existingSidecars != manifest.Sidecars {
 			return ErrConflict
 		}
 		return nil
@@ -271,12 +276,12 @@ func (s *Store) GetExportManifestByID(ctx context.Context, manifestID string) (E
 	var manifest ExportManifest
 	var itemsJSON string
 	err := s.db.QueryRowContext(ctx, `
-SELECT manifest_id, manifest_digest, view_id, representation, target,
+SELECT manifest_id, manifest_digest, view_id, representation, sidecars, target,
        subject_count, created_at_ns, items_json
 FROM export_manifests WHERE manifest_id = ?`, manifestID).Scan(
 		&manifest.ManifestID, &manifest.ManifestDigest, &manifest.ViewID,
-		&manifest.Representation, &manifest.Target, &manifest.SubjectCount,
-		&manifest.CreatedAtNS, &itemsJSON)
+		&manifest.Representation, &manifest.Sidecars, &manifest.Target,
+		&manifest.SubjectCount, &manifest.CreatedAtNS, &itemsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return manifest, ErrNotFound
 	}
@@ -294,12 +299,12 @@ func (s *Store) GetExportManifestByDigest(ctx context.Context, digest string) (E
 	var manifest ExportManifest
 	var itemsJSON string
 	err := s.db.QueryRowContext(ctx, `
-SELECT manifest_id, manifest_digest, view_id, representation, target,
+SELECT manifest_id, manifest_digest, view_id, representation, sidecars, target,
        subject_count, created_at_ns, items_json
 FROM export_manifests WHERE manifest_digest = ?`, digest).Scan(
 		&manifest.ManifestID, &manifest.ManifestDigest, &manifest.ViewID,
-		&manifest.Representation, &manifest.Target, &manifest.SubjectCount,
-		&manifest.CreatedAtNS, &itemsJSON)
+		&manifest.Representation, &manifest.Sidecars, &manifest.Target,
+		&manifest.SubjectCount, &manifest.CreatedAtNS, &itemsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return manifest, ErrNotFound
 	}
@@ -315,7 +320,7 @@ FROM export_manifests WHERE manifest_digest = ?`, digest).Scan(
 // ListExportManifests returns every frozen manifest, newest first.
 func (s *Store) ListExportManifests(ctx context.Context) ([]ExportManifest, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT manifest_id, manifest_digest, view_id, representation, target,
+SELECT manifest_id, manifest_digest, view_id, representation, sidecars, target,
        subject_count, created_at_ns, items_json
 FROM export_manifests ORDER BY created_at_ns DESC`)
 	if err != nil {
@@ -328,8 +333,8 @@ FROM export_manifests ORDER BY created_at_ns DESC`)
 		var itemsJSON string
 		if err := rows.Scan(
 			&manifest.ManifestID, &manifest.ManifestDigest, &manifest.ViewID,
-			&manifest.Representation, &manifest.Target, &manifest.SubjectCount,
-			&manifest.CreatedAtNS, &itemsJSON); err != nil {
+			&manifest.Representation, &manifest.Sidecars, &manifest.Target,
+			&manifest.SubjectCount, &manifest.CreatedAtNS, &itemsJSON); err != nil {
 			return nil, fmt.Errorf("scan export manifest: %w", err)
 		}
 		if err := json.Unmarshal([]byte(itemsJSON), &manifest.Items); err != nil {

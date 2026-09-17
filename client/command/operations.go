@@ -18,6 +18,7 @@ const (
 	OpPlanApply             = "plan.apply"
 	OpJobEvents             = "job.events"
 	OpJobCancel             = "job.cancel"
+	OpJobList               = "job.list"
 	OpRecoveryExport        = "recovery.export"
 	OpRecoveryAnchorExport  = "recovery.anchor.export"
 	OpNamespaceList         = "namespace.list"
@@ -73,6 +74,7 @@ func KnownOperations() []string {
 		OpPlanApply,
 		OpJobEvents,
 		OpJobCancel,
+		OpJobList,
 		OpRecoveryExport,
 		OpRecoveryAnchorExport,
 		OpNamespaceList,

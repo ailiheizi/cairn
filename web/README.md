@@ -21,3 +21,11 @@ trusted local process.
 
 The browser is a convenience surface. It must not be required for exact
 ingest, verification, or clean-install restore.
+
+Source layout: `src/main.tsx` is the application shell (root state, document
+effects, surface composition), `src/app/` holds one hook per data concern,
+`src/components/` holds one file per surface, `src/styles/` holds one stylesheet
+per surface aggregated by `src/styles/index.css`, and `src/lib/` holds pure
+helpers including the typed daemon operation names. See
+`docs/technical/webui-architecture.md` for the module map, the ownership rules,
+and the checklist for adding a surface.

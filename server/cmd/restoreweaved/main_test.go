@@ -109,6 +109,14 @@ func TestValidateRuntimeStorageProfileRejectsSilentlyIgnoredProfiles(t *testing.
 			want: "repository profile",
 		},
 		{
+			name: "experimental encrypted repository",
+			mutate: func(cfg *rwconfig.Config) {
+				cfg.Storage.RepositoryProfile = rwconfig.RepositoryProfileLocalZstdEncryptedV1
+				cfg.Storage.CompressionProfile = rwconfig.CompressionProfileZstdV1
+			},
+			want: "experimental and is not admitted in this build",
+		},
+		{
 			name: "compression",
 			mutate: func(cfg *rwconfig.Config) {
 				cfg.Storage.CompressionProfile = "lossless-default"

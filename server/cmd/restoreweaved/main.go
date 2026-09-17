@@ -579,6 +579,12 @@ func validateRuntimeStorageProfile(cfg rwconfig.Config) error {
 			cfg.Recovery.PublicationSigning, rwconfig.PublicationSigningLocalEd25519,
 		)
 	}
+	if cfg.Storage.RepositoryProfile == rwconfig.RepositoryProfileLocalZstdEncryptedV1 {
+		return fmt.Errorf(
+			"storage repository profile %q is experimental and is not admitted in this build (no daemon/secret-provider wiring)",
+			rwconfig.RepositoryProfileLocalZstdEncryptedV1,
+		)
+	}
 	switch cfg.Storage.RepositoryProfile {
 	case rwconfig.RepositoryProfileDirectoryCASDev:
 		if cfg.Storage.CompressionProfile != rwconfig.CompressionProfileIdentity {

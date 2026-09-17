@@ -13,12 +13,27 @@ daemon_bin=${RESTOREWEAVE_DAEMON_BIN:-restoreweaved}
 rw_bin=${RESTOREWEAVE_RW_BIN:-rw}
 api_listen=${RESTOREWEAVE_WEB_E2E_API_LISTEN:-127.0.0.1:4536}
 
-command -v "$daemon_bin" >/dev/null 2>&1 || { echo "SKIP: RESTOREWEAVE_DAEMON_BIN is not available"; exit 0; }
-command -v "$rw_bin" >/dev/null 2>&1 || { echo "SKIP: RESTOREWEAVE_RW_BIN is not available"; exit 0; }
 command -v curl >/dev/null 2>&1 || { echo "SKIP: curl is not available"; exit 0; }
 command -v node >/dev/null 2>&1 || { echo "SKIP: node is not available"; exit 0; }
 command -v npm >/dev/null 2>&1 || { echo "SKIP: npm is not available"; exit 0; }
 command -v cmp >/dev/null 2>&1 || { echo "SKIP: cmp is not available"; exit 0; }
+
+# A missing local installation must not turn the real browser run into a
+# false skip. Build both binaries into an isolated temporary directory when
+# the caller did not supply usable paths.
+build_root=$(mktemp -d "${TMPDIR:-/tmp}/restoreweave-web-e2e-build.XXXXXX")
+cleanup_build() { rm -rf "$build_root"; }
+trap cleanup_build EXIT INT TERM
+if ! command -v "$daemon_bin" >/dev/null 2>&1; then
+  command -v go >/dev/null 2>&1 || { echo "FAIL: restoreweaved is unavailable and go is not installed" >&2; exit 1; }
+  go build -tags purego -o "$build_root/restoreweaved" ./server/cmd/restoreweaved || { echo "FAIL: could not build restoreweaved" >&2; exit 1; }
+  daemon_bin=$build_root/restoreweaved
+fi
+if ! command -v "$rw_bin" >/dev/null 2>&1; then
+  command -v go >/dev/null 2>&1 || { echo "FAIL: rw is unavailable and go is not installed" >&2; exit 1; }
+  go build -tags purego -o "$build_root/rw" ./client/cmd/rw || { echo "FAIL: could not build rw" >&2; exit 1; }
+  rw_bin=$build_root/rw
+fi
 
 playwright_module=${RESTOREWEAVE_PLAYWRIGHT_MODULE:-}
 # When Playwright is available but its managed browser cache is not, set
@@ -40,6 +55,7 @@ daemon_pid=
 cleanup() {
   if [ -n "$daemon_pid" ]; then kill "$daemon_pid" 2>/dev/null || true; fi
   rm -rf "$tmp_root"
+  rm -rf "$build_root"
 }
 trap cleanup EXIT INT TERM
 
@@ -52,6 +68,7 @@ mkdir -p "$source_path"
 printf '%s\n' 'RestoreWeave browser E2E durable duplicate content' > "$source_path/alpha.txt"
 cp "$source_path/alpha.txt" "$source_path/beta.txt"
 restore_destination=$tmp_root/restored
+export_destination=$tmp_root/exported
 
 "$rw_bin" config init --path "$config_path" >/dev/null
 RESTOREWEAVE_CATALOG="$tmp_root/catalog.sqlite" \
@@ -81,6 +98,7 @@ done
 RESTOREWEAVE_WEB_E2E_URL="$web_url" \
 RESTOREWEAVE_WEB_E2E_SOURCE="$source_path" \
 RESTOREWEAVE_WEB_E2E_RESTORE_DEST="$restore_destination" \
+RESTOREWEAVE_WEB_E2E_EXPORT_DEST="$export_destination" \
 RESTOREWEAVE_PLAYWRIGHT_MODULE="$playwright_module" \
 node scripts/web-e2e.mjs online
 
@@ -91,6 +109,10 @@ sha256_file() {
 }
 [ "$(sha256_file "$source_path/alpha.txt")" = "$(sha256_file "$restore_destination/alpha.txt")" ] || { echo "alpha SHA-256 differs" >&2; exit 1; }
 [ "$(sha256_file "$source_path/beta.txt")" = "$(sha256_file "$restore_destination/beta.txt")" ] || { echo "beta SHA-256 differs" >&2; exit 1; }
+[ -f "$export_destination/alpha.txt" ] || { echo "exported alpha is missing" >&2; exit 1; }
+cmp -s "$source_path/alpha.txt" "$export_destination/alpha.txt" || { echo "exported alpha bytes differ" >&2; exit 1; }
+[ -f "$export_destination-selected/alpha.txt" ] || { echo "selected export alpha is missing" >&2; exit 1; }
+cmp -s "$source_path/alpha.txt" "$export_destination-selected/alpha.txt" || { echo "selected export alpha bytes differ" >&2; exit 1; }
 
 RESTOREWEAVE_WEB_E2E_URL="$web_url" RESTOREWEAVE_PLAYWRIGHT_MODULE="$playwright_module" node scripts/web-e2e.mjs offline
 

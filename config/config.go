@@ -36,12 +36,16 @@ const (
 	// RepositoryProfileLocalZstdV1 is the single-process local compression
 	// candidate. It is accepted by configuration but is not the release
 	// default until its repository driver is qualified.
-	RepositoryProfileLocalZstdV1   = "local-zstd-v1"
-	CompressionProfileIdentity     = "identity-v1"
-	CompressionProfileZstdV1       = "zstd-v1"
-	NeuralCodecDisabled            = "disabled"
-	PublicationSigningLocalEd25519 = "local-ed25519-v1"
-	DefaultPublicationDomain       = "workspace:default"
+	RepositoryProfileLocalZstdV1 = "local-zstd-v1"
+	// RepositoryProfileLocalZstdEncryptedV1 is experimental repository-package
+	// evidence only. Persisted config and the daemon must name-reject it;
+	// it is not an admitted tuple and does not wire a secret provider.
+	RepositoryProfileLocalZstdEncryptedV1 = "local-zstd-encrypted-v1"
+	CompressionProfileIdentity            = "identity-v1"
+	CompressionProfileZstdV1              = "zstd-v1"
+	NeuralCodecDisabled                   = "disabled"
+	PublicationSigningLocalEd25519        = "local-ed25519-v1"
+	DefaultPublicationDomain              = "workspace:default"
 
 	ConfigEnv          = "RESTOREWEAVE_CONFIG"
 	CatalogEnv         = "RESTOREWEAVE_CATALOG"
@@ -735,6 +739,9 @@ func validate(cfg Config, resolvedPaths bool) error {
 	}
 	if err := validateProfileName("storage.compression_profile", cfg.Storage.CompressionProfile); err != nil {
 		return err
+	}
+	if cfg.Storage.RepositoryProfile == RepositoryProfileLocalZstdEncryptedV1 {
+		return fmt.Errorf("storage repository profile %q is experimental and is not admitted by persisted config", RepositoryProfileLocalZstdEncryptedV1)
 	}
 	switch {
 	case cfg.Storage.RepositoryProfile == RepositoryProfileDirectoryCASDev && cfg.Storage.CompressionProfile == CompressionProfileIdentity:

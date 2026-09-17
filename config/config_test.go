@@ -138,6 +138,16 @@ func TestStorageProfileTuples(t *testing.T) {
 			repository:  "future-repository-v1",
 			compression: "future-compression-v1",
 		},
+		{
+			name:        "experimental encrypted zstd",
+			repository:  RepositoryProfileLocalZstdEncryptedV1,
+			compression: CompressionProfileZstdV1,
+		},
+		{
+			name:        "experimental encrypted identity",
+			repository:  RepositoryProfileLocalZstdEncryptedV1,
+			compression: CompressionProfileIdentity,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -149,6 +159,15 @@ func TestStorageProfileTuples(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want valid = %t", err, tt.wantValid)
 			}
 		})
+	}
+	for _, compression := range []string{CompressionProfileZstdV1, CompressionProfileIdentity} {
+		cfg := Default()
+		cfg.Storage.RepositoryProfile = RepositoryProfileLocalZstdEncryptedV1
+		cfg.Storage.CompressionProfile = compression
+		err := Validate(cfg)
+		if err == nil || !strings.Contains(err.Error(), `storage repository profile "local-zstd-encrypted-v1" is experimental and is not admitted by persisted config`) {
+			t.Fatalf("encrypted profile compression %s error = %v", compression, err)
+		}
 	}
 }
 

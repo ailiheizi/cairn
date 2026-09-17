@@ -17,15 +17,48 @@ type StatusData struct {
 	ReapedHandles int               `json:"reaped_handles,omitempty"`
 	Listen        string            `json:"listen,omitempty"`
 	Unimplemented []string          `json:"unimplemented"`
+	// Index reports the read-only discovery-index projection per workspace.
+	// It is omitted when no workspace exists yet; callers must not read an
+	// absent entry as READY or as a catalog-wide index claim.
+	Index []IndexStatusData `json:"index,omitempty"`
 }
 
+// JobSummary is the bounded durable job projection used by status.get and
+// job.list. Fields whose recorded value is absent are omitted; a missing
+// error_code is not the same claim as a successful job. checkpoint_present is
+// only a hint that the durable checkpoint column holds content beyond its
+// empty-object default, never a claim about run progress.
 type JobSummary struct {
-	JobID       string `json:"job_id"`
-	WorkspaceID string `json:"workspace_id"`
-	PlanID      string `json:"plan_id,omitempty"`
-	Kind        string `json:"kind"`
-	State       string `json:"state"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	JobID             string `json:"job_id"`
+	WorkspaceID       string `json:"workspace_id"`
+	PlanID            string `json:"plan_id,omitempty"`
+	Kind              string `json:"kind"`
+	State             string `json:"state"`
+	Attempt           int64  `json:"attempt,omitempty"`
+	MaxAttempts       int64  `json:"max_attempts,omitempty"`
+	ErrorCode         string `json:"error_code,omitempty"`
+	CheckpointPresent bool   `json:"checkpoint_present,omitempty"`
+	UpdatedAt         string `json:"updated_at,omitempty"`
+}
+
+// JobListData is the job.list payload. Jobs are ordered by most recent update.
+// A workspace filter narrows the newest rows selected by limit; it never widens
+// the bound.
+type JobListData struct {
+	Jobs []JobSummary `json:"jobs"`
+}
+
+// IndexStatusData is the read-only discovery-index projection for one
+// workspace. Lexical and Semantic reuse the same READY / NOT_BUILT /
+// UNAVAILABLE vocabulary as per-item index status and are never aggregated
+// into a catalog-wide claim: a single-workspace profile may present its entry
+// as the global state, while a catalog with several workspaces must show them
+// separately instead of inventing an aggregate.
+type IndexStatusData struct {
+	WorkspaceID    string `json:"workspace_id,omitempty"`
+	Lexical        string `json:"lexical"`
+	Semantic       string `json:"semantic"`
+	SemanticReason string `json:"semantic_reason,omitempty"`
 }
 
 type PlanSummary struct {
@@ -37,10 +70,36 @@ type PlanSummary struct {
 	CreatedAt   string `json:"created_at,omitempty"`
 }
 
+// CatalogSchemaState names the runtime comparison between the applied
+// migration ledger and this binary's embedded migrations. DRIFT and
+// NEWER_THAN_BINARY mirror the open-time schema errors as reported facts.
+const (
+	CatalogSchemaCurrent         = "CURRENT"
+	CatalogSchemaDrift           = "DRIFT"
+	CatalogSchemaNewerThanBinary = "NEWER_THAN_BINARY"
+	CatalogSchemaUnknown         = "UNKNOWN"
+)
+
 type CatalogStatus struct {
 	Path string `json:"path"`
 	OK   bool   `json:"ok"`
+	// SchemaVersion and SchemaMigration are read from the catalog's applied
+	// migration ledger. They are omitted when no ledger can be read;
+	// SchemaState then reports UNKNOWN with a reason instead of a zero version.
+	SchemaVersion       int    `json:"schema_version,omitempty"`
+	SchemaMigration     string `json:"schema_migration,omitempty"`
+	SchemaState         string `json:"schema_state,omitempty"`
+	SchemaReason        string `json:"schema_reason,omitempty"`
+	SchemaBinaryVersion int    `json:"schema_binary_version,omitempty"`
 }
+
+// Repository writability states. A probe that cannot run reports UNKNOWN with
+// a reason; it is never collapsed into WRITABLE or READ_ONLY.
+const (
+	RepositoryWritableStateWritable = "WRITABLE"
+	RepositoryWritableStateReadOnly = "READ_ONLY"
+	RepositoryWritableStateUnknown  = "UNKNOWN"
+)
 
 type RepositoryStatus struct {
 	Path               string `json:"path,omitempty"`
@@ -54,6 +113,13 @@ type RepositoryStatus struct {
 	CapacityUsed       uint64 `json:"capacity_used,omitempty"`
 	CapacityMeasuredAt string `json:"capacity_measured_at,omitempty"`
 	CapacityReason     string `json:"capacity_reason,omitempty"`
+	// Writable is the result of a live zero-byte probe: it creates and
+	// immediately removes one empty probe file under the repository root and
+	// never touches existing data. It is omitted when no repository is
+	// attached.
+	Writable          string `json:"writable,omitempty"`
+	WritableReason    string `json:"writable_reason,omitempty"`
+	WritableCheckedAt string `json:"writable_checked_at,omitempty"`
 }
 
 type IdentifyStatus struct {
@@ -89,6 +155,11 @@ type SnapshotListData struct {
 	Snapshots []SnapshotSummary `json:"snapshots"`
 }
 
+// SnapshotSummary is the restore-point projection from snapshot.list. The
+// counts and the protection mix are computed live from the repository-loaded
+// manifest, never from the rebuildable catalog. Verification is always
+// present: State UNRECORDED carries the reason no receipt exists, so an
+// unverified restore point never renders as a zeroed verification time.
 type SnapshotSummary struct {
 	SnapshotRef     string `json:"snapshot_ref"`
 	CreatedAt       string `json:"created_at,omitempty"`
@@ -96,6 +167,62 @@ type SnapshotSummary struct {
 	ManifestDigest  string `json:"manifest_digest,omitempty"`
 	WorkspaceID     string `json:"workspace_id,omitempty"`
 	NamespaceRootID string `json:"namespace_root_id,omitempty"`
+	// Entries counts every manifest entry; Files counts regular files; Bytes
+	// sums the recorded logical sizes of regular files. BytesComplete is false
+	// when any regular file lacks a recorded size, so a partial sum is never
+	// presented as the whole.
+	Entries       int   `json:"entries"`
+	Files         int   `json:"files"`
+	Bytes         int64 `json:"bytes"`
+	BytesComplete bool  `json:"bytes_complete"`
+	// ProtectedFiles counts file entries with a locally verified exact payload
+	// (EXACT_PROTECTED / EXACT_FALLBACK). UnprotectedFiles counts file entries
+	// explicitly recorded as not locally protected (LINK_ONLY_UNPROTECTED /
+	// EXPLICITLY_UNPROTECTED). ProtectionOutcomes is the faithful count of every
+	// regular file by recorded outcome, including UNRECORDED for a legacy entry
+	// without one, so blocked, unavailable, and external-replayable members
+	// stay visible instead of disappearing from the mix.
+	ProtectedFiles     int                       `json:"protected_files"`
+	UnprotectedFiles   int                       `json:"unprotected_files"`
+	ProtectionOutcomes map[string]int            `json:"protection_outcomes,omitempty"`
+	Verification       *SnapshotVerificationData `json:"verification,omitempty"`
+}
+
+// Snapshot verification receipt states and outcomes. A receipt is written once
+// per snapshot.verify run and is never rewritten.
+const (
+	SnapshotVerificationStateRecorded   = "RECORDED"
+	SnapshotVerificationStateUnrecorded = "UNRECORDED"
+
+	SnapshotVerificationOutcomeSucceeded   = "SUCCEEDED"
+	SnapshotVerificationOutcomeFailed      = "FAILED"
+	SnapshotVerificationOutcomeUnavailable = "UNAVAILABLE"
+
+	// SnapshotProtectionOutcomeUnrecorded buckets a regular file whose
+	// manifest entry carries no recorded protection outcome.
+	SnapshotProtectionOutcomeUnrecorded = "UNRECORDED"
+)
+
+// SnapshotVerificationData is the newest recorded snapshot.verify receipt for
+// one restore point. Attempted and passed counts are the values the run
+// actually reached. An UNRECORDED state means no receipt exists and Reason
+// explains why; its receipt fields stay empty rather than zero-valued.
+type SnapshotVerificationData struct {
+	State           string `json:"state"`
+	Reason          string `json:"reason,omitempty"`
+	Mode            string `json:"mode,omitempty"`
+	Outcome         string `json:"outcome,omitempty"`
+	AttemptedFiles  int    `json:"attempted_files,omitempty"`
+	AttemptedBytes  int64  `json:"attempted_bytes,omitempty"`
+	PassedFiles     int    `json:"passed_files,omitempty"`
+	PassedBytes     int64  `json:"passed_bytes,omitempty"`
+	OK              bool   `json:"ok,omitempty"`
+	RestoreVerified bool   `json:"restore_verified,omitempty"`
+	// FailureReason is the recorded reason for a FAILED or UNAVAILABLE
+	// receipt; it stays empty for a successful run.
+	FailureReason string `json:"failure_reason,omitempty"`
+	VerifiedAt    string `json:"verified_at,omitempty"`
+	RequestID     string `json:"request_id,omitempty"`
 }
 
 // SourceListData is a read-only projection of configured source provenance.

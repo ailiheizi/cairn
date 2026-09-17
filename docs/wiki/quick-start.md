@@ -39,3 +39,20 @@ deletion.
 Use the single **Notes** surface for human notes and attributed imported,
 extracted, or model-produced text. Add as many user tags as useful. System
 facets such as file type are shown separately.
+
+## Run locally
+
+From the repository root, start the daemon and its built WebUI with one command:
+
+```sh
+./scripts/run-local.sh --data-dir /absolute/path/restoreweave-data
+```
+
+The launcher creates a persisted profile on first use, keeps its catalog,
+repository, models, vectors, and recovery records below the data root, rebuilds
+the pure-Go daemon and CLI plus the current WebUI, and serves the result at
+`http://127.0.0.1:4538/`. Use `--listen 127.0.0.1:PORT` for another unused
+loopback port. It refuses a relative data path, a non-loopback listener, or an
+occupied port, and runs in the foreground so `Ctrl-C` stops only that daemon.
+It requires Go, npm, and curl; when Web dependencies are absent, it runs the
+repository-locked `npm ci` automatically before the first build.

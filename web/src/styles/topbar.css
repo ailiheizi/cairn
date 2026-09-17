@@ -1,0 +1,160 @@
+/* Top bar surface.
+
+The app header (brand, the one search field and its local recents list, the
+connection status, the top-level actions) and the readiness rail. */
+
+.topbar {
+  position: sticky; top: 0; z-index: 5; min-height: 82px;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px max(clamp(18px, 3vw, 42px), calc((100vw - 1760px) / 2 + 30px));
+  border-bottom: 1px solid rgba(190, 175, 255, 0.2);
+  background: rgba(10, 9, 16, 0.8);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58), 0 1px 0 rgba(167, 139, 250, 0.08), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+.brand { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; color: #f1f4f6; font-size: 17px; font-weight: 790; text-decoration: none; }
+.brand-mark {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border: 1px solid rgba(211, 198, 255, 0.62); border-radius: 8px;
+  color: #110d1f; background: #b9a5ff;
+  box-shadow: 0 0 0 5px rgba(167, 139, 250, 0.08), 0 12px 30px rgba(139, 92, 246, 0.28), inset 0 1px rgba(255, 255, 255, 0.42);
+}
+.global-search {
+  min-width: 180px; min-height: 50px; flex: 1 1 auto;
+  display: flex; align-items: center; gap: 12px; padding: 6px 7px 6px 17px;
+  border: 1px solid rgba(230, 226, 255, 0.2); border-radius: 8px;
+  color: var(--quiet); background: rgba(4, 4, 9, 0.78);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.07), inset 0 -1px rgba(0, 0, 0, 0.8), 0 12px 32px rgba(0, 0, 0, 0.28);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.global-search:focus-within { border-color: rgba(167, 139, 250, 0.76); background: #08070e; box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.14), 0 16px 40px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.08); }
+.global-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
+.global-search input::placeholder { color: #737b85; }
+.global-search button { min-height: 38px; border: 0; border-radius: 6px; padding: 9px 19px; color: #110d1f; background: var(--primary); font-weight: 760; }
+.global-search button:hover { background: #b9a5ff; }
+.global-search button:disabled { opacity: 0.46; cursor: wait; }
+.top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.secondary-button, .primary-button {
+  min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 7px; padding: 9px 14px; font-weight: 690;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.secondary-button { border: 1px solid var(--line-strong); color: #d7dce2; background: rgba(255, 255, 255, 0.055); }
+.secondary-button:hover { border-color: rgba(167, 139, 250, 0.48); color: var(--ink); background: var(--primary-soft); }
+.primary-button { width: max-content; border: 1px solid rgba(231, 224, 255, 0.16); color: #110d1f; background: var(--primary); box-shadow: 0 8px 22px rgba(139, 92, 246, 0.2); }
+.primary-button:hover { transform: translateY(-1px); background: #b9a5ff; box-shadow: 0 10px 26px rgba(139, 92, 246, 0.28); }
+.primary-button:active, .secondary-button:active, .icon-button:active { transform: translateY(1px); }
+.primary-button:disabled, .secondary-button:disabled { opacity: 0.42; cursor: not-allowed; transform: none; box-shadow: none; }
+.primary-button.compact, .secondary-button.compact { min-height: 34px; padding: 8px 12px; }
+.icon-button {
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); border-radius: 7px;
+  color: #aeb5bd; background: rgba(255, 255, 255, 0.045);
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+.icon-button:hover { border-color: rgba(167, 139, 250, 0.5); color: var(--primary); background: var(--primary-soft); }
+.connection { display: inline-flex; align-items: center; gap: 7px; color: #aeb5bd; font-size: 12px; white-space: nowrap; }
+.connection svg { color: var(--gold); }
+.connection.ok svg { color: var(--health); }
+.connection.bad svg { color: var(--coral); }
+
+/* Single desktop boundary: below it the topbar drops its text labels so the
+   same components work at every window width and zoom level. */
+@media (max-width: 1079px) {
+  .topbar { gap: 11px; }
+  .brand > span:last-child, .connection > span { display: none; }
+  .global-search { max-width: none; }
+  .restore-button span, .add-button span { display: none; }
+  .restore-button, .add-button { width: 38px; padding: 8px; }
+}
+@media (max-width: 640px) {
+
+  .topbar { flex-wrap: wrap; padding: 10px 14px 12px; }
+
+  .global-search { order: 3; flex-basis: 100%; max-width: none; }
+
+  .top-actions { margin-left: auto; }
+
+}
+
+/* Message-composer treatment: a soft, low-contrast rounded card with an almost
+   opaque fill, a hairline border, and no blur at all. */
+.topbar {
+  width: calc(100% - 2 * var(--page-gutter));
+  min-height: 66px; gap: 14px; margin: 10px auto 0;
+  padding: 10px 16px; border: 1px solid rgb(255 255 255 / 5%); border-radius: 20px;
+  background: rgb(32 36 40 / 92%); box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
+  /* The card owns the layout; blur belongs only to the drawer and modal. */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.brand { color: var(--ink); font-size: 16px; }
+.brand-mark { width: 34px; height: 34px; border-color: var(--line-strong); border-radius: 10px; color: var(--primary-ink); background: var(--primary); box-shadow: none; }
+.global-search { min-height: 48px; padding-left: 13px; border-color: rgb(255 255 255 / 6%); border-radius: 18px; color: var(--muted); background: rgb(31 38 46 / 88%); box-shadow: none; }
+.global-search:focus-within { border-color: var(--accent); background: rgb(31 38 46 / 96%); box-shadow: 0 0 0 3px rgb(168 204 232 / 14%); }
+.global-search input::placeholder { color: var(--quiet); }
+.global-search button, .primary-button { color: var(--primary-ink); background: var(--primary); box-shadow: none; }
+.global-search button:hover, .primary-button:hover { background: var(--primary-deep); box-shadow: none; }
+.global-search button { min-height: 36px; border: 1px solid rgb(255 255 255 / 6%); }
+.global-search button, .secondary-button, .primary-button { border-radius: 999px; }
+.secondary-button { border-color: var(--line-strong); color: var(--ink); background: transparent; }
+.secondary-button:hover, .icon-button:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+.icon-button { border-color: var(--line-strong); color: var(--muted); background: transparent; }
+/* Top-bar actions share the composer's hairline contrast instead of the
+   heavier standalone button border. */
+.topbar .secondary-button, .topbar .icon-button { border-color: rgb(255 255 255 / 6%); background: rgb(255 255 255 / 4%); }
+.topbar .primary-button { border-color: rgb(255 255 255 / 6%); }
+.topbar .secondary-button:hover, .topbar .icon-button:hover { border-color: var(--accent); background: var(--accent-soft); }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible { outline-color: var(--accent); }
+button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focus:not(:focus-visible), select:focus:not(:focus-visible), summary:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: 0; }
+.connection { color: var(--muted); }
+.connection svg { color: var(--gold); }
+.connection.ok svg { color: var(--health); }
+.connection.bad svg { color: var(--coral); }
+
+
+@media (prefers-color-scheme: light) {
+
+  .topbar { background: rgb(247 250 251 / 92%); border-color: rgb(34 42 48 / 7%); box-shadow: 0 6px 20px rgb(25 48 67 / 8%); }
+
+  .global-search { background: rgb(231 237 240 / 88%); border-color: rgb(34 42 48 / 9%); }
+
+  .global-search:focus-within { background: rgb(231 237 240 / 96%); box-shadow: 0 0 0 3px rgb(56 100 131 / 14%); }
+
+  .topbar .secondary-button, .topbar .icon-button { border-color: rgb(34 42 48 / 11%); background: rgb(34 42 48 / 4%); }
+
+  .topbar .primary-button { border-color: rgb(34 42 48 / 11%); }
+}
+@media (max-width: 640px) {
+
+  .topbar { width: calc(100% - 2 * var(--page-gutter)); min-height: 58px; display: grid; grid-template-columns: auto minmax(0, 1fr); margin: 9px auto 0; padding: 10px; border-radius: 20px; gap: 9px; }
+
+  .top-actions { width: max-content; min-width: 0; display: flex; flex-wrap: nowrap; position: static; grid-column: 2; grid-row: 1; align-self: center; justify-self: end; justify-content: flex-end; gap: 2px; margin-left: 0; }
+
+  .top-actions button, .top-actions .icon-button { width: 32px; min-width: 32px; min-height: 32px; flex: 0 0 32px; padding: 6px; }
+
+  .global-search { width: 100%; grid-column: 1 / -1; grid-row: 2; order: initial; flex-basis: auto; }
+
+}
+
+/* Search convenience: a focus shortcut, a clear control, and a local recents
+   list. The recents panel is browser-only history; the durable form of a query
+   is a saved view (`view.save`), which this panel never creates or mirrors. */
+.global-search { position: relative; }
+.global-search .search-clear { width: 30px; min-height: 30px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 999px; color: var(--muted); background: transparent; font-weight: 600; }
+.global-search .search-clear:hover { border-color: var(--line-strong); color: var(--ink); background: var(--accent-soft); }
+.global-search .search-recents { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 6; display: grid; gap: 8px; padding: 12px 14px 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-container-high); box-shadow: var(--shadow-soft); }
+.global-search .search-recents-head { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.global-search .search-recents-head > span { min-width: 0; display: inline-flex; align-items: center; gap: 7px; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 720; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; text-overflow: ellipsis; }
+.global-search .search-recents-clear { min-height: 26px; flex: 0 0 auto; border: 1px solid transparent; border-radius: 999px; padding: 4px 10px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 660; }
+.global-search .search-recents-clear:hover { border-color: var(--line-strong); color: var(--ink); background: var(--accent-soft); }
+.global-search .search-recents-note { margin: 0; color: var(--quiet); font-size: 11px; line-height: 1.45; }
+.global-search .search-recents-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.global-search .search-recent-item { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.global-search .search-recent-entry { min-width: 0; flex: 1 1 auto; overflow: hidden; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; color: var(--ink); background: transparent; font-size: 13px; font-weight: 560; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
+.global-search .search-recent-entry:hover, .global-search .search-recent-entry:focus-visible { border-color: var(--line-strong); background: var(--accent-soft); }
+.global-search .search-recent-remove { width: 30px; height: 30px; min-height: 30px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid transparent; border-radius: 10px; padding: 0; color: var(--quiet); background: transparent; }
+.global-search .search-recent-remove:hover, .global-search .search-recent-remove:focus-visible { border-color: var(--line-strong); color: var(--coral); background: rgb(244 119 107 / 10%); }
+@media (max-width: 640px) {
+  /* The panel follows the field onto its own topbar row without covering the
+     whole phone viewport. */
+  .global-search .search-recents { max-height: 62vh; overflow-y: auto; }
+}

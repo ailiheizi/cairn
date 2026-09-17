@@ -1,0 +1,334 @@
+/* The duplicate-group review surface (components/DuplicatesSurface.tsx).
+ *
+ * Owner: the duplicates surface. Imported by styles/index.css after the other
+ * surface files; never reorder the imports there.
+ *
+ * Rule: the facts carry the meaning. Members are laid out side by side with
+ * their name, provenance path, logical size, entry type, protection outcome,
+ * representation and placement; colour only accompanies a state the daemon
+ * reported. A fact the daemon did not report stays muted and marked UNKNOWN —
+ * no member card may look healthy because a field is missing. Nothing here is
+ * an affordance to delete, move, or merge bytes. */
+
+.duplicates-surface { min-width: 0; }
+
+.duplicates-note,
+.duplicates-read-at,
+.duplicates-loading,
+.duplicates-action,
+.duplicates-annotation-warning {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.duplicates-contract { color: var(--ink); }
+.duplicates-read-at { margin: 12px 0 0; }
+.duplicates-loading { margin: 18px 0 0; font-size: 12px; }
+
+.duplicates-surface .result-count.duplicates-scope {
+  max-width: min(520px, 46vw);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.duplicates-blocked,
+.duplicates-partial {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(221, 169, 82, 0.28);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--gold);
+  background: rgba(61, 45, 20, 0.3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.duplicates-blocked svg,
+.duplicates-partial svg { flex: 0 0 auto; margin-top: 1px; }
+.duplicates-blocked > div,
+.duplicates-partial > div { min-width: 0; display: grid; gap: 3px; }
+.duplicates-blocked strong,
+.duplicates-partial strong { color: var(--ink); font-size: 12px; }
+.duplicates-blocked small,
+.duplicates-partial small { overflow-wrap: anywhere; font-size: 11px; }
+
+.duplicates-empty { margin-top: 12px; }
+
+/* --- the tag selection bar (never a delete bar) --------------------------- */
+
+.duplicates-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: var(--surface-raised);
+}
+
+.duplicates-selection-count { color: var(--ink); font-size: 11px; font-weight: 800; }
+
+.duplicates-tag { display: flex; flex: 1 1 260px; min-width: 0; gap: 7px; }
+.duplicates-tag input {
+  flex: 1 1 140px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: var(--surface-dim);
+  font-size: 11px;
+}
+
+.duplicates-tag input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.duplicates-selection-note { flex: 1 1 100%; color: var(--quiet); font-size: 10px; line-height: 1.45; }
+
+.duplicates-action { margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.duplicates-action[data-action-state="DONE"] { color: var(--health); }
+
+/* --- one group ------------------------------------------------------------ */
+
+.duplicates-groups {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.duplicate-group {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 10px 11px 11px;
+  background: var(--surface-container-low);
+  box-shadow: var(--shadow-soft);
+}
+
+.duplicate-group-header { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.duplicate-group-toggle {
+  flex: 1 1 360px;
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 6px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.duplicate-group-toggle:hover { background: var(--surface-soft); }
+.duplicate-group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.duplicate-group-chevron { flex: 0 0 auto; color: var(--quiet); transition: transform 150ms ease; }
+.duplicate-group-toggle[aria-expanded="true"] .duplicate-group-chevron { transform: rotate(90deg); }
+
+.duplicate-identity {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-members-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--muted);
+  background: var(--surface-dim);
+  font-size: 10px;
+}
+
+.duplicate-logical-size { flex: 0 0 auto; color: var(--muted); font-size: 11px; }
+
+.duplicate-confirmation { flex: 1 1 100%; color: var(--muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.duplicate-confirmation[data-daemon-confirmation="MISMATCH"] { color: var(--gold); }
+.duplicate-confirmation[data-daemon-confirmation="UNKNOWN"] { color: var(--quiet); }
+
+/* --- members side by side ------------------------------------------------- */
+
+.duplicate-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.duplicate-member {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px 10px;
+  background: var(--surface-container);
+}
+
+.duplicate-member.selected { border-color: var(--blue); }
+.duplicate-member.expanded { border-color: var(--line-strong); background: var(--surface-container-high); }
+
+.duplicate-member-header { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.duplicate-member-select { flex: 0 0 auto; width: 14px; height: 14px; accent-color: var(--accent); }
+
+.duplicate-member-open {
+  flex: 1 1 140px;
+  min-width: 0;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 5px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.duplicate-member-open:hover { background: var(--surface-soft); }
+.duplicate-member-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.duplicate-member-mark {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--blue);
+  font-size: 10px;
+}
+
+.duplicate-member-facts { display: grid; gap: 6px; margin: 0; }
+.duplicate-fact { min-width: 0; display: grid; gap: 1px; }
+
+.duplicate-fact dt {
+  color: var(--quiet);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.duplicate-fact dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.duplicate-fact dd[data-protection-known="false"] { color: var(--muted); }
+.duplicate-fact dd[data-placement="missing"] { color: var(--coral); }
+.duplicate-fact dd[data-placement="unknown"] { color: var(--muted); }
+
+.duplicate-member-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.duplicate-copy-state { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+
+/* --- the member's details (opened, never destructive) --------------------- */
+
+.duplicate-member-details {
+  display: grid;
+  gap: 9px;
+  border-top: 1px dashed var(--line);
+  padding-top: 9px;
+  min-width: 0;
+}
+
+.duplicate-member-details-facts { border: 1px solid var(--line); border-radius: 5px; padding: 7px 8px; background: var(--surface-dim); }
+.duplicate-monospace { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; overflow-wrap: anywhere; }
+
+.duplicate-representations-scroll { max-width: 100%; overflow-x: auto; }
+
+.duplicate-representations {
+  border-collapse: collapse;
+  min-width: 100%;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.duplicate-representations caption { padding: 0 0 5px; color: var(--ink); font-size: 10px; font-weight: 800; text-align: left; }
+.duplicate-representations th,
+.duplicate-representations td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; white-space: nowrap; }
+.duplicate-representations th { color: var(--quiet); font-weight: 700; }
+.duplicate-representations td { color: var(--ink); }
+
+.duplicate-notes { display: grid; gap: 6px; }
+.duplicate-details-heading { margin: 0; color: var(--ink); font-size: 11px; font-weight: 800; }
+.duplicate-notes-empty { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+
+.duplicate-note-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.duplicate-note-list li {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: var(--ink);
+  background: var(--surface-dim);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-note { display: flex; flex-wrap: wrap; gap: 7px; }
+.duplicate-note input {
+  flex: 1 1 160px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: var(--surface-dim);
+  font-size: 11px;
+}
+
+.duplicate-note input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.duplicate-note-state { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .duplicate-members { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .duplicates-surface .result-count.duplicates-scope { max-width: 100%; text-align: left; }
+  .duplicate-group-toggle { flex: 1 1 100%; }
+  .duplicate-confirmation { flex: 1 1 100%; }
+  .duplicates-tag { flex: 1 1 100%; }
+}
+
+@media (prefers-color-scheme: light) {
+  .duplicate-group { background: var(--surface); }
+  .duplicate-member { background: var(--surface-raised); }
+  .duplicate-member.expanded { background: var(--surface-soft); }
+  .duplicate-member-details-facts,
+  .duplicate-note-list li,
+  .duplicate-tag input,
+  .duplicate-note input { background: var(--surface-container-low); }
+  .duplicates-blocked,
+  .duplicates-partial { background: rgba(221, 169, 82, 0.1); }
+}

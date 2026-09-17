@@ -34,6 +34,13 @@ func (s *Service) VerifyMode(ctx context.Context, snapshotRef, mode, destination
 	if normalized == VerifyRestoreDrill && strings.TrimSpace(destination) == "" {
 		return result, fmt.Errorf("%w: restore-drill requires a destination", ErrBlocked)
 	}
+	// Record the requested scope before any read so a failure receipt still
+	// names the snapshot and the mode that actually ran. Counts stay zero
+	// until the manifest is loaded.
+	result.SnapshotRef = snapshotRef
+	result.Mode = normalized
+	result.AcceptedLevel = normalized
+	result.CatalogUsed = false
 
 	manifest, err := s.loadManifest(ctx, snapshotRef)
 	if err != nil {
@@ -44,13 +51,9 @@ func (s *Service) VerifyMode(ctx context.Context, snapshotRef, mode, destination
 	}
 
 	files := fileEntries(manifest)
-	result.SnapshotRef = snapshotRef
-	result.Mode = normalized
-	result.AcceptedLevel = normalized
 	result.Entries = len(manifest.Entries)
 	result.Files = len(files)
 	result.Bytes = fileBytes(files)
-	result.CatalogUsed = false
 
 	switch normalized {
 	case VerifyAuthenticatedMetadata:

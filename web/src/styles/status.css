@@ -1,0 +1,83 @@
+/* The trusted status surface (components/StatusPanel.tsx).
+ *
+ * Owner: the status surface. This file is imported last by styles/index.css so
+ * its rules can replace the readiness strip and the readiness dots that used
+ * to live in topbar.css and library.css. Never reorder the imports in
+ * styles/index.css.
+ *
+ * Rule: a health state is always the four-state string the row renders
+ * (PROVEN / UNKNOWN / DEGRADED / FAILED). Colour and weight only accompany
+ * that string; no dot or glyph may carry a health meaning on its own.
+ */
+
+.status-panel {
+  display: block;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface-dim);
+  font-size: 12px;
+}
+
+.status-panel-summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 max(clamp(18px, 3vw, 42px), calc((100vw - 1760px) / 2 + 30px));
+  cursor: pointer;
+}
+
+.status-panel-summary::-webkit-details-marker { display: none; }
+.status-panel-summary { list-style: none; }
+.status-panel-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.status-panel-summary .status-panel-summary-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-panel-asof { color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.status-panel-chevron { flex: 0 0 auto; color: var(--muted); transition: transform 150ms ease; }
+.status-panel[open] .status-panel-chevron { transform: rotate(90deg); }
+
+.status-panel-body {
+  padding: 6px max(clamp(18px, 3vw, 42px), calc((100vw - 1760px) / 2 + 30px)) 12px;
+}
+
+.status-panel-note { max-width: 76ch; margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+.health-facts { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+
+.health-fact {
+  display: block;
+  padding: 3px 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.health-state { font-weight: 800; letter-spacing: 0.02em; }
+.health-state[data-state="PROVEN"] { color: var(--health); }
+.health-state[data-state="UNKNOWN"] { color: var(--muted); }
+.health-state[data-state="DEGRADED"] { color: var(--gold); }
+.health-state[data-state="FAILED"] { color: var(--coral); }
+
+.status-panel-summary[data-health="FAILED"] .status-panel-summary-text { color: var(--coral); }
+.status-panel-summary[data-health="DEGRADED"] .status-panel-summary-text { color: var(--gold); }
+.status-panel-summary[data-health="UNKNOWN"] .status-panel-summary-text { color: var(--muted); }
+
+.status-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.status-panel-actions .secondary-button.compact { min-height: 30px; padding: 5px 12px; font-size: 11px; }
+.status-panel-actions .icon-button { min-height: 30px; min-width: 30px; }
+
+@media (max-width: 640px) {
+  .status-panel-summary { padding: 0 14px; }
+  .status-panel-body { padding: 6px 14px 12px; }
+  .status-panel-summary .status-panel-summary-text { white-space: normal; }
+}

@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -206,18 +207,107 @@ func (d *Dispatcher) handleSnapshotList(ctx context.Context, env command.Envelop
 			DisplayPath:    manifest.Binding.DisplayPath,
 			ManifestDigest: manifest.ManifestDigest,
 		}
-		// Namespace browsing is an optional operational projection. Snapshot
-		// discovery and recovery remain repository-backed when the catalog is
-		// absent, including in the clean-install reader.
+		applySnapshotManifestFacts(&summary, manifest)
+		// Namespace browsing and verification receipts are optional
+		// operational projections. Snapshot discovery and recovery remain
+		// repository-backed when the catalog is absent, and an absent receipt
+		// is reported as UNRECORDED with a reason rather than a zeroed time.
+		summary.Verification = unrecordedSnapshotVerification(
+			"catalog is not attached; verification receipts are stored in the catalog audit ledger")
 		if d.exact.Store != nil {
 			if root, rootErr := d.exact.Store.GetNamespaceRootBySnapshotRef(ctx, manifest.SnapshotRef); rootErr == nil {
 				summary.WorkspaceID = root.WorkspaceID
 				summary.NamespaceRootID = root.ID
+				summary.Verification = d.snapshotVerificationReceipt(ctx, root.WorkspaceID, manifest.SnapshotRef)
+			} else {
+				summary.Verification = unrecordedSnapshotVerification(
+					"snapshot has no catalog namespace root; verification receipts are read from the catalog audit ledger")
 			}
 		}
 		summaries = append(summaries, summary)
 	}
 	return succeeded(env, started, command.SnapshotListData{Snapshots: summaries})
+}
+
+// applySnapshotManifestFacts derives restore-point counts only from the
+// repository-loaded manifest. Non-file entries never contribute to the
+// protection mix: their recorded METADATA_ONLY projection says nothing about
+// user content protection. Every regular file lands in exactly one outcome
+// bucket, including an explicit UNRECORDED bucket for a legacy entry without a
+// recorded outcome, so no member silently disappears from the mix.
+func applySnapshotManifestFacts(summary *command.SnapshotSummary, manifest exact.Manifest) {
+	outcomes := map[string]int{}
+	complete := true
+	for _, entry := range manifest.Entries {
+		summary.Entries++
+		if sqlite.NamespaceEntryType(entry.EntryType) != sqlite.EntryFile {
+			continue
+		}
+		summary.Files++
+		if entry.LogicalSize == nil {
+			complete = false
+		} else {
+			summary.Bytes += *entry.LogicalSize
+		}
+		outcome := entry.Protection.Outcome
+		if outcome == "" {
+			outcome = command.SnapshotProtectionOutcomeUnrecorded
+		}
+		outcomes[outcome]++
+		switch sqlite.ProtectionOutcome(outcome) {
+		case sqlite.ProtectionExactProtected, sqlite.ProtectionExactFallback:
+			summary.ProtectedFiles++
+		case sqlite.ProtectionLinkOnlyUnprotected, sqlite.ProtectionExplicitlyUnprotected:
+			summary.UnprotectedFiles++
+		}
+	}
+	summary.BytesComplete = complete
+	if len(outcomes) > 0 {
+		summary.ProtectionOutcomes = outcomes
+	}
+}
+
+func unrecordedSnapshotVerification(reason string) *command.SnapshotVerificationData {
+	return &command.SnapshotVerificationData{
+		State:  command.SnapshotVerificationStateUnrecorded,
+		Reason: reason,
+	}
+}
+
+// snapshotVerificationReceipt reads the newest append-only verification
+// receipt. A missing or unreadable receipt is UNRECORDED with a reason; it is
+// never a zeroed timestamp and never a healthy default.
+func (d *Dispatcher) snapshotVerificationReceipt(ctx context.Context, workspaceID, snapshotRef string) *command.SnapshotVerificationData {
+	if d == nil || d.store == nil {
+		return unrecordedSnapshotVerification(
+			"catalog is not attached; verification receipts are stored in the catalog audit ledger")
+	}
+	event, err := d.store.LatestSnapshotVerificationEvent(ctx, workspaceID, snapshotRef)
+	if err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			return unrecordedSnapshotVerification(
+				"no snapshot.verify receipt has been recorded for this restore point")
+		}
+		return unrecordedSnapshotVerification("verification receipts could not be read: " + err.Error())
+	}
+	var details snapshotVerifyReceiptDetails
+	if err := json.Unmarshal(event.Details, &details); err != nil {
+		return unrecordedSnapshotVerification("the newest verification receipt is unreadable: " + err.Error())
+	}
+	return &command.SnapshotVerificationData{
+		State:           command.SnapshotVerificationStateRecorded,
+		Mode:            details.Mode,
+		Outcome:         details.Outcome,
+		AttemptedFiles:  details.AttemptedFiles,
+		AttemptedBytes:  details.AttemptedBytes,
+		PassedFiles:     details.PassedFiles,
+		PassedBytes:     details.PassedBytes,
+		OK:              details.OK,
+		RestoreVerified: details.RestoreVerified,
+		FailureReason:   details.Reason,
+		VerifiedAt:      event.OccurredAt.UTC().Format(time.RFC3339),
+		RequestID:       firstNonEmpty(details.RequestID, event.RequestID),
+	}
 }
 
 type snapshotDiffInput struct {
@@ -331,10 +421,14 @@ func (d *Dispatcher) handleSnapshotVerify(ctx context.Context, env command.Envel
 		return invalidInputResult(env, started, errString("snapshot_ref is required"))
 	}
 	verified, err := d.exact.VerifyMode(ctx, input.SnapshotRef, input.Mode, input.Destination)
+	// One append-only receipt per run. Runs that never attempted verification
+	// (invalid mode or destination, unknown snapshot, cancelled context) write
+	// nothing, so they can never be mistaken for a pass.
+	receiptErr := d.recordSnapshotVerificationReceipt(ctx, env.RequestID, input.SnapshotRef, verified, err)
 	if err != nil {
 		return exactOperationErrorResult(env, started, err)
 	}
-	return succeeded(env, started, command.SnapshotVerifyData{
+	data := command.SnapshotVerifyData{
 		SnapshotRef:     verified.SnapshotRef,
 		Mode:            verified.Mode,
 		AcceptedLevel:   verified.AcceptedLevel,
@@ -348,6 +442,110 @@ func (d *Dispatcher) handleSnapshotVerify(ctx context.Context, env command.Envel
 		OK:              verified.OK,
 		RestoreVerified: verified.RestoreVerified,
 		CatalogUsed:     verified.CatalogUsed,
+	}
+	if receiptErr != nil {
+		// The verification itself succeeded and stays valid; the missing
+		// receipt is reported explicitly instead of being hidden.
+		return degradedResult(env, started, data,
+			"snapshot verification succeeded, but the audit receipt could not be recorded: "+receiptErr.Error())
+	}
+	return succeeded(env, started, data)
+}
+
+// snapshotVerifyReceiptDetails is the append-only audit details payload for
+// one verification run. It carries the mode that ran, the recorded outcome,
+// the counts the run actually reached, the caller request id, and the failure
+// or unavailability reason when the run did not pass.
+type snapshotVerifyReceiptDetails struct {
+	Mode            string `json:"mode"`
+	Outcome         string `json:"outcome"`
+	AttemptedFiles  int    `json:"attempted_files"`
+	AttemptedBytes  int64  `json:"attempted_bytes"`
+	PassedFiles     int    `json:"passed_files"`
+	PassedBytes     int64  `json:"passed_bytes"`
+	OK              bool   `json:"ok"`
+	RestoreVerified bool   `json:"restore_verified"`
+	RequestID       string `json:"request_id"`
+	Reason          string `json:"reason,omitempty"`
+}
+
+// snapshotVerificationReceiptOutcome classifies one verification error into
+// the receipt outcome. Runs that never attempted verification report no
+// outcome and write nothing.
+func snapshotVerificationReceiptOutcome(verifyErr error) (string, bool) {
+	switch {
+	case verifyErr == nil:
+		return command.SnapshotVerificationOutcomeSucceeded, true
+	case errors.Is(verifyErr, exact.ErrVerificationUnavailable):
+		return command.SnapshotVerificationOutcomeUnavailable, true
+	case errors.Is(verifyErr, exact.ErrBlocked),
+		errors.Is(verifyErr, context.Canceled),
+		errors.Is(verifyErr, context.DeadlineExceeded),
+		containsNotFound(verifyErr):
+		return "", false
+	default:
+		return command.SnapshotVerificationOutcomeFailed, true
+	}
+}
+
+// recordSnapshotVerificationReceipt appends exactly one audit event for a
+// completed verification. Catalog-free readers retain no audit ledger and
+// return nil; a snapshot without a catalog namespace root cannot be keyed to a
+// workspace, so it stays visibly unreceipted instead of fabricating one.
+func (d *Dispatcher) recordSnapshotVerificationReceipt(
+	ctx context.Context, requestID, snapshotRef string, result exact.VerifyResult, verifyErr error,
+) error {
+	if d == nil || d.store == nil {
+		return nil
+	}
+	outcome, record := snapshotVerificationReceiptOutcome(verifyErr)
+	if !record {
+		return nil
+	}
+	root, err := d.store.GetNamespaceRootBySnapshotRef(ctx, snapshotRef)
+	if err != nil {
+		if containsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	reason := ""
+	if verifyErr != nil {
+		reason = verifyErr.Error()
+	}
+	details, err := json.Marshal(snapshotVerifyReceiptDetails{
+		Mode:            result.Mode,
+		Outcome:         outcome,
+		AttemptedFiles:  result.AttemptedFiles,
+		AttemptedBytes:  result.AttemptedBytes,
+		PassedFiles:     result.PassedFiles,
+		PassedBytes:     result.PassedBytes,
+		OK:              result.OK,
+		RestoreVerified: result.RestoreVerified,
+		RequestID:       requestID,
+		Reason:          reason,
+	})
+	if err != nil {
+		return err
+	}
+	action := sqlite.AuditActionSnapshotVerifyFailed
+	auditOutcome := "FAILED"
+	if outcome == command.SnapshotVerificationOutcomeSucceeded {
+		action = sqlite.AuditActionSnapshotVerifySucceeded
+		auditOutcome = "SUCCEEDED"
+	}
+	return d.store.Update(ctx, func(tx *sqlite.Tx) error {
+		return tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
+			ID:          mustAuditID(),
+			WorkspaceID: root.WorkspaceID,
+			Actor:       "restoreweaved",
+			Action:      action,
+			TargetType:  sqlite.AuditTargetSnapshot,
+			TargetID:    snapshotRef,
+			RequestID:   requestID,
+			Outcome:     auditOutcome,
+			Details:     details,
+		})
 	})
 }
 

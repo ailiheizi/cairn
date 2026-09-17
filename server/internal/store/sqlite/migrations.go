@@ -1642,6 +1642,21 @@ END;
 PRAGMA user_version = 23;
 `,
 	},
+	{
+		version: 24,
+		name:    "export_manifest_sidecar_policy",
+		sql: `
+-- The requested sidecar policy is part of the frozen ExportManifest field set
+-- and is therefore covered by the canonical manifest digest. Persist it
+-- faithfully so a manifest planned with a policy still rebuilds the identical
+-- digest after being read back from the catalog. Rows written before this
+-- migration were planned with an empty policy; the column default reproduces
+-- that empty value instead of inventing one.
+ALTER TABLE export_manifests ADD COLUMN sidecars TEXT NOT NULL DEFAULT '';
+
+PRAGMA user_version = 24;
+`,
+	},
 }
 
 func (s *Store) migrate(ctx context.Context) error {
@@ -1740,4 +1755,102 @@ func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	return int(version.Int64), nil
+}
+
+// Catalog schema ledger states. They mirror the open-time ErrSchemaTooNew and
+// ErrMigrationDrift conditions and are reported as facts instead of only as an
+// error string.
+const (
+	SchemaStateCurrent         = "CURRENT"
+	SchemaStateDrift           = "DRIFT"
+	SchemaStateNewerThanBinary = "NEWER_THAN_BINARY"
+	SchemaStateUnknown         = "UNKNOWN"
+)
+
+// SchemaStatus is a read-only report of the catalog's applied migration
+// ledger. It never write-repairs a drifted or newer catalog; the caller
+// surfaces the state and reason to the operator.
+type SchemaStatus struct {
+	// Version and Name identify the newest applied migration. They stay zero
+	// when no ledger row can be read.
+	Version       int
+	Name          string
+	BinaryVersion int
+	State         string
+	Reason        string
+}
+
+// SchemaStatus compares the applied migration ledger with this binary's
+// embedded migrations. A missing or unreadable ledger is UNKNOWN with a
+// reason, never a healthy zero-version catalog.
+func (s *Store) SchemaStatus(ctx context.Context) SchemaStatus {
+	status := SchemaStatus{BinaryVersion: newestMigrationVersion(), State: SchemaStateUnknown}
+	rows, err := s.db.QueryContext(ctx, `SELECT version, name, checksum FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		status.Reason = fmt.Sprintf("read migration ledger: %v", err)
+		return status
+	}
+	defer rows.Close()
+	type appliedMigration struct {
+		version  int
+		name     string
+		checksum string
+	}
+	var applied []appliedMigration
+	for rows.Next() {
+		var entry appliedMigration
+		if err := rows.Scan(&entry.version, &entry.name, &entry.checksum); err != nil {
+			status.Reason = fmt.Sprintf("scan migration ledger: %v", err)
+			return status
+		}
+		applied = append(applied, entry)
+	}
+	if err := rows.Err(); err != nil {
+		status.Reason = fmt.Sprintf("iterate migration ledger: %v", err)
+		return status
+	}
+	if len(applied) == 0 {
+		status.Reason = "catalog has no applied migration ledger"
+		return status
+	}
+	newest := applied[len(applied)-1]
+	status.Version = newest.version
+	status.Name = newest.name
+	embedded := make(map[int]migration, len(migrations))
+	for _, item := range migrations {
+		embedded[item.version] = item
+	}
+	for _, entry := range applied {
+		item, ok := embedded[entry.version]
+		if !ok {
+			if entry.version > status.BinaryVersion {
+				status.State = SchemaStateNewerThanBinary
+				status.Reason = fmt.Sprintf("catalog schema version %d (%s) is newer than this binary's newest migration %d",
+					entry.version, entry.name, status.BinaryVersion)
+				return status
+			}
+			status.State = SchemaStateDrift
+			status.Reason = fmt.Sprintf("catalog migration %d (%s) is not part of this binary's migration set",
+				entry.version, entry.name)
+			return status
+		}
+		if migrationChecksum(item) != entry.checksum {
+			status.State = SchemaStateDrift
+			status.Reason = fmt.Sprintf("catalog migration %d (%s) checksum differs from this binary's embedded migration",
+				entry.version, entry.name)
+			return status
+		}
+	}
+	status.State = SchemaStateCurrent
+	return status
+}
+
+func newestMigrationVersion() int {
+	newest := 0
+	for _, item := range migrations {
+		if item.version > newest {
+			newest = item.version
+		}
+	}
+	return newest
 }

@@ -1,0 +1,35 @@
+/* Surface stylesheet: the selection report (components/SelectionBar.tsx and
+ * lib/report.ts).
+ *
+ * Owner: the selection-report surface. Imported by styles/index.css after the
+ * other surface files; never reorder the imports there.
+ *
+ * The report itself is a downloaded Markdown file, so nothing here styles an
+ * in-page document. These rules cover the bar action, its one-line truthful
+ * description, and its status message. The message keeps the bar's own layout:
+ * it sits on its own line and states the outcome the daemon's reads produced,
+ * including how many subjects could not be read or were skipped. */
+
+.selection-report { flex: 0 0 auto; }
+.selection-report[aria-busy="true"] { opacity: 0.85; }
+
+.selection-report-note {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--quiet);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.selection-report-state {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.selection-report-state[data-report-state="DONE"] { color: var(--health); }
+.selection-report-state[data-report-state="FAILED"] { color: var(--coral); }

@@ -64,6 +64,30 @@ SELECT workspace_id, name, metadata_json, revision, created_at_ns, updated_at_ns
 FROM workspaces WHERE workspace_id = ?`, workspaceID))
 }
 
+// ListWorkspaces returns every workspace in deterministic creation order. It
+// is a read-only projection used by status reporting; it creates nothing.
+func (s *Store) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT workspace_id, name, metadata_json, revision, created_at_ns, updated_at_ns
+FROM workspaces ORDER BY created_at_ns, workspace_id`)
+	if err != nil {
+		return nil, fmt.Errorf("list workspaces: %w", err)
+	}
+	defer rows.Close()
+	var workspaces []Workspace
+	for rows.Next() {
+		record, err := scanWorkspace(rows)
+		if err != nil {
+			return nil, err
+		}
+		workspaces = append(workspaces, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list workspaces: %w", err)
+	}
+	return workspaces, nil
+}
+
 func scanWorkspace(scanner rowScanner) (Workspace, error) {
 	var record Workspace
 	var metadata string
@@ -1281,6 +1305,68 @@ LIMIT ?`, workspaceID, jobID, afterSequence, limit)
 		return nil, fmt.Errorf("list job audit events: %w", err)
 	}
 	return events, nil
+}
+
+// Audit target and action vocabulary for snapshot verification receipts. The
+// audit ledger is append-only: a receipt is appended once per verification run
+// and is never rewritten.
+const (
+	AuditTargetSnapshot                = "SNAPSHOT"
+	AuditActionSnapshotVerifySucceeded = "SNAPSHOT_VERIFY_SUCCEEDED"
+	AuditActionSnapshotVerifyFailed    = "SNAPSHOT_VERIFY_FAILED"
+)
+
+// SnapshotVerificationEvent is the newest append-only snapshot.verify receipt
+// for one snapshot. Details remains an opaque JSON object owned by the writer;
+// the store never interprets it. ErrNotFound means no receipt was ever
+// recorded, which is not the same claim as a failed verification.
+type SnapshotVerificationEvent struct {
+	Sequence    int64
+	EventID     string
+	WorkspaceID string
+	SnapshotRef string
+	Action      string
+	Outcome     string
+	RequestID   string
+	Details     json.RawMessage
+	OccurredAt  time.Time
+}
+
+// LatestSnapshotVerificationEvent returns the newest recorded verification
+// receipt for one snapshot ref in one workspace.
+func (s *Store) LatestSnapshotVerificationEvent(
+	ctx context.Context,
+	workspaceID, snapshotRef string,
+) (SnapshotVerificationEvent, error) {
+	if err := requireID("workspace id", workspaceID); err != nil {
+		return SnapshotVerificationEvent{}, err
+	}
+	if err := requireText("snapshot ref", snapshotRef); err != nil {
+		return SnapshotVerificationEvent{}, err
+	}
+	var event SnapshotVerificationEvent
+	var details string
+	var occurred int64
+	err := s.db.QueryRowContext(ctx, `
+SELECT audit_sequence, audit_event_id, workspace_id, target_id, action,
+       request_id, outcome, details_json, occurred_at_ns
+FROM audit_events
+WHERE workspace_id = ? AND target_type = ? AND target_id = ?
+  AND action IN (?, ?)
+ORDER BY audit_sequence DESC
+LIMIT 1`,
+		workspaceID, AuditTargetSnapshot, snapshotRef,
+		AuditActionSnapshotVerifySucceeded, AuditActionSnapshotVerifyFailed,
+	).Scan(
+		&event.Sequence, &event.EventID, &event.WorkspaceID, &event.SnapshotRef,
+		&event.Action, &event.RequestID, &event.Outcome, &details, &occurred,
+	)
+	if err != nil {
+		return SnapshotVerificationEvent{}, rowError("snapshot verification receipt", err)
+	}
+	event.Details = json.RawMessage(details)
+	event.OccurredAt = time.Unix(0, occurred).UTC()
+	return event, nil
 }
 
 func auditEventDigest(event AuditEvent) (string, error) {

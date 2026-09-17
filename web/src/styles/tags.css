@@ -1,0 +1,316 @@
+/* The tags surface (components/TagsSurface.tsx).
+ *
+ * Owner: the tags surface. Imported by styles/index.css after the other
+ * surface files; never reorder the imports there.
+ *
+ * Rule: the stored name carries the meaning. A tag row shows the daemon's own
+ * body byte-for-byte with its live subject count, and a subject row shows the
+ * name, provenance path and protection state the daemon reported; a fact the
+ * daemon did not report stays muted and marked UNKNOWN. Colour only
+ * accompanies a state the daemon reported, and nothing here is an affordance
+ * to rewrite a tag in place: rename and merge are previewed per-subject writes
+ * whose applied record stays visible, including its failures. */
+
+.tags-surface { min-width: 0; }
+
+.tags-note,
+.tags-read-at,
+.tags-loading,
+.tags-filter-note,
+.tags-detail-note,
+.tags-detail-hint,
+.tags-listing-warning,
+.tags-edit-action,
+.tags-rename-note,
+.tags-rename-action,
+.tags-applied-note,
+.tags-handoff,
+.tags-add-empty {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tags-contract { color: var(--ink); }
+.tags-read-at { margin: 12px 0 0; }
+.tags-loading { margin: 18px 0 0; font-size: 12px; }
+
+.tags-surface .result-count.tags-scope {
+  max-width: min(520px, 46vw);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.tags-blocked,
+.tags-applied-partial {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid rgba(221, 169, 82, 0.28);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--gold);
+  background: rgba(61, 45, 20, 0.3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tags-blocked svg,
+.tags-applied-partial svg { flex: 0 0 auto; margin-top: 1px; }
+.tags-blocked > div,
+.tags-applied-partial > div { min-width: 0; display: grid; gap: 3px; }
+.tags-blocked strong,
+.tags-applied-partial strong { color: var(--ink); font-size: 12px; }
+.tags-blocked small,
+.tags-applied-partial small { overflow-wrap: anywhere; font-size: 11px; }
+
+.tags-empty { margin-top: 12px; }
+
+/* The two panes: the vocabulary on the left, one tag's subjects and controls
+   on the right. Below the desktop boundary the panes stack in one column. */
+.tags-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+.tags-list-pane,
+.tags-detail-pane { min-width: 0; }
+
+.tags-filter { display: grid; gap: 5px; margin-bottom: 7px; font-size: 11px; color: var(--muted); }
+.tags-filter input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--ink);
+  background: var(--surface-container-low);
+  font: inherit;
+  font-size: 12px;
+}
+
+.tags-filter input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tags-filter-note { margin-bottom: 8px; }
+
+.tag-rows,
+.tag-subject-rows,
+.tags-preview-rows,
+.tags-applied-rows,
+.tags-failed-subjects {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.tag-row { min-width: 0; }
+
+.tag-row-button {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--surface-container-low);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-row-button:hover { border-color: var(--line-strong); background: var(--surface-container); }
+.tag-row-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tag-row[data-selected="true"] .tag-row-button { border-left-color: var(--primary); background: var(--primary-soft); }
+
+.tag-body { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+
+.tag-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tags-filter-empty { margin: 8px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
+.tags-detail-pane {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-container-low);
+}
+
+.tags-detail-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.tags-detail-heading h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: 17px; }
+.tags-detail-count { flex: 0 0 auto; color: var(--muted); font-size: 11px; }
+.tags-detail-hint { margin: 0; }
+
+.tags-listing-warning { color: var(--gold); }
+
+.tag-subject-row {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: var(--surface-container);
+}
+
+.tag-subject-row[data-protection-state="EXACT_PROTECTED"] { border-left-color: var(--health); }
+.tag-subject-row[data-protection-state="EXACT_FALLBACK"] { border-left-color: var(--blue); }
+.tag-subject-row[data-protection-state="LINK_ONLY_UNPROTECTED"],
+.tag-subject-row[data-protection-state="EXPLICITLY_UNPROTECTED"] { border-left-color: var(--gold); }
+.tag-subject-row[data-protection-state="BLOCKED"] { border-left-color: var(--coral); }
+
+.tag-subject-toggle {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-subject-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tag-subject-name { min-width: 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 600; }
+.tag-subject-path,
+.tag-subject-protection,
+.tag-subject-record { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+.tag-subject-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.tag-subject-facts { display: grid; gap: 4px; margin: 0; padding-top: 4px; border-top: 1px solid var(--line); }
+.tag-subject-facts > div { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); gap: 8px; }
+.tag-subject-facts dt { color: var(--muted); font-size: 11px; }
+.tag-subject-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: 11px; }
+
+.tags-add,
+.tags-rename {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.tags-add h3,
+.tags-rename h3 { margin: 0 0 6px; color: var(--ink); font-size: 13px; }
+.tags-add-field,
+.tags-rename-field { display: grid; gap: 5px; margin-bottom: 8px; color: var(--muted); font-size: 11px; }
+.tags-add-field select,
+.tags-rename-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--ink);
+  background: var(--surface-container);
+  font: inherit;
+  font-size: 12px;
+}
+
+.tags-add-field select:focus-visible,
+.tags-rename-field input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tags-rename-actions,
+.tags-preview-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.tags-preview,
+.tags-applied {
+  margin-top: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 10px;
+  background: var(--surface-container);
+  min-width: 0;
+}
+
+.tags-preview { border-left: 3px solid var(--blue); }
+.tags-applied { border-left: 3px solid var(--health); }
+.tags-applied[data-partial="true"] { border-left-color: var(--coral); }
+
+.tags-preview-heading,
+.tags-applied-heading,
+.tags-applied-complete {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tags-preview-row,
+.tags-applied-row {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: var(--surface-container-low);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tags-preview-row [data-fact="preview-change"] { color: var(--ink); }
+.tags-applied-row [data-outcome="CHANGED"] { color: var(--health); }
+.tags-applied-row [data-outcome="UNCHANGED"] { color: var(--gold); }
+.tags-applied-row [data-outcome="TARGET_ADDED_SOURCE_REMAINS"] { color: var(--coral); }
+.tags-applied-row [data-fact="applied-name"] { color: var(--ink); font-weight: 600; }
+.tags-applied-row [data-fact="applied-path"],
+.tags-applied-row [data-fact="applied-outcome"],
+.tags-applied-row [data-fact="applied-reason"] { color: inherit; }
+
+.tags-applied-reason { color: var(--gold); }
+
+.tags-applied-partial { margin-bottom: 8px; }
+
+.tags-failed-subjects {
+  margin-top: 9px;
+  color: var(--coral);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tags-handoff { color: var(--ink); }
+
+@media (max-width: 1079px) {
+  .tags-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .tags-surface .result-count.tags-scope { max-width: 100%; text-align: left; }
+  .tag-subject-facts > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-color-scheme: light) {
+  .tags-detail-pane,
+  .tag-row-button,
+  .tag-subject-row,
+  .tags-preview,
+  .tags-applied { background-image: none; }
+  .tags-blocked,
+  .tags-applied-partial { background: rgb(152 98 28 / 8%); }
+}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -65,6 +66,273 @@ func TestZstdDirReadbackCompressionAndDeduplication(t *testing.T) {
 	}
 	if !second.Existed || second.StoredBytes != first.StoredBytes || second.ContentID != first.ContentID {
 		t.Fatalf("deduplicated receipt: %+v then %+v", first, second)
+	}
+}
+
+func TestZstdPlaceExactReusesExistingUnencryptedObject(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "repo")
+	repo, err := OpenZstdDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("reuseExact identical logical bytes "), 2048)
+	first, err := repo.Place(ctx, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Existed || first.Bytes != int64(len(payload)) {
+		t.Fatalf("first placement receipt: %+v", first)
+	}
+	before, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	incomingID, incomingLen := hashCompleteStream(t, bytes.NewReader(payload))
+	if incomingID != first.ContentID || incomingLen != first.Bytes {
+		t.Fatalf("incoming stream identity = %s/%d, want %s/%d", incomingID, incomingLen, first.ContentID, first.Bytes)
+	}
+
+	second, err := repo.PlaceExact(ctx, first.ContentID, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireEmptyTmp(t, root)
+	if !second.Existed || second.StoredBytes != first.StoredBytes || second.ContentID != first.ContentID || second.Bytes != first.Bytes {
+		t.Fatalf("reuseExact receipt: first=%+v second=%+v", first, second)
+	}
+	after, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("reuseExact rewrote the existing object")
+	}
+
+	existing, err := repo.Open(ctx, first.ContentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	existingID, existingLen := hashCompleteStream(t, existing)
+	if closeErr := existing.Close(); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	if existingID != first.ContentID || existingLen != first.Bytes {
+		t.Fatalf("existing stream identity = %s/%d, want %s/%d", existingID, existingLen, first.ContentID, first.Bytes)
+	}
+	if incomingID != existingID || incomingLen != existingLen {
+		t.Fatalf("independent stream hashes diverged: incoming=%s/%d existing=%s/%d", incomingID, incomingLen, existingID, existingLen)
+	}
+}
+
+func TestZstdPlaceExactMismatchDoesNotRewriteExisting(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "repo")
+	repo, err := OpenZstdDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("existing unencrypted object "), 1024)
+	other := bytes.Repeat([]byte("different logical body      "), 1024)
+	first, err := repo.Place(ctx, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.PlaceExact(ctx, first.ContentID, bytes.NewReader(other)); !errors.Is(err, ErrDigestMismatch) {
+		t.Fatalf("mismatch PlaceExact error = %v, want ErrDigestMismatch", err)
+	}
+	requireEmptyTmp(t, root)
+	after, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("mismatch PlaceExact rewrote the existing object")
+	}
+	if err := repo.Verify(ctx, first.ContentID); err != nil {
+		t.Fatalf("existing object verify after rejected PlaceExact: %v", err)
+	}
+}
+
+func TestZstdPlaceExactCorruptObjectFailsClosedWithoutRepair(t *testing.T) {
+	payload := bytes.Repeat([]byte("corrupt object must not be repaired by PlaceExact "), 512)
+	tests := []struct {
+		name   string
+		mutate func(t *testing.T, path string, original []byte) []byte
+	}{
+		{
+			name: "truncated",
+			mutate: func(t *testing.T, path string, original []byte) []byte {
+				t.Helper()
+				if err := os.Truncate(path, int64(len(original)-1)); err != nil {
+					t.Fatal(err)
+				}
+				mutated, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return mutated
+			},
+		},
+		{
+			name: "mutated",
+			mutate: func(t *testing.T, path string, original []byte) []byte {
+				t.Helper()
+				mutated := append([]byte(nil), original...)
+				mutated[len(mutated)/2] ^= 0xff
+				if err := os.WriteFile(path, mutated, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return mutated
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			root := filepath.Join(t.TempDir(), "repo")
+			repo, err := OpenZstdDir(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receipt, err := repo.Place(ctx, bytes.NewReader(payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := blobPath(root, receipt.ContentID)
+			original, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(original) < 2 {
+				t.Fatalf("placed object too small to mutate: %d bytes", len(original))
+			}
+			mutated := test.mutate(t, path, original)
+			if err := repo.Verify(ctx, receipt.ContentID); err == nil {
+				t.Fatal("corrupt zstd object verified before PlaceExact")
+			}
+
+			if _, err := repo.PlaceExact(ctx, receipt.ContentID, bytes.NewReader(payload)); err == nil {
+				t.Fatal("PlaceExact repaired or accepted a corrupt existing object")
+			}
+			requireEmptyTmp(t, root)
+			if err := repo.Verify(ctx, receipt.ContentID); err == nil {
+				t.Fatal("corrupt object verified after PlaceExact")
+			}
+			after, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(after, mutated) {
+				t.Fatal("PlaceExact replaced a corrupt object; only Repair may rewrite")
+			}
+		})
+	}
+}
+
+func TestZstdEncryptedPlaceExactDuplicateDoesNotUseReuseExact(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "encrypted")
+	key := bytes.Repeat([]byte{0x51}, 32)
+	repo, err := OpenEncryptedZstdDir(root, "key://placement-test", testKeyProvider(map[string][]byte{
+		"key://placement-test": key,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("encrypted duplicate must take the seal path\n"), 256)
+	first, err := repo.Place(ctx, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Existed || repo.encryption == nil {
+		t.Fatalf("encrypted first placement = %+v encryption=%v", first, repo.encryption == nil)
+	}
+	before, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := repo.PlaceExact(ctx, first.ContentID, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireEmptyTmp(t, root)
+	if !second.Existed || second.StoredBytes != first.StoredBytes || second.ContentID != first.ContentID {
+		t.Fatalf("encrypted duplicate receipt: first=%+v second=%+v", first, second)
+	}
+	after, err := os.ReadFile(blobPath(root, first.ContentID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("encrypted duplicate PlaceExact rewrote the existing sealed object")
+	}
+	if err := repo.Verify(ctx, first.ContentID); err != nil {
+		t.Fatalf("encrypted object verify after duplicate PlaceExact: %v", err)
+	}
+	body, err := repo.Open(ctx, first.ContentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, readErr := io.ReadAll(body)
+	closeErr := body.Close()
+	if readErr != nil || closeErr != nil || !bytes.Equal(got, payload) {
+		t.Fatalf("encrypted readback after duplicate PlaceExact: len=%d read=%v close=%v", len(got), readErr, closeErr)
+	}
+}
+
+func TestZstdPlaceExactSymlinkBlobFailsClosed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("strict no-follow open is platform-specific on Windows")
+	}
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "repo")
+	repo, err := OpenZstdDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("symlink blob must fail closed")
+	receipt, err := repo.Place(ctx, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := blobPath(root, receipt.ContentID)
+	outside := filepath.Join(t.TempDir(), "outside-blob")
+	if err := os.Rename(path, outside); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.PlaceExact(ctx, receipt.ContentID, bytes.NewReader(payload)); err == nil {
+		t.Fatal("PlaceExact followed or accepted a symlinked blob")
+	}
+	requireEmptyTmp(t, root)
+	after, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("PlaceExact wrote through a symlink")
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("PlaceExact replaced the symlink blob path")
 	}
 }
 
@@ -428,5 +696,26 @@ func TestDescribeRepositoryProfiles(t *testing.T) {
 				t.Fatalf("profile = %+v", got)
 			}
 		})
+	}
+}
+
+func hashCompleteStream(t *testing.T, body io.Reader) (string, int64) {
+	t.Helper()
+	digest := sha256.New()
+	n, err := io.Copy(digest, body)
+	if err != nil {
+		t.Fatalf("hash complete stream: %v", err)
+	}
+	return AlgorithmSHA256 + ":" + hex.EncodeToString(digest.Sum(nil)), n
+}
+
+func requireEmptyTmp(t *testing.T, root string) {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(root, tmpDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("tmp/ not empty after PlaceExact: %v", entries)
 	}
 }

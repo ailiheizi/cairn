@@ -1,0 +1,371 @@
+import { useEffect, useState } from "react";
+import { ChevronRight, RefreshCw } from "lucide-react";
+import { command } from "../app/command";
+import { operations } from "../lib/operations";
+import { formatBytes } from "../lib/format";
+import type { Translator } from "../i18n";
+import type { ExportManifestData, SnapshotSummary } from "../lib/types";
+
+// The trusted status surface.
+//
+// One rail disclosure replaces the old readiness dots and the health strip. It
+// never renders a dot, a check, or a colour as a health claim: every row is a
+// string that starts with exactly one of
+//
+//   PROVEN · {value} · {as-of}      a fact this browser read from the daemon
+//   UNKNOWN — {reason}              no source exists, or it did not answer
+//   DEGRADED — {reason}             the fact is readable but qualified
+//   FAILED — {reason}               the daemon reported the fact as failed
+//
+// The summary names the weakest attributable fact. Rows that are UNKNOWN only
+// because this build has no operation for them (the catalog-wide subject
+// count, the portable-record export list) are rendered honestly but do not
+// drive the summary, because they are a scope statement about this build
+// rather than a health regression.
+//
+// Sources: `status.get` (repository path/profile/ok/capacity, the zero-byte
+// writability probe, catalog path/ok, the schema ledger, per-workspace index
+// projections, publication/job counts and recent jobs), `capability.list`
+// (passed down from the shell), and the read-only `snapshot.list`,
+// `export.list`, and `doctor.check` operations. The panel owns no durable
+// state and writes nothing: it is a report, never a control over stored
+// content. `doctor.check` reads repository bytes, so it runs only when the
+// operator asks for it.
+
+type FactState = "PROVEN" | "UNKNOWN" | "DEGRADED" | "FAILED";
+type HealthFact = { id: string; state: FactState; name: string; line: string; blocking: boolean };
+type FactValue = [FactState, string];
+
+type DoctorResult = { ok: boolean; checks: { id: string; ok: boolean; message: string }[]; readAt: number };
+type StatusReads = {
+  snapshots: SnapshotSummary[];
+  exports: ExportManifestData[];
+  snapshotError: string;
+  exportError: string;
+  doctor?: DoctorResult;
+  doctorError: string;
+  readAt: number;
+};
+
+export type StatusPanelProps = {
+  t: Translator;
+  status: string;
+  statusData: any;
+  capabilities: any[];
+  onRefresh: () => void;
+  onOpenVerification: (trigger?: EventTarget | null) => void;
+  /** Wired by the activity surface; absent until that view exists. */
+  onOpenActivity?: () => void;
+};
+
+const RANK: Record<FactState, number> = { FAILED: 0, DEGRADED: 1, UNKNOWN: 2, PROVEN: 3 };
+const SEMANTIC_DIMENSION = "semantic-embedding";
+const LEXICAL_DIMENSION = "lexical-metadata-fts";
+
+function clockLabel(value: number) {
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function daemonDateTime(value: string | undefined, t: Translator) {
+  if (!value) return t("Not reported");
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export function StatusPanel({ t, status, statusData, capabilities, onRefresh, onOpenVerification, onOpenActivity }: StatusPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [reads, setReads] = useState<StatusReads>({ snapshots: [], exports: [], snapshotError: "", exportError: "", doctorError: "", readAt: Date.now() });
+  const [doctorBusy, setDoctorBusy] = useState(false);
+
+  // Every shell refresh produces a new status projection and re-reads the
+  // snapshot and export projections that go with it. When the service stops
+  // answering, the previous reads are dropped so no stale value can be
+  // rendered as a live fact.
+  useEffect(() => {
+    let cancelled = false;
+    if (!statusData) {
+      setReads((current) => ({ snapshots: [], exports: [], snapshotError: "", exportError: "", doctor: undefined, doctorError: "", readAt: Date.now() }));
+      return () => { cancelled = true; };
+    }
+    void (async () => {
+      const [snapshotResult, exportResult] = await Promise.allSettled([command(operations.snapshot.list, {}), command(operations.export.list, {})]);
+      if (cancelled) return;
+      const snapshots = snapshotResult.status === "fulfilled" ? ((snapshotResult.value.data?.snapshots ?? []) as SnapshotSummary[]) : [];
+      const exports = exportResult.status === "fulfilled" && Array.isArray(exportResult.value.data) ? (exportResult.value.data as ExportManifestData[]) : [];
+      setReads((current) => ({
+        snapshots,
+        exports,
+        snapshotError: snapshotResult.status === "fulfilled" ? "" : messageOf(snapshotResult.reason),
+        exportError: exportResult.status === "fulfilled" ? "" : messageOf(exportResult.reason),
+        // A doctor receipt belongs to the run that produced it; a later
+        // refresh keeps it because it is a recorded outcome, not a live probe.
+        doctor: current.doctor,
+        doctorError: current.doctorError,
+        readAt: Date.now(),
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [statusData]);
+
+  async function runDoctor() {
+    setDoctorBusy(true);
+    try {
+      const response = await command(operations.doctor.check, {});
+      const data = response.data ?? {};
+      setReads((current) => ({ ...current, doctor: { ok: data.ok === true, checks: Array.isArray(data.checks) ? data.checks : [], readAt: Date.now() }, doctorError: "" }));
+    } catch (error) {
+      setReads((current) => ({ ...current, doctor: undefined, doctorError: t("doctor.check did not answer: {{message}}", { message: messageOf(error) }) }));
+    } finally {
+      setDoctorBusy(false);
+    }
+  }
+
+  const facts = buildFacts({ t, status, statusData, capabilities, reads });
+  const asOf = t("as of {{time}} (this browser)", { time: clockLabel(reads.readAt) });
+  const attributable = facts.filter((fact) => fact.blocking || fact.state === "FAILED" || fact.state === "DEGRADED");
+  const weakest = [...attributable].sort((left, right) => RANK[left.state] - RANK[right.state])[0];
+  const summaryState: FactState = weakest?.state ?? "PROVEN";
+  const summaryText = weakest ? t("Health: {{fact}}", { fact: weakest.name }) : t("Health: {{fact}}", { fact: t("all reported facts proven") });
+
+  return <details className="status-panel" open={expanded} onToggle={(event) => setExpanded((event.currentTarget as HTMLDetailsElement).open)}>
+    <summary className="status-panel-summary" data-health={summaryState} data-weakest={weakest?.id ?? "none"}><span className="health-state" data-state={summaryState}>{summaryState}</span>{summaryState === "PROVEN" ? " · " : " — "}<span className="status-panel-summary-text">{summaryText}</span>{summaryState === "PROVEN" && <span className="status-panel-asof"> · {asOf}</span>}<ChevronRight className="status-panel-chevron" size={14} aria-hidden="true" /><span className="sr-only">{t("System readiness")}</span></summary>
+    <div className="status-panel-body">
+      <p className="status-panel-note">{t("Every health fact states what this browser can prove now. UNKNOWN names the missing source; it is never a zero or a healthy default.")}</p>
+      <ul className="health-facts" aria-label={t("Health facts")}>{facts.map((fact) => <li className="health-fact" key={fact.id} data-fact={fact.id} data-state={fact.state}><span className="health-state" data-state={fact.state}>{fact.state}</span>{fact.state === "PROVEN" ? " · " : " — "}<span className="health-fact-detail">{fact.line}</span></li>)}</ul>
+      <div className="status-panel-actions">
+        <button type="button" className="secondary-button compact" aria-label={t("Open verification report")} onClick={(event) => onOpenVerification(event.currentTarget)}>{t("Details")}</button>
+        {onOpenActivity && <button type="button" className="secondary-button compact" onClick={onOpenActivity}>{t("Open activity")}</button>}
+        <button type="button" className="icon-button" aria-label={t("Refresh facts")} title={t("Refresh facts")} onClick={onRefresh}><RefreshCw size={15} /></button>
+        <button type="button" className="secondary-button compact" title={t("The doctor check reads repository bytes; this browser never runs it automatically.")} disabled={doctorBusy || !statusData} onClick={() => void runDoctor()}>{doctorBusy ? t("Running...") : t("Run doctor check")}</button>
+      </div>
+    </div>
+  </details>;
+}
+
+function messageOf(reason: unknown) {
+  return reason instanceof Error ? reason.message : String(reason ?? "");
+}
+
+function buildFacts({ t, status, statusData, capabilities, reads }: { t: Translator; status: string; statusData: any; capabilities: any[]; reads: StatusReads }): HealthFact[] {
+  const facts: HealthFact[] = [];
+  // One place decides the row string, so a state token can never be rendered
+  // without its value, and a value can never be rendered without the state.
+  const record = (id: string, state: FactState, name: string, value: string, options: { blocking?: boolean } = {}) => {
+    const line = state === "PROVEN" ? `${value} · ${t("as of {{time}} (this browser)", { time: clockLabel(reads.readAt) })}` : value;
+    facts.push({ id, state, name, line, blocking: options.blocking === true });
+  };
+  const serviceDown = !statusData;
+  const checking = !statusData && status === "Checking service";
+  const unreachable = t("Cannot prove any health fact while the service is unreachable");
+  const notAnsweredYet = t("the service has not answered yet in this browser session");
+
+  // 1. The service itself.
+  if (serviceDown) {
+    if (checking) record("service", "UNKNOWN", t("service unreachable"), notAnsweredYet, { blocking: true });
+    else record("service", "FAILED", t("service unreachable"), t("the service did not answer this browser session"), { blocking: true });
+  } else {
+    record("service", "PROVEN", t("service unreachable"), t("Service: reachable"));
+  }
+
+  const repository = statusData?.repository;
+  const catalog = statusData?.catalog;
+
+  // 2..4. Repository, writability, and capacity - all from status.get.
+  if (serviceDown) {
+    record("repository", "UNKNOWN", t("repository unproven"), checking ? notAnsweredYet : unreachable, { blocking: true });
+    record("writability", "UNKNOWN", t("repository unproven"), checking ? notAnsweredYet : unreachable);
+    record("capacity", "UNKNOWN", t("repository unproven"), checking ? notAnsweredYet : unreachable);
+  } else if (!repository) {
+    record("repository", "UNKNOWN", t("repository unproven"), t("this service reports no repository fact"), { blocking: true });
+    record("writability", "UNKNOWN", t("repository unproven"), t("this service reports no repository fact"));
+    record("capacity", "UNKNOWN", t("repository unproven"), t("this service reports no repository fact"));
+  } else {
+    if (repository.ok === true) {
+      record("repository", "PROVEN", t("repository unproven"), t("Repository: {{path}} · profile {{profile}} · {{count}} restore points", {
+        path: repository.path || t("Not reported"),
+        profile: repository.repository_profile || repository.compression_profile || t("profile not reported"),
+        count: typeof repository.snapshots === "number" ? repository.snapshots : 0,
+      }));
+    } else {
+      record("repository", "FAILED", t("Repository unavailable"), t("the repository at {{path}} did not open", { path: repository.path || t("Not reported") }), { blocking: true });
+    }
+    const [writabilityState, writabilityValue] = writabilityFact(t, repository);
+    record("writability", writabilityState, t("repository unproven"), writabilityValue);
+    const [capacityState, capacityValue] = capacityFact(t, repository);
+    record("capacity", capacityState, t("repository unproven"), capacityValue);
+  }
+
+  // 5..6. Catalog and its schema ledger - both from status.get.
+  if (serviceDown) {
+    record("catalog", "UNKNOWN", t("catalog unproven"), checking ? notAnsweredYet : unreachable, { blocking: true });
+    record("schema", "UNKNOWN", t("catalog schema unproven"), checking ? notAnsweredYet : unreachable, { blocking: true });
+  } else if (!catalog) {
+    record("catalog", "UNKNOWN", t("catalog unproven"), t("this service reports no catalog fact"), { blocking: true });
+    record("schema", "UNKNOWN", t("catalog schema unproven"), t("this service reports no catalog fact"));
+  } else {
+    if (catalog.ok === true) record("catalog", "PROVEN", t("catalog unproven"), t("Catalog: {{path}}", { path: catalog.path || t("Not reported") }));
+    else record("catalog", "FAILED", t("Catalog unavailable"), t("the catalog at {{path}} did not open", { path: catalog.path || t("Not reported") }), { blocking: true });
+    const [schemaState, schemaValue] = schemaFact(t, catalog);
+    record("schema", schemaState, t("catalog schema unproven"), schemaValue);
+  }
+
+  // 7. Catalog-wide counts. No operation exists in this build, so the honest
+  // answer is UNKNOWN with that reason, never a client-side zero.
+  record("counts", "UNKNOWN", t("subject counts unproven"), t("No catalog subject count operation exists in this build."));
+
+  // 8..9. Freeze and materialize, read from the durable records themselves.
+  const latest = reads.snapshots.at(-1);
+  if (serviceDown) {
+    record("freeze", "UNKNOWN", t("last freeze unproven"), checking ? notAnsweredYet : unreachable);
+    record("materialize", "UNKNOWN", t("last materialize unproven"), checking ? notAnsweredYet : unreachable);
+  } else {
+    if (reads.snapshotError) record("freeze", "UNKNOWN", t("last freeze unproven"), t("snapshot.list did not answer in this browser session: {{message}}", { message: reads.snapshotError }));
+    else if (!latest) record("freeze", "PROVEN", t("last freeze unproven"), t("Last freeze: no restore point is published yet"));
+    else record("freeze", "PROVEN", t("last freeze unproven"), t("Last freeze: {{time}} · {{count}} published restore points", { time: daemonDateTime(latest.created_at, t), count: reads.snapshots.length }));
+
+    if (reads.exportError) record("materialize", "UNKNOWN", t("last materialize unproven"), t("export.list did not answer in this browser session: {{message}}", { message: reads.exportError }));
+    else if (!reads.exports.length) record("materialize", "PROVEN", t("last materialize unproven"), t("Last materialize: no export manifest is frozen yet"));
+    else record("materialize", "PROVEN", t("last materialize unproven"), t("Last materialize: {{time}} · manifest {{digest}}", { time: daemonDateTime(reads.exports[0].created_at, t), digest: reads.exports[0].manifest_digest || t("Not reported") }));
+  }
+
+  // 10. Verification receipts are recorded per restore point; an absent
+  // receipt is UNKNOWN with the service's own reason, never a zeroed time.
+  const [verificationState, verificationValue] = serviceDown
+    ? ["UNKNOWN", checking ? notAnsweredYet : unreachable] as FactValue
+    : verificationFact(t, latest, reads);
+  record("verification", verificationState, t("verification unproven"), verificationValue);
+
+  // 11. The protection mix of the newest restore point.
+  const [protectionState, protectionValue] = serviceDown
+    ? ["UNKNOWN", checking ? notAnsweredYet : unreachable] as FactValue
+    : protectionFact(t, latest, reads);
+  record("protection", protectionState, t("protection mix unproven"), protectionValue);
+
+  // 12. Doctor gates. Repository bytes are read only on request.
+  if (reads.doctorError) record("doctor", "UNKNOWN", t("doctor gates unproven"), reads.doctorError);
+  else if (!reads.doctor) record("doctor", "UNKNOWN", t("doctor gates unproven"), t("the byte-reading doctor check has not been run in this browser session"));
+  else {
+    const failed = reads.doctor.checks.filter((check) => !check.ok);
+    if (!failed.length) record("doctor", "PROVEN", t("doctor gates unproven"), t("Doctor gates: {{count}} checks passed · checked {{time}}", { count: reads.doctor.checks.length, time: clockLabel(reads.doctor.readAt) }));
+    else record("doctor", "FAILED", t("doctor gates unproven"), t("{{id}}: {{message}}", { id: failed[0].id, message: failed[0].message }), { blocking: true });
+  }
+
+  // 13..14. Discovery dimensions: per-workspace projections from status.get,
+  // gated by the provider state capability.list reports, so a per-item or
+  // single-workspace generation can never be presented as a global claim.
+  const index = Array.isArray(statusData?.index) ? statusData.index : [];
+  const lexical = dimensionFact(t, {
+    id: LEXICAL_DIMENSION,
+    label: (state) => t("Lexical index: {{state}}", { state }),
+    states: index.map((entry: any) => String(entry.lexical ?? "")),
+    capability: capabilityState(capabilities, LEXICAL_DIMENSION),
+    serviceDown, checking, unreachable, notAnsweredYet,
+  });
+  record("index-lexical", lexical[0], t("lexical index unproven"), lexical[1], { blocking: lexical[0] !== "PROVEN" });
+  const semantic = dimensionFact(t, {
+    id: SEMANTIC_DIMENSION,
+    label: (state) => t("Semantic index: {{state}}", { state }),
+    states: index.map((entry: any) => String(entry.semantic ?? "")),
+    capability: capabilityState(capabilities, SEMANTIC_DIMENSION),
+    serviceDown, checking, unreachable, notAnsweredYet,
+  });
+  record("index-semantic", semantic[0], t("semantic index unproven"), semantic[1], { blocking: semantic[0] !== "PROVEN" });
+
+  // 15. Portable recovery records: recovery.export runs one at a time and no
+  // operation lists past runs, so this browser cannot claim a count.
+  record("recovery-records", "UNKNOWN", t("portable record exports unproven"), t("no operation lists portable recovery record exports in this build"));
+
+  // 16. Durable jobs, from the same status projection the activity surface
+  // reads. The newest row keeps the daemon's own state token.
+  if (serviceDown) record("jobs", "UNKNOWN", t("job state unproven"), checking ? notAnsweredYet : unreachable);
+  else {
+    const recent = Array.isArray(statusData?.recent_jobs) ? statusData.recent_jobs : [];
+    const total = typeof statusData?.jobs === "number" ? statusData.jobs : recent.length;
+    if (!recent.length) record("jobs", "PROVEN", t("job state unproven"), t("Jobs: no durable job is recorded yet"));
+    else record("jobs", "PROVEN", t("job state unproven"), t("Jobs: {{count}} durable jobs recorded · newest {{state}} at {{time}}", { count: total, state: String(recent[0].state ?? "UNKNOWN"), time: daemonDateTime(recent[0].updated_at, t) }));
+  }
+
+  return facts;
+}
+
+function capabilityState(capabilities: any[], id: string) {
+  const entry = capabilities.find((item) => item?.kind === "index-dimension" && item?.id === id);
+  return entry ? String(entry.state ?? "") : "";
+}
+
+function dimensionFact(t: Translator, { id, label, states, capability, serviceDown, checking, unreachable, notAnsweredYet }: { id: string; label: (state: string) => string; states: string[]; capability: string; serviceDown: boolean; checking: boolean; unreachable: string; notAnsweredYet: string }): FactValue {
+  if (serviceDown) return ["UNKNOWN", checking ? notAnsweredYet : unreachable];
+  if (!capability) return ["UNKNOWN", `${label("NOT_REPORTED")} · ${t("capability.list reports no state for this dimension")}`];
+  if (capability !== "AVAILABLE") return ["DEGRADED", `${label(capability)} · ${t("capability.list reports {{id}} as {{state}}", { id, state: capability })}`];
+  if (!states.length) return ["UNKNOWN", `${label("NOT_BUILT")} · ${t("no index generation is published for this workspace")}`];
+  const unique = [...new Set(states)];
+  if (unique.length === 1 && unique[0] === "READY") return ["PROVEN", label("READY")];
+  if (unique.includes("UNAVAILABLE")) return ["DEGRADED", label("UNAVAILABLE")];
+  if (unique.includes("NOT_BUILT")) return ["UNKNOWN", `${label("NOT_BUILT")} · ${t("no index generation is published for this workspace")}`];
+  return ["DEGRADED", label(unique.filter(Boolean).join(" / ") || "NOT_REPORTED")];
+}
+
+function writabilityFact(t: Translator, repository: any): FactValue {
+  const writable = String(repository.writable ?? "");
+  if (!writable) return ["UNKNOWN", t("not probed (this build reports no repository write probe)")];
+  if (writable === "WRITABLE") {
+    const checkedAt = daemonDateTime(repository.writable_checked_at, t);
+    return ["PROVEN", `${t("Writability: writable")} · ${t("probed {{time}}", { time: checkedAt })}`];
+  }
+  if (writable === "READ_ONLY") return ["DEGRADED", t("the repository is read-only: {{reason}}", { reason: repository.writable_reason || t("reason not reported") })];
+  return ["UNKNOWN", t("the write probe did not answer: {{reason}}", { reason: repository.writable_reason || t("reason not reported") })];
+}
+
+function capacityFact(t: Translator, repository: any): FactValue {
+  const measured = repository.capacity_state === "AVAILABLE"
+    && ["capacity_total", "capacity_free", "capacity_used"].every((key) => typeof repository[key] === "number" && Number.isFinite(repository[key]));
+  if (!measured) return ["UNKNOWN", t("capacity was not measured: {{reason}}", { reason: repository.capacity_reason || t("this service reports no capacity measurement") })];
+  const base = t("Capacity: {{total}} total · {{free}} free · {{used}} used", {
+    total: formatBytes(repository.capacity_total),
+    free: formatBytes(repository.capacity_free),
+    used: formatBytes(repository.capacity_used),
+  });
+  return ["PROVEN", `${base} · ${t("measured {{time}}", { time: daemonDateTime(repository.capacity_measured_at, t) })}`];
+}
+
+function schemaFact(t: Translator, catalog: any): FactValue {
+  const state = String(catalog.schema_state ?? "");
+  const reason = String(catalog.schema_reason ?? "");
+  if (state === "CURRENT") {
+    return ["PROVEN", t("Catalog schema: version {{version}} ({{migration}})", { version: catalog.schema_version ?? "UNKNOWN", migration: catalog.schema_migration || t("Not reported") })];
+  }
+  if (state === "DRIFT" || state === "NEWER_THAN_BINARY") return ["FAILED", t("the migration ledger was not read: {{reason}}", { reason: reason || state })];
+  if (state === "UNKNOWN") return ["UNKNOWN", t("the migration ledger was not read: {{reason}}", { reason: reason || t("reason not reported") })];
+  return ["UNKNOWN", t("this service reports no catalog schema state")];
+}
+
+function verificationFact(t: Translator, latest: SnapshotSummary | undefined, reads: StatusReads): FactValue {
+  if (reads.snapshotError) return ["UNKNOWN", t("snapshot.list did not answer in this browser session: {{message}}", { message: reads.snapshotError })];
+  if (!latest) return ["UNKNOWN", t("no restore point is published yet")];
+  const verification = latest.verification;
+  if (!verification || verification.state === "UNRECORDED") {
+    return ["UNKNOWN", t("no verification receipt is recorded (service reason: {{reason}})", { reason: verification?.reason || t("reason not reported") })];
+  }
+  const mode = verification.mode || "UNKNOWN";
+  if (verification.outcome === "FAILED") return ["FAILED", t("Verification failed: {{reason}}", { reason: verification.failure_reason || mode })];
+  if (verification.outcome === "UNAVAILABLE") return ["DEGRADED", t("Verification coverage is degraded: {{reason}}", { reason: verification.failure_reason || mode })];
+  return ["PROVEN", t("Last verification: {{time}} · {{mode}} · files {{passed}}/{{attempted}}", {
+    time: daemonDateTime(verification.verified_at, t),
+    mode,
+    passed: Number(verification.passed_files ?? 0),
+    attempted: Number(verification.attempted_files ?? 0),
+  })];
+}
+
+function protectionFact(t: Translator, latest: SnapshotSummary | undefined, reads: StatusReads): FactValue {
+  if (reads.snapshotError) return ["UNKNOWN", t("snapshot.list did not answer in this browser session: {{message}}", { message: reads.snapshotError })];
+  if (!latest) return ["UNKNOWN", t("no restore point is published yet")];
+  const files = Number(latest.files ?? 0);
+  if (!files) return ["PROVEN", t("Protection: the newest restore point has no regular files")];
+  const protectedFiles = Number(latest.protected_files ?? 0);
+  const unprotectedFiles = Number(latest.unprotected_files ?? 0);
+  if (!latest.protection_outcomes && !protectedFiles && !unprotectedFiles) return ["UNKNOWN", t("the newest restore point reports no protection mix")];
+  const base = t("Protection: {{protected}} of {{files}} files exact-protected · {{unprotected}} unprotected", { protected: protectedFiles, files, unprotected: unprotectedFiles });
+  if (latest.bytes_complete === false) return ["DEGRADED", `${base} · ${t("logical byte total incomplete")}`];
+  return ["PROVEN", `${base} · ${t("{{size}} logical", { size: formatBytes(Number(latest.bytes ?? 0)) })}`];
+}

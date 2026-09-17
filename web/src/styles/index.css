@@ -1,0 +1,27 @@
+/* RestoreWeave WebUI stylesheet entry point.
+ *
+ * The stylesheet is one file per surface. `main.tsx` imports only this file, so
+ * the cascade below is the single place that decides rule order:
+ *
+ *   tokens -> base -> topbar -> library -> drawer -> settings -> viewer
+ *          -> status -> verification -> activity
+ *
+ * A surface change touches that surface's file and never this one. New
+ * surfaces are appended after the files they must override (status replaces
+ * the readiness strip that used to live in topbar.css); the existing imports
+ * are never reordered, because that would change the cascade.
+ */
+@import "./tokens.css";
+@import "./base.css";
+@import "./topbar.css";
+@import "./library.css";
+@import "./drawer.css";
+@import "./settings.css";
+@import "./viewer.css";
+@import "./status.css";
+@import "./verification.css";
+@import "./activity.css";
+@import "./duplicates.css";
+@import "./tags.css";
+@import "./searchops.css";
+@import "./report.css";
