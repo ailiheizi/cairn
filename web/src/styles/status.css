@@ -51,6 +51,34 @@
 
 .status-panel-note { max-width: 76ch; margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
+/* The body groups the facts instead of listing them flat: the protection and
+   recovery facts (the summary's own set), the discovery facts, and the facts
+   this build cannot source at all. Each group is a native disclosure, so its
+   collapsed line still carries a four-state token: a collapsed group is never
+   a neutral-looking one. */
+
+.status-group { border-top: 1px solid var(--hairline); }
+.status-group:first-of-type { border-top: 0; }
+
+.status-group-summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.status-group-summary::-webkit-details-marker { display: none; }
+.status-group-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.status-group-name { color: var(--ink); font-weight: 760; }
+.status-group-count { color: var(--quiet); font-size: 10px; white-space: nowrap; }
+.status-group-chevron { flex: 0 0 auto; margin-left: auto; color: var(--quiet); transition: transform 150ms ease; }
+.status-group[open] .status-group-chevron { transform: rotate(90deg); }
+.status-group .health-facts { padding: 1px 0 6px 12px; border-left: 1px solid var(--hairline); margin-left: 3px; }
+
 .health-facts { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
 
 .health-fact {

@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- The workspace rail is reachable on a phone. Below the 640px boundary the
+  topbar shows one workspace button that opens the same rail element and the
+  same trusted status panel as a left slide-in panel — not copies: selecting a
+  view closes the panel and runs the desktop handler, and the panel reuses the
+  shell's drawer contract (focus moves in, Tab is trapped, Escape and the
+  backdrop dismiss it, focus returns to the button). Above 640px nothing
+  changes: the rail stays inline and the button is not rendered.
+- The trusted status surface no longer lets a discovery or build-scope fact
+  headline it. The summary names the weakest fact among the protection and
+  recovery facts only, and the body is three named disclosures — Protection and
+  recovery (open by default), Discovery, and Not sourced by this build, whose
+  collapsed line states how many rows it hides under an UNKNOWN token. No fact
+  was added, removed, or restated: every row still renders exactly one of
+  `PROVEN · {value} · {as-of}`, `UNKNOWN — {reason}`, `DEGRADED — {reason}`,
+  `FAILED — {reason}`.
+- The Sources view reports what changed since the previous restore point. For
+  each source the browser compares its two newest restore points with
+  `snapshot.diff` and shows the daemon's own added, removed and changed counts
+  with both restore-point times on one line, plus the affected subjects (the
+  daemon's change kind and the provenance path) in a bounded detail that states
+  how many rows it is not showing. A source with one restore point says there is
+  nothing to compare against yet rather than "no changes"; a newest point with no
+  verification receipt says so; a comparison the daemon refuses shows its reason
+  and never renders zero as fact.
 - Added a derived `media_class` search filter (image, video, audio, document,
   archive, other) to `search.query`, computed from the entry's recorded
   filename suffix by one server-side table. The browser's `type:image` and its

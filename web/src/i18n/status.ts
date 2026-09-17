@@ -49,14 +49,22 @@ export const status: Record<string, string> = {
   //   FAILED — {reason}
   // so a fact this build cannot source says UNKNOWN and names the missing
   // capability instead of showing zero or a healthy default.
+  //
+  // The body groups those rows: "Protection and recovery" holds the facts the
+  // headline may draw from, "Discovery" holds the search/index facts, and
+  // "Not sourced by this build" holds the facts whose only source is an
+  // operation this build does not have.
   "Health: {{fact}}": "健康：{{fact}}",
-  "all reported facts proven": "所有已报告事实均已证明",
+  "all protection and recovery facts proven": "所有保护与恢复事实均已证明",
+  "Protection and recovery": "保护与恢复",
+  "Discovery": "检索与发现",
+  "Not sourced by this build": "此构建无法提供来源",
+  "{{count}} facts": "{{count}} 项事实",
   "service unreachable": "服务不可达",
   "repository unproven": "仓库尚未证明",
   "catalog unproven": "目录数据库尚未证明",
   "catalog schema unproven": "目录架构尚未证明",
   "Reading service facts…": "正在读取服务事实……",
-  "Health facts": "健康事实",
   "Every health fact states what this browser can prove now. UNKNOWN names the missing source; it is never a zero or a healthy default.": "每条健康事实都只说明本浏览器当前能够证明的内容。UNKNOWN 会指出缺失的来源，绝不表示零或默认健康。",
   "Open verification report": "打开验证报告",
   "Details": "详情",

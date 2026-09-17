@@ -34,6 +34,7 @@ export const operations = {
   },
   snapshot: {
     list: "snapshot.list",
+    diff: "snapshot.diff",
     verify: "snapshot.verify",
   },
   source: {

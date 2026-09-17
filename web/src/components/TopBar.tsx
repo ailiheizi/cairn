@@ -1,4 +1,5 @@
-import { AlertCircle, ArchiveRestore, CheckCircle2, History, LoaderCircle, Plus, RefreshCw, Search, Settings, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, ArchiveRestore, CheckCircle2, History, LoaderCircle, PanelLeft, Plus, RefreshCw, Search, Settings, ShieldCheck, X } from "lucide-react";
+import type { RefObject } from "react";
 import type { Translator } from "../i18n";
 import type { SearchFlow } from "../app/useSearch";
 import { predicateWireLabel, searchOperatorInfo, SEARCH_OPERATOR_NAMES } from "../lib/searchops";
@@ -12,12 +13,18 @@ import { StatusPanel } from "./StatusPanel";
 // one rail disclosure that reports what this browser can actually prove; it is
 // a report, never a control over stored content.
 //
+// Below the single compact boundary (`max-width: 640px`, the same query
+// `useCompactLayout` asks) the top bar carries one workspace button instead:
+// the rail is not rendered inline there, and `StatusPanel` moves into the
+// panel the button opens, so exactly one status disclosure is mounted at a
+// time and every rail surface stays reachable on a phone.
+//
 // The predicate row is a projection of the field text: every chip is one token
 // the operator grammar recognised, it names the daemon input that token really
 // writes, and removing or editing a chip rewrites the text instead of keeping
 // a second copy of the query.
 
-export function TopBar({ t, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
+export function TopBar({ t, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, compact, onOpenRail, railTriggerRef, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
   t: Translator;
   query: string;
   busy: boolean;
@@ -29,6 +36,9 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
   catalogHealthy: boolean;
   snapshotRef: string;
   search: SearchFlow;
+  compact?: boolean;
+  onOpenRail?: (trigger?: EventTarget | null) => void;
+  railTriggerRef?: RefObject<HTMLButtonElement | null>;
   onRefresh: () => void;
   onOpenRestore: (trigger?: EventTarget | null) => void;
   onOpenAdd: (sourceItem?: undefined, trigger?: EventTarget | null) => void;
@@ -85,6 +95,7 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
         {!error && plan.limits.length === 0 && <p className="search-ops-hint">{t("Operators available: {{operators}}. Select a predicate to edit it, or remove it to rewrite the search text.", { operators: SEARCH_OPERATOR_NAMES.map((name) => `${name}:`).join(" ") })}</p>}
       </div>}
       <div className="top-actions">
+        {compact && <button type="button" ref={railTriggerRef} className="icon-button rail-trigger" aria-label={t("Open workspace navigation")} title={t("Open workspace navigation")} aria-haspopup="dialog" onClick={(event) => onOpenRail?.(event.currentTarget)}><PanelLeft size={17} aria-hidden="true" /></button>}
         <span className={`connection ${isConnected ? "ok" : "bad"}`} aria-label={t(status)}>{status === "Checking service" ? <LoaderCircle className="spin" size={15} /> : isConnected ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}<span>{t(status)}</span></span>
         <button className="secondary-button restore-button" aria-label={t("Restore latest snapshot")} title={t("Restore latest snapshot")} onClick={(event) => onOpenRestore(event.currentTarget)} disabled={!snapshotRef || !isConnected || !coreStorageReady}><ArchiveRestore size={16} /><span>{t("Restore")}</span></button>
         <button className="primary-button add-button" aria-label={t("Add source")} title={t("Add source")} onClick={(event) => onOpenAdd(undefined, event.currentTarget)} disabled={!isConnected || !coreStorageReady}><Plus size={16} /><span>{t("Add source")}</span></button>
@@ -92,6 +103,6 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
         <button className="icon-button settings-trigger" title={t("Open settings")} aria-label={t("Open settings")} onClick={(event) => onOpenSettings(event.currentTarget)}><Settings size={17} /></button>
       </div>
     </header>
-    <StatusPanel t={t} status={status} statusData={statusData} capabilities={capabilities} onRefresh={onRefresh} onOpenVerification={onOpenVerification} onOpenActivity={onOpenActivity} />
+    {!compact && <StatusPanel t={t} status={status} statusData={statusData} capabilities={capabilities} onRefresh={onRefresh} onOpenVerification={onOpenVerification} onOpenActivity={onOpenActivity} />}
   </>;
 }

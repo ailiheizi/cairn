@@ -54,6 +54,41 @@ export type SourceScan = { scan_ref?: string; generation?: number; state?: strin
 export type SourceSummary = { source_ref?: string; kind?: string; locator?: string; state?: string; reachability?: string; reachability_checked_at?: string; reachability_message?: string; latest_scan?: SourceScan; latest_snapshot_ref?: string; latest_namespace_root_id?: string };
 export type SourceProjection = { state: "READY" | "DEGRADED"; message?: string };
 
+// The path-level change the daemon classified between two restore points
+// (`snapshot.diff`). `kind` is the daemon's own token (`added`, `removed`,
+// `moved`, `content_changed`, `metadata_changed`, `type_changed`); the browser
+// never reclassifies a change, and `path`/`from_path`/`to_path` are the
+// recorded provenance strings.
+export type SnapshotDiffItem = { kind?: string; path?: string; from_path?: string; to_path?: string; entry_type?: string; from_type?: string; to_type?: string; content_id?: string; from_content_id?: string; to_content_id?: string };
+
+// The change summary between one source's two newest restore points. The
+// counts and the affected subjects are the daemon's answer to `snapshot.diff`;
+// the browser renders them and never computes a comparison of its own.
+//
+//   - READY        the daemon compared two restore points and answered;
+//   - READING      the comparison is in flight; no count is claimed yet;
+//   - NO_POINTS    the source has no published restore point;
+//   - SINGLE_POINT only one restore point exists: there is nothing to compare
+//                  against yet (this is not "no changes");
+//   - UNAVAILABLE  the daemon reported no comparison; `reason` carries the
+//                  daemon's own reason and no count is rendered.
+// `newestVerification` is the newest restore point's recorded verification
+// receipt, so an unverified comparison never reads as a verified one.
+export type SourceChangeState = "READY" | "READING" | "NO_POINTS" | "SINGLE_POINT" | "UNAVAILABLE";
+export type SourceChangeSummary = {
+  state: SourceChangeState;
+  reason?: string;
+  fromRef?: string;
+  toRef?: string;
+  fromAt?: string;
+  toAt?: string;
+  added: number;
+  removed: number;
+  changed: number;
+  changes: SnapshotDiffItem[];
+  newestVerification?: SnapshotVerificationData;
+};
+
 // Durable job rows (`job.list` / `status.get.recent_jobs`). Every field the
 // daemon omits is genuinely absent from the record: a missing error_code is
 // not a successful job, and a missing updated_at is not a completion time. The

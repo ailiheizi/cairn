@@ -119,6 +119,30 @@ selection bar, and the details inspector column. */
 .source-recovery.ready strong { color: #a7dec6; }
 .source-card-actions { display: flex; justify-content: flex-end; gap: 7px; }
 .source-card-actions button { min-height: 31px; padding: 6px 9px; font-size: 10px; }
+
+/* The change summary between a source's two newest restore points. The whole
+   block is one card row: the daemon's counts and the two restore point times
+   stay visible without expanding the detail list. */
+.source-changes { min-width: 0; display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.07); padding-top: 9px; color: #7c8590; }
+.source-changes > svg { flex: 0 0 auto; margin-top: 1px; }
+.source-changes-body { min-width: 0; flex: 1 1 auto; display: grid; gap: 4px; }
+.source-changes-label { color: #777486; font-size: 9px; font-weight: 760; text-transform: uppercase; }
+.source-changes-line { min-width: 0; display: flex; flex-wrap: wrap; gap: 0 10px; color: #bcc5cc; font-size: 10px; line-height: 1.5; }
+.source-changes-line > span { min-width: 0; overflow-wrap: anywhere; }
+.source-change-counts { color: #cfc7e4; }
+.source-changes-verification, .source-changes-empty { overflow-wrap: anywhere; color: #737b85; font-size: 10px; line-height: 1.45; }
+.source-changes[data-change-state="UNAVAILABLE"] { color: #d0b982; }
+.source-changes[data-change-state="UNAVAILABLE"] .source-changes-line { color: #d0b982; }
+.source-changes[data-change-state="SINGLE_POINT"] .source-changes-line, .source-changes[data-change-state="NO_POINTS"] .source-changes-line { color: #b8b2a4; }
+.source-changes-detail { min-width: 0; }
+.source-changes-detail > summary { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; border-radius: 5px; color: #aeb8c1; font-size: 10px; cursor: pointer; }
+.source-changes-detail > summary small { color: #737b85; }
+.source-change-list { min-width: 0; display: grid; gap: 3px; margin: 7px 0 0; padding: 0; list-style: none; }
+.source-change { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.source-change-kind { flex: 0 0 auto; padding: 1px 5px; border: 1px solid rgba(167, 139, 250, 0.28); border-radius: 4px; color: #cbc2e6; background: rgba(167, 139, 250, 0.08); font-size: 9px; font-weight: 700; }
+.source-change-kind[data-kind="added"] { border-color: rgba(98, 189, 145, 0.34); color: #9edabd; background: rgba(98, 189, 145, 0.1); }
+.source-change-kind[data-kind="removed"] { border-color: rgba(220, 130, 120, 0.34); color: #dfa79f; background: rgba(220, 130, 120, 0.1); }
+.source-change-path { min-width: 0; overflow-wrap: anywhere; color: #b7b2c4; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
 .breadcrumbs { min-height: 34px; display: flex; align-items: center; gap: 2px; margin: -4px 0 12px; color: #69747e; overflow-x: auto; }
 .breadcrumbs > button { width: 32px; height: 32px; justify-content: center; flex: 0 0 auto; }
 .breadcrumbs span { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; }
@@ -410,6 +434,13 @@ selection bar, and the details inspector column. */
 .source-health.offline, .source-recovery.pending { color: var(--gold); }
 .source-health.offline { border-color: rgba(208, 161, 82, 0.34); background: rgba(208, 161, 82, 0.12); }
 .source-health.offline > span { background: var(--gold); box-shadow: none; }
+.source-changes { border-top-color: var(--hairline); color: var(--muted); }
+.source-changes-label, .source-changes-detail > summary small, .source-changes-verification, .source-changes-empty { color: var(--muted); }
+.source-changes-line { color: var(--ink); }
+.source-change-counts { color: var(--ink); }
+.source-changes-detail > summary { color: var(--muted); }
+.source-change-kind { border-color: var(--hairline-strong); border-radius: 10px; color: var(--ink); background: var(--card-fill-quiet); }
+.source-change-path { color: var(--ink); }
 .source-projection-warning, .drawer-inline-warning, .plan-warning { color: var(--gold); background: rgba(208, 161, 82, 0.1); }
 .source-projection-warning, .drawer-inline-warning, .plan-warning { border-color: rgba(208, 161, 82, 0.34); border-radius: 14px; }
 
@@ -539,28 +570,30 @@ selection bar, and the details inspector column. */
    aligned with RestoreWeave while letting its desktop Layout/Menu own sizing
    and keyboard interaction. */
 
-/* Desktop workspace rail. The later single-column `.workspace:not(.detail-active)`
+/* The workspace rail. The later single-column `.workspace:not(.detail-active)`
    rule is more specific than `.workspace`, so these selectors must match that
-   specificity or the sidebar becomes a full-width poster card. */
+   specificity or the sidebar becomes a full-width poster card. The entries are
+   styled at every width because the same rail markup is mounted inside the
+   phone panel below; the media query only decides where it is mounted. */
 .workspace-sidebar {
   position: sticky; top: 104px; min-width: 0; min-height: calc(100vh - 168px);
   display: flex; flex-direction: column; gap: 14px; padding: 4px 10px 4px 0;
   border: 0; border-radius: 0; background: transparent;
 }
-@media (min-width: 641px) {
-  .workspace-sidebar-group { display: grid; gap: 3px; }
-  .workspace-sidebar-label { margin: 0 8px 5px; color: var(--quiet); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-  .workspace-nav-item { min-width: 0; min-height: 38px; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 0; border-radius: 7px; padding: 8px 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
-  .workspace-nav-item svg { color: var(--quiet); }
-  .workspace-nav-item small { min-width: 20px; color: var(--quiet); font-size: 10px; text-align: right; }
-  .workspace-nav-item:hover { color: var(--ink); background: var(--surface-soft); }
-  .workspace-nav-item:hover svg, .workspace-nav-item.active svg { color: var(--accent); }
-  .workspace-nav-item.active { color: var(--ink); background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
-  .workspace-nav-item.active small { color: var(--accent); }
-  .workspace-nav-item:disabled { opacity: .45; cursor: not-allowed; }
-}
+.workspace-sidebar-group { display: grid; gap: 3px; }
+.workspace-sidebar-label { margin: 0 8px 5px; color: var(--quiet); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.workspace-nav-item { min-width: 0; min-height: 38px; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 0; border-radius: 7px; padding: 8px 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
+.workspace-nav-item svg { color: var(--quiet); }
+.workspace-nav-item small { min-width: 20px; color: var(--quiet); font-size: 10px; text-align: right; }
+.workspace-nav-item:hover { color: var(--ink); background: var(--surface-soft); }
+.workspace-nav-item:hover svg, .workspace-nav-item.active svg { color: var(--accent); }
+.workspace-nav-item.active { color: var(--ink); background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
+.workspace-nav-item.active small { color: var(--accent); }
+.workspace-nav-item:disabled { opacity: .45; cursor: not-allowed; }
 @media (max-width: 640px) {
-  .workspace-sidebar { display: none; }
+  /* Below the compact boundary the rail is not mounted inline; it lives in
+     the panel the topbar button opens. */
+  .workspace > .workspace-sidebar { display: none; }
   /* The rail is hidden on phones; this compact entry drives the same sources
      view and disappears again from 641px up. */
   .sources-entry { width: 100%; min-height: 38px; display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--muted); background: var(--surface-raised); font-size: 13px; font-weight: 650; text-align: left; }
@@ -568,6 +601,26 @@ selection bar, and the details inspector column. */
   .sources-entry small { margin-left: auto; color: var(--quiet); font-size: 10px; }
   .sources-entry:hover { color: var(--ink); border-color: var(--accent); }
   .sources-entry.active { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
+}
+
+/* The phone workspace panel (components/WorkspaceRail.tsx `WorkspaceRailPanel`).
+   It follows the drawer conventions: a full-viewport backdrop that dismisses on
+   click, a dialog surface that slides in from the edge, its own scroll area,
+   and the shell's focus trap/`drawer-open` body lock. It renders only below the
+   compact boundary, so its rules live in the matching media query and never
+   affect the inline rail. */
+@media (max-width: 640px) {
+  .rail-backdrop { position: fixed; inset: 0; z-index: 20; display: flex; align-items: stretch; justify-content: flex-start; background: rgba(0, 0, 0, 0.56); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .rail-panel { width: min(330px, 86vw); max-width: 100%; height: 100%; min-width: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--hairline); padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); color: var(--ink); background: var(--surface-dim); box-shadow: 16px 0 48px rgb(0 0 0 / 40%); animation: rail-in 200ms ease both; }
+  .rail-panel-head { flex: 0 0 auto; display: flex; justify-content: flex-end; }
+  .rail-panel-close { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+  .rail-panel-scroll { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 4px; }
+  /* The mounted rail is the desktop rail: only its sticky desktop frame is
+     replaced by the panel's own scroll area. */
+  .rail-panel .workspace-sidebar { position: static; min-height: 0; flex: 0 0 auto; gap: 12px; padding: 0; }
+  .rail-panel .workspace-nav-item { min-height: 40px; }
+  .rail-panel .status-panel { flex: 0 0 auto; margin-top: 2px; border-top: 1px solid var(--hairline); border-bottom: 0; border-radius: 0; background: transparent; }
+  @keyframes rail-in { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
 }
 
 .result-duplicate { display: inline-flex; align-items: center; gap: 4px; width: max-content; max-width: 100%; border: 1px solid rgba(168, 204, 232, .28); border-radius: 5px; padding: 3px 6px; color: var(--accent); background: var(--accent-soft); font-size: 10px; font-weight: 700; }

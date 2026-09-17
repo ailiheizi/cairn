@@ -8,6 +8,7 @@ import { isTextEntryTarget, useSearch } from "./app/useSearch";
 import { useSettings } from "./app/useSettings";
 import { useRecents } from "./app/useRecents";
 import { useViewMode } from "./app/useViewMode";
+import { useCompactLayout } from "./app/useCompactLayout";
 import { useLibraryDrafts } from "./app/useLibraryDrafts";
 import { useLibrary } from "./app/useLibrary";
 import { useDetails } from "./app/useDetails";
@@ -16,7 +17,8 @@ import { useSources } from "./app/useSources";
 import { useRestore } from "./app/useRestore";
 import { useExport } from "./app/useExport";
 import { TopBar } from "./components/TopBar";
-import { WorkspaceRail } from "./components/WorkspaceRail";
+import { WorkspaceRail, WorkspaceRailPanel } from "./components/WorkspaceRail";
+import { StatusPanel } from "./components/StatusPanel";
 import { LibrarySurface } from "./components/LibrarySurface";
 import { ActivitySurface } from "./components/ActivitySurface";
 import { DuplicatesSurface } from "./components/DuplicatesSurface";
@@ -68,11 +70,17 @@ function App() {
   // The verification report is a fourth modal drawer. Its trigger lives in the
   // trusted status panel; the drawer itself is the verification surface's file.
   const [verificationOpen, setVerificationOpen] = useState(false);
+  // The workspace rail is inline above the compact boundary and a modal panel
+  // below it. The shell owns the flag, exactly like the drawer flags; the
+  // panel itself is the rail surface's own host.
+  const [railOpen, setRailOpen] = useState(false);
+  const compactLayout = useCompactLayout();
   const refreshGenerationRef = useRef(0);
   // Capture the invoking control before React changes the surface. This keeps
   // close/escape dismissal predictable when a page-level surface unmounts the
   // normal library controls.
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
+  const railTriggerRef = useRef<HTMLButtonElement | null>(null);
   const libraryListRef = useRef<HTMLDivElement | null>(null);
   // The activity view hands focus back to the rail entry it was opened from.
   const duplicatesRailRef = useRef<HTMLButtonElement | null>(null);
@@ -112,10 +120,10 @@ function App() {
       : t("Service connected, but catalog is unavailable.");
   const repositoryPath = statusData?.repository?.path || t("Configured content repository");
   // Settings is a full page in the document flow. Only the add, restore,
-  // export, and verification surfaces participate in the modal focus trap and
-  // body lock.
-  const drawerOpen = addOpen || restoreOpen || exportOpen || verificationOpen;
-  const drawerKind = addOpen ? "add" : restoreOpen ? "restore" : exportOpen ? "export" : verificationOpen ? "verification" : "closed";
+  // export, verification, and workspace-rail surfaces participate in the modal
+  // focus trap and body lock.
+  const drawerOpen = addOpen || restoreOpen || exportOpen || verificationOpen || (compactLayout && railOpen);
+  const drawerKind = addOpen ? "add" : restoreOpen ? "restore" : exportOpen ? "export" : verificationOpen ? "verification" : railOpen ? "rail" : "closed";
 
   async function refreshCapabilities() {
     try {
@@ -204,7 +212,7 @@ function App() {
     if (activeWorkspaceID) rememberWorkspace(activeWorkspaceID);
     if (activeWorkspaceID) {
       try {
-        await sources.loadSources(activeWorkspaceID, refreshGeneration);
+        await sources.loadSources(activeWorkspaceID, refreshGeneration, snapshots);
         await library.loadContentLibrary(activeWorkspaceID, refreshGeneration);
       } catch (error) {
         if (!isCurrentRefresh()) return;
@@ -230,6 +238,9 @@ function App() {
   const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
 
   useEffect(() => { void refresh(); }, []);
+  // The panel exists only below the compact boundary. A resize across it
+  // closes the panel instead of leaving a stale open flag behind.
+  useEffect(() => { if (!compactLayout) setRailOpen(false); }, [compactLayout]);
   // A selected subject that leaves the current listing is dropped instead of
   // being kept as a hidden member of the batch. Reordering (sorting) keeps the
   // same subjects and therefore the same selection.
@@ -296,7 +307,7 @@ function App() {
     requestAnimationFrame(focusFirstControl);
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        if (addOpen) sources.closeAdd(); else { setSettingsOpen(false); setRestoreOpen(false); setExportOpen(false); setVerificationOpen(false); }
+        if (addOpen) sources.closeAdd(); else { setRailOpen(false); setSettingsOpen(false); setRestoreOpen(false); setExportOpen(false); setVerificationOpen(false); }
         return;
       }
       if (event.key !== "Tab") return;
@@ -360,6 +371,33 @@ function App() {
   function viewSource(sourceItem: SourceSummary) { void sources.viewSource(sourceItem); }
   function recheckSource(sourceItem: SourceSummary, trigger?: EventTarget | null) { sources.openAdd(sourceItem, trigger); }
   function addSource(trigger?: EventTarget | null) { sources.openAdd(undefined, trigger); }
+  // The compact workspace panel is opened from the topbar button and dismissed
+  // like every other modal surface: Escape, the backdrop, or its own close
+  // control. The shell's drawer effect owns the focus trap, the `drawer-open`
+  // body lock, and the focus return to the button that opened it.
+  function openRail(trigger?: EventTarget | null) {
+    rememberDrawerTrigger(trigger);
+    setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setExportOpen(false); setVerificationOpen(false);
+    setRailOpen(true);
+  }
+  function closeRail() { setRailOpen(false); }
+  // Selecting a view is the panel's own dismiss action: the panel closes and
+  // the same handler the desktop rail uses switches the view. On a phone the
+  // inspector takes over the one column a workspace view would render in, so
+  // the panel's selection also leaves the inspected subject, behind the same
+  // unsaved-draft guard the library, sources, and activity entries already
+  // apply. Above the compact boundary none of this fires.
+  function selectRailView<Args extends unknown[]>(action: (...args: Args) => void) {
+    return (...args: Args) => {
+      setRailOpen(false);
+      if (compactLayout && selected) {
+        if (!drafts.canLeaveDetailDrafts()) return;
+        drafts.discardDetailDrafts();
+        setSelected(undefined);
+      }
+      action(...args);
+    };
+  }
   // The activity view is one real workspace view beside the library and the
   // sources. Entering it leaves the inspected subject like the sources view
   // does, through the same unsaved-draft guard the library owns.
@@ -380,6 +418,39 @@ function App() {
   // The workspace layout and the library's first-source empty state describe
   // the same condition, so the shell computes it once and passes it down.
   const showFirstSource = view.viewMode === "content" && library.libraryItems.length === 0 && sources.sources.length === 0 && sources.sourceProjection.state !== "DEGRADED";
+  // One rail element, mounted either inline (above the compact boundary) or
+  // inside the panel (below it). Selecting a view dismisses the panel and then
+  // runs the same handler the desktop rail calls; closing an already-closed
+  // panel is a no-op, so both mounts share this one element.
+  const rail = <WorkspaceRail
+    t={t}
+    viewMode={view.viewMode}
+    hasActiveFilters={library.hasActiveFilters}
+    libraryCount={library.libraryItems.length}
+    sourceCount={sources.sources.length}
+    onLibrary={selectRailView((event) => openLibrary(event))}
+    onSources={selectRailView(library.showSourcesSurface)}
+    onActivity={selectRailView(openActivity)}
+    onDuplicates={selectRailView(() => view.setViewMode("duplicates"))}
+    onTags={selectRailView(() => view.setViewMode("tags"))}
+    activityRef={activityRailRef}
+    duplicatesRef={duplicatesRailRef}
+    tagsRef={tagsRailRef}
+  />;
+  // The panel hosts that same rail element and the same trusted status
+  // disclosure; it adds the dialog shell only.
+  const railPanel = <WorkspaceRailPanel t={t} onClose={closeRail}>
+    {rail}
+    <StatusPanel
+      t={t}
+      status={status}
+      statusData={statusData}
+      capabilities={capabilities}
+      onRefresh={() => void refresh()}
+      onOpenVerification={(trigger) => { rememberDrawerTrigger(trigger); setRailOpen(false); setVerificationOpen(true); }}
+      onOpenActivity={selectRailView(openActivity)}
+    />
+  </WorkspaceRailPanel>;
 
   return <div className="app-shell">
     <TopBar
@@ -394,6 +465,9 @@ function App() {
       catalogHealthy={catalogHealthy}
       snapshotRef={snapshotRef}
       search={search}
+      compact={compactLayout}
+      onOpenRail={openRail}
+      railTriggerRef={railTriggerRef}
       onRefresh={() => void refresh()}
       onOpenRestore={(trigger) => restore.openRestore(trigger)}
       onOpenAdd={(_, trigger) => addSource(trigger)}
@@ -403,21 +477,7 @@ function App() {
       canLeaveSettings={settings.canLeaveSettings}
     />
     <main className={`workspace ${selected ? "detail-active" : ""} ${showFirstSource ? "empty-library" : ""}`}>
-      <WorkspaceRail
-        t={t}
-        viewMode={view.viewMode}
-        hasActiveFilters={library.hasActiveFilters}
-        libraryCount={library.libraryItems.length}
-        sourceCount={sources.sources.length}
-        onLibrary={openLibrary}
-        onSources={library.showSourcesSurface}
-        onActivity={openActivity}
-        onDuplicates={() => view.setViewMode("duplicates")}
-        onTags={() => view.setViewMode("tags")}
-        activityRef={activityRailRef}
-        duplicatesRef={duplicatesRailRef}
-        tagsRef={tagsRailRef}
-      />
+      {compactLayout ? undefined : rail}
       {view.viewMode === "duplicates" ? <DuplicatesSurface t={t} /> : view.viewMode === "tags" ? <TagsSurface t={t} /> : view.viewMode === "activity" ? <ActivitySurface
         t={t}
         locale={locale}
@@ -490,6 +550,7 @@ function App() {
         onCancelEdit={() => { drafts.setEditingNoteID(""); drafts.setEditingBody(""); drafts.setEditingOriginalBody(""); }}
       />}
     </main>
+    {compactLayout && railOpen && railPanel}
     {settingsOpen && <SettingsDialog
       t={t}
       locale={locale}

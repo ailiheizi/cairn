@@ -42,10 +42,11 @@ web/src/
     useSettings.ts             the persisted configuration dialog
     useRecents.ts              browser-local recent searches/destinations
     useViewMode.ts             view mode, layout, and sort preferences
+    useCompactLayout.ts        the one `max-width: 640px` boundary the shell and CSS share
   components/                  one surface per file
     TopBar.tsx                 header, search field, actions
     StatusPanel.tsx            the trusted status surface (rail disclosure + fact rows)
-    WorkspaceRail.tsx          the workspace navigation rail
+    WorkspaceRail.tsx          the workspace navigation rail and its phone panel host
     LibrarySurface.tsx         library column: heading, controls, notices, views
     ResultList.tsx             the tile grid / dense list and its rows
     SourcesSurface.tsx         the configured-sources view and its cards
@@ -98,9 +99,18 @@ scripts/
 The shell owns only: the locale and translator, the one notice, the busy flag,
 the query text and last submitted query, the service projection
 (`status`/`statusData`/`capabilities`/`snapshotRef`/`workspaceID`), the open
-surface flags, the drawer focus trap, the document-level search shortcut, and
-the ordered composition of each flow's reset. Everything else belongs to a
-flow.
+surface flags (including the compact workspace panel), the drawer focus trap,
+the document-level search shortcut, and the ordered composition of each flow's
+reset. Everything else belongs to a flow.
+
+Below the one compact boundary (`max-width: 640px`, asked through
+`app/useCompactLayout.ts` and by the stylesheet itself), the shell mounts the
+same `WorkspaceRail` element and the same `StatusPanel` inside
+`WorkspaceRailPanel` instead of inline, and the topbar renders the one button
+that opens it. Selecting a view in the panel closes it and runs the same
+handler the desktop rail runs, and all three drawers' behaviours (focus into
+the panel, Tab trap, Escape, backdrop dismissal, `drawer-open`, focus return)
+come from the shell's existing drawer effect rather than a second copy.
 
 Markup was moved verbatim. The shell's original JSX was written with one dense
 line per surface element, and that formatting was preserved so the split is
@@ -264,6 +274,14 @@ instead of the library). The status panel already exposes an optional
   `DEGRADED — {reason}`, `FAILED — {reason}`; a fact with no source in this
   build reads UNKNOWN with the missing capability named, never a zero or a
   healthy default.
+- It does not let a discovery fact or a scope statement headline the status
+  surface. The summary names the weakest *protection and recovery* fact only
+  (service, repository, writability, catalog, schema, verification, protection
+  mix); the lexical/semantic index and doctor rows live in the `Discovery`
+  group, and the facts whose only source is an operation this build does not
+  have live in `Not sourced by this build`, whose collapsed line states their
+  count under an UNKNOWN token. No fact is dropped by the grouping: every row
+  still renders one of the four state strings when its group is expanded.
 - It does not run an expensive daemon operation implicitly. `doctor.check`
   reads repository bytes and runs only on the operator's explicit request; the
   status panel reports its receipt (or that it has not run) either way.

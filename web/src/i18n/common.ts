@@ -28,6 +28,8 @@ export const common: Record<string, string> = {
   "Cancel": "取消",
   "Save": "保存",
   "Workspace navigation": "工作区导航",
+  "Open workspace navigation": "打开工作区导航",
+  "Close workspace navigation": "关闭工作区导航",
   "WORKSPACE": "工作区",
   "OPERATIONS": "操作",
   "Library": "内容库",

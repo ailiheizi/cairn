@@ -78,7 +78,7 @@ export async function assertResponsiveLayout(ctx) {
   // Desktop layout is one grid with two width boundaries: the navigation rail
   // appears above 640px, and from 1080px the list and the inspector share the
   // window instead of the inspector replacing the list.
-  for (const [width, expectRail, expectList] of [[640, false, false], [900, true, false], [1079, true, false], [1080, true, true], [1440, true, true]]) {
+  for (const [width, expectRail, expectList] of [[640, false, false], [900, true, false], [1079, true, false], [1080, true, true], [1440, true, true], [1512, true, true]]) {
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(150);
     const paneGeometry = await page.evaluate(() => {
@@ -90,6 +90,7 @@ export async function assertResponsiveLayout(ctx) {
       const rail = document.querySelector(".workspace-sidebar");
       return {
         rail: rail ? (getComputedStyle(rail).display === "none" ? 0 : box(".workspace-sidebar")) : -1,
+        railTrigger: document.querySelectorAll(".rail-trigger").length,
         list: box(".content-column"),
         inspector: box(".detail-column"),
         detailPosition: detail ? getComputedStyle(detail).position : "",
@@ -97,6 +98,9 @@ export async function assertResponsiveLayout(ctx) {
       };
     });
     assert.equal(paneGeometry.rail > 0, expectRail, `${width}px navigation rail visibility changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
+    // The compact workspace button exists only below the boundary; above it the
+    // rail is inline and the button must not be rendered at all.
+    assert.equal(paneGeometry.railTrigger, width <= 640 ? 1 : 0, `${width}px workspace button visibility changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
     assert.equal(paneGeometry.list > 0, expectList, `${width}px list visibility changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
     assert.ok(paneGeometry.inspector > 0, `${width}px inspector is missing: ${JSON.stringify(paneGeometry)}`);
     if (expectRail) assert.ok(paneGeometry.rail >= 160 && paneGeometry.rail <= 230, `${width}px rail width changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
@@ -107,6 +111,89 @@ export async function assertResponsiveLayout(ctx) {
   }
 }
 
+// The phone workspace panel: one topbar button opens the same rail (Library,
+// Sources, Duplicates, Tags, Activity) and the same trusted status disclosure
+// as a left slide-in panel, with the drawer dismiss contract. Above the
+// boundary the button does not exist and the rail stays inline; that half is
+// asserted by the responsive loop above.
+export async function assertMobileWorkspacePanel(ctx) {
+  const { page } = ctx;
+  const trigger = page.getByRole("button", { name: /打开工作区导航|Open workspace navigation/ });
+  await trigger.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await page.locator(".workspace > .workspace-sidebar").count(), 0, "the rail must not be rendered inline on a phone");
+  const triggerBox = await trigger.boundingBox();
+  assert.ok(triggerBox && triggerBox.width >= 32 && triggerBox.height >= 32, `the workspace button must keep a 32px hit target: ${JSON.stringify(triggerBox)}`);
+
+  await trigger.click();
+  const panel = page.getByRole("dialog", { name: /工作区导航|Workspace navigation/ });
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await page.evaluate(() => document.body.classList.contains("drawer-open")), true, "the workspace panel must lock the page like the other drawers");
+
+  // Every rail entry is the desktop entry, inside the panel.
+  const entries = panel.locator("button.workspace-nav-item");
+  assert.equal(await entries.count(), 5, "the panel must hold the five workspace views");
+  const entryText = (await entries.allInnerTexts()).join("\n");
+  for (const label of [/内容库|Library/, /来源|Sources/, /Duplicates/, /标签|Tags/, /活动|Activity/]) {
+    assert.match(entryText, label, `the panel must offer the ${label} view: ${entryText}`);
+  }
+  assert.equal(await entries.nth(0).isEnabled(), true, "every panel entry must be interactive");
+
+  // The status disclosure inside the panel is the same surface: its own
+  // summary opens it, and its action controls are reachable from the panel.
+  const statusPanel = panel.locator(".status-panel");
+  const statusSummary = statusPanel.locator("summary.status-panel-summary");
+  await statusSummary.waitFor({ state: "visible", timeout: 10000 });
+  assert.match((await statusSummary.innerText()).trim(), /^(PROVEN|UNKNOWN|DEGRADED|FAILED)/, `the panel's status summary must carry a state token: ${(await statusSummary.innerText()).trim()}`);
+  if (await statusPanel.getAttribute("open") === null) await statusSummary.click();
+  await statusPanel.locator(".health-fact").first().waitFor({ state: "visible", timeout: 10000 });
+  for (const control of [/打开验证报告|Open verification report/, /打开活动|Open activity/, /刷新事实|Refresh facts/, /运行体检检查|Run doctor check/]) {
+    const button = statusPanel.getByRole("button", { name: control }).first();
+    assert.equal(await button.isVisible(), true, `the panel's status control ${control} must be reachable: ${await button.count()}`);
+    assert.equal(await button.isEnabled(), true, `the panel's status control ${control} must be usable`);
+  }
+  const overflow = await page.evaluate(() => {
+    const railPanel = document.querySelector(".rail-panel");
+    return {
+      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      panel: railPanel ? railPanel.scrollWidth - railPanel.clientWidth : -1,
+    };
+  });
+  assert.equal(overflow.document, 0, `the panel must not overflow the page: ${JSON.stringify(overflow)}`);
+  assert.ok(overflow.panel <= 0, `the panel must not overflow horizontally: ${JSON.stringify(overflow)}`);
+
+  // Escape dismisses the panel and hands focus back to the button.
+  await page.keyboard.press("Escape");
+  await panel.waitFor({ state: "detached", timeout: 10000 });
+  assert.equal(await page.evaluate(() => document.body.classList.contains("drawer-open")), false, "Escape must release the page after the panel closes");
+  await assertFocusReturned(ctx, trigger);
+
+  // Selecting a view closes the panel and switches the view.
+  await trigger.click();
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+  await panel.getByRole("button", { name: /标签|Tags/ }).click();
+  await panel.waitFor({ state: "detached", timeout: 10000 });
+  await page.locator('.tags-surface[data-view="tags"]').waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await page.evaluate(() => document.body.classList.contains("drawer-open")), false, "selecting a view must release the page too");
+
+  // The backdrop closes the panel as well, and returns focus to the button.
+  await trigger.click();
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+  const viewport = page.viewportSize();
+  await page.mouse.click(viewport.width - 4, Math.round(viewport.height / 2));
+  await panel.waitFor({ state: "detached", timeout: 10000 });
+  await assertFocusReturned(ctx, trigger);
+
+  // Leave the workspace on the content view for the surfaces that follow. The
+  // Library entry re-reads the content listing, so the tags surface leaves when
+  // that read answers.
+  await trigger.click();
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+  await panel.locator("button.workspace-nav-item").first().click();
+  await panel.waitFor({ state: "detached", timeout: 10000 });
+  await page.locator('.tags-surface[data-view="tags"]').waitFor({ state: "detached", timeout: 10000 });
+  await assertNoHorizontalOverflow(ctx);
+}
+
 export async function assertNarrowDrawers(ctx) {
   const { page } = ctx;
   // Exercise the page-level settings workspace and the remaining drawers at
@@ -114,6 +201,8 @@ export async function assertNarrowDrawers(ctx) {
   // present but unreachable on mobile.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(150);
+
+  await assertMobileWorkspacePanel(ctx);
 
   const settingsTrigger = page.getByRole("button", { name: /打开设置|Open settings/ });
   await settingsTrigger.click();

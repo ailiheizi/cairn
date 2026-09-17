@@ -5,19 +5,27 @@ import { command } from "./command";
 import { operations } from "../lib/operations";
 import { looksLikeRemoteLocator } from "../lib/format";
 import type { LibraryFlow } from "./useLibrary";
-import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceProjection, SourceSummary } from "../lib/types";
+import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceChangeSummary, SourceProjection, SourceSummary, SnapshotDiffItem, SnapshotSummary } from "../lib/types";
 
 // The configured sources surface and the add/recheck drawer.
 //
 // Planning is read-only and reviewable: `plan.ingest` records a plan, and only
 // `plan.apply` on the exact plan digest writes bytes. A plan whose outcome is
 // unknown is never made executable again by this flow.
+//
+// The change summary between a source's two newest restore points is the
+// daemon's own comparison: the restore points come from `snapshot.list` (read
+// by the shell on the same refresh) and the counts come from `snapshot.diff`.
+// The browser never derives a change, and a comparison the daemon did not
+// answer stays unavailable with the daemon's reason instead of reading as
+// "nothing changed".
 
 export type SourcesFlow = {
   sources: SourceSummary[];
   setSources: (value: SourceSummary[]) => void;
   sourceProjection: SourceProjection;
   setSourceProjection: (value: SourceProjection) => void;
+  sourceChanges: Record<string, SourceChangeSummary>;
   source: string;
   setSource: (value: string) => void;
   changeSourceInput: (value: string) => void;
@@ -35,7 +43,7 @@ export type SourcesFlow = {
   sourcePlanBusy: boolean;
   sourceSaveDisabled: boolean;
   sourceSuggestionDisabled: boolean;
-  loadSources: (activeWorkspaceID: string, refreshGeneration?: number) => Promise<void>;
+  loadSources: (activeWorkspaceID: string, refreshGeneration?: number, restorePoints?: SnapshotSummary[]) => Promise<void>;
   makePlan: (event?: FormEvent) => void;
   runIngestPlan: (rootPath: string) => Promise<void>;
   pickSuggestedPath: (suggestion: PathSuggestion) => void;
@@ -70,6 +78,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
 }): SourcesFlow {
   const [sources, setSources] = useState<SourceSummary[]>([]);
   const [sourceProjection, setSourceProjection] = useState<SourceProjection>({ state: "READY" });
+  const [sourceChanges, setSourceChanges] = useState<Record<string, SourceChangeSummary>>({});
   const [source, setSource] = useState("");
   const [recheckSourceRef, setRecheckSourceRef] = useState("");
   const [plan, setPlan] = useState<any>();
@@ -94,12 +103,14 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     return suggestions.slice(0, 6);
   }, [lastPlannedSource, sources]);
 
-  async function loadSources(activeWorkspaceID: string, refreshGeneration = refreshGenerationRef.current) {
+  async function loadSources(activeWorkspaceID: string, refreshGeneration = refreshGenerationRef.current, restorePoints: SnapshotSummary[] = []) {
     try {
       const response = await command(operations.source.list, { workspace_id: activeWorkspaceID });
       if (refreshGenerationRef.current !== refreshGeneration) return;
-      setSources((response.data?.sources ?? []) as SourceSummary[]);
+      const projected = (response.data?.sources ?? []) as SourceSummary[];
+      setSources(projected);
       setSourceProjection({ state: "READY" });
+      void loadSourceChanges(projected, restorePoints, refreshGeneration);
     } catch {
       if (refreshGenerationRef.current !== refreshGeneration) return;
       // Source management is a secondary projection; an unavailable projection
@@ -107,7 +118,91 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       // Drop the old cards so a failed refresh cannot leave actions bound to a
       // stale source projection.
       setSources([]);
+      setSourceChanges({});
       setSourceProjection({ state: "DEGRADED" });
+    }
+  }
+  // The daemon's own answer to "what changed since the previous restore
+  // point". `restorePoints` is the `snapshot.list` projection the shell read on
+  // this refresh; one `snapshot.diff` call compares a source's two newest
+  // points, and a source with fewer than two points issues no diff at all.
+  async function loadSourceChanges(projected: SourceSummary[], restorePoints: SnapshotSummary[], refreshGeneration: number) {
+    const next: Record<string, SourceChangeSummary> = {};
+    const pending: Array<{ key: string; from: SnapshotSummary; to: SnapshotSummary }> = [];
+    for (const item of projected) {
+      const key = item.source_ref?.trim();
+      if (!key) continue;
+      const resolved = resolveSourceRestorePoints(item, restorePoints, t);
+      if (resolved.state === "READY") {
+        next[key] = {
+          state: "READING",
+          added: 0, removed: 0, changed: 0, changes: [],
+          fromRef: resolved.previous.snapshot_ref ?? "",
+          toRef: resolved.newest.snapshot_ref ?? "",
+          fromAt: resolved.previous.created_at ?? "",
+          toAt: resolved.newest.created_at ?? "",
+          newestVerification: resolved.newest.verification,
+        };
+        pending.push({ key, from: resolved.previous, to: resolved.newest });
+        continue;
+      }
+      if (resolved.state === "UNAVAILABLE") {
+        next[key] = { state: "UNAVAILABLE", reason: resolved.reason, added: 0, removed: 0, changed: 0, changes: [] };
+        continue;
+      }
+      const newest = resolved.state === "SINGLE_POINT" ? resolved.newest : undefined;
+      next[key] = {
+        state: resolved.state,
+        added: 0, removed: 0, changed: 0, changes: [],
+        fromRef: newest?.snapshot_ref ?? "",
+        toRef: newest?.snapshot_ref ?? "",
+        fromAt: newest?.created_at ?? "",
+        toAt: newest?.created_at ?? "",
+        newestVerification: newest?.verification,
+      };
+    }
+    if (refreshGenerationRef.current !== refreshGeneration) return;
+    setSourceChanges(next);
+    if (!pending.length) return;
+    await Promise.allSettled(pending.map(async ({ key, from, to }) => {
+      const summary = await readChangeSummary(from, to);
+      if (refreshGenerationRef.current !== refreshGeneration) return;
+      setSourceChanges((current) => ({ ...current, [key]: summary }));
+    }));
+  }
+  // One `snapshot.diff` read. Only a SUCCEEDED answer that echoes the two
+  // requested refs proves the daemon compared these restore points; every
+  // other outcome is UNAVAILABLE with the daemon's reason and asserts no count.
+  async function readChangeSummary(from: SnapshotSummary, to: SnapshotSummary): Promise<SourceChangeSummary> {
+    const fromRef = from.snapshot_ref ?? "";
+    const toRef = to.snapshot_ref ?? "";
+    const base = {
+      added: 0, removed: 0, changed: 0, changes: [] as SnapshotDiffItem[],
+      fromRef, toRef,
+      fromAt: from.created_at ?? "", toAt: to.created_at ?? "",
+      newestVerification: to.verification,
+    };
+    try {
+      const response = await command(operations.snapshot.diff, { from_snapshot_ref: fromRef, to_snapshot_ref: toRef });
+      const data = response.data ?? {};
+      const answered = response.status === "SUCCEEDED"
+        && String(data.from_snapshot_ref ?? "") === fromRef
+        && String(data.to_snapshot_ref ?? "") === toRef;
+      if (!answered) {
+        return { ...base, state: "UNAVAILABLE", reason: t("The daemon did not answer snapshot.diff for these two restore points, so no comparison is reported.") };
+      }
+      const items = (Array.isArray(data.changes) ? data.changes : []) as SnapshotDiffItem[];
+      let added = 0;
+      let removed = 0;
+      let changed = 0;
+      for (const item of items) {
+        if (item?.kind === "added") added += 1;
+        else if (item?.kind === "removed") removed += 1;
+        else changed += 1;
+      }
+      return { ...base, state: "READY", added, removed, changed, changes: items };
+    } catch (error) {
+      return { ...base, state: "UNAVAILABLE", reason: error instanceof Error ? error.message : t("The change summary could not be read.") };
     }
   }
   // Preview and suggestion taps share one ingest runner so Enter in the path
@@ -228,6 +323,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
   function resetSourceProjection() {
     setPlan(undefined);
     setSources([]);
+    setSourceChanges({});
   }
 
   const sourceLooksRemote = looksLikeRemoteLocator(source);
@@ -272,6 +368,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     setSources,
     sourceProjection,
     setSourceProjection,
+    sourceChanges,
     source,
     setSource,
     changeSourceInput,
@@ -300,4 +397,41 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     closeAdd,
     resetSourceProjection,
   };
+}
+
+// Resolve the two newest restore points of one configured source. The newest
+// point is the daemon's own source record (`latest_snapshot_ref`); the point
+// before it is the newest other restore point whose recorded provenance path
+// is this source's locator. Both facts are the daemon's; the browser selects
+// two of its restore points and never invents one. A source with one point is
+// SINGLE_POINT — there is nothing to compare against yet, which is not the
+// same claim as "no changes".
+function resolveSourceRestorePoints(source: SourceSummary, snapshots: SnapshotSummary[], t: Translator):
+  | { state: "NO_POINTS" }
+  | { state: "SINGLE_POINT"; newest: SnapshotSummary }
+  | { state: "UNAVAILABLE"; reason: string }
+  | { state: "READY"; newest: SnapshotSummary; previous: SnapshotSummary } {
+  const latestRef = source.latest_snapshot_ref?.trim() ?? "";
+  if (!latestRef) return { state: "NO_POINTS" };
+  const newest = snapshots.find((snapshot) => snapshot.snapshot_ref === latestRef);
+  if (!newest) {
+    return { state: "UNAVAILABLE", reason: t("snapshot.list did not report this source's newest restore point, so its restore points cannot be compared.") };
+  }
+  const pathKey = provenanceKey(source.locator);
+  if (!pathKey) {
+    return { state: "UNAVAILABLE", reason: t("This source record does not report a path, so its restore points cannot be matched to it.") };
+  }
+  const previous = snapshots
+    .filter((snapshot) => snapshot.snapshot_ref !== latestRef && provenanceKey(snapshot.display_path) === pathKey)
+    .sort((left, right) => String(left.created_at ?? "").localeCompare(String(right.created_at ?? "")))
+    .at(-1);
+  if (!previous) return { state: "SINGLE_POINT", newest };
+  return { state: "READY", newest, previous };
+}
+
+// The recorded provenance path with separators normalized. It is a matching
+// key only: a source and its restore points are bound by the path the daemon
+// recorded, never by a browser-computed identity.
+function provenanceKey(value?: string) {
+  return String(value ?? "").trim().replace(/\/{2,}/g, "/").replace(/\/+$/, "");
 }
