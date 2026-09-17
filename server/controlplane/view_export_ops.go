@@ -325,6 +325,13 @@ func (d *Dispatcher) handleExportPlan(ctx context.Context, env command.Envelope,
 	if err != nil {
 		return invalidInputResult(env, started, err)
 	}
+	// The frozen sidecar policy is validated before anything is frozen: an
+	// operator who requests a sidecar must never receive a manifest (or later
+	// a destination) that silently omits it.
+	sidecarFiles, err := exact.ResolveExportSidecarFiles(strings.TrimSpace(input.Sidecars))
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	if d.exact == nil || d.exact.Repo == nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "exact repository is unavailable; export planning cannot freeze subject bytes"))
 	}
@@ -335,6 +342,9 @@ func (d *Dispatcher) handleExportPlan(ctx context.Context, env command.Envelope,
 	items, err := d.freezeExportItems(ctx, subjects, requestedOutput)
 	if err != nil {
 		return exportPlanErrorResult(env, started, err)
+	}
+	if err := exact.ExportSidecarNameConflict(sidecarFiles, items); err != nil {
+		return invalidInputResult(env, started, err)
 	}
 	representation := strings.TrimSpace(input.Representation)
 	if representation == "" {
@@ -676,7 +686,9 @@ type exportApplyVerifyInput struct {
 
 // handleExportApply revalidates the frozen manifest digest, checks the
 // destination, and materializes exact bytes from the repository. Each item
-// receives an exact or declared non-exact receipt via the apply result.
+// receives an exact or declared non-exact receipt via the apply result. A
+// frozen manifest that requested a sidecar policy additionally writes every
+// derived sidecar file the policy requires, and the response names them.
 func (d *Dispatcher) handleExportApply(ctx context.Context, env command.Envelope, started time.Time) command.Result {
 	if d.exact == nil || d.exact.Repo == nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "exact repository is unavailable; export.apply cannot materialize exact bytes"))
@@ -697,11 +709,16 @@ func (d *Dispatcher) handleExportApply(ctx context.Context, env command.Envelope
 		ManifestID: applyResult.ManifestID, ManifestDigest: applyResult.ManifestDigest,
 		Destination: applyResult.Destination, Items: applyResult.Items,
 		Bytes: applyResult.Bytes, Verified: applyResult.Verified,
+		Sidecars: applyResult.Sidecars,
 	})
 }
 
 // handleExportVerify checks a materialized destination against the frozen
-// manifest. Partial, changed, or extra output fails closed.
+// manifest. Partial, changed, or extra output fails closed. When the frozen
+// manifest requested a sidecar policy, every derived sidecar file is
+// recomputed from the frozen manifest and compared byte-for-byte with what is
+// on disk; a missing or altered sidecar is a verification failure and is never
+// reported as a clean verify.
 func (d *Dispatcher) handleExportVerify(ctx context.Context, env command.Envelope, started time.Time) command.Result {
 	if d.exact == nil || d.exact.Repo == nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "exact repository is unavailable; export.verify cannot read the frozen manifest"))
@@ -721,10 +738,15 @@ func (d *Dispatcher) handleExportVerify(ctx context.Context, env command.Envelop
 	if !verified {
 		return failed(env, started, newReason(ReasonCodeConflict, "export verification failed: materialized output does not match the frozen manifest"))
 	}
+	sidecars, err := exact.ResolveExportSidecarFiles(manifest.Sidecars)
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	items, bytes := manifestItemTotals(manifest)
 	return succeeded(env, started, command.ExportApplyVerifyData{
 		ManifestID: manifest.ManifestID, ManifestDigest: manifest.ManifestDigest,
 		Destination: input.Destination, Items: items, Bytes: bytes, Verified: true,
+		Sidecars: sidecars,
 	})
 }
 
@@ -895,6 +917,13 @@ func exportManifestLookupResult(env command.Envelope, started time.Time, err err
 }
 
 func exportApplyVerifyErrorResult(env command.Envelope, started time.Time, err error) command.Result {
+	// A frozen manifest whose sidecar policy this build does not implement is
+	// a caller-visible input problem, not an internal failure: the export was
+	// asked for output this daemon cannot produce, and materializing the
+	// subject files alone would silently drop it.
+	if exact.IsUnsupportedSidecarPolicy(err) {
+		return invalidInputResult(env, started, err)
+	}
 	if errors.Is(err, exact.ErrBlocked) {
 		return failed(env, started, newReason(ReasonCodeUnavailable, err.Error()))
 	}

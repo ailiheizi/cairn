@@ -3,14 +3,15 @@
 // Owner: components/TagsSurface.tsx and scripts/e2e/tags.mjs. The keys are
 // exactly the strings that surface renders: the durable tag vocabulary and its
 // subject counts, the per-subject tag record facts, the add/remove controls,
-// the previewed rename/merge path with its partial-failure report, and the
+// the daemon's rename/merge plan and its per-subject apply outcomes, and the
 // loading/empty/blocked states.
 //
 // A number of keys intentionally stay in other partials and are only
 // referenced here, because the concept they name already belongs to the
 // surface that owns it and a key may live in exactly one partial: "WORKSPACE"
 // and "Library" (common), "Tags" (library), "UNKNOWN — not reported by this
-// build" (activity), and the protection vocabulary the duplicate review owns —
+// build" (activity), "Plan digest: {{digest}}" (activity), and the protection
+// vocabulary the duplicate review owns —
 // "Protection: {{label}} ({{token}})", "Exact protected",
 // "Exact fallback (bytes still exact)", "External replayable",
 // "Link only, unprotected", "Explicitly unprotected", "Blocked",
@@ -21,14 +22,14 @@
 // not redefine them.
 
 export const tags: Record<string, string> = {
-  // --- surface chrome, the scope label, and the truth note ------------------
+  // --- surface chrome, the scope label, and the truth notes -----------------
   "{{tags}} tags over {{subjects}} subjects with a live record": "{{tags}} 个标签，覆盖 {{subjects}} 个带有存续记录的主题",
   "Refresh tag vocabulary": "刷新标签词汇表",
   "Reading the durable tag vocabulary…": "正在读取持久标签词汇表……",
   "Tag vocabulary read at {{time}} (this browser)": "标签词汇表读取于 {{time}}（本浏览器）",
   "The tag vocabulary has not been read in this browser yet": "本浏览器尚未读取标签词汇表",
   "Every row here is a durable TAG annotation record the daemon returned for this workspace. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.": "此处的每一行都是服务为此工作区返回的持久 TAG 注释记录。名称就是存储的正文，按记录原样显示；本表面绝不规范化、转为小写或合并两个名称，也不会应用任何机器建议。",
-  "A rename or merge is a previewed sequence of per-subject writes: the new name is added, then the old record is deleted. Nothing is rewritten in place, and the preview lists every subject before any write is issued.": "重命名或合并是一系列按主题、经预览的写入：先添加新名称，再删除旧记录。不会就地改写任何内容，并且预览会在发出任何写入之前列出每个主题。",
+  "A rename or merge is one service operation pair: the service plans every affected subject and the exact changes, and only the confirmed, digest-bound apply writes. The service adds the new name before tombstoning the old record, so an interruption leaves both names rather than neither.": "重命名或合并是一对服务操作：服务先规划每个受影响的主题与确切的变更，只有经过确认、以摘要绑定的应用才会写入。服务先添加新名称，再为旧记录置墓碑，因此中断会让主题同时保留两个名称，而不是两个都不剩。",
 
   // --- the empty and blocked states ----------------------------------------
   "No live tag is recorded in this workspace yet": "此工作区尚未记录任何存续标签",
@@ -88,36 +89,45 @@ export const tags: Record<string, string> = {
   "The daemon reports that {{name}} already carries this tag; the existing record {{annotation_id}} is unchanged.": "服务报告 {{name}} 已带有此标签；现有记录 {{annotation_id}} 未发生变化。",
   "The tag was not added: {{message}}": "未能添加标签：{{message}}",
 
-  // --- the previewed rename / merge ----------------------------------------
+  // --- the service-planned rename / merge and its confirmation -------------
   "Rename or merge this tag": "重命名或合并此标签",
   "Rename or merge {{name}}": "重命名或合并 {{name}}",
-  "Both are the same operation: add the new name to each subject, then delete the old record. The preview lists exactly which records change before anything is written, and what was applied stays visible afterwards.": "两者是同一个操作：为每个主题添加新名称，然后删除旧记录。预览会在任何写入之前列出确切会变化的记录，已应用的内容在此之后仍然可见。",
   "New name (an existing name merges into it)": "新名称（与已有名称相同即合并到其中）",
   "New tag name": "新标签名称",
   "New name for {{name}}": "{{name}} 的新名称",
-  "Preview the change": "预览此变更",
   "Tag names are stored exactly as written; remove the leading or trailing whitespace before previewing.": "标签名称按原样存储；请在预览前去掉开头或结尾的空白。",
-  "Preview only — {{count}} subjects and their records would change. No write has been issued yet.": "仅为预览——将有 {{count}} 个主题及其记录发生变化。尚未发出任何写入。",
-  "{{from}} → {{to}}": "{{from}} → {{to}}",
-  "The tag's subject count changed after this preview was built; preview again before applying.": "此预览生成后标签的主题数量发生了变化；请在应用前重新预览。",
-  "Confirm and apply to {{count}} subjects": "确认并应用到 {{count}} 个主题",
+  "Ask the service to plan the change": "请求服务规划此变更",
+  "The service planned {{count}} subjects. Review the plan and its digest, then confirm it to apply.": "服务已规划 {{count}} 个主题。请审阅计划及其摘要，然后确认以应用。",
+  "The service planned zero remaining changes for this pair: no subject still carries the old name, so there is nothing to apply.": "服务规划出此名称对没有任何剩余变更：已没有主题还带有旧名称，因此没有可应用的内容。",
+  "The service returned a plan without a digest; nothing can be confirmed from it, so nothing was written.": "服务返回的计划没有摘要；无法据此确认任何内容，因此没有写入。",
+  "The service did not return a plan: {{message}}": "服务未返回计划：{{message}}",
+  "Preview only — the service planned {{count}} subjects. No write has been issued yet.": "仅为预览——服务已规划 {{count}} 个主题。尚未发出任何写入。",
+  "{{count}} of these subjects already carry the new name, so the plan records their add as an explicit no-op.": "其中 {{count}} 个主题已带有新名称，因此计划把它们的添加记录为显式的无操作。",
+  "{{action}} {{body}}: already recorded as {{annotation_id}}; no write": "{{action}} {{body}}：已记录为 {{annotation_id}}；不写入",
+  "{{action}} {{body}}: record {{annotation_id}} at revision {{revision}}": "{{action}} {{body}}：记录 {{annotation_id}}，修订 {{revision}}",
+  "The service planned zero remaining changes for this pair, so there is nothing to apply. No write has been issued.": "服务规划出此名称对没有任何剩余变更，因此没有可应用的内容。尚未发出任何写入。",
+  "Confirm and apply the service plan to {{count}} subjects": "确认并将服务计划应用到 {{count}} 个主题",
   "Discard the preview": "放弃该预览",
+  "The service refused this apply and wrote nothing: {{message}} The service no longer reports the facts this plan was bound to, so plan the change again before applying.": "服务拒绝了本次应用且没有写入：{{message}} 服务已不再报告此计划所绑定的既成事实，因此请在应用前重新规划此变更。",
 
-  // --- what was applied, and what failed -----------------------------------
+  // --- the service's own per-subject outcomes ------------------------------
   "{{changed}} of {{requested}} subjects changed; {{failed}} failed and are listed below with their own reasons. A failed subject is left unchanged or carries both names, exactly as listed — this is not a clean rename.": "已变更 {{changed}} 个主题，共 {{requested}} 个；{{failed}} 个失败，并在下方连同各自原因列出。失败的主题保持未变或同时带有两个名称，与列表完全一致——这不是一次干净的重命名。",
   "All {{changed}} subjects changed.": "全部 {{changed}} 个主题已完成变更。",
   "The change was applied, but the tag vocabulary could not be read back: refresh to see the daemon's current records.": "变更已应用，但无法读回标签词汇表：请刷新以查看服务的当前记录。",
   "Applied record — {{changed}} of {{requested}} subjects changed, {{failed}} failed.": "已应用记录——{{changed}} 个主题已变更，共 {{requested}} 个，{{failed}} 个失败。",
+  "The service reported {{changed}} changed, {{unchanged}} with nothing written, and {{remains}} still carrying both names.": "服务报告：{{changed}} 个已变更，{{unchanged}} 个未写入任何内容，{{remains}} 个仍同时带有两个名称。",
+  "Service message: {{message}}": "服务消息：{{message}}",
   "This was not a clean rename": "这不是一次干净的重命名",
   "The subjects below were left unchanged or carry both names, exactly as each row states. No rollback is attempted or claimed.": "下列主题保持未变或同时带有两个名称，与每一行的说明完全一致。此处不尝试也不声称回滚。",
   "Every subject listed below now carries the new name and no longer carries the old one.": "下列每个主题现在都带有新名称，且不再带有旧名称。",
-  "Changed: {{from}} removed, {{to}} added (record {{annotation_id}})": "已变更：移除 {{from}}，添加 {{to}}（记录 {{annotation_id}}）",
-  "Left unchanged: nothing was written; {{from}} is still recorded, and the new name was not added.": "保持未变：没有写入任何内容；{{from}} 仍被记录，且未添加新名称。",
-  "Not clean: {{to}} was added (record {{annotation_id}}), and {{from}} is still recorded on this subject.": "不干净：已添加 {{to}}（记录 {{annotation_id}}），且此主题上仍记录着 {{from}}。",
+  "Changed: {{from}} is tombstoned and {{to}} is recorded (record {{annotation_id}})": "已变更：{{from}} 已置墓碑，{{to}} 已记录（记录 {{annotation_id}}）",
+  "Left unchanged: nothing was written for this subject; {{from}} is still recorded, and {{to}} was not added.": "保持未变：此主题没有写入任何内容；{{from}} 仍被记录，且未添加 {{to}}。",
+  "Not clean: {{to}} is recorded (record {{annotation_id}}), and {{from}} is still recorded on this subject.": "不干净：{{to}} 已记录（记录 {{annotation_id}}），且此主题上仍记录着 {{from}}。",
+  "Outcome reported by the service: {{outcome}}": "服务报告的结果：{{outcome}}",
   "Reason reported by the service: {{message}}": "服务报告的原因：{{message}}",
-  "Only the subjects listed here were written. Every other subject keeps its previous records; the reverse change is available below and is again previewed before it is applied.": "仅写入了此处列出的主题。其他每个主题保留此前的记录；下方提供反向变更，并且在应用前同样会先预览。",
+  "These are the service's own per-subject outcomes for the confirmed plan. Every subject not listed here was not part of the plan; the reverse change is available below and is planned and confirmed again before it is applied.": "以下是服务针对已确认计划给出的逐主题结果。未列出的主题不在该计划之内；下方提供反向变更，并且在应用前会再次规划并确认。",
   "Subjects the change did not complete for": "变更未完成的主题",
   "{{name}} ({{subject_ref}}) was not changed: {{reason}}": "{{name}}（{{subject_ref}}）未变更：{{reason}}",
   "Prepare the reverse change": "准备反向变更",
-  "The reverse change is prepared below. Preview it, then confirm it to restore the previous name on the subjects that changed.": "反向变更已在下方准备好。请先预览，然后确认，以便在已变更的主题上恢复此前的名称。",
+  "The reverse change is prepared below. Ask the service to plan it, then confirm it to restore the previous name on the subjects that changed.": "反向变更已在下方准备好。请让服务规划它，然后确认，以便在已变更的主题上恢复此前的名称。",
 };

@@ -253,16 +253,20 @@ type Filters struct {
 	ProtectionMode string `json:"protection_mode"`
 	Language       string `json:"language"`
 	Suffix         string `json:"suffix"`
-	SizeMin        *int64 `json:"size_min"`
-	SizeMax        *int64 `json:"size_max"`
-	MtimeAfter     *int64 `json:"mtime_after"`
-	MtimeBefore    *int64 `json:"mtime_before"`
+	// MediaClass is the derived media-class projection (see media_class.go).
+	// It is an additive convenience facet computed from the entry's recorded
+	// suffix; it is not a durable fact and not exact identity.
+	MediaClass  string `json:"media_class"`
+	SizeMin     *int64 `json:"size_min"`
+	SizeMax     *int64 `json:"size_max"`
+	MtimeAfter  *int64 `json:"mtime_after"`
+	MtimeBefore *int64 `json:"mtime_before"`
 }
 
 // Has reports whether at least one structured constraint is set.
 func (f Filters) Has() bool {
 	if f.EntryType != "" || f.ContentID != "" || f.DuplicateGroup != "" ||
-		f.ProtectionMode != "" || f.Language != "" || f.Suffix != "" {
+		f.ProtectionMode != "" || f.Language != "" || f.Suffix != "" || f.MediaClass != "" {
 		return true
 	}
 	return f.SizeMin != nil || f.SizeMax != nil || f.MtimeAfter != nil || f.MtimeBefore != nil
@@ -539,9 +543,10 @@ func NormalizeConstructAxes(axes []string) ([]string, error) {
 	return normalized, nil
 }
 
-// NormalizeFilters trims structured constraints and rejects invalid numeric
-// ranges. It is the search-package contract; the control plane performs the
-// same validation so a malformed request fails before any generation lookup.
+// NormalizeFilters trims structured constraints, rejects invalid numeric
+// ranges, and rejects a media_class outside the closed vocabulary. It is the
+// search-package contract; the control plane performs the same validation so a
+// malformed request fails before any generation lookup.
 func NormalizeFilters(f Filters) (Filters, error) {
 	f.EntryType = strings.TrimSpace(strings.ToUpper(f.EntryType))
 	f.ContentID = strings.TrimSpace(f.ContentID)
@@ -549,6 +554,11 @@ func NormalizeFilters(f Filters) (Filters, error) {
 	f.ProtectionMode = strings.TrimSpace(strings.ToUpper(f.ProtectionMode))
 	f.Language = strings.TrimSpace(f.Language)
 	f.Suffix = strings.TrimSpace(strings.ToLower(f.Suffix))
+	mediaClass, err := NormalizeMediaClass(f.MediaClass)
+	if err != nil {
+		return f, err
+	}
+	f.MediaClass = mediaClass
 	if f.SizeMin != nil && f.SizeMax != nil && *f.SizeMin > *f.SizeMax {
 		return f, errors.New("size_min must not exceed size_max")
 	}

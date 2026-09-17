@@ -1,6 +1,7 @@
 package exact
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -120,6 +121,9 @@ func (manifest ExportManifest) Validate() error {
 // explicit destination. Verified is true only when the complete destination
 // was written and then independently verified byte-for-byte against the
 // frozen items. Items counts every frozen item (exact or declared non-exact).
+// Sidecars names the destination-relative derived sidecar files this apply
+// wrote for the frozen sidecar policy; it is empty when the policy requested
+// none. A sidecar is derived output, never part of the frozen item set.
 type ExportApplyResult struct {
 	ManifestID     string
 	ManifestDigest string
@@ -127,6 +131,7 @@ type ExportApplyResult struct {
 	Items          int
 	Bytes          int64
 	Verified       bool
+	Sidecars       []string
 }
 
 // exportManifestDestinationBasis mirrors the restore plan destination basis:
@@ -188,6 +193,8 @@ func (manifest ExportManifest) PrepareExportManifestDigest() (string, error) {
 // Re-applying the same manifest to the same destination is idempotent only
 // through verify: because the destination must be empty at apply time, a
 // caller that already has a populated destination uses VerifyExportManifest.
+// When the frozen sidecar policy requests derived sidecars, they are written
+// next to the frozen subject files and covered by the same verification.
 func (s *Service) ApplyExportManifest(ctx context.Context, manifest ExportManifest, destination string) (ExportApplyResult, error) {
 	var result ExportApplyResult
 	if err := s.requireRepository(); err != nil {
@@ -201,6 +208,14 @@ func (s *Service) ApplyExportManifest(ctx context.Context, manifest ExportManife
 	result = ExportApplyResult{
 		ManifestID: manifest.ManifestID, ManifestDigest: digest,
 		Items: len(manifest.Items),
+	}
+	// Resolve the frozen sidecar policy before touching the destination: an
+	// unimplemented policy or a name collision must fail closed with nothing
+	// written, never materialize a destination that silently lacks the
+	// requested sidecar.
+	sidecarPlan, err := exportSidecarPlan(manifest)
+	if err != nil {
+		return result, err
 	}
 	if strings.TrimSpace(destination) == "" {
 		return result, fmt.Errorf("%w: export destination is required", ErrBlocked)
@@ -234,6 +249,16 @@ func (s *Service) ApplyExportManifest(ctx context.Context, manifest ExportManife
 		bytes += n
 	}
 	result.Bytes = bytes
+	sidecars := orderedExportSidecarNames(sidecarPlan)
+	for _, name := range sidecars {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
+		if err := writeExportSidecar(filepath.Join(absolute, name), sidecarPlan[name]); err != nil {
+			return result, err
+		}
+	}
+	result.Sidecars = sidecars
 	verified, err := s.VerifyExportManifest(ctx, manifest, absolute)
 	if err != nil {
 		return result, err
@@ -243,6 +268,28 @@ func (s *Service) ApplyExportManifest(ctx context.Context, manifest ExportManife
 	}
 	result.Verified = true
 	return result, nil
+}
+
+// writeExportSidecar writes one derived sidecar file with the same no-follow,
+// create-exclusive rules as a frozen subject output. A sidecar is regenerated
+// from the frozen manifest, so it is never merged, appended, or repaired in
+// place.
+func writeExportSidecar(path string, payload []byte) error {
+	file, err := createRestoreFile(path, 0o644)
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write(payload)
+	closeErr := file.Close()
+	if writeErr != nil {
+		_ = os.Remove(path)
+		return writeErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(path)
+		return closeErr
+	}
+	return nil
 }
 
 func (s *Service) materializeExportItem(ctx context.Context, destination string, item ExportItem) (int64, error) {
@@ -285,11 +332,19 @@ func (s *Service) materializeExportItem(ctx context.Context, destination string,
 // VerifyExportManifest checks a materialized destination against a frozen
 // manifest. Every exact frozen output must exist with the expected SHA-256 and
 // logical length, no extra path may exist, and a path claimed by a declared
-// non-exact item must not be materialized. A manifest with only non-exact
-// items verifies an empty destination honestly: it declared no exact output to
-// reproduce. Any deviation fails closed.
+// non-exact item must not be materialized. A manifest that requested a sidecar
+// policy must also carry each derived sidecar file recomputed from the frozen
+// manifest and byte-identical to what is on disk; a missing, altered, or
+// shortened sidecar is a verification failure and is never reported as a clean
+// verify. A manifest with only non-exact items verifies an empty destination
+// honestly: it declared no exact output to reproduce. A manifest whose frozen
+// sidecar policy is unimplemented fails closed. Any deviation fails closed.
 func (s *Service) VerifyExportManifest(ctx context.Context, manifest ExportManifest, destination string) (bool, error) {
 	if err := manifest.Validate(); err != nil {
+		return false, err
+	}
+	sidecarPlan, err := exportSidecarPlan(manifest)
+	if err != nil {
 		return false, err
 	}
 	if strings.TrimSpace(destination) == "" {
@@ -314,6 +369,7 @@ func (s *Service) VerifyExportManifest(ctx context.Context, manifest ExportManif
 		expected[item.OutputName] = item
 	}
 	seen := make(map[string]struct{}, len(manifest.Items))
+	seenSidecars := make(map[string]struct{}, len(sidecarPlan))
 	walkErr := filepath.WalkDir(absolute, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -329,6 +385,9 @@ func (s *Service) VerifyExportManifest(ctx context.Context, manifest ExportManif
 			return err
 		}
 		rel = filepath.ToSlash(rel)
+		if want, ok := sidecarPlan[rel]; ok {
+			return verifyExportSidecar(path, rel, entry, want, seenSidecars)
+		}
 		item, ok := expected[rel]
 		if !ok {
 			return fmt.Errorf("%w: export destination contains unexpected path %q", ErrBlocked, rel)
@@ -375,7 +434,40 @@ func (s *Service) VerifyExportManifest(ctx context.Context, manifest ExportManif
 			return false, fmt.Errorf("%w: export destination is missing %q", ErrBlocked, rel)
 		}
 	}
+	for _, name := range orderedExportSidecarNames(sidecarPlan) {
+		if _, ok := seenSidecars[name]; !ok {
+			return false, fmt.Errorf(
+				"%w: export destination is missing the sidecar %q requested by sidecar policy %q",
+				ErrBlocked, name, manifest.Sidecars)
+		}
+	}
 	return true, nil
+}
+
+// verifyExportSidecar compares one materialized sidecar byte-for-byte with the
+// content recomputed from the frozen manifest. The comparison is over the full
+// byte stream, not its length: an altered sidecar of the same length fails
+// exactly like a truncated one. A sidecar may be a regular file only.
+func verifyExportSidecar(path, rel string, entry os.DirEntry, want []byte, seen map[string]struct{}) error {
+	if entry.IsDir() {
+		return fmt.Errorf("%w: export sidecar %q is a directory", ErrBlocked, rel)
+	}
+	if entry.Type()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%w: export sidecar %q is a symbolic link", ErrBlocked, rel)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(got, want) {
+		gotDigest := sha256.Sum256(got)
+		wantDigest := sha256.Sum256(want)
+		return fmt.Errorf(
+			"%w: export sidecar %q does not match the frozen manifest: got %d bytes sha256:%s want %d bytes sha256:%s",
+			ErrBlocked, rel, len(got), hex.EncodeToString(gotDigest[:]), len(want), hex.EncodeToString(wantDigest[:]))
+	}
+	seen[rel] = struct{}{}
+	return nil
 }
 
 // ExportManifestReceipt is the per-item materialization receipt returned by

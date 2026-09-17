@@ -6,9 +6,9 @@
 // no browser storage, no durable state.
 //
 // Every operator maps onto an input `search.query` already accepts:
-//   - `filters.entry_type` / `filters.size_min` / `filters.size_max` /
-//     `filters.mtime_after` / `filters.mtime_before` / `filters.content_id` /
-//     `filters.duplicate_group`, and
+//   - `filters.entry_type` / `filters.media_class` / `filters.size_min` /
+//     `filters.size_max` / `filters.mtime_after` / `filters.mtime_before` /
+//     `filters.content_id` / `filters.duplicate_group`, and
 //   - the lexical text plus `construct_axes` (the daemon's own lexical field
 //     selector: `tags`, `path`, `name`, `duplicates`, ...).
 // Nothing here invents a wire field. An operator the daemon cannot express is
@@ -29,9 +29,8 @@ export type SearchOperatorInfo = {
 };
 
 // The daemon's entry-type vocabulary (`server/internal/store/sqlite/types.go`).
-// `type:` maps onto `filters.entry_type`, which compares one exact entry type;
-// it is not a media class, so image/video/audio/document/archive are reported
-// as inexpressible instead of being sent as a value the daemon never records.
+// `type:` maps a filesystem class onto `filters.entry_type`, which compares one
+// exact entry type.
 const ENTRY_TYPE_ALIASES: Record<string, string> = {
   file: "REGULAR_FILE", files: "REGULAR_FILE", regular_file: "REGULAR_FILE", regularfile: "REGULAR_FILE",
   directory: "DIRECTORY", directories: "DIRECTORY", dir: "DIRECTORY", folder: "DIRECTORY",
@@ -40,8 +39,15 @@ const ENTRY_TYPE_ALIASES: Record<string, string> = {
   socket: "SOCKET", device: "DEVICE", special: "SPECIAL",
 };
 
-/** Media classes the daemon has no entry type for. */
-const MEDIA_CLASS_VALUES = ["image", "video", "audio", "document", "archive"] as const;
+// The daemon's derived media-class vocabulary. The one definitions table is
+// `server/internal/search/media_class.go`; a media class is a rebuildable
+// projection over the entry's recorded filename suffix, not identity and not a
+// durable fact. `type:image` and its siblings therefore map onto
+// `filters.media_class` — never onto a value the daemon never records and
+// never onto a guess from a name, a path, or a size. `other` is the recorded
+// suffix the daemon's table does not classify; an entry whose suffix is not
+// recorded matches no class at all, including `other`.
+const MEDIA_CLASS_VALUES = ["image", "video", "audio", "document", "archive", "other"] as const;
 
 // The daemon's lexical axes this surface scopes a predicate to. `tags`, `path`,
 // `name`, and `duplicates` are the rebuildable text fields of the bundled FTS5
@@ -53,7 +59,7 @@ const SEARCH_AXIS_DUPLICATES = "duplicates";
 
 export const SEARCH_OPERATORS: SearchOperatorInfo[] = [
   { name: "tag", description: "Durable tag on the subject. Repeat it to require several tags.", valueHint: "tag:reviewed", limitation: "Matched as a token prefix in the daemon's tag field, not as an exact tag string." },
-  { name: "type", description: "The daemon's entry type: regular_file, directory, symlink, fifo, socket, device, or special.", valueHint: "type:regular_file", limitation: "" },
+  { name: "type", description: "The daemon's entry type (regular_file, directory, symlink, fifo, socket, device, special) or its derived media class (image, video, audio, document, archive, other).", valueHint: "type:image", limitation: "Entry types are compared exactly. A media class is derived from the entry's recorded filename suffix only — never from its content, name, path, or size — and one entry maps to one class: an entry whose suffix is not recorded matches no media class, including other." },
   { name: "size", description: "Logical size in bytes, KB, MB, GB, or TB. Use >10MB, <1GB, 1MB..10MB, or one exact value.", valueHint: "size:>10MB", limitation: "Items without a measured logical size never match a size range." },
   { name: "mtime", description: "Recorded modification time, as an exclusive < or > bound on a YYYY-MM-DD date.", valueHint: "mtime:<2024-01-01", limitation: "Exclusive: mtime:<2024-01-01 excludes that exact instant." },
   { name: "dup", description: "Exact-identity duplicates (dup:yes) or unique content (dup:no).", valueHint: "dup:yes", limitation: "The daemon records a duplicate projection but no unique-only filter, so dup:no is evaluated over loaded results." },
@@ -80,6 +86,9 @@ export function predicateWireLabel(predicate: SearchPredicate, plan: SearchPlan)
   if (predicate.overLoadedResults) return "loaded results";
   if (predicate.operator === "tag" || predicate.operator === "path" || predicate.operator === "name") return plan.axesRestricted ? predicate.axis : "any field";
   if (predicate.operator === "dup") return plan.axesRestricted ? SEARCH_AXIS_DUPLICATES : "loaded results";
+  // `type:` writes one of two daemon inputs depending on the value: a
+  // filesystem entry type or the derived media class.
+  if (predicate.operator === "type" && predicate.mediaClass) return "media_class";
   return SEARCH_OPERATOR_WIRE[predicate.operator];
 }
 
@@ -96,6 +105,11 @@ export type SearchPredicate = {
   end: number;
   /** The lexical axis this predicate scopes, or "" when it writes a typed filter. */
   axis: string;
+  /**
+   * The derived media class this predicate writes to `filters.media_class`, or
+   * "" when `type:` writes an entry type to `filters.entry_type` instead.
+   */
+  mediaClass: string;
   /** True when this predicate can only be evaluated over the returned hits. */
   overLoadedResults: boolean;
 };
@@ -120,6 +134,7 @@ export type ParsedSearchQuery = {
 
 export type SearchFilters = {
   entry_type?: string;
+  media_class?: string;
   content_id?: string;
   duplicate_group?: string;
   size_min?: number;
@@ -287,7 +302,7 @@ export function parseSearchQuery(source: string): ParsedSearchQuery {
     }
     const valueRaw = parts.value;
     const value = unquote(valueRaw);
-    const predicate: SearchPredicate = { operator: operator.name, negated, raw: token.raw, valueRaw, value, start: token.start, end: token.end, axis: "", overLoadedResults: false };
+    const predicate: SearchPredicate = { operator: operator.name, negated, raw: token.raw, valueRaw, value, start: token.start, end: token.end, axis: "", mediaClass: "", overLoadedResults: false };
     if (!value) { errors.push({ raw: token.raw, message: "{{operator}}: needs a value.", values: { operator: operator.name } }); continue; }
     switch (operator.name) {
       case "tag": predicate.axis = SEARCH_AXIS_TAGS; break;
@@ -298,19 +313,32 @@ export function parseSearchQuery(source: string): ParsedSearchQuery {
         break;
       }
       case "type": {
-        const entryType = ENTRY_TYPE_ALIASES[value.toLowerCase()];
-        if (!entryType) {
-          const media = (MEDIA_CLASS_VALUES as readonly string[]).includes(value.toLowerCase());
+        const requested = value.toLowerCase();
+        const entryType = ENTRY_TYPE_ALIASES[requested];
+        if (entryType) { predicate.value = entryType; break; }
+        const mediaClass = (MEDIA_CLASS_VALUES as readonly string[]).includes(requested) ? requested : "";
+        if (!mediaClass) {
           errors.push({
             raw: token.raw,
-            message: media
-              ? "type:{{value}} cannot be expressed: the daemon records no {{value}} entry type, and its suffix filter accepts one value. Use type:regular_file with name: or path:."
-              : "type:{{value}} is not one of the daemon's entry types (regular_file, directory, symlink, fifo, socket, device, special).",
+            message: "type:{{value}} is not one of the daemon's entry types (regular_file, directory, symlink, fifo, socket, device, special) or derived media classes (image, video, audio, document, archive, other).",
             values: { value },
           });
           continue;
         }
-        predicate.value = entryType;
+        if (negated) {
+          // The daemon has no negation for the derived media class, and a
+          // search hit carries no recorded suffix this browser could derive
+          // the class from, so excluding it is reported instead of narrowed
+          // with a guess.
+          errors.push({
+            raw: token.raw,
+            message: "-type:{{value}} cannot be expressed: the daemon has no negation for the derived media class, and a search hit carries no recorded suffix, so this browser cannot exclude it.",
+            values: { value },
+          });
+          continue;
+        }
+        predicate.value = mediaClass;
+        predicate.mediaClass = mediaClass;
         break;
       }
       case "size": {
@@ -360,7 +388,10 @@ export function searchPlan(parsed: ParsedSearchQuery): SearchPlan {
         lexical.push(/\s/.test(predicate.value) ? `"${predicate.value}"` : predicate.value);
         axisOf(predicate.axis);
         break;
-      case "type": filters.entry_type = predicate.value; break;
+      case "type":
+        if (predicate.mediaClass) filters.media_class = predicate.mediaClass;
+        else filters.entry_type = predicate.value;
+        break;
       case "size": {
         const parsedSize = parseSize(predicate.value);
         if (parsedSize.min !== undefined) filters.size_min = parsedSize.min;

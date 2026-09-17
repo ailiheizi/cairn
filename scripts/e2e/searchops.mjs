@@ -177,14 +177,36 @@ export async function assertSearchOperators(ctx) {
   await page.waitForTimeout(400);
   assert.equal(daemon.queries.length, 0, `an invalid token must run no query at all: ${JSON.stringify(daemon.queries)}`);
 
-  // The daemon's entry-type filter has no media class, so a media class is
-  // reported instead of being sent as a value the daemon never records.
-  await search.fill("type:image");
+  // A media class is a derived projection the daemon does expose, so
+  // type:image must reach search.query as filters.media_class, and the
+  // daemon's own answer must be exactly the fixture's image. The browser has
+  // no suffix projection, so this set cannot come from a client-side filter.
+  await submit("type:image");
+  assert.equal(daemon.queries.length, 1, `type:image must run search.query exactly once: ${JSON.stringify(daemon.queries)}`);
+  assert.equal(daemon.queries[0].query, "", `a filter-only query must send no lexical text: ${JSON.stringify(daemon.queries[0])}`);
+  assert.deepEqual(daemon.queries[0].filters, { media_class: "image" }, `type:image must reach the daemon's media_class filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual((await chipTokens()).map((value) => value.trim()), ["type:image"], "the predicate row must show the media-class predicate");
+  assert.deepEqual(await chipWires(), ["media_class"], "the predicate chip must name the daemon input it writes");
+  assert.deepEqual(ctx.state.lastSearchHitNames.slice().sort(), ["tiny.png"], `the daemon must answer with exactly the fixture's image: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+  assert.equal(await page.locator(".result-list .result-row").count(), 1, "the rendered set must be the daemon's one image hit");
+
+  // The same operator narrows to a different class with a different answer, so
+  // the classification is the daemon's, not a rendered subset: both text files
+  // are documents and the image is not.
+  await submit("type:document");
+  assert.deepEqual(daemon.queries[0].filters, { media_class: "document" }, `type:document must reach the daemon's media_class filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual(ctx.state.lastSearchHitNames.slice().sort(), ["alpha.txt", "beta.txt"], `the daemon must answer with exactly the fixture's documents: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+  assert.equal(await page.locator(".result-list .result-row").count(), 2, "the rendered set must be the daemon's two document hits");
+
+  // A media class cannot be negated: the daemon has no negation for the
+  // derived class, and a search hit carries no recorded suffix this browser
+  // could derive it from, so the token is reported and no query runs.
+  await search.fill("-type:image");
   await errorLine.waitFor({ state: "visible", timeout: 10000 });
-  const typeError = (await errorLine.innerText()).trim();
-  assert.match(typeError, /type:image/, `the error must name the inexpressible operator: ${typeError}`);
-  assert.match(typeError, INEXPRESSIBLE_TEXT, `a media class must be reported as inexpressible: ${typeError}`);
-  assert.match(typeError, /regular_file/, `the error must name the entry types the daemon really has: ${typeError}`);
+  const negatedClassError = (await errorLine.innerText()).trim();
+  assert.match(negatedClassError, /-type:image/, `the error must name the inexpressible token: ${negatedClassError}`);
+  assert.match(negatedClassError, INEXPRESSIBLE_TEXT, `a negated media class must be reported as inexpressible: ${negatedClassError}`);
+  assert.match(negatedClassError, /recorded suffix|记录的后缀/, `the error must explain why it cannot be excluded: ${negatedClassError}`);
   daemon.queries.length = 0;
   await search.press("Enter");
   await page.waitForTimeout(400);

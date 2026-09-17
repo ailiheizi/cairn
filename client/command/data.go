@@ -640,6 +640,115 @@ type AnnotationExportData struct {
 	Conflict    string           `json:"conflict,omitempty"`
 }
 
+// AnnotationTagPlanSchema names the canonical, non-mutating rename/merge plan.
+// The plan is derived from the live TAG records of one workspace and is bound
+// by AnnotationTagPlanData.PlanDigest: the SHA-256 of the canonical JSON of
+// {schema, kind, workspace_id, from, to, subjects} with subjects sorted by
+// subject_ref and each subject's changes in the fixed add-then-tombstone
+// order. Planning writes nothing, including no plan row.
+const AnnotationTagPlanSchema = "org.restoreweave.annotation-tag-plan.v1"
+
+// AnnotationTagApplySchema names the digest-bound apply result. It reports one
+// outcome per planned subject; a partial apply is a first-class outcome and is
+// never collapsed into success.
+const AnnotationTagApplySchema = "org.restoreweave.annotation-tag-apply.v1"
+
+// AnnotationTagPlanAction* are the only two changes a tag rename/merge plan
+// carries. A subject that already carries the target name keeps its ADD_TAG
+// change as an explicit no-op instead of an omitted step.
+const (
+	AnnotationTagPlanActionAddTag    = "ADD_TAG"
+	AnnotationTagPlanActionTombstone = "TOMBSTONE_TAG"
+)
+
+// AnnotationTagOutcome* are the per-subject apply outcomes. CHANGED means the
+// subject now carries the target name and no longer carries the source name.
+// UNCHANGED means nothing was written for that subject.
+// TARGET_ADDED_SOURCE_REMAINS is the documented interruption state: the target
+// name is recorded and the source record is still recorded, because the add is
+// committed before the tombstone is attempted.
+const (
+	AnnotationTagOutcomeChanged                  = "CHANGED"
+	AnnotationTagOutcomeUnchanged                = "UNCHANGED"
+	AnnotationTagOutcomeTargetAddedSourceRemains = "TARGET_ADDED_SOURCE_REMAINS"
+)
+
+// AnnotationTagPlanChangeData is one exact change the apply must issue for one
+// subject. Noop marks a change the current state already satisfies: it is
+// still listed so the plan states every intended effect. AnnotationID and
+// ExpectedRevision name the live record the change concerns (the record to
+// tombstone, or the already-live target record for a no-op add).
+type AnnotationTagPlanChangeData struct {
+	Action           string `json:"action"`
+	Body             string `json:"body"`
+	Noop             bool   `json:"noop"`
+	AnnotationID     string `json:"annotation_id,omitempty"`
+	ExpectedRevision int64  `json:"expected_revision,omitempty"`
+}
+
+// AnnotationTagPlanSubjectData is one affected subject and the ordered
+// changes planned for it. The first change is always the ADD_TAG and the
+// second the TOMBSTONE_TAG, so the plan itself states the add-before-tombstone
+// ordering the apply follows.
+type AnnotationTagPlanSubjectData struct {
+	SubjectRef string                        `json:"subject_ref"`
+	Changes    []AnnotationTagPlanChangeData `json:"changes"`
+}
+
+// AnnotationTagPlanData is the annotation.tag_plan result. Wrote is always
+// false on the plan path and is reported explicitly so a client can assert it
+// instead of inferring it. RemainingSubjects is the number of subjects whose
+// records still carry the source name; a re-plan after a completed rename
+// reports zero. NoopSubjects counts subjects whose ADD_TAG is already
+// satisfied by a live target record.
+type AnnotationTagPlanData struct {
+	Schema            string                         `json:"schema"`
+	Kind              string                         `json:"kind"`
+	WorkspaceID       string                         `json:"workspace_id"`
+	From              string                         `json:"from"`
+	To                string                         `json:"to"`
+	Subjects          []AnnotationTagPlanSubjectData `json:"subjects"`
+	RemainingSubjects int                            `json:"remaining_subjects"`
+	NoopSubjects      int                            `json:"noop_subjects"`
+	Wrote             bool                           `json:"wrote"`
+	PlanDigest        string                         `json:"plan_digest"`
+}
+
+// AnnotationTagApplySubjectData is one subject's outcome after the digest-bound
+// apply ran its add-then-tombstone pair. Reason carries the daemon's own
+// refusal or failure reason when the subject did not reach CHANGED.
+type AnnotationTagApplySubjectData struct {
+	SubjectRef         string `json:"subject_ref"`
+	Outcome            string `json:"outcome"`
+	TargetAnnotationID string `json:"target_annotation_id,omitempty"`
+	TargetCreated      bool   `json:"target_created"`
+	SourceAnnotationID string `json:"source_annotation_id,omitempty"`
+	SourceTombstoned   bool   `json:"source_tombstoned"`
+	Reason             string `json:"reason,omitempty"`
+}
+
+// AnnotationTagApplyData is the annotation.tag_apply result. Changed counts
+// CHANGED subjects; Unchanged counts subjects nothing was written for;
+// SourceRemains counts subjects left carrying both names. Failed counts every
+// subject whose change did not complete and Partial is Failed > 0: the data
+// always carries the per-subject outcomes, so a partial apply cannot be read as
+// a clean one. Applied is true only when every planned subject reached CHANGED.
+type AnnotationTagApplyData struct {
+	Schema        string                          `json:"schema"`
+	WorkspaceID   string                          `json:"workspace_id"`
+	From          string                          `json:"from"`
+	To            string                          `json:"to"`
+	PlanDigest    string                          `json:"plan_digest"`
+	Subjects      []AnnotationTagApplySubjectData `json:"subjects"`
+	Changed       int                             `json:"changed"`
+	Unchanged     int                             `json:"unchanged"`
+	SourceRemains int                             `json:"source_remains"`
+	Failed        int                             `json:"failed"`
+	Partial       bool                            `json:"partial"`
+	Applied       bool                            `json:"applied"`
+	Warnings      []string                        `json:"warnings,omitempty"`
+}
+
 // DescriptionDocumentData is the durable source/provenance projection for a
 // description revision. Segments are retained here as source material; any
 // embeddings or other retrieval generations remain rebuildable derivatives.
@@ -1063,6 +1172,23 @@ type ViewEvaluateData struct {
 	Coverage []string        `json:"coverage,omitempty"`
 }
 
+// ExportSidecarPolicyNone and ExportSidecarPolicyHandoffV1ManifestJSON are the
+// frozen sidecar-policy vocabulary. The empty policy requests no sidecar and
+// keeps the destination to the frozen subject files. The implemented policy
+// writes the derived handoff sidecar named by ExportSidecarFileName next to
+// them. Any other value is rejected as invalid_input by export.plan instead of
+// being ignored. These values mirror server/internal/exact's vocabulary; a
+// control-plane test asserts the two definitions stay equal.
+const (
+	ExportSidecarPolicyNone                  = ""
+	ExportSidecarPolicyHandoffV1ManifestJSON = "handoff-v1:manifest-json"
+)
+
+// ExportSidecarFileName is the destination-relative name of the one derived
+// handoff sidecar the implemented policy writes. It is derived output, never a
+// frozen subject name and never content identity.
+const ExportSidecarFileName = "restoreweave-export.json"
+
 // ExportPlanInput is the export.plan input. It names a saved view or explicit
 // subject set, output naming policy, and optional sidecar policy.
 type ExportPlanInput struct {
@@ -1100,12 +1226,17 @@ type ExportVerifyInput struct {
 	Destination    string `json:"destination"`
 }
 
-// ExportApplyVerifyData is shared by export.apply and export.verify.
+// ExportApplyVerifyData is shared by export.apply and export.verify. Sidecars
+// names the destination-relative derived sidecar files that were written
+// (apply) or verified (verify) for the frozen sidecar policy. It is empty when
+// the frozen manifest requested no sidecar; the files are derived handoff
+// output and are never part of the frozen item set or its identity.
 type ExportApplyVerifyData struct {
-	ManifestID     string `json:"manifest_id"`
-	ManifestDigest string `json:"manifest_digest"`
-	Destination    string `json:"destination"`
-	Items          int    `json:"items"`
-	Bytes          int64  `json:"bytes"`
-	Verified       bool   `json:"verified"`
+	ManifestID     string   `json:"manifest_id"`
+	ManifestDigest string   `json:"manifest_digest"`
+	Destination    string   `json:"destination"`
+	Items          int      `json:"items"`
+	Bytes          int64    `json:"bytes"`
+	Verified       bool     `json:"verified"`
+	Sidecars       []string `json:"sidecars,omitempty"`
 }

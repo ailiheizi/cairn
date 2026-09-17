@@ -35,6 +35,8 @@ const (
 	OpAnnotationDelete      = "annotation.delete"
 	OpAnnotationExport      = "annotation.export"
 	OpAnnotationImport      = "annotation.import"
+	OpAnnotationTagPlan     = "annotation.tag_plan"
+	OpAnnotationTagApply    = "annotation.tag_apply"
 	OpSearchQuery           = "search.query"
 	OpSearchRebuild         = "search.rebuild"
 	OpSemanticBundleInstall = "semantic.bundle.install"
@@ -91,6 +93,8 @@ func KnownOperations() []string {
 		OpAnnotationDelete,
 		OpAnnotationExport,
 		OpAnnotationImport,
+		OpAnnotationTagPlan,
+		OpAnnotationTagApply,
 		OpSearchQuery,
 		OpSearchRebuild,
 		OpSemanticBundleInstall,

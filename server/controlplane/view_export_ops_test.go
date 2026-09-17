@@ -588,7 +588,7 @@ func TestExportSidecarPolicySurvivesApplyVerifyAndStoreReopen(t *testing.T) {
 	}
 	h := newViewExportHarness(t, root)
 
-	const policy = "keep-metadata-and-subtitle-sidecars"
+	const policy = exact.ExportSidecarPolicyHandoffV1ManifestJSON
 	planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{
 		"subjects": []string{h.subjectRef}, "sidecars": policy,
 	}))
@@ -682,7 +682,7 @@ func TestExportTamperedSidecarPolicyFailsClosed(t *testing.T) {
 	h := newViewExportHarness(t, root)
 
 	planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{
-		"subjects": []string{h.subjectRef}, "sidecars": "keep-metadata-sidecars",
+		"subjects": []string{h.subjectRef}, "sidecars": exact.ExportSidecarPolicyHandoffV1ManifestJSON,
 	}))
 	if planned.Status != command.StatusSucceeded {
 		t.Fatalf("export.plan = %q: %+v", planned.Status, planned.Reasons)

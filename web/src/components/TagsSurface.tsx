@@ -8,9 +8,10 @@ import type { AnnotationRecord, SearchHit } from "../lib/types";
 
 // The tags surface (Tier-1 spec §3 item 8).
 //
-// One job: show the durable tag facts the daemon already records, and let the
+// One job: show the durable tag facts the daemon already records, let the
 // operator change exactly one per-subject tag row at a time through the
-// admitted `annotation.upsert` / `annotation.delete` operations.
+// admitted `annotation.upsert` / `annotation.delete` operations, and rename or
+// merge one tag through the daemon's reviewed plan/apply pair.
 //
 // The truth rules this file enforces:
 //
@@ -25,15 +26,23 @@ import type { AnnotationRecord, SearchHit } from "../lib/types";
 //     is rendered byte-for-byte as the daemon stored it, and a write sends that
 //     exact body. Two names the daemon treats as distinct stay two rows. The
 //     substring filter is a view over the list only.
-//   - Rename and merge are the same operation: for each subject that carries
-//     the source name, add the target name and then delete the old record.
-//     Nothing is rewritten in place and nothing happens before the operator
-//     confirms a preview that lists every affected subject. The target is added
-//     before the source is deleted, so a failure can leave a subject with both
-//     names (reported exactly like that), never with neither.
-//   - A partial apply is reported as a partial apply: the count that changed,
-//     the count that did not, and every failed subject with its own reason and
-//     its own post-failure state. The surface never claims a clean rename.
+//   - Rename and merge are one daemon operation pair, not a client loop:
+//     `annotation.tag_plan` is read-only and returns every affected subject with
+//     the exact ordered changes, the explicit no-op cases, and the canonical
+//     plan digest; `annotation.tag_apply` carries that digest, re-derives the
+//     plan, refuses a digest that no longer matches (nothing written), and
+//     performs the per-subject pairs. This surface renders the daemon's plan
+//     before any write and the daemon's per-subject outcomes after it; it never
+//     issues the per-subject rename writes itself.
+//   - The plan states the order the daemon follows: add the target name first,
+//     then tombstone the source record. A subject that already carries the
+//     target keeps an explicit no-op add. An interruption between the two steps
+//     therefore leaves both names rather than neither, and the apply reports
+//     that subject exactly so.
+//   - A partial apply is reported as a partial apply, using the daemon's own
+//     counts and reasons: the subjects that changed, the subject nothing was
+//     written for, and the subjects left carrying both names. The surface never
+//     claims a clean rename, and it never claims a rollback.
 //   - Each write re-reads `annotation.list`; the rendered list is always the
 //     daemon's answer, never a client-side guess.
 //   - No machine suggestion is present or applied: this surface has no
@@ -70,17 +79,86 @@ export type TagRow = { body: string; subjects: TagSubjectRef[] };
 type ProtectionRead = { status: "LOADING" | "READY"; bySubject: Record<string, string>; reason: string };
 type ActionMessage = { state: "IDLE" | "RUNNING" | "DONE" | "FAILED"; text: string };
 
-/** One planned per-subject change. Built by the preview, never by the apply. */
-type RenameStep = { subjectRef: string; name: string; path: string; annotationID: string; revision: number; target: string };
-/** CHANGED: both writes succeeded. UNCHANGED: the target write failed, nothing was written.
- *  TARGET_ADDED_SOURCE_REMAINS: the target was added and the old record survived. */
-type RenameOutcome = "CHANGED" | "UNCHANGED" | "TARGET_ADDED_SOURCE_REMAINS";
-type RenameStepReport = RenameStep & { outcome: RenameOutcome; reason: string; addedAnnotationID: string };
-type RenamePreview = { source: string; target: string; steps: RenameStep[] };
-type RenameReport = { source: string; target: string; steps: RenameStepReport[]; changed: number; failed: number; appliedAt: number };
+/** One change the daemon's plan would issue for one subject, verbatim. */
+export type TagPlanChangeFact = { action: string; body: string; noop: boolean; annotationID: string; expectedRevision: number };
+/** One subject's ordered changes. The daemon plans the add before the tombstone. */
+export type TagPlanSubjectFact = { subjectRef: string; changes: TagPlanChangeFact[] };
+/** The daemon's `annotation.tag_plan` answer: read the digest, then confirm it. */
+export type TagPlanFact = { from: string; to: string; digest: string; subjects: TagPlanSubjectFact[]; remaining: number; noopSubjects: number };
+/**
+ * One subject's outcome the daemon reported after apply.
+ *   CHANGED:     the subject carries the new name and no longer the old one.
+ *   UNCHANGED:   nothing was written for that subject.
+ *   TARGET_ADDED_SOURCE_REMAINS: the subject carries both names.
+ * Any other token is rendered verbatim as the daemon's own answer.
+ */
+export type TagApplyOutcomeFact = { subjectRef: string; outcome: string; targetAnnotationID: string; targetCreated: boolean; sourceAnnotationID: string; sourceTombstoned: boolean; reason: string };
+/** The daemon's `annotation.tag_apply` answer, including its own refusals. */
+export type TagApplyReportFact = {
+  from: string; to: string; digest: string;
+  outcomes: TagApplyOutcomeFact[];
+  changed: number; unchanged: number; sourceRemains: number; failed: number;
+  partial: boolean; applied: boolean; degraded: boolean; message: string; appliedAt: number;
+};
 
 function messageOf(reason: unknown) {
   return reason instanceof Error ? reason.message : String(reason ?? "");
+}
+
+/** Reads one daemon change verbatim; an absent fact stays absent, never guessed. */
+function planChangeFromPayload(raw: any): TagPlanChangeFact {
+  return {
+    action: String(raw?.action ?? ""),
+    body: String(raw?.body ?? ""),
+    noop: raw?.noop === true,
+    annotationID: String(raw?.annotation_id ?? ""),
+    expectedRevision: typeof raw?.expected_revision === "number" ? raw.expected_revision : 0,
+  };
+}
+
+/** Reads the daemon's plan answer. A malformed answer is rejected, not patched. */
+function planFromResponse(data: any): TagPlanFact {
+  const subjects = Array.isArray(data?.subjects) ? data.subjects : [];
+  return {
+    from: String(data?.from ?? ""),
+    to: String(data?.to ?? ""),
+    digest: String(data?.plan_digest ?? ""),
+    remaining: typeof data?.remaining_subjects === "number" ? data.remaining_subjects : subjects.length,
+    noopSubjects: typeof data?.noop_subjects === "number" ? data.noop_subjects : 0,
+    subjects: subjects.map((subject: any) => ({
+      subjectRef: String(subject?.subject_ref ?? ""),
+      changes: (Array.isArray(subject?.changes) ? subject.changes : []).map(planChangeFromPayload),
+    })),
+  };
+}
+
+/** Reads the daemon's apply answer, including the outcome of every subject. */
+function applyReportFromResponse(request: { from: string; to: string; digest: string }, response: { status?: string; data?: any; reasons?: Array<{ message?: string }> }): TagApplyReportFact {
+  const data = response.data ?? {};
+  const outcomes = Array.isArray(data?.subjects) ? data.subjects : [];
+  return {
+    from: String(data?.from ?? request.from),
+    to: String(data?.to ?? request.to),
+    digest: String(data?.plan_digest ?? request.digest),
+    changed: Number(data?.changed ?? 0),
+    unchanged: Number(data?.unchanged ?? 0),
+    sourceRemains: Number(data?.source_remains ?? 0),
+    failed: Number(data?.failed ?? 0),
+    partial: data?.partial === true || Number(data?.failed ?? 0) > 0,
+    applied: data?.applied === true,
+    degraded: response.status === "DEGRADED",
+    message: String(response.reasons?.[0]?.message ?? ""),
+    appliedAt: Date.now(),
+    outcomes: outcomes.map((outcome: any) => ({
+      subjectRef: String(outcome?.subject_ref ?? ""),
+      outcome: String(outcome?.outcome ?? ""),
+      targetAnnotationID: String(outcome?.target_annotation_id ?? ""),
+      targetCreated: outcome?.target_created === true,
+      sourceAnnotationID: String(outcome?.source_annotation_id ?? ""),
+      sourceTombstoned: outcome?.source_tombstoned === true,
+      reason: String(outcome?.reason ?? ""),
+    })),
+  };
 }
 
 /** True when the daemon's lexical projection actually answered this query. */
@@ -157,8 +235,8 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
   const [editAction, setEditAction] = useState<ActionMessage>({ state: "IDLE", text: "" });
   const [handoff, setHandoff] = useState("");
   const [renameTarget, setRenameTarget] = useState("");
-  const [preview, setPreview] = useState<RenamePreview>();
-  const [report, setReport] = useState<RenameReport>();
+  const [tagPlan, setTagPlan] = useState<TagPlanFact>();
+  const [applyReport, setApplyReport] = useState<TagApplyReportFact>();
   const [renameAction, setRenameAction] = useState<ActionMessage>({ state: "IDLE", text: "" });
   const [rovingTagIndex, setRovingTagIndex] = useState(0);
   const [rovingSubjectIndex, setRovingSubjectIndex] = useState(0);
@@ -321,8 +399,8 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
   }, [protection, selectedRow, selectedTag, workspaceID]);
 
   function resetEditPanels() {
-    setPreview(undefined);
-    setReport(undefined);
+    setTagPlan(undefined);
+    setApplyReport(undefined);
     setRenameTarget("");
     setRenameAction({ state: "IDLE", text: "" });
     setEditAction({ state: "IDLE", text: "" });
@@ -399,70 +477,79 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
     }
   }
 
-  // Build the plan only. No write is issued here; the preview is exactly the
-  // list of subjects and records the apply will touch.
-  function buildPreview() {
+  // Ask the daemon for the plan. This is a read-only operation: the plan
+  // carries every affected subject, the ordered add-then-tombstone changes,
+  // the explicit no-op cases, and the digest the apply is bound to. Nothing is
+  // written here, and the surface never builds a plan of its own.
+  async function requestPlan() {
     const target = renameTarget;
-    if (!selectedTag || !target) return;
+    if (!selectedTag || !target || !workspaceID) return;
     if (target !== target.trim() || !target.trim()) {
       // Refusing is honest: the daemon stores the body exactly, so a padded
       // name would become a different durable tag.
-      setPreview(undefined);
-      setReport(undefined);
+      setTagPlan(undefined);
+      setApplyReport(undefined);
       setRenameAction({ state: "FAILED", text: t("Tag names are stored exactly as written; remove the leading or trailing whitespace before previewing.") });
       return;
     }
-    if (!selectedRow) return;
-    setReport(undefined);
-    setRenameAction({ state: "IDLE", text: "" });
-    setPreview({
-      source: selectedTag,
-      target,
-      steps: selectedRow.subjects.map((subject) => ({
-        subjectRef: subject.subjectRef,
-        name: subjectName(subject.subjectRef),
-        path: subjectPath(subject.subjectRef),
-        annotationID: subject.annotationID,
-        revision: subject.revision,
-        target,
-      })),
-    });
+    setRenameAction({ state: "RUNNING", text: "" });
+    try {
+      const response = await command(operations.annotation.tagPlan, { workspace_id: workspaceID, from: selectedTag, to: target });
+      const plan = planFromResponse(response.data);
+      if (!plan.digest) {
+        setTagPlan(undefined);
+        setRenameAction({ state: "FAILED", text: t("The service returned a plan without a digest; nothing can be confirmed from it, so nothing was written.") });
+        return;
+      }
+      setApplyReport(undefined);
+      setTagPlan(plan);
+      setRenameAction({
+        state: "IDLE",
+        text: plan.remaining === 0
+          ? t("The service planned zero remaining changes for this pair: no subject still carries the old name, so there is nothing to apply.")
+          : t("The service planned {{count}} subjects. Review the plan and its digest, then confirm it to apply.", { count: plan.remaining }),
+      });
+    } catch (error) {
+      setTagPlan(undefined);
+      setApplyReport(undefined);
+      setRenameAction({ state: "FAILED", text: t("The service did not return a plan: {{message}}", { message: messageOf(error) }) });
+    }
   }
 
-  // Apply the previewed plan, one subject at a time. The target is added
-  // before the source is deleted so a failure leaves both names visible rather
-  // than neither; every outcome is recorded and reported.
-  async function applyPreview() {
-    const plan = preview;
-    if (!workspaceID || !plan) return;
+  // Apply the daemon's plan by its digest. The daemon re-derives the plan,
+  // refuses a digest that no longer matches (a typed conflict that wrote
+  // nothing), and otherwise performs the per-subject add-then-tombstone pairs,
+  // returning one outcome per subject. The surface only reports those answers.
+  async function applyPlan() {
+    const plan = tagPlan;
+    if (!workspaceID || !plan || !plan.digest) return;
     setRenameAction({ state: "RUNNING", text: "" });
-    const reports: RenameStepReport[] = [];
-    for (const step of plan.steps) {
-      let addedAnnotationID = "";
+    let response: { status?: string; data?: any; reasons?: Array<{ message?: string }> };
+    try {
+      response = await command(operations.annotation.tagApply, { workspace_id: workspaceID, from: plan.from, to: plan.to, plan_digest: plan.digest });
+    } catch (error) {
+      // The daemon refused the apply (for example a digest that no longer
+      // matches). Nothing was written; the surface says exactly that and keeps
+      // the stale plan visible rather than pretending a rename happened.
+      setRenameAction({
+        state: "FAILED",
+        text: t("The service refused this apply and wrote nothing: {{message}} The service no longer reports the facts this plan was bound to, so plan the change again before applying.", { message: messageOf(error) }),
+      });
       try {
-        const response = await command(operations.annotation.upsert, { workspace_id: workspaceID, subject_ref: step.subjectRef, kind: "TAG", body: step.target, expected_revision: 0 });
-        addedAnnotationID = String(response.data?.annotation?.annotation_id ?? "");
-      } catch (error) {
-        // Nothing was written for this subject: its tag rows are untouched.
-        reports.push({ ...step, outcome: "UNCHANGED", reason: messageOf(error), addedAnnotationID: "" });
-        continue;
+        await reloadAnnotations(workspaceID);
+      } catch {
+        // A failed re-read after a refusal is reported, never hidden.
       }
-      try {
-        await command(operations.annotation.delete, { workspace_id: workspaceID, annotation_id: step.annotationID, expected_revision: step.revision });
-        reports.push({ ...step, outcome: "CHANGED", reason: "", addedAnnotationID });
-      } catch (error) {
-        reports.push({ ...step, outcome: "TARGET_ADDED_SOURCE_REMAINS", reason: messageOf(error), addedAnnotationID });
-      }
+      return;
     }
-    const changed = reports.filter((step) => step.outcome === "CHANGED").length;
-    const failed = reports.length - changed;
-    setReport({ source: plan.source, target: plan.target, steps: reports, changed, failed, appliedAt: Date.now() });
-    setPreview(undefined);
+    const report = applyReportFromResponse({ from: plan.from, to: plan.to, digest: plan.digest }, response);
+    setApplyReport(report);
+    setTagPlan(undefined);
     setRenameAction({
-      state: failed ? "FAILED" : "DONE",
-      text: failed
-        ? t("{{changed}} of {{requested}} subjects changed; {{failed}} failed and are listed below with their own reasons. A failed subject is left unchanged or carries both names, exactly as listed — this is not a clean rename.", { changed, requested: reports.length, failed })
-        : t("All {{changed}} subjects changed.", { changed }),
+      state: report.partial ? "FAILED" : "DONE",
+      text: report.partial
+        ? t("{{changed}} of {{requested}} subjects changed; {{failed}} failed and are listed below with their own reasons. A failed subject is left unchanged or carries both names, exactly as listed — this is not a clean rename.", { changed: report.changed, requested: report.outcomes.length, failed: report.failed })
+        : t("All {{changed}} subjects changed.", { changed: report.changed }),
     });
     try {
       await reloadAnnotations(workspaceID);
@@ -473,19 +560,19 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
     }
   }
 
-  // Reversibility without a second write: the reverse plan is the same
-  // per-subject pair with the names swapped, and it must be previewed and
-  // confirmed again.
+  // The reverse change is the same operation pair with the names swapped. It is
+  // prepared here and must be planned and confirmed again like any other
+  // change: nothing claims an automatic rollback.
   function prepareReverse() {
-    if (!report || report.changed === 0) return;
-    setSelectedTag(report.target);
+    if (!applyReport || applyReport.changed === 0) return;
+    setSelectedTag(applyReport.to);
     setRovingSubjectIndex(0);
     setExpandedSubject("");
     setAddTarget("");
     setHandoff("");
-    setPreview(undefined);
-    setRenameTarget(report.source);
-    setRenameAction({ state: "IDLE", text: t("The reverse change is prepared below. Preview it, then confirm it to restore the previous name on the subjects that changed.") });
+    setTagPlan(undefined);
+    setRenameTarget(applyReport.from);
+    setRenameAction({ state: "IDLE", text: t("The reverse change is prepared below. Ask the service to plan it, then confirm it to restore the previous name on the subjects that changed.") });
   }
 
   // Opening the library is a handoff the shell owns. The current shell does not
@@ -549,15 +636,28 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
   const blocked = surfaceState === "BLOCKED";
   const scopeLabel = t("{{tags}} tags over {{subjects}} subjects with a live record", { tags: tagRows.length, subjects: totalSubjects });
   // The heading of the detail pane: the selected tag, or — when a rename or
-  // merge removed its last record — the name the applied record still reports.
-  const detailName = selectedRow ? selectedRow.body : report?.source ?? "";
+  // merge removed its last record — the source name the applied record names.
+  const detailName = selectedRow ? selectedRow.body : applyReport?.from ?? "";
+
+  // The daemon's per-subject outcome token rendered honestly. The three
+  // admitted tokens get the surface's long-standing wording; any other token
+  // is shown verbatim rather than described as one of them.
+  function outcomeText(outcome: TagApplyOutcomeFact) {
+    const from = applyReport?.from ?? "";
+    const to = applyReport?.to ?? "";
+    const record = outcome.targetAnnotationID || t("UNKNOWN — not reported by this build");
+    if (outcome.outcome === "CHANGED") return t("Changed: {{from}} is tombstoned and {{to}} is recorded (record {{annotation_id}})", { from, to, annotation_id: record });
+    if (outcome.outcome === "UNCHANGED") return t("Left unchanged: nothing was written for this subject; {{from}} is still recorded, and {{to}} was not added.", { from, to });
+    if (outcome.outcome === "TARGET_ADDED_SOURCE_REMAINS") return t("Not clean: {{to}} is recorded (record {{annotation_id}}), and {{from}} is still recorded on this subject.", { from, to, annotation_id: record });
+    return t("Outcome reported by the service: {{outcome}}", { outcome: outcome.outcome || t("UNKNOWN — not reported by this build") });
+  }
 
   return <section
     className="content-column tags-surface"
     aria-label={t("Tags")}
     data-view="tags"
     data-state={surfaceState}
-    data-partial={report && report.failed > 0 ? "true" : "false"}
+    data-partial={applyReport?.partial ? "true" : "false"}
     data-workspace-id={workspaceID}
     data-tag-count={tagRows.length}
     onKeyDown={handleKeyDown}
@@ -573,7 +673,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
       </div>
     </div>
     <p className="tags-note">{t("Every row here is a durable TAG annotation record the daemon returned for this workspace. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.")}</p>
-    <p className="tags-note tags-contract">{t("A rename or merge is a previewed sequence of per-subject writes: the new name is added, then the old record is deleted. Nothing is rewritten in place, and the preview lists every subject before any write is issued.")}</p>
+    <p className="tags-note tags-contract">{t("A rename or merge is one service operation pair: the service plans every affected subject and the exact changes, and only the confirmed, digest-bound apply writes. The service adds the new name before tombstoning the old record, so an interruption leaves both names rather than neither.")}</p>
 
     {blocked
       ? <div className="tags-blocked" data-state="BLOCKED" role="alert"><AlertCircle size={16} /><div><strong>{t("Tags are not readable right now")}</strong><small data-blocked-reason={blockedReason}>{blockedReason}</small></div></div>
@@ -618,7 +718,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
               {visibleTags.length === 0 && <p className="tags-filter-empty" data-empty-filter="true">{t("No stored tag name contains this substring. Nothing was rewritten or merged by filtering.")}</p>}
             </div>
             <div className="tags-detail-pane">
-              {!selectedRow && !report
+              {!selectedRow && !applyReport
                 ? <p className="tags-detail-hint" data-detail-state="NONE">{t("Select a tag to see the subjects that carry it and the per-subject controls.")}</p>
                 : <>
                   <div className="tags-detail-heading">
@@ -710,36 +810,66 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
 
                   {selectedRow && <section className="tags-rename" data-rename-state={renameAction.state} aria-label={t("Rename or merge {{name}}", { name: selectedRow.body })}>
                     <h3>{t("Rename or merge this tag")}</h3>
-                    <p className="tags-rename-note">{t("Both are the same operation: add the new name to each subject, then delete the old record. The preview lists exactly which records change before anything is written, and what was applied stays visible afterwards.")}</p>
+                    <p className="tags-rename-note">{t("A rename or merge is one service operation pair: the service plans every affected subject and the exact changes, and only the confirmed, digest-bound apply writes. The service adds the new name before tombstoning the old record, so an interruption leaves both names rather than neither.")}</p>
                     <label className="tags-rename-field"><span>{t("New name (an existing name merges into it)")}</span>
-                      <input type="text" value={renameTarget} placeholder={t("New tag name")} aria-label={t("New name for {{name}}", { name: selectedRow.body })} onChange={(event) => { setRenameTarget(event.target.value); setPreview(undefined); setRenameAction({ state: "IDLE", text: "" }); }} />
+                      <input type="text" value={renameTarget} placeholder={t("New tag name")} aria-label={t("New name for {{name}}", { name: selectedRow.body })} onChange={(event) => { setRenameTarget(event.target.value); setTagPlan(undefined); setRenameAction({ state: "IDLE", text: "" }); }} />
                     </label>
                     <div className="tags-rename-actions">
-                      <button type="button" className="secondary-button compact" data-action="preview-rename" disabled={!renameTarget || renameAction.state === "RUNNING"} onClick={() => buildPreview()}>{t("Preview the change")}</button>
+                      <button type="button" className="secondary-button compact" data-action="preview-rename" disabled={!renameTarget || renameAction.state === "RUNNING"} onClick={() => void requestPlan()}>{t("Ask the service to plan the change")}</button>
                     </div>
 
-                    {preview && <div className="tags-preview" data-preview-target={preview.target} data-preview-count={preview.steps.length} data-writes-issued="0">
-                      <p className="tags-preview-heading">{t("Preview only — {{count}} subjects and their records would change. No write has been issued yet.", { count: preview.steps.length })}</p>
+                    {tagPlan && <div className="tags-preview" data-preview-target={tagPlan.to} data-preview-count={tagPlan.subjects.length} data-writes-issued="0" data-plan-digest={tagPlan.digest} data-plan-remaining={tagPlan.remaining} data-plan-noop-subjects={tagPlan.noopSubjects}>
+                      <p className="tags-preview-heading" data-fact="plan-summary">{t("Preview only — the service planned {{count}} subjects. No write has been issued yet.", { count: tagPlan.subjects.length })}</p>
+                      <p className="tags-preview-heading" data-fact="plan-digest">{t("Plan digest: {{digest}}", { digest: tagPlan.digest })}</p>
+                      {tagPlan.noopSubjects > 0 && <p className="tags-preview-heading" data-fact="plan-noop">{t("{{count}} of these subjects already carry the new name, so the plan records their add as an explicit no-op.", { count: tagPlan.noopSubjects })}</p>}
                       <ul className="tags-preview-rows">
-                        {preview.steps.map((step) => <li className="tags-preview-row" key={step.subjectRef} data-preview-row="true" data-subject-ref={step.subjectRef} data-annotation-id={step.annotationID} data-revision={step.revision}>
-                          <span data-fact="preview-name">{step.name}</span>
-                          <span data-fact="preview-path">{step.path}</span>
-                          <span data-fact="preview-change">{t("{{from}} → {{to}}", { from: preview.source, to: preview.target })}</span>
-                        </li>)}
+                        {tagPlan.subjects.map((subject) => {
+                          // The tombstone change names the record the apply will
+                          // close; it is the subject's own live source record.
+                          const tombstone = subject.changes.find((change) => change.action === "TOMBSTONE_TAG");
+                          return <li className="tags-preview-row" key={subject.subjectRef} data-preview-row="true" data-subject-ref={subject.subjectRef} data-annotation-id={tombstone?.annotationID ?? ""} data-revision={tombstone?.expectedRevision ?? 0} data-plan-changes={subject.changes.length}>
+                            <span data-fact="preview-name">{subjectName(subject.subjectRef)}</span>
+                            <span data-fact="preview-path">{subjectPath(subject.subjectRef)}</span>
+                            {subject.changes.map((change, index) => <span
+                              key={`${change.action}-${index}`}
+                              data-fact="preview-change"
+                              data-change-action={change.action}
+                              data-change-noop={change.noop ? "true" : "false"}
+                              data-change-annotation-id={change.annotationID}
+                              data-change-revision={change.expectedRevision}
+                            >{change.noop
+                                ? t("{{action}} {{body}}: already recorded as {{annotation_id}}; no write", { action: change.action, body: change.body, annotation_id: change.annotationID || t("UNKNOWN — not reported by this build") })
+                                : t("{{action}} {{body}}: record {{annotation_id}} at revision {{revision}}", { action: change.action, body: change.body, annotation_id: change.annotationID || t("UNKNOWN — not reported by this build"), revision: change.expectedRevision || t("UNKNOWN — not reported by this build") })}</span>)}
+                          </li>;
+                        })}
                       </ul>
-                      {preview.steps.length !== selectedRow.subjects.length && <p className="tags-preview-warning">{t("The tag's subject count changed after this preview was built; preview again before applying.")}</p>}
-                      <div className="tags-preview-actions">
-                        <button type="button" className="primary-button compact" data-action="apply-rename" disabled={renameAction.state === "RUNNING"} onClick={() => void applyPreview()}>{t("Confirm and apply to {{count}} subjects", { count: preview.steps.length })}</button>
-                        <button type="button" className="secondary-button compact" data-action="discard-preview" disabled={renameAction.state === "RUNNING"} onClick={() => { setPreview(undefined); setRenameAction({ state: "IDLE", text: "" }); }}>{t("Discard the preview")}</button>
-                      </div>
+                      {tagPlan.remaining === 0
+                        ? <p className="tags-preview-warning" data-plan-empty="true">{t("The service planned zero remaining changes for this pair, so there is nothing to apply. No write has been issued.")}</p>
+                        : <div className="tags-preview-actions">
+                          <button type="button" className="primary-button compact" data-action="apply-rename" disabled={renameAction.state === "RUNNING"} onClick={() => void applyPlan()}>{t("Confirm and apply the service plan to {{count}} subjects", { count: tagPlan.subjects.length })}</button>
+                          <button type="button" className="secondary-button compact" data-action="discard-preview" disabled={renameAction.state === "RUNNING"} onClick={() => { setTagPlan(undefined); setRenameAction({ state: "IDLE", text: "" }); }}>{t("Discard the preview")}</button>
+                        </div>}
                     </div>}
                   </section>}
 
                   {renameAction.text && <p className="tags-rename-action" data-action-state={renameAction.state} role="status">{renameAction.text}</p>}
 
-                  {report && <div className="tags-applied" data-applied-changed={report.changed} data-applied-failed={report.failed} data-partial={report.failed > 0 ? "true" : "false"} data-applied-source={report.source} data-applied-target={report.target}>
-                      <p className="tags-applied-heading">{t("Applied record — {{changed}} of {{requested}} subjects changed, {{failed}} failed.", { changed: report.changed, requested: report.steps.length, failed: report.failed })}</p>
-                      {report.failed > 0
+                  {applyReport && <div
+                    className="tags-applied"
+                    data-applied-changed={applyReport.changed}
+                    data-applied-unchanged={applyReport.unchanged}
+                    data-applied-source-remains={applyReport.sourceRemains}
+                    data-applied-failed={applyReport.failed}
+                    data-partial={applyReport.partial ? "true" : "false"}
+                    data-applied-source={applyReport.from}
+                    data-applied-target={applyReport.to}
+                    data-applied-digest={applyReport.digest}
+                    data-applied-degraded={applyReport.degraded ? "true" : "false"}
+                  >
+                      <p className="tags-applied-heading">{t("Applied record — {{changed}} of {{requested}} subjects changed, {{failed}} failed.", { changed: applyReport.changed, requested: applyReport.outcomes.length, failed: applyReport.failed })}</p>
+                      <p className="tags-applied-heading" data-fact="applied-counts">{t("The service reported {{changed}} changed, {{unchanged}} with nothing written, and {{remains}} still carrying both names.", { changed: applyReport.changed, unchanged: applyReport.unchanged, remains: applyReport.sourceRemains })}</p>
+                      {applyReport.message && <p className="tags-applied-reason" data-fact="applied-service-message">{t("Service message: {{message}}", { message: applyReport.message })}</p>}
+                      {applyReport.partial
                         ? <div className="tags-applied-partial" data-state="PARTIAL" role="alert">
                           <AlertCircle size={15} />
                           <div>
@@ -749,31 +879,29 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
                         </div>
                         : <p className="tags-applied-complete">{t("Every subject listed below now carries the new name and no longer carries the old one.")}</p>}
                       <ul className="tags-applied-rows">
-                        {report.steps.map((step) => <li
+                        {applyReport.outcomes.map((outcome) => <li
                           className="tags-applied-row"
-                          key={step.subjectRef}
+                          key={outcome.subjectRef}
                           data-applied-row="true"
-                          data-subject-ref={step.subjectRef}
-                          data-outcome={step.outcome}
-                          data-reason={step.reason}
+                          data-subject-ref={outcome.subjectRef}
+                          data-outcome={outcome.outcome}
+                          data-reason={outcome.reason}
+                          data-target-created={outcome.targetCreated ? "true" : "false"}
+                          data-source-tombstoned={outcome.sourceTombstoned ? "true" : "false"}
                         >
-                          <span data-fact="applied-name">{step.name}</span>
-                          <span data-fact="applied-path">{step.path}</span>
-                          <span data-fact="applied-outcome">{step.outcome === "CHANGED"
-                            ? t("Changed: {{from}} removed, {{to}} added (record {{annotation_id}})", { from: report.source, to: report.target, annotation_id: step.addedAnnotationID || t("UNKNOWN — not reported by this build") })
-                            : step.outcome === "UNCHANGED"
-                              ? t("Left unchanged: nothing was written; {{from}} is still recorded, and the new name was not added.", { from: report.source })
-                              : t("Not clean: {{to}} was added (record {{annotation_id}}), and {{from}} is still recorded on this subject.", { from: report.source, to: report.target, annotation_id: step.addedAnnotationID || t("UNKNOWN — not reported by this build") })}</span>
-                          {step.reason && <span className="tags-applied-reason" data-fact="applied-reason">{t("Reason reported by the service: {{message}}", { message: step.reason })}</span>}
+                          <span data-fact="applied-name">{subjectName(outcome.subjectRef)}</span>
+                          <span data-fact="applied-path">{subjectPath(outcome.subjectRef)}</span>
+                          <span data-fact="applied-outcome">{outcomeText(outcome)}</span>
+                          {outcome.reason && <span className="tags-applied-reason" data-fact="applied-reason">{t("Reason reported by the service: {{message}}", { message: outcome.reason })}</span>}
                         </li>)}
                       </ul>
-                      <p className="tags-applied-note">{t("Only the subjects listed here were written. Every other subject keeps its previous records; the reverse change is available below and is again previewed before it is applied.")}</p>
-                      <button type="button" className="secondary-button compact" data-action="prepare-reverse" disabled={report.changed === 0} onClick={() => prepareReverse()}><Undo2 size={13} />{t("Prepare the reverse change")}</button>
+                      <p className="tags-applied-note">{t("These are the service's own per-subject outcomes for the confirmed plan. Every subject not listed here was not part of the plan; the reverse change is available below and is planned and confirmed again before it is applied.")}</p>
+                      <button type="button" className="secondary-button compact" data-action="prepare-reverse" disabled={applyReport.changed === 0} onClick={() => prepareReverse()}><Undo2 size={13} />{t("Prepare the reverse change")}</button>
                     </div>}
 
-                    {report && report.failed > 0 && <ul className="tags-failed-subjects" aria-label={t("Subjects the change did not complete for")}>
-                      {report.steps.filter((step) => step.outcome !== "CHANGED").map((step) => <li key={step.subjectRef} data-failed-row="true" data-subject-ref={step.subjectRef}>
-                        {t("{{name}} ({{subject_ref}}) was not changed: {{reason}}", { name: step.name, subject_ref: step.subjectRef, reason: step.reason || t("UNKNOWN — not reported by this build") })}
+                    {applyReport && applyReport.partial && <ul className="tags-failed-subjects" aria-label={t("Subjects the change did not complete for")}>
+                      {applyReport.outcomes.filter((outcome) => outcome.outcome !== "CHANGED").map((outcome) => <li key={outcome.subjectRef} data-failed-row="true" data-subject-ref={outcome.subjectRef} data-outcome={outcome.outcome}>
+                        {t("{{name}} ({{subject_ref}}) was not changed: {{reason}}", { name: subjectName(outcome.subjectRef), subject_ref: outcome.subjectRef, reason: outcome.reason || t("UNKNOWN — not reported by this build") })}
                       </li>)}
                     </ul>}
 

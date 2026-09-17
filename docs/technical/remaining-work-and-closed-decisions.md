@@ -203,7 +203,20 @@ recording this note:
    failed later apply and verify with a conflicting digest. That persistence
    defect is fixed: the policy is stored, read back on every manifest path, and
    passed into the rebuilt manifest, so the digest now survives a store reopen.
-   The frozen digest field set is unchanged.
+   The frozen digest field set is unchanged. One policy value now has a
+   materializer: `handoff-v1:manifest-json` writes exactly one derived
+   `restoreweave-export.json` file beside the frozen subject files,
+   `export.apply` reports the sidecar files it wrote, and `export.verify`
+   recomputes the sidecar from the frozen manifest and compares it
+   byte-for-byte, so a missing or altered sidecar is a verification failure and
+   never a clean verify. Every other non-empty policy value fails as
+   `invalid_input` at plan time and is refused by apply and verify instead of
+   being ignored, so an operator who asks for a sidecar never silently receives
+   none. The sidecar is derived output that states so in its own document; it
+   is not identity, it is never a frozen item, and it changes no subject file
+   byte, no frozen field, and no digest. Other handoff profiles (music
+   `.lrc`/m3u, anime NFO, sticker `pack.json`, citation files) still have no
+   materializer.
 2. **Minimal file-only `LinkGroup`.** Per the Core MVP Execution Plan, Phase 6
    supplies the minimal `LinkGroup`, and per `AGENTS.md` it may not be
    implemented before the Phase 4 and Phase 5 gates close. An album or series

@@ -48,8 +48,14 @@ type Dispatcher struct {
 	access                         *access.Service
 	recoveryReader                 *recoveryReaderState
 	operatorConfig                 *operatorConfigState
-	implemented                    map[string]bool
-	unimplemented                  []string
+	// tagApplyStepFailure is a test-only seam on the documented
+	// add-then-tombstone boundary of annotation.tag_apply. It is nil in
+	// production; a test installs it to fail one named step exactly as a real
+	// store failure would, so an interruption between the two steps can be
+	// proven to leave a subject carrying both names rather than neither.
+	tagApplyStepFailure func(subjectRef, action string) error
+	implemented         map[string]bool
+	unimplemented       []string
 }
 
 const modelBundleCapabilityKind = "model-bundle"
@@ -291,6 +297,8 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		implemented[command.OpAnnotationDelete] = true
 		implemented[command.OpAnnotationExport] = true
 		implemented[command.OpAnnotationImport] = true
+		implemented[command.OpAnnotationTagPlan] = true
+		implemented[command.OpAnnotationTagApply] = true
 		implemented[command.OpSearchQuery] = true
 		implemented[command.OpContentOpen] = true
 		implemented[command.OpContentRead] = true
@@ -472,6 +480,10 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleAnnotationExport(ctx, env, started)
 	case command.OpAnnotationImport:
 		return d.handleAnnotationImport(ctx, env, started)
+	case command.OpAnnotationTagPlan:
+		return d.handleAnnotationTagPlan(ctx, env, started)
+	case command.OpAnnotationTagApply:
+		return d.handleAnnotationTagApply(ctx, env, started)
 	case command.OpSearchQuery:
 		return d.handleSearchQuery(ctx, env, started)
 	case command.OpSearchRebuild:

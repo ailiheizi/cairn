@@ -29,7 +29,7 @@ export const searchops: Record<string, string> = {
 
   // The operator vocabulary, one line each.
   "Durable tag on the subject. Repeat it to require several tags.": "主体的持久标签。重复书写表示同时满足多个标签。",
-  "The daemon's entry type: regular_file, directory, symlink, fifo, socket, device, or special.": "守护进程的条目类型：regular_file、directory、symlink、fifo、socket、device 或 special。",
+  "The daemon's entry type (regular_file, directory, symlink, fifo, socket, device, special) or its derived media class (image, video, audio, document, archive, other).": "守护进程的条目类型（regular_file、directory、symlink、fifo、socket、device、special）或其派生的媒体类别（image、video、audio、document、archive、other）。",
   "Logical size in bytes, KB, MB, GB, or TB. Use >10MB, <1GB, 1MB..10MB, or one exact value.": "逻辑大小，单位 B、KB、MB、GB 或 TB。可用 >10MB、<1GB、1MB..10MB 或一个精确值。",
   "Recorded modification time, as an exclusive < or > bound on a YYYY-MM-DD date.": "记录中的修改时间，以 YYYY-MM-DD 日期的排他 < 或 > 边界表示。",
   "Exact-identity duplicates (dup:yes) or unique content (dup:no).": "精确同一性重复内容（dup:yes）或唯一内容（dup:no）。",
@@ -38,6 +38,7 @@ export const searchops: Record<string, string> = {
   "Recorded content id (SHA-256). A complete id filters exactly; a shorter value is a prefix.": "记录中的内容标识（SHA-256）。完整标识为精确过滤，较短取值按前缀匹配。",
 
   // The honest limit of each mapping, shown on the chip.
+  "Entry types are compared exactly. A media class is derived from the entry's recorded filename suffix only — never from its content, name, path, or size — and one entry maps to one class: an entry whose suffix is not recorded matches no media class, including other.": "条目类型按精确值比较。媒体类别只依据条目记录的文件名后缀推导——绝不依据内容、名称、路径或大小——且一个条目只属于一个类别：未记录后缀的条目不匹配任何媒体类别，包括 other。",
   "Matched as a token prefix in the daemon's tag field, not as an exact tag string.": "按守护进程标签字段中的词元前缀匹配，并非精确标签字符串。",
   "Items without a measured logical size never match a size range.": "没有测得逻辑大小的项目不会匹配任何大小范围。",
   "Exclusive: mtime:<2024-01-01 excludes that exact instant.": "排他边界：mtime:<2024-01-01 不包含该时刻本身。",
@@ -49,8 +50,8 @@ export const searchops: Record<string, string> = {
   "Unknown operator \"{{name}}\". Quote the token to search for it literally.": "未知运算符“{{name}}”。若想按字面搜索，请为该词加引号。",
   "{{operator}}: needs a value.": "{{operator}}: 需要一个取值。",
   "hash:{{value}} is not a hexadecimal content id prefix.": "hash:{{value}} 不是十六进制内容标识前缀。",
-  "type:{{value}} cannot be expressed: the daemon records no {{value}} entry type, and its suffix filter accepts one value. Use type:regular_file with name: or path:.": "type:{{value}} 无法表达：守护进程没有 {{value}} 条目类型，其后缀过滤器也只接受一个取值。请改用 type:regular_file 搭配 name: 或 path:。",
-  "type:{{value}} is not one of the daemon's entry types (regular_file, directory, symlink, fifo, socket, device, special).": "type:{{value}} 不属于守护进程的条目类型（regular_file、directory、symlink、fifo、socket、device、special）。",
+  "type:{{value}} is not one of the daemon's entry types (regular_file, directory, symlink, fifo, socket, device, special) or derived media classes (image, video, audio, document, archive, other).": "type:{{value}} 不属于守护进程的条目类型（regular_file、directory、symlink、fifo、socket、device、special）或派生的媒体类别（image、video、audio、document、archive、other）。",
+  "-type:{{value}} cannot be expressed: the daemon has no negation for the derived media class, and a search hit carries no recorded suffix, so this browser cannot exclude it.": "-type:{{value}} 无法表达：守护进程没有针对派生媒体类别的取反，且搜索结果不携带记录的后缀，浏览器无法据此排除。",
   "size:{{value}} is not a size. Use >10MB, <1GB, 1MB..10MB, or one exact value.": "size:{{value}} 不是有效大小。请使用 >10MB、<1GB、1MB..10MB 或一个精确值。",
   "size:{{value}} starts after it ends.": "size:{{value}} 的起始值大于结束值。",
   "mtime:{{value}} is not a date bound. Use <2024-01-01 or >2024-01-01.": "mtime:{{value}} 不是有效日期边界。请使用 <2024-01-01 或 >2024-01-01。",

@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- Added a derived `media_class` search filter (image, video, audio, document,
+  archive, other) to `search.query`, computed from the entry's recorded
+  filename suffix by one server-side table. The browser's `type:image` and its
+  siblings now reach the daemon as `filters.media_class` instead of being
+  reported as inexpressible, an entry with no recorded suffix matches no media
+  class including `other`, an unknown filter value fails closed as
+  `invalid_input`, and a negated media class is still reported as inexpressible
+  with no query sent. No durable column or table was added: the class is
+  recomputed from the recorded suffix.
+- Tag rename and merge are now one digest-bound daemon operation pair.
+  `annotation.tag_plan` returns a read-only plan naming every affected subject,
+  the ordered add-then-tombstone changes (including explicit no-op adds) and a
+  canonical digest; `annotation.tag_apply` re-derives that plan, refuses a
+  changed digest with a typed conflict before writing anything, and returns one
+  outcome per subject — changed, unchanged, or left carrying both names with the
+  daemon's own reason. Because the target is added before the source is
+  tombstoned, an interruption leaves both names rather than neither; a partial
+  apply returns DEGRADED and is never presented as a clean rename; the reverse
+  change is the same planned, confirmed operation. The tags view now shows the
+  daemon's plan before any write and the daemon's per-subject outcomes after.
+- Added a bounded read-only MCP profile over the typed command ABI
+  (`rw mcp serve --stdio --read-only`). Four tools — `search`, `get_subject`,
+  `list_recent`, `read_text_extract` — can dispatch only an enumerated allowlist
+  of read operations through one gateway, so no plan, apply, restore, verify,
+  export, cancel, delete or configuration operation is reachable; a test
+  enumerates the whole command ABI and fails when a new operation appears
+  unclassified. The surface is stdio-only against the local socket, requires a
+  read-only token that must differ from the write-capable API tokens and is
+  never logged, echoed or sent to the daemon, and refuses every tool call when
+  no token is configured. Results separate the daemon's own status, component
+  states and reasons from what is unavailable or unknown, clamp the requested
+  limit to a server maximum and report the clamp and any truncation, and never
+  answer from a cache or generate text.
+- The frozen export manifest's `sidecars` field now has one implemented
+  materializer. `export.plan` accepts the empty default plus
+  `handoff-v1:manifest-json`; anything else fails as `invalid_input` with the
+  vocabulary in the reason, and a frozen output name that collides with a
+  derived sidecar name fails the same way. Applying with that policy writes the
+  frozen subject files exactly as before plus one derived
+  `restoreweave-export.json` beside them that restates each item's output name,
+  exact identity, logical size and exactness with the manifest id, digest and
+  policy, and says in its own note that it is derived output rather than content
+  identity. Its content is a function of the frozen manifest alone, so applying
+  the same manifest to another empty destination reproduces byte-identical sidecar
+  bytes. Verification recomputes it and compares byte-for-byte: a missing, a
+  renamed or a byte-altered sidecar of the same length fails with the reason and
+  is never a clean verify, while an export that requested none keeps today's
+  layout. Apply and verify name the sidecar files they wrote or verified.
 - The search field now accepts operators — `tag:`, `type:`, `size:`, `mtime:`,
   `dup:`, `path:`, `name:`, and `hash:`, with `-` negation and quoted values —
   mapped onto the existing `search.query` filters, lexical text, and construct

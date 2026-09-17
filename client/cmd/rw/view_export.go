@@ -133,6 +133,9 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 			if rep, _ := cmd.Flags().GetString("representation"); rep != "" {
 				input["representation"] = rep
 			}
+			if sidecars, _ := cmd.Flags().GetString("sidecars"); sidecars != "" {
+				input["sidecars"] = sidecars
+			}
 			return env.request(cmd, command.OpExportPlan, input, func(cmd *cobra.Command, result command.Result) error {
 				var data command.ExportManifestData
 				if err := json.Unmarshal(result.Data, &data); err != nil {
@@ -177,6 +180,9 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "items=%d bytes=%d verified=%t\n", data.Items, data.Bytes, data.Verified)
+				for _, sidecar := range data.Sidecars {
+					fmt.Fprintf(cmd.OutOrStdout(), "sidecar: %s\n", sidecar)
+				}
 				return nil
 			})
 		}).Command)
@@ -196,11 +202,16 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "items=%d bytes=%d verified=%t\n", data.Items, data.Bytes, data.Verified)
+				for _, sidecar := range data.Sidecars {
+					fmt.Fprintf(cmd.OutOrStdout(), "sidecar: %s\n", sidecar)
+				}
 				return nil
 			})
 		}).Command)
 	export.PersistentFlags().String("view", "", "saved view to freeze")
 	export.PersistentFlags().StringSlice("subject", nil, "explicit subject references")
 	export.PersistentFlags().String("representation", "", "selected representation")
+	export.PersistentFlags().String("sidecars", "",
+		"frozen sidecar policy: empty for none, or "+command.ExportSidecarPolicyHandoffV1ManifestJSON)
 	return export
 }

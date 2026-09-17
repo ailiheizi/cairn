@@ -62,6 +62,10 @@ export const operations = {
     list: "annotation.list",
     upsert: "annotation.upsert",
     delete: "annotation.delete",
+    // The reviewed rename/merge pair: a read-only plan and the digest-bound
+    // apply that performs it. They replace N sequential per-subject writes.
+    tagPlan: "annotation.tag_plan",
+    tagApply: "annotation.tag_apply",
   },
   representation: {
     list: "representation.list",

@@ -333,7 +333,14 @@ func matchesFilters(hit Hit, filters Filters, sizeFacet, mtimeFacet sql.NullInt6
 		!strings.EqualFold(want, strings.TrimSpace(language)) {
 		return false
 	}
-	if filters.Suffix != "" && strings.TrimPrefix(strings.ToLower(suffix), ".") != strings.TrimPrefix(strings.ToLower(filters.Suffix), ".") {
+	if filters.Suffix != "" && NormalizeSuffix(suffix) != NormalizeSuffix(filters.Suffix) {
+		return false
+	}
+	// The media class is derived from the recorded suffix by the one table in
+	// media_class.go. An entry whose suffix is not recorded has no class and
+	// matches no media_class value, including "other"; a recorded suffix the
+	// table does not classify is "other".
+	if filters.MediaClass != "" && MediaClassOf(suffix) != filters.MediaClass {
 		return false
 	}
 	if filters.SizeMin != nil {
