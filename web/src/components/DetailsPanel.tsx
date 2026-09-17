@@ -1,8 +1,10 @@
-import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronRight, Download as DownloadIcon, FileSearch, Hash, Pencil, Plus, ShieldCheck, Tag, Trash2, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronRight, Download as DownloadIcon, FileSearch, Hash, Pencil, Plus, ShieldCheck, Sparkles, Tag, Trash2, X } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { abbreviateIdentity, identityBars } from "../identity";
 import { ContentPreview } from "./ContentPreview";
 import { command } from "../app/command";
+import { operations } from "../lib/operations";
 import { deriveSystemTags, descriptionKindLabel, formatBytes, formatEntryType, formatNoteDate } from "../lib/format";
 import type { DetailResourceStatus, SearchHit } from "../lib/types";
 
@@ -13,7 +15,69 @@ import type { DetailResourceStatus, SearchHit } from "../lib/types";
 // the durable user notes with imported, extracted, and model-produced notes
 // into the single Notes surface; the durable records keep their own provenance.
 
+// On-demand description generation is one explicit action for one subject, and
+// it can only run when the daemon defines an operation for it. `capability.list`
+// advertises one row per known operation; the client can dispatch only a verb
+// its typed map (`lib/operations.ts`) contains. That map holds description reads
+// only, the daemon's single description write (`description.create`) stores a
+// caller-supplied body and runs no provider, and no `DESCRIBE_SUBJECT`
+// operation is advertised today. The closed set below is therefore empty: the
+// action reports the missing capability with the daemon's own configuration
+// state instead of sending a request the daemon does not define.
+const describeGenerationOperationIDs: readonly string[] = [];
+
+type DescribeProbe =
+  | { state: "checking" }
+  | { state: "ready"; descriptions: { enabled?: boolean; generate?: string; provider_profile?: string; credential_ref?: string }; generationAdvertised: boolean }
+  | { state: "unreadable"; message: string };
+
 export function Details({ workspaceId, hit, annotations, representations, descriptions, descriptionsTruncated, annotationStatus, representationsStatus, descriptionsStatus, annotationMutationEnabled, noteDraft, tagDraft, tagVocabulary, editingNoteID, editingBody, busy, t, locale, onBack, onExport, onDraft, onTagDraft, onAddTag, onDeleteTag, onAdd, onEdit, onDeleteNote, onEditBody, onSaveEdit, onCancelEdit }: { workspaceId: string; hit: SearchHit; annotations: any[]; representations: any[]; descriptions: any[]; descriptionsTruncated: boolean; annotationStatus: DetailResourceStatus; representationsStatus: DetailResourceStatus; descriptionsStatus: DetailResourceStatus; annotationMutationEnabled: boolean; noteDraft: string; tagDraft: string; tagVocabulary: string[]; editingNoteID: string; editingBody: string; busy: boolean; t: Translator; locale: Locale; onBack: () => void; onExport?: () => void; onDraft: (value: string) => void; onTagDraft: (value: string) => void; onAddTag: () => void; onDeleteTag: (tag: any) => void; onAdd: () => void; onEdit: (note: any) => void; onDeleteNote: (note: any) => void; onEditBody: (value: string) => void; onSaveEdit: (note: any) => void; onCancelEdit: () => void }) {
+  // The generation action's availability probe: the daemon's persisted
+  // description settings plus the operations it advertises. Both are reads. The
+  // probe runs once per workspace while the inspector is open, never starts,
+  // schedules, or implies a generation, and reports every unmet gate by name.
+  const describeReasonID = useId();
+  const [describeProbe, setDescribeProbe] = useState<DescribeProbe>({ state: "checking" });
+  const describeProbeToken = useRef(0);
+  useEffect(() => {
+    const token = ++describeProbeToken.current;
+    setDescribeProbe({ state: "checking" });
+    void (async () => {
+      const [configResult, capabilityResult] = await Promise.allSettled([
+        command(operations.config.get, {}),
+        command(operations.capability.list, {}),
+      ]);
+      if (describeProbeToken.current !== token) return;
+      if (configResult.status === "rejected" || capabilityResult.status === "rejected") {
+        const failure = configResult.status === "rejected" ? configResult.reason : (capabilityResult as PromiseRejectedResult).reason;
+        setDescribeProbe({ state: "unreadable", message: failure instanceof Error ? failure.message : String(failure) });
+        return;
+      }
+      const capabilities = capabilityResult.value.data?.capabilities ?? [];
+      setDescribeProbe({
+        state: "ready",
+        descriptions: configResult.value.data?.config?.descriptions ?? {},
+        generationAdvertised: capabilities.some((capability: any) => capability?.kind === "operation"
+          && capability?.state === "AVAILABLE"
+          && describeGenerationOperationIDs.includes(String(capability?.id ?? ""))),
+      });
+    })();
+  }, [workspaceId]);
+  const describeReasons: string[] = [];
+  if (describeProbe.state === "unreadable") {
+    describeReasons.push(t("Could not read the daemon's description settings and capabilities: {{message}}", { message: describeProbe.message }));
+  } else if (describeProbe.state === "ready") {
+    // Every unmet gate is named, deepest last: the settings the operator owns,
+    // then the capability the daemon has to publish before a request could be
+    // dispatched at all.
+    if (describeProbe.descriptions.enabled !== true) describeReasons.push(t("Descriptions are turned off in the settings (descriptions.enabled)."));
+    if (String(describeProbe.descriptions.generate ?? "").trim() === "disabled") describeReasons.push(t("On-demand generation is turned off in the settings (descriptions.generate)."));
+    if (!String(describeProbe.descriptions.provider_profile ?? "").trim()) describeReasons.push(t("No description provider profile is selected (descriptions.provider_profile)."));
+    if (!String(describeProbe.descriptions.credential_ref ?? "").trim()) describeReasons.push(t("No credential reference is configured for the description provider (descriptions.credential_ref)."));
+    if (!describeProbe.generationAdvertised) describeReasons.push(t("This daemon does not implement on-demand description generation (no DESCRIBE_SUBJECT operation)."));
+  }
+  const describeChecking = describeProbe.state === "checking";
+  const describeEnabled = describeProbe.state === "ready" && describeReasons.length === 0;
   const notes = annotations.filter((item) => item.kind === "NOTE" && !item.tombstoned);
   // A successor replaces a previous generated/imported note in the daily
   // view. The complete revision chain remains durable in the catalog.
@@ -68,6 +132,14 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     {hit.entry_type !== "DIRECTORY" && <section className="detail-section preview-section"><div className="section-heading"><h3>{t("Preview")}</h3></div><ContentPreview key={`${workspaceId}:${hit.entry_id || hit.subject_ref || "subject"}:${hit.content_id || ""}`} command={command} locale={locale === "zh-CN" ? "zh-CN" : "en"} workspaceId={workspaceId} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={hit.name || t("Untitled subject")} logicalSize={hit.logical_size} exactAvailable={representationsStatus === "ready" ? previewAvailable : representationsStatus !== "error"} autoOpen /></section>}
     <dl className="facts"><div><dt>{t("Protection")}</dt><dd><span className={`inline-state ${verifiedExact ? "" : "warning"}`}>{verifiedExact ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{t(exactState)}</span></dd></div>{exact && <div><dt>{t("Logical size")}</dt><dd>{formatBytes(exact.decoded_length)}</dd></div>}</dl>
     <div className="detail-section notes-section"><div className="section-heading"><h3>{t("Notes")}</h3><span>{combinedNotes.length}</span></div>
+      <div className="describe-action" data-describe-state={describeChecking ? "checking" : describeEnabled ? "ready" : "disabled"}>
+        <button type="button" className="secondary-button compact describe-trigger" aria-describedby={describeReasonID} disabled={!describeEnabled}><Sparkles size={14} />{t("Generate a description")}</button>
+        <div className="describe-status" id={describeReasonID} role="status">
+          {describeChecking && <p className="muted">{t("Checking whether this daemon can generate a description...")}</p>}
+          {!describeChecking && describeReasons.length > 0 && <><p className="muted">{t("Generation is unavailable:")}</p><ul className="describe-reasons">{describeReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></>}
+          {describeEnabled && <p className="muted">{t("Generation runs only from this action, for this one subject; it never starts on selection or ingest.")}</p>}
+        </div>
+      </div>
       <div className="notes-list">
         {annotationStatus !== "ready" && <p className="muted" role="status">{detailStatus(annotationStatus)}</p>}
         {descriptionsStatus === "loading" && <p className="muted" role="status">{t("Loading additional notes...")}</p>}

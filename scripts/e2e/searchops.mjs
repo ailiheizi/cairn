@@ -212,6 +212,89 @@ export async function assertSearchOperators(ctx) {
   await page.waitForTimeout(400);
   assert.equal(daemon.queries.length, 0, "an inexpressible operator must run no query");
 
+  // 6b. The remaining daemon-backed facets. The recorded suffix, the recorded
+  // protection mode, and the recorded language each reach `search.query` as
+  // typed filters, and the daemon's own answer decides the result set.
+  await submit("suffix:txt");
+  assert.equal(daemon.queries.length, 1, `suffix: must run search.query exactly once: ${JSON.stringify(daemon.queries)}`);
+  assert.equal(daemon.queries[0].query, "", `a filter-only query must send no lexical text: ${JSON.stringify(daemon.queries[0])}`);
+  assert.deepEqual(daemon.queries[0].filters, { suffix: "txt" }, `suffix: must reach the daemon's suffix filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual(await chipWires(), ["suffix"], "the suffix chip must name the daemon input it writes");
+  assert.deepEqual(ctx.state.lastSearchHitNames.slice().sort(), ["alpha.txt", "beta.txt"], `the daemon must answer with exactly the fixture's .txt files: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+  assert.equal(await page.locator(".result-list .result-row").count(), 2, "the rendered set must be the daemon's two .txt hits");
+
+  // A leading dot is tolerated, and the payload carries the daemon's own
+  // normalized value while the chip keeps the token exactly as typed.
+  await submit("suffix:.png");
+  assert.deepEqual(daemon.queries[0].filters, { suffix: "png" }, `a leading dot must normalize to the daemon's own suffix value: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual((await chipTokens()).map((value) => value.trim()), ["suffix:.png"], "the chip must show the suffix token exactly as typed");
+  assert.deepEqual(ctx.state.lastSearchHitNames.slice().sort(), ["tiny.png"], `the daemon must answer with exactly the fixture's .png file: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+
+  // The protection mode is the daemon's closed vocabulary; the protected
+  // fixture answers, and a mode no fixture entry records answers nothing —
+  // both are the daemon's own protection-axis answers, never a rendered guess.
+  await submit("protection:STORE_EXACT");
+  assert.equal(daemon.queries.length, 1, `protection: must run search.query exactly once: ${JSON.stringify(daemon.queries)}`);
+  assert.equal(daemon.queries[0].query, "", "a filter-only protection query must send no lexical text");
+  assert.deepEqual(daemon.queries[0].filters, { protection_mode: "STORE_EXACT" }, `protection: must reach the daemon's protection filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual(await chipWires(), ["protection_mode"], "the protection chip must name the daemon input it writes");
+  assert.ok(ctx.state.lastSearchHitNames.length > 0, `the fixture's protected entries must be the daemon's answer: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+  assert.equal(await page.locator(".result-list .result-row").count(), ctx.state.lastSearchHitNames.length, "an exact protection filter needs no client-side narrowing");
+  await submit("protection:METADATA_ONLY");
+  assert.deepEqual(daemon.queries[0].filters, { protection_mode: "METADATA_ONLY" }, `a different mode must reach the same daemon filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual(ctx.state.lastSearchHitNames, [], `no fixture entry records METADATA_ONLY, so the daemon's answer must be empty: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+  assert.equal(await page.locator(".result-list .result-row").count(), 0, "the rendered set must be the daemon's empty answer");
+
+  // The recorded language is a typed filter too. The fixture records no
+  // language, so the daemon's own answer to an unrecorded code is empty.
+  await submit("lang:zz");
+  assert.equal(daemon.queries.length, 1, `lang: must run search.query exactly once: ${JSON.stringify(daemon.queries)}`);
+  assert.equal(daemon.queries[0].query, "", "a filter-only language query must send no lexical text");
+  assert.deepEqual(daemon.queries[0].filters, { language: "zz" }, `lang: must reach the daemon's language filter: ${JSON.stringify(daemon.queries[0].filters)}`);
+  assert.deepEqual(await chipWires(), ["language"], "the language chip must name the daemon input it writes");
+  assert.deepEqual(ctx.state.lastSearchHitNames, [], `an unrecorded language must be the daemon's own empty answer, not a client-side guess: ${JSON.stringify(ctx.state.lastSearchHitNames)}`);
+
+  // A protection value outside the daemon's closed mode vocabulary is a
+  // visible error, and no query leaves the browser.
+  await search.fill("protection:store_everything");
+  await errorLine.waitFor({ state: "visible", timeout: 10000 });
+  const protectionError = (await errorLine.innerText()).trim();
+  assert.match(protectionError, /protection:store_everything/, `the error must name the failing token: ${protectionError}`);
+  assert.match(protectionError, /STORE_EXACT/, `the error must name the daemon's own mode vocabulary: ${protectionError}`);
+  assert.match(protectionError, NO_SEARCH_TEXT, `the error must state that nothing was searched: ${protectionError}`);
+  daemon.queries.length = 0;
+  await search.press("Enter");
+  await page.waitForTimeout(400);
+  assert.equal(daemon.queries.length, 0, "an invalid protection token must run no query at all");
+
+  // Two suffix: predicates are refused: the daemon's suffix filter compares
+  // one recorded suffix, so neither an AND (impossible for one file) nor an OR
+  // (not expressible, and it cannot be evaluated over the loaded results the
+  // single filtered request returned) is honest here.
+  await search.fill("suffix:txt suffix:png");
+  await errorLine.waitFor({ state: "visible", timeout: 10000 });
+  const suffixError = (await errorLine.innerText()).trim();
+  assert.match(suffixError, /suffix:png/, `the error must name the second predicate: ${suffixError}`);
+  assert.match(suffixError, /one recorded suffix|一个记录后缀/, `the error must explain the single-valued daemon filter: ${suffixError}`);
+  assert.match(suffixError, INEXPRESSIBLE_TEXT, `the repeated suffix must be reported as inexpressible: ${suffixError}`);
+  assert.match(suffixError, NO_SEARCH_TEXT, `the error must state that nothing was searched: ${suffixError}`);
+  daemon.queries.length = 0;
+  await search.press("Enter");
+  await page.waitForTimeout(400);
+  assert.equal(daemon.queries.length, 0, "a repeated suffix: predicate must run no query at all");
+
+  // A suffix cannot be negated either: the daemon has no negation, and the
+  // browser must not re-derive a hit's recorded suffix from its displayed name.
+  await search.fill("-suffix:txt");
+  await errorLine.waitFor({ state: "visible", timeout: 10000 });
+  const negatedSuffixError = (await errorLine.innerText()).trim();
+  assert.match(negatedSuffixError, /-suffix:txt/, `the error must name the inexpressible token: ${negatedSuffixError}`);
+  assert.match(negatedSuffixError, INEXPRESSIBLE_TEXT, `a negated suffix must be reported as inexpressible: ${negatedSuffixError}`);
+  daemon.queries.length = 0;
+  await search.press("Enter");
+  await page.waitForTimeout(400);
+  assert.equal(daemon.queries.length, 0, "a negated suffix must run no query");
+
   await search.fill("weird:thing");
   await errorLine.waitFor({ state: "visible", timeout: 10000 });
   assert.match((await errorLine.innerText()).trim(), /weird/, "an unknown operator must be reported, not searched for");
@@ -282,6 +365,57 @@ export async function assertSearchOperators(ctx) {
   await search.fill("hash:");
   await page.waitForTimeout(200);
   assert.equal(await suggest.count(), 0, "hash: must not offer values the browser cannot know");
+
+  // The remaining operator names are offered with their own one-line
+  // descriptions and value shapes.
+  const suggestRows = () => suggest.locator(".search-suggest-entry").evaluateAll((nodes) => nodes.map((node) => ({
+    value: node.querySelector("b")?.textContent?.trim() ?? "",
+    note: node.querySelector("span")?.textContent?.trim() ?? "",
+    token: node.querySelector("code")?.textContent?.trim() ?? "",
+  })));
+  await search.fill("suff");
+  await suggest.waitFor({ state: "visible", timeout: 10000 });
+  const suffixOperatorRows = await suggestRows();
+  assert.deepEqual(suffixOperatorRows.map((entry) => entry.value), ["suffix:"], `a typed suffix prefix must offer the operator: ${JSON.stringify(suffixOperatorRows)}`);
+  assert.match(suffixOperatorRows[0].note, /filename suffix|文件名后缀/, `the suffix row must carry its one-line description: ${suffixOperatorRows[0].note}`);
+  assert.equal(suffixOperatorRows[0].token, "suffix:png", "the suffix row must show its value shape");
+  await search.fill("prot");
+  await suggest.waitFor({ state: "visible", timeout: 10000 });
+  const protectionOperatorRows = await suggestRows();
+  assert.deepEqual(protectionOperatorRows.map((entry) => entry.value), ["protection:"], `a typed protection prefix must offer the operator: ${JSON.stringify(protectionOperatorRows)}`);
+  assert.match(protectionOperatorRows[0].note, /protection mode|保护模式/, `the protection row must carry its one-line description: ${protectionOperatorRows[0].note}`);
+  assert.equal(protectionOperatorRows[0].token, "protection:STORE_EXACT", "the protection row must show its value shape");
+  await search.fill("lan");
+  await suggest.waitFor({ state: "visible", timeout: 10000 });
+  const languageOperatorRows = await suggestRows();
+  assert.deepEqual(languageOperatorRows.map((entry) => entry.value), ["lang:"], `a typed language prefix must offer the operator: ${JSON.stringify(languageOperatorRows)}`);
+  assert.match(languageOperatorRows[0].note, /recorded for the entry's descriptions|记录的语言/, `the language row must carry its one-line description: ${languageOperatorRows[0].note}`);
+  assert.equal(languageOperatorRows[0].token, "lang:und", "the language row must show its value shape");
+
+  // The protection modes are the one closed value vocabulary this browser
+  // knows besides tags, so protection: offers exactly the daemon's modes —
+  // each completing the operator, none invented.
+  await search.fill("protection:");
+  await suggest.waitFor({ state: "visible", timeout: 10000 });
+  const protectionEntries = await suggestRows();
+  assert.deepEqual(protectionEntries.map((entry) => entry.value), ["STORE_EXACT", "STORE_EXACT_WITH_EXTERNAL_FALLBACK", "LINK_ONLY", "METADATA_ONLY"],
+    `protection: must offer the daemon's closed mode vocabulary: ${JSON.stringify(protectionEntries)}`);
+  for (const entry of protectionEntries) assert.equal(entry.token, `protection:${entry.value}`, "an offered protection mode must complete the operator");
+  assert.match(protectionEntries[0].note, /Exact bytes|精确字节/, `a mode row must carry its one-line description: ${protectionEntries[0].note}`);
+  await suggest.locator(".search-suggest-entry").nth(2).click();
+  assert.equal(await search.inputValue(), "protection:LINK_ONLY", "picking a protection mode must complete the token in the field");
+  await search.fill("protection:store_exact_");
+  await suggest.waitFor({ state: "visible", timeout: 10000 });
+  const narrowedModes = (await suggestRows()).map((entry) => entry.value);
+  assert.deepEqual(narrowedModes, ["STORE_EXACT_WITH_EXTERNAL_FALLBACK"], `a typed protection prefix must narrow the offered modes, never add one: ${JSON.stringify(narrowedModes)}`);
+  // Suffix and language values are not known to this browser, so none are
+  // offered — including a protection value that looks like one.
+  await search.fill("suffix:");
+  await page.waitForTimeout(200);
+  assert.equal(await suggest.count(), 0, "suffix: must not offer values this browser cannot know");
+  await search.fill("lang:");
+  await page.waitForTimeout(200);
+  assert.equal(await suggest.count(), 0, "lang: must not offer values this browser cannot know");
 
   // 8. Honest limits: a predicate the daemon cannot express is labelled on the
   // chip and in the result set, and it really narrows the hits the daemon

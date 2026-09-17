@@ -60,11 +60,13 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
         {Boolean(query.trim()) && <button type="button" className="search-clear" aria-label={t("Clear search text")} title={t("Clears the field only. Current results stay until you search again or return to All content.")} onClick={search.clearSearchText}><X size={14} aria-hidden="true" /></button>}
         <button type="submit" className="search-submit" disabled={busy || !query.trim() || !isConnected || !catalogHealthy}>{busy ? <LoaderCircle className="spin" size={16} /> : t("Search")}</button>
         {suggestionsOpen && <div className="search-suggest" role="listbox" aria-label={t("Search operators and values")} aria-describedby="restoreweave-search-suggest-note">
-          <p className="search-suggest-note" id="restoreweave-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary.")}</p>
+          <p className="search-suggest-note" id="restoreweave-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary, and protection modes from the daemon's closed protection vocabulary.")}</p>
           {suggestions.map((suggestion, index) => <button key={suggestion.key} type="button" role="option" aria-selected={index === activeSuggestion} className={`search-suggest-entry ${index === activeSuggestion ? "active" : ""}`} onClick={() => ops.acceptSuggestion(index)}>
             {suggestion.kind === "operator"
               ? <><b>{suggestion.name}</b><span>{t(suggestion.description)}</span><code>{suggestion.valueHint}</code></>
-              : <><b>{suggestion.value}</b><span>{t("Tag, {{count}} items", { count: suggestion.count })}</span><code>{suggestion.token}</code></>}
+              : suggestion.kind === "protection"
+                ? <><b>{suggestion.value}</b><span>{t(suggestion.description)}</span><code>{suggestion.token}</code></>
+                : <><b>{suggestion.value}</b><span>{t("Tag, {{count}} items", { count: suggestion.count })}</span><code>{suggestion.token}</code></>}
           </button>)}
         </div>}
         {search.searchRecentsOpen && <div className="search-recents" role="group" aria-label={t("Local recent searches")} aria-describedby="restoreweave-search-recents-note">

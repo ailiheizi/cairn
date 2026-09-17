@@ -820,3 +820,15 @@ selection bar, and the details inspector column. */
   .selection-tag { flex-basis: 100%; }
   .selection-clear { margin-left: 0; }
 }
+
+/* The on-demand description action in the inspector's Notes section. It is one
+   explicit action for one subject: the trigger is enabled only when every gate
+   the daemon reports is satisfied, and the status block below it names each
+   unmet gate instead of leaving a disabled control with no reason. */
+.describe-action { display: grid; justify-items: start; gap: 8px; margin: 12px 0 14px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); }
+.describe-trigger { display: inline-flex; align-items: center; gap: 7px; }
+.describe-trigger:disabled { cursor: not-allowed; }
+.describe-status { min-width: 0; }
+.describe-status .muted { margin: 0; }
+.describe-reasons { min-width: 0; display: grid; gap: 4px; margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.describe-reasons li { overflow-wrap: anywhere; }

@@ -12,6 +12,7 @@
 
 import { activity } from "./i18n/activity";
 import { common } from "./i18n/common";
+import { description } from "./i18n/description";
 import { drawers } from "./i18n/drawers";
 import { duplicates } from "./i18n/duplicates";
 import { library } from "./i18n/library";
@@ -41,6 +42,7 @@ const chinese: Record<string, string> = {
   ...tags,
   ...searchops,
   ...report,
+  ...description,
 };
 
 export function resolveInitialLocale(): Locale {

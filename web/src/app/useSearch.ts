@@ -4,8 +4,9 @@ import type { Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
 import {
-  completedOperatorToken, completedTagToken, contentIDMatchesPrefix, operatorSuggestions,
-  parseSearchQuery, rewriteSearchText, searchCompletionContext, searchPlan,
+  completedOperatorToken, completedProtectionToken, completedTagToken, contentIDMatchesPrefix,
+  operatorSuggestions, parseSearchQuery, rewriteSearchText, searchCompletionContext, searchPlan,
+  SEARCH_PROTECTION_MODES,
 } from "../lib/searchops";
 import type { ParsedSearchQuery, SearchOperatorInfo, SearchParseError, SearchPlan } from "../lib/searchops";
 import { exactIdentityKey } from "../lib/format";
@@ -36,7 +37,8 @@ export function isTextEntryTarget(target: EventTarget | null) {
 
 export type SearchSuggestion =
   | { kind: "operator"; key: string; token: string; name: string; description: string; valueHint: string }
-  | { kind: "tag"; key: string; token: string; value: string; count: number };
+  | { kind: "tag"; key: string; token: string; value: string; count: number }
+  | { kind: "protection"; key: string; token: string; value: string; description: string };
 
 export type PredicateEdit = { index: number; value: string };
 
@@ -223,6 +225,15 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         .filter((facet) => facet.value.toLowerCase().startsWith(prefix))
         .slice(0, 12)
         .map((facet) => ({ kind: "tag" as const, key: `tag:${facet.value}`, token: completedTagToken(facet.value), value: facet.value, count: facet.count }));
+    }
+    if (completion.kind === "protection") {
+      // The protection modes are a closed vocabulary the daemon's own records
+      // use, so offering them is a fact, not a fabrication; no other operator
+      // offers values this browser cannot know.
+      const prefix = completion.prefix.replace(/^["']/, "").toUpperCase();
+      return SEARCH_PROTECTION_MODES
+        .filter((mode) => mode.value.startsWith(prefix))
+        .map((mode) => ({ kind: "protection" as const, key: `protection:${mode.value}`, token: completedProtectionToken(mode.value), value: mode.value, description: mode.description }));
     }
     return [];
   }, [completion, library.tagFacets, query, suggestionsDismissed]);

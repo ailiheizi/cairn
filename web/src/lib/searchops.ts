@@ -8,14 +8,20 @@
 // Every operator maps onto an input `search.query` already accepts:
 //   - `filters.entry_type` / `filters.media_class` / `filters.size_min` /
 //     `filters.size_max` / `filters.mtime_after` / `filters.mtime_before` /
-//     `filters.content_id` / `filters.duplicate_group`, and
+//     `filters.content_id` / `filters.duplicate_group` / `filters.suffix` /
+//     `filters.protection_mode` / `filters.language`, and
 //   - the lexical text plus `construct_axes` (the daemon's own lexical field
 //     selector: `tags`, `path`, `name`, `duplicates`, ...).
 // Nothing here invents a wire field. An operator the daemon cannot express is
 // reported as an error and never becomes a silently different query.
+//
+// `suffix:`, `protection:`, and `lang:` each write one single-valued daemon
+// filter, so a repeated predicate for any of them is refused instead of
+// becoming an impossible AND or an OR the daemon cannot express; the daemon
+// has exactly one `suffix`, one `protection_mode`, and one `language` input.
 
 /** The operator vocabulary of the one search field. */
-export const SEARCH_OPERATOR_NAMES = ["tag", "type", "size", "mtime", "dup", "path", "name", "hash"] as const;
+export const SEARCH_OPERATOR_NAMES = ["tag", "type", "suffix", "protection", "lang", "size", "mtime", "dup", "path", "name", "hash"] as const;
 export type SearchOperatorName = (typeof SEARCH_OPERATOR_NAMES)[number];
 
 export type SearchOperatorInfo = {
@@ -49,6 +55,18 @@ const ENTRY_TYPE_ALIASES: Record<string, string> = {
 // recorded matches no class at all, including `other`.
 const MEDIA_CLASS_VALUES = ["image", "video", "audio", "document", "archive", "other"] as const;
 
+// The daemon's protection-mode vocabulary (`server/internal/store/sqlite/
+// types.go`, `validProtectionMode`). It is a closed set the daemon records on
+// every protection record, so the operator refuses any other value and the
+// autocomplete may offer these rows without guessing. The descriptions are
+// English source strings; the surface renders them through `t()`.
+export const SEARCH_PROTECTION_MODES: Array<{ value: string; description: string }> = [
+  { value: "STORE_EXACT", description: "Exact bytes are stored in this repository. This is the default protection mode." },
+  { value: "STORE_EXACT_WITH_EXTERNAL_FALLBACK", description: "Exact bytes are stored here, with a qualified external route kept as an additional recovery fallback." },
+  { value: "LINK_ONLY", description: "No local copy is kept. The entry stays visibly LINK_ONLY_UNPROTECTED until it is independently reacquired and verified." },
+  { value: "METADATA_ONLY", description: "Only catalog metadata is kept. There is no local representation and no recovery claim." },
+];
+
 // The daemon's lexical axes this surface scopes a predicate to. `tags`, `path`,
 // `name`, and `duplicates` are the rebuildable text fields of the bundled FTS5
 // generation, and `construct_axes` is the daemon input that selects them.
@@ -60,6 +78,9 @@ const SEARCH_AXIS_DUPLICATES = "duplicates";
 export const SEARCH_OPERATORS: SearchOperatorInfo[] = [
   { name: "tag", description: "Durable tag on the subject. Repeat it to require several tags.", valueHint: "tag:reviewed", limitation: "Matched as a token prefix in the daemon's tag field, not as an exact tag string." },
   { name: "type", description: "The daemon's entry type (regular_file, directory, symlink, fifo, socket, device, special) or its derived media class (image, video, audio, document, archive, other).", valueHint: "type:image", limitation: "Entry types are compared exactly. A media class is derived from the entry's recorded filename suffix only — never from its content, name, path, or size — and one entry maps to one class: an entry whose suffix is not recorded matches no media class, including other." },
+  { name: "suffix", description: "The entry's recorded filename suffix: its final extension, lowercased by the daemon. A leading dot is accepted.", valueHint: "suffix:png", limitation: "One value per query. The daemon compares one exact recorded suffix, so a second suffix: predicate is refused instead of becoming an AND that could never hold or an OR the daemon cannot express. An entry whose name records no suffix matches nothing." },
+  { name: "protection", description: "The entry's recorded protection mode: STORE_EXACT, STORE_EXACT_WITH_EXTERNAL_FALLBACK, LINK_ONLY, or METADATA_ONLY.", valueHint: "protection:STORE_EXACT", limitation: "One value per query: a second protection: predicate is refused. The daemon compares the mode against the entry's recorded protection text as a whole word or a word prefix, so STORE_EXACT also matches STORE_EXACT_WITH_EXTERNAL_FALLBACK." },
+  { name: "lang", description: "The language the daemon recorded for the entry's descriptions, compared as an exact value without case.", valueHint: "lang:und", limitation: "One value per query: a second lang: predicate is refused. Only an entry with a recorded language can match; an entry with no descriptions, or whose descriptions recorded no language, matches nothing." },
   { name: "size", description: "Logical size in bytes, KB, MB, GB, or TB. Use >10MB, <1GB, 1MB..10MB, or one exact value.", valueHint: "size:>10MB", limitation: "Items without a measured logical size never match a size range." },
   { name: "mtime", description: "Recorded modification time, as an exclusive < or > bound on a YYYY-MM-DD date.", valueHint: "mtime:<2024-01-01", limitation: "Exclusive: mtime:<2024-01-01 excludes that exact instant." },
   { name: "dup", description: "Exact-identity duplicates (dup:yes) or unique content (dup:no).", valueHint: "dup:yes", limitation: "The daemon records a duplicate projection but no unique-only filter, so dup:no is evaluated over loaded results." },
@@ -77,7 +98,8 @@ export function searchOperatorInfo(name: SearchOperatorName): SearchOperatorInfo
 
 /** The short name of the daemon input each operator writes, shown on the chip. */
 export const SEARCH_OPERATOR_WIRE: Record<SearchOperatorName, string> = {
-  tag: "tags", type: "entry_type", size: "size_min/size_max", mtime: "mtime_after/mtime_before",
+  tag: "tags", type: "entry_type", suffix: "suffix", protection: "protection_mode",
+  lang: "language", size: "size_min/size_max", mtime: "mtime_after/mtime_before",
   dup: "duplicates", path: "path", name: "name", hash: "content_id",
 };
 
@@ -137,6 +159,9 @@ export type SearchFilters = {
   media_class?: string;
   content_id?: string;
   duplicate_group?: string;
+  suffix?: string;
+  protection_mode?: string;
+  language?: string;
   size_min?: number;
   size_max?: number;
   mtime_after?: number;
@@ -262,6 +287,33 @@ export function parseSearchDate(value: string): number | null {
   return millis;
 }
 
+// The one suffix normalization: trim, lowercase, tolerate one leading dot, and
+// refuse anything that cannot be a recorded final extension — whitespace, a
+// slash, a colon, or an interior dot (the daemon records `filepath.Ext`, the
+// final extension only, so "tar.gz" can never equal a recorded suffix).
+export function normalizeSuffixValue(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  const stripped = trimmed.startsWith(".") ? trimmed.slice(1) : trimmed;
+  return /^[^\s.:/\\]+$/.test(stripped) ? stripped : "";
+}
+
+// A recorded language is a code the daemon stores as written (its own default
+// is `und`). The shape is validated so a typo fails visibly, but the value set
+// is open: the browser never claims to know which codes are recorded.
+export function isLanguageTag(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value.trim());
+}
+
+// A negation this surface reports instead of approximating. Each of these
+// filters has one positive daemon input and no inverse, and a search hit
+// carries no recorded value this browser could evaluate the exclusion over.
+const NEGATED_PREDICATE_LIMITS: Partial<Record<SearchOperatorName, string>> = {
+  mtime: "-mtime: cannot be expressed: a hit carries no modification time, so this browser cannot exclude it.",
+  suffix: "-suffix:{{value}} cannot be expressed: the daemon has no negation for the suffix filter, and a search hit carries no recorded suffix, so this browser cannot exclude it.",
+  protection: "-protection:{{value}} cannot be expressed: the daemon has no negation for the protection filter, and a search hit carries no recorded protection state, so this browser cannot exclude it.",
+  lang: "-lang:{{value}} cannot be expressed: the daemon has no negation for the language filter, and a search hit carries no recorded language, so this browser cannot exclude it.",
+};
+
 export function normalizeContentID(value: string): string {
   const trimmed = value.trim().toLowerCase();
   return trimmed.startsWith("sha256:") ? trimmed.slice("sha256:".length) : trimmed;
@@ -285,6 +337,10 @@ export function parseSearchQuery(source: string): ParsedSearchQuery {
   const predicates: SearchPredicate[] = [];
   const freeTokens: string[] = [];
   const errors: SearchParseError[] = [];
+  // The daemon carries one `suffix`, one `protection_mode`, and one `language`
+  // input, so a second predicate for any of them is refused here instead of
+  // silently overwriting the first or inventing an OR the daemon cannot run.
+  const singleValuedSeen = new Set<SearchOperatorName>();
   for (const token of tokenizeSearchText(source)) {
     if (token.quoted && !token.raw.startsWith("-") && !splitToken(token.raw)) { freeTokens.push(token.raw); continue; }
     const negated = token.raw.startsWith("-") && token.raw.length > 1;
@@ -341,6 +397,72 @@ export function parseSearchQuery(source: string): ParsedSearchQuery {
         predicate.mediaClass = mediaClass;
         break;
       }
+      case "suffix": {
+        const normalized = normalizeSuffixValue(value);
+        if (!normalized) {
+          errors.push({
+            raw: token.raw,
+            message: "suffix:{{value}} is not a recorded filename suffix. Use the final extension only, without spaces, slashes, colons, or an interior dot (for example png or .png).",
+            values: { value },
+          });
+          continue;
+        }
+        if (singleValuedSeen.has(operator.name)) {
+          errors.push({
+            raw: token.raw,
+            message: "suffix:{{value}} cannot be expressed: the daemon's suffix filter compares one recorded suffix, so a second suffix: predicate is neither an AND that could hold nor an OR the daemon can express. Keep one suffix: value.",
+            values: { value },
+          });
+          continue;
+        }
+        singleValuedSeen.add(operator.name);
+        predicate.value = normalized;
+        break;
+      }
+      case "protection": {
+        const requested = value.trim().toUpperCase();
+        if (!SEARCH_PROTECTION_MODES.some((mode) => mode.value === requested)) {
+          errors.push({
+            raw: token.raw,
+            message: "protection:{{value}} is not one of the daemon's protection modes (STORE_EXACT, STORE_EXACT_WITH_EXTERNAL_FALLBACK, LINK_ONLY, METADATA_ONLY).",
+            values: { value },
+          });
+          continue;
+        }
+        if (singleValuedSeen.has(operator.name)) {
+          errors.push({
+            raw: token.raw,
+            message: "protection:{{value}} cannot be expressed: the daemon's protection filter compares one mode, and a second protection: predicate is not an OR the daemon can express. Keep one protection: value.",
+            values: { value },
+          });
+          continue;
+        }
+        singleValuedSeen.add(operator.name);
+        predicate.value = requested;
+        break;
+      }
+      case "lang": {
+        const tag = value.trim();
+        if (!isLanguageTag(tag)) {
+          errors.push({
+            raw: token.raw,
+            message: "lang:{{value}} is not a language tag. Use a recorded code such as und or zh-Hans, without spaces, dots, or colons.",
+            values: { value },
+          });
+          continue;
+        }
+        if (singleValuedSeen.has(operator.name)) {
+          errors.push({
+            raw: token.raw,
+            message: "lang:{{value}} cannot be expressed: the daemon's language filter compares one recorded language, and a second lang: predicate is not an OR the daemon can express. Keep one lang: value.",
+            values: { value },
+          });
+          continue;
+        }
+        singleValuedSeen.add(operator.name);
+        predicate.value = tag;
+        break;
+      }
       case "size": {
         const parsedSize = parseSize(value);
         if (parsedSize.error) { errors.push({ raw: token.raw, message: parsedSize.error, values: { value } }); continue; }
@@ -357,11 +479,11 @@ export function parseSearchQuery(source: string): ParsedSearchQuery {
         break;
       }
     }
-    if (negated && predicate.operator === "mtime") {
-      errors.push({ raw: token.raw, message: "-mtime: cannot be expressed: a hit carries no modification time, so this browser cannot exclude it.", values: {} });
-      continue;
+    if (negated) {
+      const inexpressible = NEGATED_PREDICATE_LIMITS[predicate.operator];
+      if (inexpressible) { errors.push({ raw: token.raw, message: inexpressible, values: { value } }); continue; }
+      predicate.overLoadedResults = true;
     }
-    if (negated) predicate.overLoadedResults = true;
     predicates.push(predicate);
   }
   return { source, predicates, freeTokens, freeText: freeTokens.join(" "), errors };
@@ -409,6 +531,15 @@ export function searchPlan(parsed: ParsedSearchQuery): SearchPlan {
         else { predicate.overLoadedResults = true; overLoadedResults.push(predicate); }
         break;
       }
+      case "suffix":
+        filters.suffix = predicate.value;
+        break;
+      case "protection":
+        filters.protection_mode = predicate.value;
+        break;
+      case "lang":
+        filters.language = predicate.value;
+        break;
       case "dup": {
         duplicateRequested = true;
         if (predicate.value === "no") { predicate.overLoadedResults = true; duplicateClientSide = true; overLoadedResults.push(predicate); }
@@ -471,7 +602,7 @@ export function rewriteSearchText(parsed: ParsedSearchQuery, index: number, next
 
 /** The token the operator autocomplete should complete, if any. */
 export type SearchCompletionContext = {
-  kind: "operator" | "tag" | "none";
+  kind: "operator" | "tag" | "protection" | "none";
   /** The already typed text that a picked suggestion replaces. */
   prefix: string;
   replaceStart: number;
@@ -489,6 +620,10 @@ export function searchCompletionContext(source: string, caret: number): SearchCo
     return { kind: "operator", prefix: token, replaceStart: start, replaceEnd: caret };
   }
   if (parts.name === "tag" && token.toLowerCase().startsWith("tag:")) return { kind: "tag", prefix: parts.value, replaceStart: start, replaceEnd: caret };
+  // The protection modes are the one operator whose values this browser knows
+  // without asking the daemon: a closed vocabulary, not a guess. A negated
+  // protection: predicate is refused, so only the positive form completes.
+  if (parts.name === "protection" && token.toLowerCase().startsWith("protection:")) return { kind: "protection", prefix: parts.value, replaceStart: start, replaceEnd: caret };
   return { kind: "none", prefix: "", replaceStart: caret, replaceEnd: caret };
 }
 
@@ -509,4 +644,9 @@ export function completedOperatorToken(prefix: string, operator: SearchOperatorI
 /** The completed token for a picked tag suggestion. */
 export function completedTagToken(value: string): string {
   return `tag:${/\s/.test(value) ? `"${value}"` : value}`;
+}
+
+/** The completed token for a picked protection-mode suggestion. */
+export function completedProtectionToken(value: string): string {
+  return `protection:${value}`;
 }

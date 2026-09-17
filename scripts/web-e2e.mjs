@@ -27,6 +27,7 @@ import { assertSelectionReport } from "./e2e/report.mjs";
 import { assertStatusSurface } from "./e2e/status.mjs";
 import { assertVerificationSurface } from "./e2e/verification.mjs";
 import { assertActivitySurface } from "./e2e/activity.mjs";
+import { assertDescriptionAction } from "./e2e/description.mjs";
 
 const phase = process.argv[2] ?? "online";
 const url = process.env.RESTOREWEAVE_WEB_E2E_URL ?? "http://127.0.0.1:5174/";
@@ -104,4 +105,5 @@ async function assertOnline(ctx) {
   await assertSelectionReport(ctx);
   await assertVerificationSurface(ctx);
   await assertActivitySurface(ctx);
+  await assertDescriptionAction(ctx);
 }

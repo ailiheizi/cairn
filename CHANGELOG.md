@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- The search field now reaches every filter `search.query` records: `suffix:EXT`
+  writes the daemon's recorded suffix, `protection:MODE` writes the protection
+  mode against the daemon's closed vocabulary, and `lang:CODE` writes the
+  recorded language. A second predicate for any of those three is refused with
+  the reason, since the daemon compares one value per entry and neither an
+  impossible AND nor an OR it cannot express is sent; a value outside the
+  protection vocabulary is a visible error that runs no query; a negated
+  suffix, protection, or language predicate is reported as inexpressible; and
+  the autocomplete offers the protection modes, the only value set this browser
+  actually knows.
+- The details inspector offers one explicit "Generate a description" action in
+  the existing Notes section, and it is honest about what this build can do: the
+  daemon defines only `description.list/get/create` and `create` stores a
+  caller-supplied body without running a provider, so there is no
+  `DESCRIBE_SUBJECT` operation to call. The action therefore stays disabled and
+  names every unmet gate on its own described-by reason list — the missing
+  provider profile, the missing credential reference, and the absent daemon
+  capability — and it sends no request at all, even with a provider profile and
+  credential configured. It never runs on selection, on ingest, or in the
+  background. Model-produced text the daemon does return stays one durable
+  revision rendered exactly once in the single Notes list with its source label,
+  revision, and non-accepted state.
 - The workspace rail is reachable on a phone. Below the 640px boundary the
   topbar shows one workspace button that opens the same rail element and the
   same trusted status panel as a left slide-in panel — not copies: selecting a
