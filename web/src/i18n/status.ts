@@ -137,4 +137,9 @@ export const status: Record<string, string> = {
   "job state unproven": "作业状态尚未证明",
   "capability.list reports no state for this dimension": "capability.list 未报告该维度的状态",
   "doctor.check did not answer: {{message}}": "doctor.check 未应答：{{message}}",
+  "Image index: {{state}}": "图像索引：{{state}}",
+  "image index unproven": "图像索引尚未证明",
+  "Text in images: {{state}}": "图片文字（OCR）：{{state}}",
+  "text-in-image extraction unproven": "图片文字提取尚未证明",
+  "capability.list reports no state for this component": "capability.list 未报告该组件的状态",
 };

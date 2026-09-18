@@ -190,6 +190,9 @@ export async function assertViewExportWithVerifyRetry(ctx) {
     let request;
     try { request = response.request().postDataJSON(); } catch { request = undefined; }
     if (request?.operation !== "export.plan") return;
+    // The sidecar policy assertion reads the payload the browser actually sent,
+    // not the rendered drawer.
+    ctx.state.lastExportPlanInput = request.input;
     let body;
     try { body = await response.json(); } catch { return; }
     if (body?.data?.manifest_id && body?.data?.manifest_digest) ctx.state.lastFrozenManifest = body.data;
@@ -289,4 +292,40 @@ export async function assertDurableSavedViewsAfterReload(ctx) {
   await historyDrawer.getByText(/已根据冻结清单通过导出校验|Export verification passed/, { exact: false }).waitFor({ state: "visible", timeout: 15000 });
   assert.equal(ctx.state.viewExportApplyRequests, historyVerifyApplyCount, "verifying a manifest from history must not call export.apply");
   await historyDrawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+}
+
+// The sidecar policy is a closed vocabulary the daemon implements and verifies.
+// These assertions pin that the browser sends exactly the selected policy, that
+// the empty default is the absent field rather than an empty string, and that a
+// frozen manifest locks the choice.
+export async function assertExportSidecarPolicy(ctx) {
+  const { page, button } = ctx;
+  // This phase may start on any workspace view, so it establishes its own state:
+  // the library listing with one selected subject.
+  await button(/内容库|Library/).click();
+  await page.getByRole("main").getByRole("button", { name: /alpha\.txt/ }).first().click();
+  await button(/^(导出|Export)$/).click();
+  const drawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
+  await drawer.waitFor({ state: "visible", timeout: 10000 });
+  const selector = drawer.getByLabel(/随附文件策略|Sidecar policy/);
+  await selector.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await selector.inputValue(), "", "the default sidecar policy must be the empty (none) value");
+  // Default policy: the field is absent from the payload, not empty.
+  await drawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).fill(`${ctx.exportDestination}-sidecar-default`);
+  await drawer.getByRole("button", { name: /预览冻结导出|Preview frozen export/ }).click();
+  await drawer.getByText(/导出清单已冻结|Export manifest frozen/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
+  assert.ok(ctx.state.lastExportPlanInput, "the default plan payload must have been captured");
+  assert.equal(Object.prototype.hasOwnProperty.call(ctx.state.lastExportPlanInput, "sidecars"), false, `the empty policy must be the absent field: ${JSON.stringify(ctx.state.lastExportPlanInput)}`);
+  assert.equal(await selector.isDisabled(), true, "a frozen manifest must lock the sidecar policy");
+  await drawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+  // Selected policy: the vocabulary reaches the daemon unchanged.
+  await button(/^(导出|Export)$/).click();
+  const second = page.getByRole("dialog", { name: /导出内容|Export content/ });
+  await second.waitFor({ state: "visible", timeout: 10000 });
+  await second.getByLabel(/随附文件策略|Sidecar policy/).selectOption("handoff-v1:manifest-json");
+  await second.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).fill(`${ctx.exportDestination}-sidecar-handoff`);
+  await second.getByRole("button", { name: /预览冻结导出|Preview frozen export/ }).click();
+  await second.getByText(/导出清单已冻结|Export manifest frozen/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(ctx.state.lastExportPlanInput?.sidecars, "handoff-v1:manifest-json", `the selected policy must reach the daemon: ${JSON.stringify(ctx.state.lastExportPlanInput)}`);
+  await second.getByRole("button", { name: /关闭导出|Close export/ }).click();
 }

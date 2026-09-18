@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- The browser surfaces the capabilities this build now has. The trusted status
+  panel reports the image index and the OCR processor as their own discovery
+  facts, read from capability.list with the daemon's own reason, so an installed
+  provider with no built generation and a missing artifact are different states
+  and neither can read as healthy; and the export drawer gained a sidecar policy
+  selector offering exactly the implemented vocabulary, with the frozen manifest
+  locking the choice once it exists. The browser sends the empty policy as an
+  absent field rather than an empty string, and the selected policy reaches the
+  daemon unchanged.
 - The image bundle is installable and reproducible instead of hand-placed.
   `rw image bundle install --archive PATH` admits one Chinese-CLIP bundle from a
   local archive: the archive is transport, every declared asset is re-hashed

@@ -117,7 +117,30 @@ export async function assertStatusSurface(ctx) {
   assert.equal(expandedGroups[2].facts, groupCount(defaults[2].summary), `the not-sourced count must equal the rows it hides: ${JSON.stringify(expandedGroups[2])}`);
   const expandedRows = await factRows(panel);
   assert.deepEqual(expandedRows.filter((row) => row.group === "not-sourced").map((row) => row.fact).sort(), ["counts", "recovery-records"], `the not-sourced group must hold exactly the facts this build cannot source: ${JSON.stringify(expandedRows)}`);
-  assert.equal(expandedRows.filter((row) => row.group === "discovery").length, 3, `the discovery group must hold the lexical, semantic, and doctor facts: ${JSON.stringify(expandedRows)}`);
+  const discoveryIds = expandedRows.filter((row) => row.group === "discovery").map((row) => row.fact).sort();
+  assert.deepEqual(discoveryIds, ["doctor", "index-lexical", "index-multimodal", "index-semantic", "processor-ocr"], `the discovery group must hold the index and provider facts: ${JSON.stringify(expandedRows)}`);
+  const imageRow = expandedRows.find((row) => row.fact === "index-multimodal");
+  const ocrRow = expandedRows.find((row) => row.fact === "processor-ocr");
+  assert.ok(imageRow && ocrRow, `the image and OCR capability rows must render: ${JSON.stringify(expandedRows)}`);
+  for (const row of [imageRow, ocrRow]) {
+    assert.match(row.state, /^(PROVEN|UNKNOWN|DEGRADED|FAILED)$/, `a capability row must carry exactly one state token: ${JSON.stringify(row)}`);
+  }
+  // A capability this build cannot source must never read as healthy: the image
+  // row may only be PROVEN when the daemon reports the dimension READY, and OCR
+  // may only be PROVEN when the daemon reports its processor READY.
+  const capabilityState = async (kind, id) => page.evaluate(async ({ kind, id }) => {
+    const response = await fetch("/api/v1/command", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "capability.list", input: {} }),
+    });
+    const body = await response.json();
+    const entry = (body?.data?.capabilities ?? []).find((item) => item?.kind === kind && item?.id === id);
+    return entry ? String(entry.state ?? "") : "";
+  }, { kind, id });
+  const imageState = await capabilityState("index-dimension", "multimodal-clip");
+  assert.equal(imageRow.state === "PROVEN", imageState === "READY", `the image row must only read PROVEN when the daemon reports READY: ${JSON.stringify({ imageRow, imageState })}`);
+  const ocrState = await capabilityState("processor", "ocr.image.text.v1");
+  assert.equal(ocrRow.state === "PROVEN", ocrState === "READY", `the OCR row must only read PROVEN when the daemon reports READY: ${JSON.stringify({ ocrRow, ocrState })}`);
 
   // 1. The surface reports the daemon's own facts, and nothing but the four
   // state strings carries health.

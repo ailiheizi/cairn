@@ -64,6 +64,12 @@ export type StatusPanelProps = {
 
 const RANK: Record<FactState, number> = { FAILED: 0, DEGRADED: 1, UNKNOWN: 2, PROVEN: 3 };
 const SEMANTIC_DIMENSION = "semantic-embedding";
+// The image dimension composes its artifact state and its generation state into
+// one capability state, and OCR is a processor capability rather than an index,
+// so both are read from capability.list directly instead of the per-workspace
+// index projection the lexical and semantic rows use.
+const MULTIMODAL_DIMENSION = "multimodal-clip";
+const OCR_CAPABILITY = "ocr.image.text.v1";
 const LEXICAL_DIMENSION = "lexical-metadata-fts";
 
 // The headline's own set. These are the protection and recovery facts whose
@@ -310,6 +316,20 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
     serviceDown, checking, unreachable, notAnsweredYet,
   });
   record("index-semantic", semantic[0], t("semantic index unproven"), semantic[1], discovery);
+  const image = capabilityFact(t, {
+    kind: "index-dimension",
+    id: MULTIMODAL_DIMENSION,
+    label: (state) => t("Image index: {{state}}", { state }),
+    capabilities, serviceDown, checking, unreachable, notAnsweredYet,
+  });
+  record("index-multimodal", image[0], t("image index unproven"), image[1], discovery);
+  const ocr = capabilityFact(t, {
+    kind: "processor",
+    id: OCR_CAPABILITY,
+    label: (state) => t("Text in images: {{state}}", { state }),
+    capabilities, serviceDown, checking, unreachable, notAnsweredYet,
+  });
+  record("processor-ocr", ocr[0], t("text-in-image extraction unproven"), ocr[1], discovery);
 
   // 15. Portable recovery records: recovery.export runs one at a time and no
   // operation lists past runs, so this browser cannot claim a count.
@@ -326,6 +346,21 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
   }
 
   return facts;
+}
+
+// capabilityFact reports a component whose own capability state is the whole
+// truth: an installed-but-not-yet-built artifact and a missing artifact are
+// different states, and the notes carry the daemon's reason for either.
+function capabilityFact(t: Translator, { kind, id, label, capabilities, serviceDown, checking, unreachable, notAnsweredYet }: { kind: string; id: string; label: (state: string) => string; capabilities: any[]; serviceDown: boolean; checking: boolean; unreachable: string; notAnsweredYet: string }): FactValue {
+  if (serviceDown) return ["UNKNOWN", checking ? notAnsweredYet : unreachable];
+  const entry = capabilities.find((item) => item?.kind === kind && item?.id === id);
+  if (!entry) return ["UNKNOWN", `${label("NOT_REPORTED")} · ${t("capability.list reports no state for this component")}`];
+  const state = String(entry.state ?? "");
+  const reason = String(entry.notes ?? "").trim();
+  const detail = reason ? `${label(state)} · ${reason}` : label(state);
+  if (state === "READY" || state === "AVAILABLE") return ["PROVEN", detail];
+  if (state === "NOT_BUILT") return ["UNKNOWN", detail];
+  return ["DEGRADED", detail];
 }
 
 function capabilityState(capabilities: any[], id: string) {

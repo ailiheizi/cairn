@@ -19,6 +19,8 @@ export type ExportFlow = {
   setViewName: (value: string) => void;
   exportView: any;
   exportDestination: string;
+  exportSidecars: string;
+  changeExportSidecars: (value: string) => void;
   exportManifest: ExportManifestData | undefined;
   exportManifestSource: ExportManifestSource;
   exportResult: any;
@@ -84,6 +86,10 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   const [exportViewName, setExportViewName] = useState("");
   const [exportView, setExportView] = useState<any>();
   const [exportDestination, setExportDestination] = useState("");
+  // The daemon implements one sidecar policy besides the empty default. The
+  // selector offers exactly that vocabulary; a daemon that moves ahead surfaces
+  // its own invalid_input rather than a silent no-op.
+  const [exportSidecars, setExportSidecars] = useState("");
   const [exportManifest, setExportManifest] = useState<ExportManifestData>();
   const [exportResult, setExportResult] = useState<any>();
   const [exportAction, setExportAction] = useState<ExportActionState>("IDLE");
@@ -187,8 +193,8 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       // by the daemon with a numeric suffix, and an unusable member is
       // surfaced with the daemon's own message.
       const input = exportMode === "selected"
-        ? { subjects: exportRefs, output_name: exportSelection.length === 1 ? exportSelection[0].name : undefined, target: exportDestination.trim(), representation: "exact" }
-        : { view_id: exportView.view_id, target: exportDestination.trim(), representation: "exact" };
+        ? { subjects: exportRefs, output_name: exportSelection.length === 1 ? exportSelection[0].name : undefined, target: exportDestination.trim(), representation: "exact", sidecars: exportSidecars || undefined }
+        : { view_id: exportView.view_id, target: exportDestination.trim(), representation: "exact", sidecars: exportSidecars || undefined };
       const response = await command(operations.export.plan, input);
       if (exportRequestRef.current !== request) return;
       setExportManifest(response.data as ExportManifestData);
@@ -359,6 +365,8 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     setViewName: setExportViewName,
     exportView,
     exportDestination,
+    exportSidecars,
+    changeExportSidecars: setExportSidecars,
     exportManifest,
     exportManifestSource,
     exportResult,
