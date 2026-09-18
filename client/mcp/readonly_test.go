@@ -98,6 +98,17 @@ var frozenAdmitted = map[string]bool{
 	command.OpAnnotationTagApply:    false,
 	command.OpSearchRebuild:         false,
 	command.OpSemanticBundleInstall: false,
+	// The online provider profile install writes into the models root, so it is
+	// not admitted to the read-only surface either.
+	command.OpSemanticProviderInstall: false,
+	// semantic.provider.list is read-only but not admitted to this four-tool
+	// surface.
+	command.OpSemanticProviderList: false,
+	// Egress grant mutations are lifecycle operations and are never reachable
+	// from this surface; the read-only grant list is not admitted either.
+	command.OpEgressGrantCreate: false,
+	command.OpEgressGrantRevoke: false,
+	command.OpEgressGrantList:   false,
 	// The image bundle install writes into the models root, so it is not admitted
 	// to the read-only surface either.
 	command.OpImageBundleInstall: false,

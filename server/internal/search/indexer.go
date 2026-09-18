@@ -900,6 +900,23 @@ func (idx *Indexer) SemanticFailure() string {
 	return failure
 }
 
+// SemanticFailureReason returns the stable egress reason of the latest
+// semantic failure, if any. It is empty when the failure is not an egress
+// refusal; a stored diagnostic is classified, never guessed.
+func (idx *Indexer) SemanticFailureReason() SemanticEgressReason {
+	if idx == nil {
+		return ""
+	}
+	if health, ok := idx.SemanticProvider.(interface {
+		SemanticFailureReason() SemanticEgressReason
+	}); ok {
+		if reason := health.SemanticFailureReason(); reason != "" {
+			return reason
+		}
+	}
+	return SemanticEgressReasonFromText(idx.SemanticFailure())
+}
+
 // semanticGenerationMatchesLatestFeed binds the default semantic broker to
 // the same durable lexical feed that is current after restart. Pinned
 // historical generations remain addressable explicitly; only the implicit
@@ -1238,7 +1255,9 @@ func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRe
 	}
 	results, err := embedSemanticDocumentBatches(ctx, idx.SemanticProvider, manifest, generationID, inputs)
 	if err != nil {
-		return generation, fmt.Errorf("%w: provider: %v", ErrUnavailable, err)
+		// %w preserves the provider's typed egress refusal through the
+		// ErrUnavailable degradation so callers can report its stable reason.
+		return generation, fmt.Errorf("%w: provider: %w", ErrUnavailable, err)
 	}
 	zvecSegments := make([]ZvecSegment, 0, len(results))
 	for _, result := range results {
@@ -1418,7 +1437,7 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 	}
 	results, err := idx.SemanticProvider.Embed(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("%w: provider: %v", ErrUnavailable, err)
+		return nil, fmt.Errorf("%w: provider: %w", ErrUnavailable, err)
 	}
 	if err := validateSemanticEmbeddingResults(request, results); err != nil {
 		return nil, err

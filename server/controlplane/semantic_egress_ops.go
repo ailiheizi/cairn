@@ -34,6 +34,13 @@ const (
 	AuditActionSemanticEgressFailed    = "SEMANTIC_EGRESS_FAILED"
 	auditActorSemanticEgress           = "restoreweaved"
 	auditSourceSemanticEgress          = "semantic.embedding.online"
+
+	// Grant lifecycle events share the same append-only ledger.
+	AuditTargetEgressGrant        = "EGRESS_GRANT"
+	AuditActionEgressGrantCreated = "EGRESS_GRANT_CREATED"
+	AuditActionEgressGrantRevoked = "EGRESS_GRANT_REVOKED"
+	auditActorEgressGrant         = "operator"
+	auditSourceEgressGrant        = "egress.grant"
 )
 
 type semanticEgressAuditSink struct {
@@ -102,41 +109,97 @@ func NewSemanticEgressSubjectPolicy(store *sqlite.Store) search.SemanticEgressSu
 }
 
 // SemanticEgressSubjectAllowed implements search.SemanticEgressSubjectPolicy.
-func (p semanticEgressSubjectPolicy) SemanticEgressSubjectAllowed(ctx context.Context, subjectID string) (bool, search.SemanticEgressReason, string) {
+// It reports the admitted protection class with every allowed subject; the
+// egress grant must also admit that class.
+func (p semanticEgressSubjectPolicy) SemanticEgressSubjectAllowed(ctx context.Context, subjectID string) (bool, string, search.SemanticEgressReason, string) {
 	if p.store == nil {
-		return false, search.EgressReasonSubjectPolicyUnavail, "no catalog is attached; protection cannot be established"
+		return false, "", search.EgressReasonSubjectPolicyUnavail, "no catalog is attached; protection cannot be established"
 	}
 	subjectID = strings.TrimSpace(subjectID)
 	if subjectID == "" {
-		return false, search.EgressReasonSubjectUnknown, "the subject identity is empty"
+		return false, "", search.EgressReasonSubjectUnknown, "the subject identity is empty"
 	}
 	workspaceID, err := semanticEgressWorkspaceID(ctx, p.store)
 	if err != nil {
-		return false, search.EgressReasonSubjectPolicyUnavail, err.Error()
+		return false, "", search.EgressReasonSubjectPolicyUnavail, err.Error()
 	}
 	record, err := p.store.GetProtectionRecordBySubject(ctx, workspaceID, subjectID)
 	if err != nil {
 		if errors.Is(err, sqlite.ErrNotFound) {
-			return false, search.EgressReasonSubjectUnknown,
+			return false, "", search.EgressReasonSubjectUnknown,
 				"the subject has no protection record; unknown or unprotected content is never disclosed"
 		}
-		return false, search.EgressReasonSubjectPolicyUnavail, "reading the subject protection record failed"
+		return false, "", search.EgressReasonSubjectPolicyUnavail, "reading the subject protection record failed"
 	}
 	switch record.Outcome {
-	case sqlite.ProtectionExactProtected, sqlite.ProtectionExactFallback, sqlite.ProtectionExternalReplayable:
-		return true, "", ""
+	case sqlite.ProtectionExactProtected:
+		return true, search.EgressSubjectClassExactProtected, "", ""
+	case sqlite.ProtectionExactFallback:
+		return true, search.EgressSubjectClassExactFallback, "", ""
+	case sqlite.ProtectionExternalReplayable:
+		return true, search.EgressSubjectClassExternalReplayable, "", ""
 	case sqlite.ProtectionLinkOnlyUnprotected:
-		return false, search.EgressReasonSubjectUnprotected,
+		return false, "", search.EgressReasonSubjectUnprotected,
 			"LINK_ONLY_UNPROTECTED content is never sent to a remote embedding provider"
 	case sqlite.ProtectionExplicitlyUnprotected:
-		return false, search.EgressReasonSubjectUnprotected,
+		return false, "", search.EgressReasonSubjectUnprotected,
 			"explicitly unprotected content is never sent to a remote embedding provider"
 	case sqlite.ProtectionBlocked:
-		return false, search.EgressReasonSubjectBlocked, "the subject protection state is BLOCKED"
+		return false, "", search.EgressReasonSubjectBlocked, "the subject protection state is BLOCKED"
 	default:
-		return false, search.EgressReasonSubjectUnknown,
+		return false, "", search.EgressReasonSubjectUnknown,
 			"the subject protection outcome is not admitted for remote disclosure"
 	}
+}
+
+// semanticEgressGrantLookup reads durable grants for the egress gate. It
+// resolves the same default workspace as the receipt ledger and the subject
+// policy, so an admission and its receipt can never disagree about scope.
+type semanticEgressGrantLookup struct {
+	store *sqlite.Store
+}
+
+// NewSemanticEgressGrantLookup returns the catalog-backed grant ledger used by
+// remote providers. It is deliberately read-only: grants are created and
+// revoked only through the typed egress.grant operations.
+func NewSemanticEgressGrantLookup(store *sqlite.Store) search.EgressGrantLookup {
+	return semanticEgressGrantLookup{store: store}
+}
+
+// EgressGrants implements search.EgressGrantLookup. Every matching grant is
+// returned, including revoked and expired rows, so the gate can report the
+// precise refusal reason.
+func (l semanticEgressGrantLookup) EgressGrants(ctx context.Context, query search.EgressGrantQuery) ([]search.EgressGrant, error) {
+	if l.store == nil {
+		return nil, errors.New("egress grant lookup requires an attached catalog")
+	}
+	workspaceID, err := semanticEgressWorkspaceID(ctx, l.store)
+	if err != nil {
+		return nil, err
+	}
+	states, err := l.store.ListEgressGrantStates(ctx, workspaceID, sqlite.EgressGrantMatch{
+		ProfileID:     query.ProfileID,
+		ProfileDigest: query.ProfileDigest,
+		EndpointHost:  query.EndpointHost,
+		ModelID:       query.ModelID,
+		Purpose:       query.Purpose,
+	}, "")
+	if err != nil {
+		return nil, err
+	}
+	grants := make([]search.EgressGrant, 0, len(states))
+	for _, state := range states {
+		grants = append(grants, search.EgressGrant{
+			ID: state.Grant.ID, ProfileID: state.Grant.ProfileID, ProfileDigest: state.Grant.ProfileDigest,
+			EndpointHost: state.Grant.EndpointHost, ModelID: state.Grant.ModelID, Purpose: state.Grant.Purpose,
+			DataClasses:    append([]string(nil), state.Grant.DataClasses...),
+			SubjectClasses: append([]string(nil), state.Grant.SubjectClasses...),
+			MaxRequests:    state.Grant.MaxRequests, MaxBytes: state.Grant.MaxBytes, MaxSeconds: state.Grant.MaxSeconds,
+			ExpiresAt: state.Grant.ExpiresAt, Revoked: state.Revoked,
+			RevocationID: state.RevocationID, RevokedReason: state.RevokedReason,
+		})
+	}
+	return grants, nil
 }
 
 // semanticEgressWorkspaceID resolves the workspace of the current single

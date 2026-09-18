@@ -1657,6 +1657,70 @@ ALTER TABLE export_manifests ADD COLUMN sidecars TEXT NOT NULL DEFAULT '';
 PRAGMA user_version = 24;
 `,
 	},
+	{
+		version: 25,
+		name:    "egress_grants",
+		sql: `
+-- A durable egress grant is the operator's immutable authorization for one
+-- remote provider disclosure scope. Grants are append-only: a grant is
+-- revoked by appending a revocation row, never by editing or deleting the
+-- grant. A grant is live iff expires_at_ns is in the future and no
+-- revocation row exists for it.
+CREATE TABLE egress_grants (
+    grant_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    profile_digest TEXT NOT NULL,
+    endpoint_host TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    purpose TEXT NOT NULL CHECK (purpose IN ('DOCUMENT', 'QUERY')),
+    data_classes_json TEXT NOT NULL CHECK (json_valid(data_classes_json)),
+    subject_classes_json TEXT NOT NULL CHECK (json_valid(subject_classes_json)),
+    max_requests INTEGER NOT NULL CHECK (max_requests > 0),
+    max_bytes INTEGER NOT NULL CHECK (max_bytes > 0),
+    max_seconds INTEGER NOT NULL CHECK (max_seconds > 0),
+    expires_at_ns INTEGER NOT NULL,
+    granted_by TEXT NOT NULL,
+    created_at_ns INTEGER NOT NULL,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+    UNIQUE (workspace_id, grant_id)
+) STRICT;
+
+CREATE TRIGGER egress_grants_no_update
+BEFORE UPDATE ON egress_grants BEGIN
+    SELECT RAISE(ABORT, 'egress grants are immutable; revoke by appending a revocation');
+END;
+
+CREATE TRIGGER egress_grants_no_delete
+BEFORE DELETE ON egress_grants BEGIN
+    SELECT RAISE(ABORT, 'egress grants are immutable');
+END;
+
+CREATE TABLE egress_grant_revocations (
+    revocation_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    grant_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    revoked_by TEXT NOT NULL,
+    revoked_at_ns INTEGER NOT NULL,
+    FOREIGN KEY (workspace_id, grant_id) REFERENCES egress_grants(workspace_id, grant_id) ON DELETE RESTRICT,
+    UNIQUE (workspace_id, revocation_id),
+    UNIQUE (workspace_id, grant_id)
+) STRICT;
+
+CREATE TRIGGER egress_grant_revocations_no_update
+BEFORE UPDATE ON egress_grant_revocations BEGIN
+    SELECT RAISE(ABORT, 'egress grant revocations are immutable');
+END;
+
+CREATE TRIGGER egress_grant_revocations_no_delete
+BEFORE DELETE ON egress_grant_revocations BEGIN
+    SELECT RAISE(ABORT, 'egress grant revocations are immutable');
+END;
+
+PRAGMA user_version = 25;
+`,
+	},
 }
 
 func (s *Store) migrate(ctx context.Context) error {

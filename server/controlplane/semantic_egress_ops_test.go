@@ -67,6 +67,14 @@ func testEgressRecord() search.SemanticEgressRecord {
 		Outcome:                search.SemanticEgressOutcomeSucceeded,
 		StartedAt:              started,
 		CompletedAt:            started.Add(120 * time.Millisecond),
+		GrantID:                "egt_0123456789abcdef0123456789abcdef",
+		DisclosedDataClasses:   []string{search.EgressDataClassTextSegment},
+		CredentialRef:          "env://RW_TEST_ONLINE_KEY",
+		RequestSent:            true,
+		OutputDigest:           "sha256:" + strings.Repeat("7", 64),
+		Truncated:              false,
+		OutputSchemaRef:        search.OnlineEmbeddingOutputSchema,
+		BudgetUsage:            search.EgressBudgetUsage{Requests: 1, Bytes: 256, Seconds: 1},
 	}
 }
 
@@ -116,6 +124,16 @@ func TestSemanticEgressSinkAppendsDigestOnlyReceipts(t *testing.T) {
 		details.PayloadBytes != record.PayloadBytes || details.ItemCount != record.ItemCount ||
 		details.TextBytes != record.TextBytes || len(details.TextDigests) != 2 {
 		t.Fatalf("receipt digests/counts = %+v", details)
+	}
+	// The grant, class, credential reference, request/output provenance, and
+	// budget consumption are part of the durable receipt.
+	if details.GrantID != record.GrantID ||
+		len(details.DisclosedDataClasses) != 1 || details.DisclosedDataClasses[0] != search.EgressDataClassTextSegment ||
+		details.CredentialRef != record.CredentialRef || !details.RequestSent ||
+		details.OutputDigest != record.OutputDigest || details.Truncated ||
+		details.OutputSchemaRef != search.OnlineEmbeddingOutputSchema ||
+		details.BudgetUsage != record.BudgetUsage {
+		t.Fatalf("receipt provenance fields = %+v", details)
 	}
 	if !details.StartedAt.Equal(record.StartedAt) || !details.CompletedAt.Equal(record.CompletedAt) {
 		t.Fatalf("receipt timestamps = %v .. %v", details.StartedAt, details.CompletedAt)
@@ -188,23 +206,23 @@ func TestSemanticEgressSubjectPolicyFailsClosed(t *testing.T) {
 		SubjectRef: blockedSubject, Mode: sqlite.ProtectionLinkOnly, Outcome: sqlite.ProtectionBlocked,
 	})
 
-	allowed, reason, _ := policy.SemanticEgressSubjectAllowed(ctx, exactSubject)
-	if !allowed || reason != "" {
-		t.Fatalf("EXACT_PROTECTED subject refused: allowed=%v reason=%q", allowed, reason)
+	allowed, class, reason, _ := policy.SemanticEgressSubjectAllowed(ctx, exactSubject)
+	if !allowed || reason != "" || class != search.EgressSubjectClassExactProtected {
+		t.Fatalf("EXACT_PROTECTED subject refused: allowed=%v class=%q reason=%q", allowed, class, reason)
 	}
-	allowed, reason, detail := policy.SemanticEgressSubjectAllowed(ctx, linkOnlySubject)
+	allowed, class, reason, detail := policy.SemanticEgressSubjectAllowed(ctx, linkOnlySubject)
 	if allowed || reason != search.EgressReasonSubjectUnprotected || !strings.Contains(detail, "LINK_ONLY_UNPROTECTED") {
-		t.Fatalf("LINK_ONLY_UNPROTECTED subject = %v/%q/%q", allowed, reason, detail)
+		t.Fatalf("LINK_ONLY_UNPROTECTED subject = %v/%q/%q/%q", allowed, class, reason, detail)
 	}
-	allowed, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, blockedSubject)
+	allowed, _, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, blockedSubject)
 	if allowed || reason != search.EgressReasonSubjectBlocked {
 		t.Fatalf("BLOCKED subject = %v/%q", allowed, reason)
 	}
-	allowed, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, unknownSubject)
+	allowed, _, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, unknownSubject)
 	if allowed || reason != search.EgressReasonSubjectUnknown {
 		t.Fatalf("unknown subject = %v/%q", allowed, reason)
 	}
-	allowed, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, "")
+	allowed, _, reason, _ = policy.SemanticEgressSubjectAllowed(ctx, "")
 	if allowed || reason != search.EgressReasonSubjectUnknown {
 		t.Fatalf("empty subject = %v/%q", allowed, reason)
 	}

@@ -156,16 +156,24 @@ func FuseSucceeded(result FuseResult) bool {
 
 // QueryFailureReason maps one dimension query failure onto a stable
 // machine-readable reason. It never turns a failure into a success code: an
-// unrecognized failure is reported as QUERY_FAILED.
+// unrecognized failure is reported as QUERY_FAILED. An egress refusal keeps
+// its own stable reason so a remote-provider authorization problem is never
+// reported as a generic unavailable index.
 func QueryFailureReason(dimension string, err error) string {
 	if err == nil {
 		return ""
+	}
+	if reason := SemanticEgressReasonOf(err); reason != "" {
+		return string(reason)
 	}
 	message := err.Error()
 	for _, reason := range []string{MultimodalSpaceMismatchReason, MultimodalIndexNotBuiltReason, MultimodalIndexUnavailableReason, QueryTextRequiredReason} {
 		if strings.Contains(message, reason) {
 			return reason
 		}
+	}
+	if egress := SemanticEgressReasonFromText(message); egress != "" {
+		return string(egress)
 	}
 	if errors.Is(err, ErrUnavailable) {
 		if dimension == DimensionMultimodal {

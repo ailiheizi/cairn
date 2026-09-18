@@ -334,6 +334,7 @@ func buildOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedC
 		SendContentWithoutConfirmation: resolved.Config.Semantic.SendContentWithoutConfirmation,
 		AuditSink:                      controlplane.NewSemanticEgressAuditSink(store),
 		SubjectPolicy:                  controlplane.NewSemanticEgressSubjectPolicy(store),
+		Grants:                         controlplane.NewSemanticEgressGrantLookup(store),
 	})
 	if err != nil {
 		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, err
@@ -549,6 +550,21 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 				return controlplane.ImageBundleInstallReceipt{}, err
 			}
 			return controlplane.ImageBundleInstallReceipt{Admission: admission, Destination: destination, Changed: changed}, nil
+		}))
+	// An online provider profile installs from an absolute local path on the
+	// host only: the daemon reads and admits the document itself, and no URL,
+	// browser upload, or network fetch is ever an install source.
+	dispatcherOptions = append(dispatcherOptions, controlplane.WithOnlineProviderInstaller(
+		resolved.Config.Paths.Models,
+		func(installCtx context.Context, modelsRoot, sourcePath, declaredDigest string) (controlplane.OnlineProviderInstallReceipt, error) {
+			receipt, err := search.InstallOnlineEmbeddingProfile(installCtx, modelsRoot, sourcePath, declaredDigest)
+			if err != nil {
+				return controlplane.OnlineProviderInstallReceipt{}, err
+			}
+			return controlplane.OnlineProviderInstallReceipt{
+				Profile: receipt.Profile, Destination: receipt.Destination,
+				Changed: receipt.Changed, AlreadyInstalled: receipt.AlreadyInstalled,
+			}, nil
 		}))
 	if imageOption != nil {
 		dispatcherOptions = append(dispatcherOptions, imageOption)

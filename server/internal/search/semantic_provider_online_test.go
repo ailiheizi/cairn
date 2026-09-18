@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,13 +104,18 @@ func (s *recordingEgressSink) snapshot() []SemanticEgressRecord {
 
 type stubSubjectPolicy struct {
 	allowed map[string]bool
+	class   string
 	reason  SemanticEgressReason
 	detail  string
 }
 
-func (p stubSubjectPolicy) SemanticEgressSubjectAllowed(_ context.Context, subjectID string) (bool, SemanticEgressReason, string) {
+func (p stubSubjectPolicy) SemanticEgressSubjectAllowed(_ context.Context, subjectID string) (bool, string, SemanticEgressReason, string) {
 	if p.allowed[subjectID] {
-		return true, "", ""
+		class := p.class
+		if class == "" {
+			class = EgressSubjectClassExactProtected
+		}
+		return true, class, "", ""
 	}
 	reason := p.reason
 	if reason == "" {
@@ -119,15 +125,96 @@ func (p stubSubjectPolicy) SemanticEgressSubjectAllowed(_ context.Context, subje
 	if detail == "" {
 		detail = "subject is not admitted"
 	}
-	return false, reason, detail
+	return false, "", reason, detail
+}
+
+// stubGrantLookup is the in-process grant ledger double. It returns exactly
+// the grants a test seeds; no network or catalog is involved.
+type stubGrantLookup struct {
+	mu     sync.Mutex
+	grants []EgressGrant
+	err    error
+	calls  int
+}
+
+func (l *stubGrantLookup) EgressGrants(_ context.Context, _ EgressGrantQuery) ([]EgressGrant, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.calls++
+	if l.err != nil {
+		return nil, l.err
+	}
+	return append([]EgressGrant(nil), l.grants...), nil
+}
+
+func (l *stubGrantLookup) setGrants(grants ...EgressGrant) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.grants = append([]EgressGrant(nil), grants...)
+}
+
+func (l *stubGrantLookup) callCount() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.calls
 }
 
 // ---- helpers ---------------------------------------------------------------
 
+const testOnlineGrantID = "egt_0123456789abcdef0123456789abcdef"
+
+// testOnlineGrant returns one live grant covering the whole test profile.
+func testOnlineGrant(profile OnlineEmbeddingProfile, now time.Time) EgressGrant {
+	return EgressGrant{
+		ID:            testOnlineGrantID,
+		ProfileID:     profile.ProfileID,
+		ProfileDigest: profile.ProviderProfileDigest(),
+		EndpointHost:  profile.EndpointHost(),
+		ModelID:       profile.ModelID,
+		Purpose:       EgressPurposeDocument,
+		DataClasses:   []string{EgressDataClassTextSegment, EgressDataClassTextQuery},
+		SubjectClasses: []string{
+			EgressSubjectClassExactProtected, EgressSubjectClassExactFallback, EgressSubjectClassExternalReplayable,
+		},
+		MaxRequests: profile.Egress.Budgets.MaxRequests,
+		MaxBytes:    profile.Egress.Budgets.MaxBytes,
+		MaxSeconds:  profile.Egress.Budgets.MaxSeconds,
+		ExpiresAt:   now.Add(time.Hour),
+	}
+}
+
+// testOnlineEgressScope declares a complete, strict egress scope for one test
+// endpoint. Every test that builds a profile must carry one: a profile without
+// an admitted egress scope is refused.
+func testOnlineEgressScope(t *testing.T, endpoint string) OnlineEgressScope {
+	t.Helper()
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Host == "" {
+		t.Fatalf("test endpoint %q has no host: %v", endpoint, err)
+	}
+	return OnlineEgressScope{
+		DestinationHost:       parsed.Host,
+		DisclosedDataClasses:  []string{EgressDataClassTextSegment, EgressDataClassTextQuery},
+		AllowedSubjectClasses: EgressSubjectClasses(),
+		Minimization: OnlineEgressMinimization{
+			Statement: "only the model id, input text, encoding format, and declared instruction are transmitted",
+			Fields:    expectedOnlineEgressRequestFields("", false),
+		},
+		Budgets:       EgressBudget{MaxRequests: 8, MaxBytes: 1 << 20, MaxSeconds: 120},
+		Expiry:        time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
+		RevocationRef: "env://RW_TEST_REVOKED_ONLINE",
+		PolicyRefs: OnlineEgressPolicyRefs{
+			Residency: "loopback-stub", Logging: "stub", Retention: "none",
+			TrainingUse: "none", OutputUse: "operator-only",
+		},
+		AuditRequired: true,
+	}
+}
+
 func testOnlineProfile(t *testing.T, endpoint string) OnlineEmbeddingProfile {
 	t.Helper()
 	profile := OnlineEmbeddingProfile{
-		Schema:               OnlineEmbeddingProfileSchemaV1,
+		Schema:               OnlineEmbeddingProfileSchemaV2,
 		ProfileID:            "stub-online-v1",
 		Provider:             "stub",
 		APIStyle:             OnlineEmbeddingAPIStyleOpenAI,
@@ -146,6 +233,7 @@ func testOnlineProfile(t *testing.T, endpoint string) OnlineEmbeddingProfile {
 		TimeoutMS:            5000,
 		RetentionDeclaration: "loopback stub; no retention",
 		TrainingUse:          "none",
+		Egress:               testOnlineEgressScope(t, endpoint),
 	}
 	if err := profile.Validate(); err != nil {
 		t.Fatalf("test profile must be valid: %v", err)
@@ -165,14 +253,18 @@ func testOnlineManifest(t *testing.T, profile OnlineEmbeddingProfile) EmbeddingG
 type testOnlineOptions struct {
 	options OnlineEmbeddingProviderOptions
 	sink    *recordingEgressSink
+	grants  *stubGrantLookup
 }
 
 func testOnlineProviderOptions(t *testing.T, profile OnlineEmbeddingProfile) testOnlineOptions {
 	t.Helper()
 	manifest := testOnlineManifest(t, profile)
 	sink := &recordingEgressSink{}
+	grants := &stubGrantLookup{}
+	grants.setGrants(testOnlineGrant(profile, time.Now().UTC()))
 	return testOnlineOptions{
-		sink: sink,
+		sink:   sink,
+		grants: grants,
 		options: OnlineEmbeddingProviderOptions{
 			Mode:          "online",
 			Profile:       profile,
@@ -187,6 +279,7 @@ func testOnlineProviderOptions(t *testing.T, profile OnlineEmbeddingProfile) tes
 			SendContentWithoutConfirmation: true,
 			AuditSink:                      sink,
 			SubjectPolicy:                  stubSubjectPolicy{allowed: map[string]bool{"subj_1": true}},
+			Grants:                         grants,
 		},
 	}
 }
@@ -216,6 +309,14 @@ func onlineDocumentRequest(manifest EmbeddingGenerationManifest, texts ...string
 
 func assertEgressRefused(t *testing.T, err error, stub *onlineStub, sink *recordingEgressSink, want SemanticEgressReason) {
 	t.Helper()
+	assertEgressRefusedWithReceipts(t, err, stub, sink, want, 0)
+}
+
+// assertEgressRefusedWithReceipts additionally checks receipt accounting. A
+// refusal after the grant check is recorded with RequestSent=false; a refusal
+// before it is not a disclosure attempt and records nothing.
+func assertEgressRefusedWithReceipts(t *testing.T, err error, stub *onlineStub, sink *recordingEgressSink, want SemanticEgressReason, wantReceipts int) {
+	t.Helper()
 	if err == nil {
 		t.Fatalf("expected a typed refusal with reason %s, got nil", want)
 	}
@@ -228,8 +329,17 @@ func assertEgressRefused(t *testing.T, err error, stub *onlineStub, sink *record
 	if stub.callCount() != 0 {
 		t.Fatalf("refused egress still made %d network call(s)", stub.callCount())
 	}
-	if records := sink.snapshot(); len(records) != 0 {
-		t.Fatalf("refused egress recorded %d receipts, want 0", len(records))
+	records := sink.snapshot()
+	if len(records) != wantReceipts {
+		t.Fatalf("refused egress recorded %d receipts, want %d", len(records), wantReceipts)
+	}
+	for _, record := range records {
+		if record.RequestSent {
+			t.Fatalf("a refused attempt claimed a request was sent: %+v", record)
+		}
+		if record.Outcome != SemanticEgressOutcomeFailed || record.Reason != want {
+			t.Fatalf("refusal receipt = %+v, want FAILED with %s", record, want)
+		}
 	}
 }
 
@@ -295,12 +405,18 @@ func TestOnlineProviderRefusesWithoutConfirmation(t *testing.T) {
 	provider := mustTestOnlineProvider(t, built.options)
 	request := onlineDocumentRequest(built.options.Manifest, "sensitive text")
 	err := onlineEmbedErr(t, provider, context.Background(), request)
-	assertEgressRefused(t, err, stub, built.sink, EgressReasonConfirmationRequired)
+	// The live grant exists, so the refusal is exactly the missing
+	// per-request confirmation and is recorded as a non-sent attempt.
+	assertEgressRefusedWithReceipts(t, err, stub, built.sink, EgressReasonConfirmationRequired, 1)
 	if !strings.Contains(err.Error(), "send_content_without_confirmation") {
 		t.Fatalf("refusal must name the failed condition: %v", err)
 	}
 	if !strings.Contains(provider.SemanticFailure(), string(EgressReasonConfirmationRequired)) {
 		t.Fatalf("provider failure summary = %q, want the confirmation reason", provider.SemanticFailure())
+	}
+	record := built.sink.snapshot()[0]
+	if record.GrantID != testOnlineGrantID || record.RequestSent {
+		t.Fatalf("a refused attempt must name its live grant and never claim a sent request: %+v", record)
 	}
 }
 
@@ -313,18 +429,29 @@ func TestOnlineProviderRefusesConfirmationForDifferentContent(t *testing.T) {
 	request := onlineDocumentRequest(built.options.Manifest, "sensitive text")
 	confirmation := SemanticEgressConfirmation{
 		ProviderProfileID: profile.ProfileID, Endpoint: profile.Endpoint, ModelID: profile.ModelID,
-		Purpose: SemanticEmbeddingDocument, ContentDigest: SemanticEgressContentDigest([]SemanticTextInput{
+		Purpose: SemanticEmbeddingDocument, GrantID: testOnlineGrantID,
+		ContentDigest: SemanticEgressContentDigest([]SemanticTextInput{
 			{SubjectID: "subj_1", SegmentID: "seg_1", Text: "different text"},
 		}),
 	}
 	ctx := WithSemanticEgressConfirmation(context.Background(), confirmation)
-	assertEgressRefused(t, onlineEmbedErr(t, provider, ctx, request), stub, built.sink, EgressReasonConfirmationMismatch)
+	assertEgressRefusedWithReceipts(t, onlineEmbedErr(t, provider, ctx, request), stub, built.sink, EgressReasonConfirmationMismatch, 1)
 
 	// A confirmation for another endpoint is also refused.
 	confirmation.ContentDigest = SemanticEgressContentDigest(request.Inputs)
 	confirmation.Endpoint = "https://elsewhere.invalid/v1/embeddings"
 	ctx = WithSemanticEgressConfirmation(context.Background(), confirmation)
-	assertEgressRefused(t, onlineEmbedErr(t, provider, ctx, request), stub, built.sink, EgressReasonConfirmationMismatch)
+	assertEgressRefusedWithReceipts(t, onlineEmbedErr(t, provider, ctx, request), stub, built.sink, EgressReasonConfirmationMismatch, 2)
+
+	// A confirmation naming a different grant is refused even when everything
+	// else matches.
+	wrongGrant := SemanticEgressConfirmation{
+		ProviderProfileID: profile.ProfileID, EndpointHost: profile.EndpointHost(), ModelID: profile.ModelID,
+		Purpose: SemanticEmbeddingDocument, ContentDigest: SemanticEgressContentDigest(request.Inputs),
+		GrantID: "egt_ffffffffffffffffffffffffffffffff",
+	}
+	ctx = WithSemanticEgressConfirmation(context.Background(), wrongGrant)
+	assertEgressRefusedWithReceipts(t, onlineEmbedErr(t, provider, ctx, request), stub, built.sink, EgressReasonConfirmationMismatch, 3)
 }
 
 func TestOnlineProviderAcceptsBoundPerRequestConfirmation(t *testing.T) {
@@ -335,8 +462,9 @@ func TestOnlineProviderAcceptsBoundPerRequestConfirmation(t *testing.T) {
 	provider := mustTestOnlineProvider(t, built.options)
 	request := onlineDocumentRequest(built.options.Manifest, "confirmed disclosure")
 	ctx := WithSemanticEgressConfirmation(context.Background(), SemanticEgressConfirmation{
-		ProviderProfileID: profile.ProfileID, Endpoint: profile.Endpoint, ModelID: profile.ModelID,
-		Purpose: SemanticEmbeddingDocument, ContentDigest: SemanticEgressContentDigest(request.Inputs),
+		ProfileDigest: profile.ProviderProfileDigest(), EndpointHost: profile.EndpointHost(),
+		ModelID: profile.ModelID, Purpose: SemanticEmbeddingDocument, GrantID: testOnlineGrantID,
+		ContentDigest: SemanticEgressContentDigest(request.Inputs),
 	})
 	if _, err := provider.Embed(ctx, request); err != nil {
 		t.Fatalf("confirmed request refused: %v", err)
@@ -347,6 +475,9 @@ func TestOnlineProviderAcceptsBoundPerRequestConfirmation(t *testing.T) {
 	records := built.sink.snapshot()
 	if len(records) != 1 || records[0].Authorization != SemanticEgressAuthorizationRequest {
 		t.Fatalf("receipts = %+v, want one PER_REQUEST_CONFIRMATION receipt", records)
+	}
+	if records[0].GrantID != testOnlineGrantID {
+		t.Fatalf("receipt grant id = %q, want %q", records[0].GrantID, testOnlineGrantID)
 	}
 }
 

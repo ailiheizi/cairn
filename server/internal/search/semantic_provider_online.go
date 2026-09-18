@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"regexp"
@@ -22,19 +23,26 @@ import (
 //
 // The provider implements the same SemanticEmbeddingProvider contract as the
 // local ONNX worker. It differs in exactly one respect: vectors are produced
-// by a remote service, so every request must pass the egress gate below.
+// by a remote service, so every request must pass the provider-neutral gate in
+// egress_gate.go (AdmitEgress) before any HTTP request exists.
 //
-// Gate conditions, all evaluated in admitOnlineEgress:
+// admission conditions, all evaluated before any HTTP request is built:
 //
 //	(a) semantic.embedding_mode is online or hybrid;
-//	(b) the immutable online profile resolves and is valid;
-//	(c) the host credential reference resolves;
-//	(d) semantic.send_content_without_confirmation is true, or the specific
-//	    request carries an explicit SemanticEgressConfirmation;
-//	(e) every document subject is allowed by the host protection policy
-//	    (LINK_ONLY_UNPROTECTED and every other unprotected or unknown outcome
-//	    is refused);
-//	(f) an append-only audit sink is attached.
+//	(b) the immutable online profile resolves and is valid (it carries the
+//	    egress scope: destination, data classes, subject classes,
+//	    minimization, budgets, expiry, revocation, policy refs, audit);
+//	(c) the host credential reference resolves and the profile's revocation
+//	    reference resolves empty;
+//	(d) the profile has not expired;
+//	(e) every disclosed subject is allowed by the host protection policy and
+//	    carries an admitted protection class;
+//	(f) a durable, live egress grant covers the profile digest, endpoint host,
+//	    model, purpose, data classes, and subject classes;
+//	(g) semantic.send_content_without_confirmation is true, or the specific
+//	    request carries an explicit SemanticEgressConfirmation naming the live
+//	    grant; the config switch skips only the confirmation;
+//	(h) an append-only audit sink is attached when the profile requires it.
 //
 // A refusal is a typed *SemanticEgressRefusedError that names the failed
 // condition, and it is raised before any HTTP request is built. The only code
@@ -73,6 +81,18 @@ const (
 	EgressReasonSpaceUnbound           SemanticEgressReason = "EGRESS_SPACE_UNBOUND"
 	EgressReasonModeInvalid            SemanticEgressReason = "EGRESS_MODE_INVALID"
 	EgressReasonProviderProfileChanged SemanticEgressReason = "EGRESS_PROVIDER_PROFILE_CHANGED"
+
+	// Grant and profile-egress reasons. Every one of these is raised before
+	// any HTTP request exists.
+	EgressReasonGrantMissing          SemanticEgressReason = "EGRESS_GRANT_MISSING"
+	EgressReasonGrantExpired          SemanticEgressReason = "EGRESS_GRANT_EXPIRED"
+	EgressReasonGrantRevoked          SemanticEgressReason = "EGRESS_GRANT_REVOKED"
+	EgressReasonGrantStoreUnavailable SemanticEgressReason = "EGRESS_GRANT_STORE_UNAVAILABLE"
+	EgressReasonProfileExpired        SemanticEgressReason = "EGRESS_PROFILE_EXPIRED"
+	EgressReasonProfileRevoked        SemanticEgressReason = "EGRESS_PROFILE_REVOKED"
+	EgressReasonBudgetExceeded        SemanticEgressReason = "EGRESS_BUDGET_EXCEEDED"
+	EgressReasonDataClassDenied       SemanticEgressReason = "EGRESS_DATA_CLASS_DENIED"
+	EgressReasonSubjectClassDenied    SemanticEgressReason = "EGRESS_SUBJECT_CLASS_DENIED"
 )
 
 // Egress outcome vocabulary for the append-only receipt.
@@ -99,6 +119,10 @@ type SemanticEgressRefusedError struct {
 	Reason    SemanticEgressReason
 	Condition string
 	Detail    string
+	// GrantID is the live grant this refusal applies to when the refusal
+	// happened at or after the grant check. It is empty for a refusal raised
+	// before any grant applied: those are not disclosure attempts.
+	GrantID string
 }
 
 func (e *SemanticEgressRefusedError) Error() string {
@@ -127,6 +151,14 @@ func (e *SemanticEgressRefusedError) EgressReason() SemanticEgressReason {
 	return e.Reason
 }
 
+// EgressGrantID implements the grant carrier used by SemanticEgressGrantIDOf.
+func (e *SemanticEgressRefusedError) EgressGrantID() string {
+	if e == nil {
+		return ""
+	}
+	return strings.TrimSpace(e.GrantID)
+}
+
 // semanticEgressReasonCarrier is implemented by every typed error that names
 // one stable egress reason.
 type semanticEgressReasonCarrier interface {
@@ -142,20 +174,118 @@ func SemanticEgressReasonOf(err error) SemanticEgressReason {
 	return ""
 }
 
+// AllSemanticEgressReasons returns every stable egress reason code in
+// deterministic order. It is the vocabulary operator views and query
+// projections classify against.
+func AllSemanticEgressReasons() []SemanticEgressReason {
+	return []SemanticEgressReason{
+		EgressReasonModeNotOnline,
+		EgressReasonProfileUnresolved,
+		EgressReasonCredentialUnresolved,
+		EgressReasonConfirmationRequired,
+		EgressReasonConfirmationMismatch,
+		EgressReasonSubjectPolicyUnavail,
+		EgressReasonSubjectUnknown,
+		EgressReasonSubjectUnprotected,
+		EgressReasonSubjectBlocked,
+		EgressReasonAuditUnavailable,
+		EgressReasonProviderUnreachable,
+		EgressReasonProviderTimeout,
+		EgressReasonProviderQuota,
+		EgressReasonProviderRejected,
+		EgressReasonProviderError,
+		EgressReasonProviderRedirect,
+		EgressReasonResponseMalformed,
+		EgressReasonDimensionMismatch,
+		EgressReasonSpaceMismatch,
+		EgressReasonInvalidVector,
+		EgressReasonRequestInvalid,
+		EgressReasonReceiptUnrecorded,
+		EgressReasonSpaceUnbound,
+		EgressReasonModeInvalid,
+		EgressReasonProviderProfileChanged,
+		EgressReasonGrantMissing,
+		EgressReasonGrantExpired,
+		EgressReasonGrantRevoked,
+		EgressReasonGrantStoreUnavailable,
+		EgressReasonProfileExpired,
+		EgressReasonProfileRevoked,
+		EgressReasonBudgetExceeded,
+		EgressReasonDataClassDenied,
+		EgressReasonSubjectClassDenied,
+	}
+}
+
+// IsSemanticEgressReason reports whether a stable reason string is part of the
+// egress vocabulary.
+func IsSemanticEgressReason(value string) bool {
+	for _, reason := range AllSemanticEgressReasons() {
+		if string(reason) == value {
+			return true
+		}
+	}
+	return false
+}
+
+// SemanticEgressReasonFromText extracts the first admitted egress reason code
+// occurring in a diagnostic message. It exists so a stored failure summary
+// stays machine-classifiable; it never invents a reason for unrelated text.
+func SemanticEgressReasonFromText(message string) SemanticEgressReason {
+	for _, reason := range AllSemanticEgressReasons() {
+		if strings.Contains(message, string(reason)) {
+			return reason
+		}
+	}
+	return ""
+}
+
 func refusedEgress(reason SemanticEgressReason, condition, detail string) error {
 	return &SemanticEgressRefusedError{Reason: reason, Condition: condition, Detail: detail}
 }
 
+// refusedEgressForGrant is a refusal raised at or after the grant check: it
+// names the live grant the operator must inspect, and it is recorded as a
+// non-sent disclosure attempt.
+func refusedEgressForGrant(reason SemanticEgressReason, condition, detail, grantID string) error {
+	return &SemanticEgressRefusedError{Reason: reason, Condition: condition, Detail: detail, GrantID: strings.TrimSpace(grantID)}
+}
+
+// semanticEgressGrantCarrier is implemented by a refusal that names the live
+// grant it applied to.
+type semanticEgressGrantCarrier interface {
+	EgressGrantID() string
+}
+
+// SemanticEgressGrantIDOf returns the live grant id of a refusal that reached
+// the grant check, or empty for a refusal raised before any grant applied.
+func SemanticEgressGrantIDOf(err error) string {
+	var carrier semanticEgressGrantCarrier
+	if errors.As(err, &carrier) {
+		return carrier.EgressGrantID()
+	}
+	return ""
+}
+
 // SemanticEgressConfirmation is one explicit, per-request authorization to
-// disclose exactly one embedding request. It binds the provider profile,
-// endpoint, model id, purpose, and the content digest of the request inputs,
-// so a confirmation for one disclosure cannot authorize another.
+// disclose exactly one disclosure run. It binds the provider profile,
+// endpoint, model, purpose, the live grant that authorized it, and (when the
+// caller knows it) the content digest of the request inputs, so a confirmation
+// for one disclosure cannot authorize another.
+//
+// A confirmation must name the provider (id or digest), the destination (URL
+// or host), the model, the purpose, and the grant; those bindings are required
+// and checked by the gate. ContentDigest is optional for daemon-assembled
+// content (search.query and search.rebuild know the exact inputs); when it is
+// present it must match.
 type SemanticEgressConfirmation struct {
 	ProviderProfileID string
+	ProfileDigest     string
 	Endpoint          string
+	EndpointHost      string
 	ModelID           string
 	Purpose           SemanticEmbeddingPurpose
 	ContentDigest     string
+	GrantID           string
 	ConfirmedAt       time.Time
 	ExpiresAt         time.Time
 }
@@ -205,9 +335,9 @@ func writeLengthPrefixed(w io.Writer, payload []byte) {
 }
 
 // SemanticEgressRecord is the append-only receipt for one attempted remote
-// embedding request. It deliberately has no payload field: it records
-// digests, byte counts, identities, authorizations, timestamps, and the
-// outcome classification, never the text that was sent.
+// egress. It deliberately has no payload field: it records digests, byte
+// counts, identities, authorizations, budget consumption, timestamps, and the
+// outcome classification, never the text that was sent and never a secret.
 type SemanticEgressRecord struct {
 	ProviderProfile        string               `json:"provider_profile"`
 	ProviderProfileDigest  string               `json:"provider_profile_digest"`
@@ -238,6 +368,29 @@ type SemanticEgressRecord struct {
 	ProviderErrorClass     string               `json:"provider_error_class,omitempty"`
 	StartedAt              time.Time            `json:"started_at"`
 	CompletedAt            time.Time            `json:"completed_at"`
+	// GrantID is the durable grant that authorized this disclosure. It is
+	// empty only for a receipt of an attempt refused before a grant applied.
+	GrantID string `json:"grant_id,omitempty"`
+	// DisclosedDataClasses names the closed data classes this attempt carried.
+	DisclosedDataClasses []string `json:"disclosed_data_classes,omitempty"`
+	// CredentialRef is the redacted credential reference (a location, never a
+	// secret). The plaintext credential is never recorded.
+	CredentialRef string `json:"credential_ref,omitempty"`
+	// RequestSent distinguishes "no request was sent" from a transport
+	// attempt. A refusal recorded before the HTTP request is built has
+	// RequestSent=false.
+	RequestSent bool `json:"request_sent"`
+	// OutputDigest is the canonical digest of the decoded vectors. It is empty
+	// when no response was decoded.
+	OutputDigest string `json:"output_digest,omitempty"`
+	// Truncated reports whether any input was truncated before transmission.
+	// The current OpenAI-compatible profile never truncates locally; provider
+	// side truncation is a declared policy reference, not an observable fact.
+	Truncated bool `json:"truncated"`
+	// OutputSchemaRef names the admitted response schema.
+	OutputSchemaRef string `json:"output_schema_ref,omitempty"`
+	// BudgetUsage is the run's consumption after this attempt.
+	BudgetUsage EgressBudgetUsage `json:"budget_usage"`
 }
 
 // SemanticEgressAuditSink appends one receipt per attempted egress. The host
@@ -249,9 +402,12 @@ type SemanticEgressAuditSink interface {
 
 // SemanticEgressSubjectPolicy is the host-owned protection authority. It must
 // fail closed: an unknown subject, an unavailable catalog, or any unprotected
-// outcome reports allowed=false with a stable reason.
+// outcome reports allowed=false with a stable reason. When a subject is
+// allowed it must name the admitted protection class from the closed
+// EgressSubjectClasses vocabulary; a policy that cannot classify a subject
+// refuses it.
 type SemanticEgressSubjectPolicy interface {
-	SemanticEgressSubjectAllowed(ctx context.Context, subjectID string) (allowed bool, reason SemanticEgressReason, detail string)
+	SemanticEgressSubjectAllowed(ctx context.Context, subjectID string) (allowed bool, class string, reason SemanticEgressReason, detail string)
 }
 
 // OnlineEmbeddingProviderOptions constructs one online provider.
@@ -276,6 +432,10 @@ type OnlineEmbeddingProviderOptions struct {
 	// SubjectPolicy resolves per-subject protection. It is required for
 	// document embedding; a nil policy refuses every disclosure.
 	SubjectPolicy SemanticEgressSubjectPolicy
+	// Grants is the durable, append-only egress grant ledger. It is required:
+	// a provider without a grant ledger refuses every disclosure with
+	// EGRESS_GRANT_MISSING.
+	Grants EgressGrantLookup
 	// HTTPClient is optional; tests inject one. The default refuses redirects
 	// and uses the profile timeout.
 	HTTPClient *http.Client
@@ -295,6 +455,7 @@ type OnlineEmbeddingProvider struct {
 	sendWithout    bool
 	audit          SemanticEgressAuditSink
 	subjects       SemanticEgressSubjectPolicy
+	grants         EgressGrantLookup
 	client         *http.Client
 	now            func() time.Time
 
@@ -360,6 +521,7 @@ func NewOnlineEmbeddingProvider(options OnlineEmbeddingProviderOptions) (*Online
 		mode:           mode, credentialRef: options.CredentialRef, resolver: resolver,
 		sendWithout: options.SendContentWithoutConfirmation,
 		audit:       options.AuditSink, subjects: options.SubjectPolicy,
+		grants: options.Grants,
 		client: client, now: now,
 	}, nil
 }
@@ -391,8 +553,8 @@ func (p *OnlineEmbeddingProvider) Profile() OnlineEmbeddingProfile {
 }
 
 // SemanticReady reports whether the provider's static gate prerequisites are
-// satisfied. Per-request confirmation and per-subject protection are still
-// evaluated on every request.
+// satisfied. Grant liveness, per-request confirmation, and per-subject
+// protection are still evaluated on every request.
 func (p *OnlineEmbeddingProvider) SemanticReady() bool {
 	if p == nil {
 		return false
@@ -400,7 +562,7 @@ func (p *OnlineEmbeddingProvider) SemanticReady() bool {
 	if p.mode != "online" && p.mode != "hybrid" {
 		return false
 	}
-	if p.profile.Validate() != nil || p.audit == nil || p.subjects == nil {
+	if p.profile.Validate() != nil || p.audit == nil || p.subjects == nil || p.grants == nil {
 		return false
 	}
 	if _, err := OnlineCredentialRefScheme(p.credentialRef); err != nil {
@@ -410,15 +572,20 @@ func (p *OnlineEmbeddingProvider) SemanticReady() bool {
 }
 
 // CheckEgressReadiness reports why this provider cannot egress right now,
-// without reading any secret: it validates the mode, profile, credential
-// reference form, audit sink, and subject policy. It never performs a network
-// call.
+// without reading any secret: it validates the mode, profile (including
+// expiry), credential reference form, audit sink, subject policy, and grant
+// ledger. It never performs a network call and never checks a specific grant,
+// because that is a per-request decision.
 func (p *OnlineEmbeddingProvider) CheckEgressReadiness(_ context.Context) error {
 	if p == nil {
 		return refusedEgress(EgressReasonModeNotOnline, "embedding_mode", "online provider is not configured")
 	}
 	if p.mode != "online" && p.mode != "hybrid" {
 		return refusedEgress(EgressReasonModeNotOnline, "embedding_mode", "embedding mode is not online or hybrid")
+	}
+	if p.profile.Egress.Expired(p.now()) {
+		return refusedEgress(EgressReasonProfileExpired, "egress.expiry",
+			"the online profile has expired")
 	}
 	if err := p.profile.Validate(); err != nil {
 		return refusedEgress(EgressReasonProfileUnresolved, "online_profile", err.Error())
@@ -433,6 +600,10 @@ func (p *OnlineEmbeddingProvider) CheckEgressReadiness(_ context.Context) error 
 	if p.subjects == nil {
 		return refusedEgress(EgressReasonSubjectPolicyUnavail, "protection",
 			"no subject protection policy is attached; document disclosure cannot be authorized")
+	}
+	if p.grants == nil {
+		return refusedEgress(EgressReasonGrantMissing, "egress_grant",
+			"no durable egress grant ledger is attached; remote disclosure requires a live grant")
 	}
 	return nil
 }
@@ -473,8 +644,9 @@ func (p *OnlineEmbeddingProvider) clearFailure() {
 }
 
 // Embed implements SemanticEmbeddingProvider. Every batch passes the same
-// gate; a failure in any batch is reported with its stable reason and nothing
-// falls back to another space.
+// gate against one run budget; a failure in any batch is reported with its
+// stable reason and nothing falls back to another space. A budget exhaustion
+// is a typed refusal for the whole call, never a partial result.
 func (p *OnlineEmbeddingProvider) Embed(ctx context.Context, request SemanticEmbeddingRequest) ([]SemanticVector, error) {
 	if p == nil {
 		return nil, refusedEgress(EgressReasonModeNotOnline, "embedding_mode", "online provider is not configured")
@@ -494,6 +666,7 @@ func (p *OnlineEmbeddingProvider) Embed(ctx context.Context, request SemanticEmb
 		batchSize = len(request.Inputs)
 	}
 	requestDigest := SemanticEgressContentDigest(request.Inputs)
+	run := NewEgressRunBudget(p.now())
 	results := make([]SemanticVector, 0, len(request.Inputs))
 	batchCount := (len(request.Inputs) + batchSize - 1) / batchSize
 	for start := 0; start < len(request.Inputs); start += batchSize {
@@ -502,7 +675,7 @@ func (p *OnlineEmbeddingProvider) Embed(ctx context.Context, request SemanticEmb
 			end = len(request.Inputs)
 		}
 		batchIndex := start/batchSize + 1
-		vectors, err := p.embedBatch(ctx, request.Purpose, request.GenerationID, requestDigest, batchIndex, batchCount, request.Inputs[start:end])
+		vectors, err := p.embedBatch(ctx, run, request.Purpose, request.GenerationID, requestDigest, batchIndex, batchCount, request.Inputs[start:end])
 		if err != nil {
 			return nil, err
 		}
@@ -545,6 +718,7 @@ func onlineProviderErrorClass(response onlineEmbeddingResponseBody) string {
 
 func (p *OnlineEmbeddingProvider) embedBatch(
 	ctx context.Context,
+	run *EgressRunBudget,
 	purpose SemanticEmbeddingPurpose,
 	generationID, requestDigest string,
 	batchIndex, batchCount int,
@@ -554,20 +728,28 @@ func (p *OnlineEmbeddingProvider) embedBatch(
 	if err != nil {
 		return nil, refusedEgress(EgressReasonRequestInvalid, "request", err.Error())
 	}
-	permit, credential, err := p.admitOnlineEgress(ctx, purpose, batch, requestDigest, body)
+	permit, credential, err := p.admitOnlineEgress(ctx, run, purpose, batch, requestDigest, body)
 	if err != nil {
+		// A refusal after the grant check is recorded as an attempt that never
+		// sent a request; a refusal before it is not a disclosure attempt at
+		// all. Either way the refusal is typed and visible.
+		if refusedAfterGrantCheck(err) {
+			p.recordRefusedAttempt(ctx, permit, purpose, generationID, requestDigest, batch, run, err)
+		}
 		p.recordFailure(fmt.Sprintf("online provider refused (batch %d/%d): %v", batchIndex, batchCount, err), SemanticEgressReasonOf(err))
 		return nil, err
 	}
 	started := p.now().UTC()
 	response, meta, callErr := p.performPermittedEgress(ctx, permit, body, credential)
 	completed := p.now().UTC()
+	run.Record(permit.payloadBytes)
 
 	var (
-		vectors    []SemanticVector
-		failReason SemanticEgressReason
-		failDetail string
-		errorClass string
+		vectors      []SemanticVector
+		failReason   SemanticEgressReason
+		failDetail   string
+		errorClass   string
+		outputDigest string
 	)
 	if callErr != nil {
 		reason := SemanticEgressReasonOf(callErr)
@@ -582,11 +764,16 @@ func (p *OnlineEmbeddingProvider) embedBatch(
 		}
 	} else {
 		vectors, failReason, failDetail, errorClass = p.decodeOnlineEmbeddingResponse(purpose, batch, response)
+		if failReason == "" {
+			outputDigest = SemanticEgressOutputDigest(vectors)
+		}
 	}
 
 	// Exactly one append-only receipt per attempted egress: the receipt
-	// records what was sent by digest and byte count plus the outcome.
-	record := p.egressRecord(permit, purpose, generationID, batch, requestDigest, meta, started, completed, failReason, errorClass)
+	// records what was sent by digest and byte count plus the outcome, the
+	// authorizing grant, the credential reference (redacted), and the run's
+	// budget consumption.
+	record := p.egressRecord(permit, purpose, generationID, batch, requestDigest, meta, started, completed, failReason, errorClass, outputDigest, true, run.Usage(completed))
 	receiptErr := p.recordEgressReceipt(ctx, record)
 
 	switch {
@@ -603,14 +790,47 @@ func (p *OnlineEmbeddingProvider) embedBatch(
 	return vectors, nil
 }
 
-// egressPermit is produced only by admitOnlineEgress and binds the exact
-// request bytes it authorizes. performPermittedEgress refuses a permit whose
-// payload digest does not match the body it was handed.
+// refusedAfterGrantCheck reports whether a refusal happened at or after the
+// grant check. Those attempts name the live grant they applied to and are
+// recorded; earlier refusals (mode, profile, credential, revocation, expiry,
+// missing/expired/revoked grant, subject classification) are not disclosure
+// attempts and must not appear as attempts.
+func refusedAfterGrantCheck(err error) bool {
+	return SemanticEgressGrantIDOf(err) != ""
+}
+
+// recordRefusedAttempt appends the receipt for a refusal that happened after
+// the grant check but before any HTTP request was built. The receipt carries
+// RequestSent=false, so it never claims a request was sent.
+func (p *OnlineEmbeddingProvider) recordRefusedAttempt(
+	ctx context.Context,
+	permit egressPermit,
+	purpose SemanticEmbeddingPurpose,
+	generationID, requestDigest string,
+	batch []SemanticTextInput,
+	run *EgressRunBudget,
+	refusal error,
+) {
+	permit.grantID = SemanticEgressGrantIDOf(refusal)
+	now := p.now().UTC()
+	record := p.egressRecord(permit, purpose, generationID, batch, requestDigest, onlineHTTPMeta{}, now, now,
+		SemanticEgressReasonOf(refusal), "", "", false, run.Usage(now))
+	if err := p.recordEgressReceipt(ctx, record); err != nil {
+		p.recordFailure("online provider refused and its refusal receipt could not be recorded: "+err.Error(), EgressReasonReceiptUnrecorded)
+	}
+}
+
+// egressPermit binds the exact request bytes an admission authorized.
+// performPermittedEgress refuses a permit whose payload digest does not match
+// the body it was handed.
 type egressPermit struct {
 	profileID     string
 	spaceID       string
 	purpose       SemanticEmbeddingPurpose
 	authorization string
+	grantID       string
+	dataClasses   []string
+	credentialRef string
 	requestDigest string
 	payloadDigest string
 	payloadBytes  int64
@@ -619,11 +839,34 @@ type egressPermit struct {
 	textDigests   []string
 }
 
-// admitOnlineEgress is the single gate. Every condition is evaluated here,
-// before any HTTP request exists, and the returned permit is the only way to
-// reach the network call.
+// newPermit builds the request binding for one batch. It is used both for the
+// admitted attempt and for a refusal receipt, so the two can never disagree
+// about what was about to be sent.
+func (p *OnlineEmbeddingProvider) newPermit(purpose SemanticEmbeddingPurpose, requestDigest string, body []byte, admission *EgressAdmission) egressPermit {
+	permit := egressPermit{
+		profileID:     p.profile.ProfileID,
+		spaceID:       p.profile.Fingerprint().SpaceID(),
+		purpose:       purpose,
+		requestDigest: requestDigest,
+		payloadDigest: sha256Digest(body),
+		payloadBytes:  int64(len(body)),
+	}
+	if admission != nil {
+		permit.authorization = admission.Authorization
+		permit.grantID = admission.GrantID
+		permit.dataClasses = append([]string(nil), admission.DataClasses...)
+		permit.credentialRef = admission.CredentialRef
+	}
+	return permit
+}
+
+// admitOnlineEgress is the single provider-side admission path. It classifies
+// subjects against host protection policy, then delegates the decision to the
+// provider-neutral gate (AdmitEgress) and admits the request against the run's
+// budget. The returned permit is the only way to reach the network call.
 func (p *OnlineEmbeddingProvider) admitOnlineEgress(
 	ctx context.Context,
+	run *EgressRunBudget,
 	purpose SemanticEmbeddingPurpose,
 	batch []SemanticTextInput,
 	requestDigest string,
@@ -634,40 +877,29 @@ func (p *OnlineEmbeddingProvider) admitOnlineEgress(
 		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonModeNotOnline, "embedding_mode",
 			fmt.Sprintf("content is not sent in embedding_mode %q", p.mode))
 	}
-	// (b) immutable profile
+	// (b) profile validity, with expiry reported as its own stable reason
+	if p.profile.Egress.Expired(p.now()) {
+		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonProfileExpired, "egress.expiry",
+			fmt.Sprintf("the online profile expired at %s", p.profile.Egress.Expiry))
+	}
 	if err := p.profile.Validate(); err != nil {
 		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonProfileUnresolved, "online_profile", err.Error())
 	}
-	// (c) credential
-	if _, err := OnlineCredentialRefScheme(p.credentialRef); err != nil {
-		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonCredentialUnresolved, "online_credential_ref", err.Error())
+	// (c) protection: unprotected or unknown subjects are never disclosed, and
+	// an allowed subject must carry an admitted protection class.
+	//
+	// The request binding is built before the gate so a refusal after the
+	// grant check can be recorded with exactly what was about to be sent.
+	refused := p.newPermit(purpose, requestDigest, body, nil)
+	refused.itemCount = len(batch)
+	for _, input := range batch {
+		refused.textBytes += int64(len(input.Text))
+		refused.textDigests = append(refused.textDigests, sha256Digest([]byte(input.Text)))
 	}
-	credential, err := p.resolver.Resolve(ctx, p.credentialRef)
-	if err != nil {
-		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonCredentialUnresolved, "online_credential_ref", err.Error())
-	}
-	if credential.IsZero() {
-		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonCredentialUnresolved, "online_credential_ref",
-			"the resolved credential is empty")
-	}
-	// (d) authorization: the config switch or an explicit per-request
-	// confirmation bound to exactly this disclosure.
-	authorization := SemanticEgressAuthorizationConfig
-	if !p.sendWithout {
-		confirmation, ok := SemanticEgressConfirmationFrom(ctx)
-		if !ok {
-			return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonConfirmationRequired, "send_content_without_confirmation",
-				"semantic.send_content_without_confirmation is false and the request carries no per-request confirmation")
-		}
-		if mismatch := p.confirmationMismatch(confirmation, purpose, requestDigest); mismatch != "" {
-			return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonConfirmationMismatch, "confirmation", mismatch)
-		}
-		authorization = SemanticEgressAuthorizationRequest
-	}
-	// (e) protection: unprotected or unknown subjects are never disclosed.
+	var outcomes []EgressSubjectOutcome
 	if purpose == SemanticEmbeddingDocument {
 		if p.subjects == nil {
-			return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonSubjectPolicyUnavail, "protection",
+			return refused, OnlineCredential{}, refusedEgress(EgressReasonSubjectPolicyUnavail, "protection",
 				"no subject protection policy is attached")
 		}
 		checked := map[string]struct{}{}
@@ -677,55 +909,73 @@ func (p *OnlineEmbeddingProvider) admitOnlineEgress(
 				continue
 			}
 			checked[subject] = struct{}{}
-			allowed, reason, detail := p.subjects.SemanticEgressSubjectAllowed(ctx, subject)
+			allowed, class, reason, detail := p.subjects.SemanticEgressSubjectAllowed(ctx, subject)
 			if !allowed {
 				if reason == "" {
 					reason = EgressReasonSubjectUnknown
 				}
-				return egressPermit{}, OnlineCredential{}, refusedEgress(reason, "protection", detail)
+				return refused, OnlineCredential{}, refusedEgress(reason, "protection", detail)
 			}
+			if !ValidEgressSubjectClass(class) {
+				return refused, OnlineCredential{}, refusedEgress(EgressReasonSubjectClassDenied, "protection",
+					fmt.Sprintf("the protection policy returned unknown subject class %q", class))
+			}
+			outcomes = append(outcomes, EgressSubjectOutcome{SubjectID: subject, Class: class})
 		}
 	}
-	// (f) receipt channel
+	// (d) the provider-neutral gate: credential, revocation, expiry, live
+	// grant, class coverage, confirmation, and audit requirements.
+	var confirmation *SemanticEgressConfirmation
+	if attached, ok := SemanticEgressConfirmationFrom(ctx); ok {
+		confirmation = &attached
+	}
+	admission, credential, err := AdmitEgress(ctx, EgressGateRequest{
+		ProviderKind:            p.mode,
+		ProfileID:               p.profile.ProfileID,
+		ProfileDigest:           p.profile.ProviderProfileDigest(),
+		Endpoint:                p.profile.Endpoint,
+		EndpointHost:            p.profile.EndpointHost(),
+		ModelID:                 p.profile.ModelID,
+		Purpose:                 string(purpose),
+		DataClasses:             []string{EgressDataClassForPurpose(string(purpose))},
+		SubjectOutcomes:         outcomes,
+		CredentialRef:           p.credentialRef,
+		ContentDigest:           requestDigest,
+		ProfileEgress:           p.profile.Egress,
+		ProfileBudget:           p.profile.Egress.Budgets,
+		SendWithoutConfirmation: p.sendWithout,
+		AuditRequired:           p.profile.Egress.AuditRequired,
+		AuditAttached:           p.audit != nil,
+		Confirmation:            confirmation,
+		Now:                     p.now(),
+	}, EgressGateDeps{Credential: p.resolver, Grants: p.grants})
+	if err != nil {
+		return refused, OnlineCredential{}, err
+	}
+	// One receipt per attempt is mandatory even when the profile does not
+	// require audit: an unrecordable disclosure is refused rather than sent
+	// with no evidence. The profile's audit_required flag is the stricter
+	// declared policy, checked by the gate.
 	if p.audit == nil {
-		return egressPermit{}, OnlineCredential{}, refusedEgress(EgressReasonAuditUnavailable, "audit_ledger",
-			"no append-only egress ledger is attached")
+		return refused, OnlineCredential{}, refusedEgressForGrant(EgressReasonAuditUnavailable, "audit_ledger",
+			"no append-only egress ledger is attached; the disclosure cannot be recorded", admission.GrantID)
 	}
-	payloadDigest := sha256Digest(body)
-	permit := egressPermit{
-		profileID:     p.profile.ProfileID,
-		spaceID:       p.profile.Fingerprint().SpaceID(),
-		purpose:       purpose,
-		authorization: authorization,
-		requestDigest: requestDigest,
-		payloadDigest: payloadDigest,
-		payloadBytes:  int64(len(body)),
-		itemCount:     len(batch),
-	}
-	for _, input := range batch {
-		permit.textBytes += int64(len(input.Text))
-		permit.textDigests = append(permit.textDigests, sha256Digest([]byte(input.Text)))
+	// (e) run budget: requests, bytes, and wall-clock deadline. Exhaustion is
+	// a typed refusal for the whole call, never a partial success.
+	permit := p.newPermit(purpose, requestDigest, body, &admission)
+	permit.itemCount = refused.itemCount
+	permit.textBytes = refused.textBytes
+	permit.textDigests = refused.textDigests
+	if err := run.Admit(p.now(), permit.payloadBytes, admission.Budget); err != nil {
+		var refused *SemanticEgressRefusedError
+		detail := ""
+		if errors.As(err, &refused) {
+			detail = refused.Detail
+		}
+		return permit, OnlineCredential{}, refusedEgressForGrant(
+			SemanticEgressReasonOf(err), "egress_budget", detail, admission.GrantID)
 	}
 	return permit, credential, nil
-}
-
-func (p *OnlineEmbeddingProvider) confirmationMismatch(confirmation SemanticEgressConfirmation, purpose SemanticEmbeddingPurpose, requestDigest string) string {
-	switch {
-	case strings.TrimSpace(confirmation.ProviderProfileID) != p.profile.ProfileID:
-		return "the confirmation names a different provider profile"
-	case strings.TrimSpace(confirmation.Endpoint) != p.profile.Endpoint:
-		return "the confirmation names a different endpoint"
-	case strings.TrimSpace(confirmation.ModelID) != p.profile.ModelID:
-		return "the confirmation names a different model"
-	case confirmation.Purpose != purpose:
-		return "the confirmation names a different embedding purpose"
-	case strings.TrimSpace(confirmation.ContentDigest) != requestDigest:
-		return "the confirmation does not match the content digest of this request"
-	case !confirmation.ExpiresAt.IsZero() && !confirmation.ExpiresAt.After(p.now()):
-		return "the confirmation has expired"
-	default:
-		return ""
-	}
 }
 
 type onlineEmbeddingRequestBody struct {
@@ -953,9 +1203,28 @@ func (p *OnlineEmbeddingProvider) decodeOnlineEmbeddingResponse(
 	return vectors, "", "", ""
 }
 
+// SemanticEgressOutputDigest is the canonical digest of one decoded remote
+// embedding output. It covers the ordered subject, segment, and float32 vector
+// bits; it never covers provider text and cannot be confused with an input
+// digest.
+func SemanticEgressOutputDigest(results []SemanticVector) string {
+	h := sha256.New()
+	writeLengthPrefixed(h, []byte("restoreweave.semantic-egress-output.v1"))
+	var lane [4]byte
+	for _, result := range results {
+		writeLengthPrefixed(h, []byte(result.SubjectID))
+		writeLengthPrefixed(h, []byte(result.SegmentID))
+		for _, value := range result.Vector {
+			binary.LittleEndian.PutUint32(lane[:], math.Float32bits(value))
+			_, _ = h.Write(lane[:])
+		}
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil))
+}
+
 // egressRecord builds the append-only receipt. It copies only digests,
-// counts, identities, and classifications; the request text and the response
-// body are not referenced.
+// counts, identities, classifications, and budget consumption; the request
+// text, the response body, and the credential value are never referenced.
 func (p *OnlineEmbeddingProvider) egressRecord(
 	permit egressPermit,
 	purpose SemanticEmbeddingPurpose,
@@ -966,6 +1235,9 @@ func (p *OnlineEmbeddingProvider) egressRecord(
 	started, completed time.Time,
 	failReason SemanticEgressReason,
 	errorClass string,
+	outputDigest string,
+	requestSent bool,
+	budgetUsage EgressBudgetUsage,
 ) SemanticEgressRecord {
 	outcome := SemanticEgressOutcomeSucceeded
 	if failReason != "" {
@@ -1002,6 +1274,14 @@ func (p *OnlineEmbeddingProvider) egressRecord(
 		ProviderErrorClass:     errorClass,
 		StartedAt:              started,
 		CompletedAt:            completed,
+		GrantID:                permit.grantID,
+		DisclosedDataClasses:   append([]string(nil), permit.dataClasses...),
+		CredentialRef:          permit.credentialRef,
+		RequestSent:            requestSent,
+		OutputDigest:           outputDigest,
+		Truncated:              false,
+		OutputSchemaRef:        OnlineEmbeddingOutputSchema,
+		BudgetUsage:            budgetUsage,
 	}
 }
 

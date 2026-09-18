@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -40,8 +41,15 @@ var onlineInstructionFieldPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 // reinterprets previously stored vectors.
 
 const (
-	// OnlineEmbeddingProfileSchemaV1 is the only online profile schema
-	// accepted by this package.
+	// OnlineEmbeddingProfileSchemaV2 is the only online profile schema
+	// accepted by this package. It is v2 because the profile now carries the
+	// required egress scope: a v1 document has no disclosed data classes,
+	// budgets, expiry, or revocation identity, so it cannot authorize any
+	// disclosure and is refused by name instead of being read as malformed.
+	OnlineEmbeddingProfileSchemaV2 = "restoreweave.online-embedding-profile.v2"
+
+	// OnlineEmbeddingProfileSchemaV1 is the superseded schema. It is kept so
+	// the refusal can name the exact version an operator installed.
 	OnlineEmbeddingProfileSchemaV1 = "restoreweave.online-embedding-profile.v1"
 
 	// OnlineEmbeddingProfileDirName and OnlineEmbeddingProfileFileName are the
@@ -143,6 +151,11 @@ type OnlineEmbeddingProfile struct {
 	// visible as a declaration, never assumed benign.
 	RetentionDeclaration string `json:"retention_declaration"`
 	TrainingUse          string `json:"training_use"`
+	// Egress is the immutable egress declaration. It is part of the profile
+	// document, so ProviderProfileDigest covers it and a stored grant or
+	// receipt can never be reinterpreted by editing one egress fact in place.
+	// A profile without a valid egress scope is not admitted.
+	Egress OnlineEgressScope `json:"egress"`
 }
 
 // OnlineSpaceFingerprint is the tuple that defines a retrieval space. Two
@@ -234,7 +247,7 @@ func (p OnlineEmbeddingProfile) Fingerprint() OnlineSpaceFingerprint {
 // facts even when the space tuple is unchanged.
 func (p OnlineEmbeddingProfile) ProviderProfileDigest() string {
 	payload, _ := json.Marshal(p)
-	h := sha256.Sum256(append([]byte("restoreweave.online-embedding-profile.v1\n"), payload...))
+	h := sha256.Sum256(append([]byte(OnlineEmbeddingProfileSchemaV2+"\n"), payload...))
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 
@@ -292,8 +305,20 @@ func (p OnlineEmbeddingProfile) EmbeddingGenerationManifest(configDigest string)
 // Validate rejects an incomplete or unsafe profile before it can describe a
 // production space. Empty values are not meaningful defaults.
 func (p OnlineEmbeddingProfile) Validate() error {
-	if p.Schema != OnlineEmbeddingProfileSchemaV1 {
-		return fmt.Errorf("%w: schema must be %q", ErrInvalidOnlineEmbeddingProfile, OnlineEmbeddingProfileSchemaV1)
+	return p.ValidateAt(time.Now().UTC())
+}
+
+// ValidateAt is Validate against one explicit instant. Expiry is a profile
+// fact, so admitting a past-expiry profile is refused; a profile that expires
+// while a daemon runs is refused per request by the egress gate with the
+// dedicated EGRESS_PROFILE_EXPIRED reason.
+func (p OnlineEmbeddingProfile) ValidateAt(now time.Time) error {
+	if p.Schema == OnlineEmbeddingProfileSchemaV1 {
+		return fmt.Errorf("%w: profile schema %q carries no egress scope and is not admitted; install a %q profile",
+			ErrInvalidOnlineEmbeddingProfile, OnlineEmbeddingProfileSchemaV1, OnlineEmbeddingProfileSchemaV2)
+	}
+	if p.Schema != OnlineEmbeddingProfileSchemaV2 {
+		return fmt.Errorf("%w: schema must be %q", ErrInvalidOnlineEmbeddingProfile, OnlineEmbeddingProfileSchemaV2)
 	}
 	if err := validateOnlineProfileID("profile_id", p.ProfileID); err != nil {
 		return err
@@ -379,6 +404,12 @@ func (p OnlineEmbeddingProfile) Validate() error {
 		return err
 	}
 	if err := validateOnlineProfileToken("training_use", p.TrainingUse, 64); err != nil {
+		return err
+	}
+	// The egress scope is part of the immutable profile: a document that does
+	// not declare exactly where content may go, what classes may go there, how
+	// much, until when, and how it can be revoked is not admitted at all.
+	if err := p.Egress.ValidateFor(p.Endpoint, p.InstructionField, p.SendDimensions, now); err != nil {
 		return err
 	}
 	return nil

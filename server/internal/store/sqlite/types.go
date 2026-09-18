@@ -42,6 +42,8 @@ const (
 	IDPrefixRecoveryReference = "rrf"
 	IDPrefixExternalBinding   = "sbd"
 	IDPrefixExternalLocator   = "elc"
+	IDPrefixEgressGrant       = "egt"
+	IDPrefixEgressRevocation  = "egr"
 	// Compatibility aliases for callers that use the requirements vocabulary.
 	IDPrefixProtection    = IDPrefixProtectionRecord
 	IDPrefixRecovery      = IDPrefixRecoveryReference

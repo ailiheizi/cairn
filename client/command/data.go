@@ -953,6 +953,138 @@ type SemanticBundleInstallData struct {
 	RestartRequired bool   `json:"restart_required"`
 }
 
+// SemanticProviderInstallInput installs one online provider profile from an
+// absolute local path on the host. The daemon reads the file itself: the
+// browser never uploads content and a URL is never an install source.
+type SemanticProviderInstallInput struct {
+	Path          string `json:"path"`
+	ProfileDigest string `json:"profile_digest"`
+}
+
+// SemanticProviderInstallData reports one admitted online provider profile. It
+// is a profile fact, not a readiness claim: no provider, endpoint, grant, or
+// generation is activated by installing, and the daemon must restart before
+// the profile can be selected.
+type SemanticProviderInstallData struct {
+	ProfileID             string   `json:"profile_id"`
+	Provider              string   `json:"provider"`
+	APIStyle              string   `json:"api_style"`
+	EndpointHost          string   `json:"endpoint_host"`
+	ModelID               string   `json:"model_id"`
+	ModelRevision         string   `json:"model_revision"`
+	Dimension             int      `json:"dimension"`
+	SpaceDigest           string   `json:"space_digest"`
+	ProfileDigest         string   `json:"profile_digest"`
+	Destination           string   `json:"destination"`
+	Expiry                string   `json:"expiry"`
+	DisclosedDataClasses  []string `json:"disclosed_data_classes"`
+	AllowedSubjectClasses []string `json:"allowed_subject_classes"`
+	Changed               bool     `json:"changed"`
+	AlreadyInstalled      bool     `json:"already_installed"`
+	RestartRequired       bool     `json:"restart_required"`
+}
+
+// SemanticProviderListInput is intentionally empty: the daemon lists the
+// profiles installed under its own configured models root.
+type SemanticProviderListInput struct{}
+
+// SemanticProviderProfileData is one installed online provider profile as the
+// daemon reads it from disk. It never contains credential material.
+type SemanticProviderProfileData struct {
+	ProfileID             string   `json:"profile_id"`
+	Provider              string   `json:"provider"`
+	APIStyle              string   `json:"api_style"`
+	EndpointHost          string   `json:"endpoint_host"`
+	ModelID               string   `json:"model_id"`
+	ModelRevision         string   `json:"model_revision"`
+	Dimension             int      `json:"dimension"`
+	SpaceDigest           string   `json:"space_digest"`
+	ProfileDigest         string   `json:"profile_digest"`
+	Destination           string   `json:"destination"`
+	Expiry                string   `json:"expiry"`
+	DisclosedDataClasses  []string `json:"disclosed_data_classes"`
+	AllowedSubjectClasses []string `json:"allowed_subject_classes"`
+	MaxRequests           int64    `json:"max_requests"`
+	MaxBytes              int64    `json:"max_bytes"`
+	MaxSeconds            int64    `json:"max_seconds"`
+	AuditRequired         bool     `json:"audit_required"`
+	Expired               bool     `json:"expired"`
+}
+
+type SemanticProviderListData struct {
+	ModelsRoot string                        `json:"models_root"`
+	Profiles   []SemanticProviderProfileData `json:"profiles"`
+}
+
+// EgressGrantCreateInput creates one immutable egress grant. The profile,
+// endpoint host, and model must match an installed online provider profile,
+// the expiry must be in the future, and every class must be part of its
+// closed vocabulary.
+type EgressGrantCreateInput struct {
+	WorkspaceID    string   `json:"workspace_id,omitempty"`
+	ProfileID      string   `json:"profile_id"`
+	ProfileDigest  string   `json:"profile_digest"`
+	EndpointHost   string   `json:"endpoint_host"`
+	ModelID        string   `json:"model_id"`
+	Purpose        string   `json:"purpose"`
+	DataClasses    []string `json:"data_classes"`
+	SubjectClasses []string `json:"subject_classes"`
+	MaxRequests    int64    `json:"max_requests"`
+	MaxBytes       int64    `json:"max_bytes"`
+	MaxSeconds     int64    `json:"max_seconds"`
+	ExpiresAt      string   `json:"expires_at"`
+	GrantedBy      string   `json:"granted_by,omitempty"`
+}
+
+type EgressGrantListInput struct {
+	WorkspaceID string `json:"workspace_id,omitempty"`
+}
+
+type EgressGrantRevokeInput struct {
+	WorkspaceID string `json:"workspace_id,omitempty"`
+	GrantID     string `json:"grant_id"`
+	Reason      string `json:"reason"`
+	RevokedBy   string `json:"revoked_by,omitempty"`
+}
+
+// EgressGrantData is one durable grant exactly as recorded, together with its
+// derived liveness and revocation evidence.
+type EgressGrantData struct {
+	GrantID        string   `json:"grant_id"`
+	WorkspaceID    string   `json:"workspace_id"`
+	ProfileID      string   `json:"profile_id"`
+	ProfileDigest  string   `json:"profile_digest"`
+	EndpointHost   string   `json:"endpoint_host"`
+	ModelID        string   `json:"model_id"`
+	Purpose        string   `json:"purpose"`
+	DataClasses    []string `json:"data_classes"`
+	SubjectClasses []string `json:"subject_classes"`
+	MaxRequests    int64    `json:"max_requests"`
+	MaxBytes       int64    `json:"max_bytes"`
+	MaxSeconds     int64    `json:"max_seconds"`
+	ExpiresAt      string   `json:"expires_at"`
+	GrantedBy      string   `json:"granted_by"`
+	CreatedAt      string   `json:"created_at"`
+	Live           bool     `json:"live"`
+	Revoked        bool     `json:"revoked"`
+	RevocationID   string   `json:"revocation_id,omitempty"`
+	RevokedReason  string   `json:"revoked_reason,omitempty"`
+	RevokedAt      string   `json:"revoked_at,omitempty"`
+}
+
+type EgressGrantListData struct {
+	Grants []EgressGrantData `json:"grants"`
+}
+
+type EgressGrantRevokeData struct {
+	GrantID      string `json:"grant_id"`
+	RevocationID string `json:"revocation_id"`
+	RevokedBy    string `json:"revoked_by"`
+	RevokedAt    string `json:"revoked_at"`
+	Reason       string `json:"reason"`
+	Live         bool   `json:"live"`
+}
+
 // SearchCoverageData is the public projection of measured lexical field
 // coverage. It describes the generation that was actually built; it is not a
 // claim based on the index schema alone.

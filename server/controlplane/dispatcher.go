@@ -44,6 +44,9 @@ type Dispatcher struct {
 	imageBundleModelsRoot          string
 	imageBundleArchiveInstaller    ImageBundleArchiveInstaller
 	imageBundleInstallMu           sync.Mutex
+	onlineProviderModelsRoot       string
+	onlineProviderInstaller        OnlineProviderProfileInstaller
+	onlineProviderInstallMu        sync.Mutex
 	now                            func() time.Time
 	exact                          *exact.Service
 	search                         *search.Indexer
@@ -128,6 +131,21 @@ type ImageBundleInstallReceipt struct {
 // configured models root. Like its semantic counterpart it is not a general
 // model manager: the callback may only install the admitted image profile there.
 type ImageBundleArchiveInstaller func(context.Context, string, string) (ImageBundleInstallReceipt, error)
+
+// OnlineProviderInstallReceipt is the deterministic result of one online
+// provider profile installation: the admission the daemon verified and where
+// it landed.
+type OnlineProviderInstallReceipt struct {
+	Profile          search.OnlineEmbeddingProfile
+	Destination      string
+	Changed          bool
+	AlreadyInstalled bool
+}
+
+// OnlineProviderProfileInstaller admits one operator-supplied online provider
+// profile document into the configured models root. The source is an absolute
+// local path on the host; a URL is never an install source.
+type OnlineProviderProfileInstaller func(context.Context, string, string, string) (OnlineProviderInstallReceipt, error)
 
 // DispatcherOption configures optional exact-lane handlers.
 type DispatcherOption func(*Dispatcher)
@@ -255,6 +273,18 @@ func WithSemanticBundleArchiveInstaller(modelsRoot string, installer SemanticBun
 	}
 }
 
+// WithOnlineProviderInstaller enables the explicit semantic.provider.install
+// operation and the read-only semantic.provider.list operation for one
+// persisted models root. A nil callback leaves installation unimplemented
+// while listing stays available, which keeps override and test harness
+// configurations honest.
+func WithOnlineProviderInstaller(modelsRoot string, installer OnlineProviderProfileInstaller) DispatcherOption {
+	return func(d *Dispatcher) {
+		d.onlineProviderModelsRoot = strings.TrimSpace(modelsRoot)
+		d.onlineProviderInstaller = installer
+	}
+}
+
 // WithExact enables capture-qualified ingest, snapshot list/diff/verify,
 // recovery.export, and catalog-free restore when a repository-backed exact
 // service is available.
@@ -355,6 +385,20 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 	}
 	if dispatcher.imageBundleArchiveInstaller != nil && strings.TrimSpace(dispatcher.imageBundleModelsRoot) != "" {
 		implemented[command.OpImageBundleInstall] = true
+	}
+	if dispatcher.onlineProviderModelsRoot != "" {
+		implemented[command.OpSemanticProviderList] = true
+	}
+	if dispatcher.onlineProviderInstaller != nil && dispatcher.onlineProviderModelsRoot != "" {
+		implemented[command.OpSemanticProviderInstall] = true
+	}
+	if dispatcher.store != nil {
+		// Egress grant operations are durable catalog facts; they need no
+		// provider binding beyond the configured models root for install
+		// verification, which grant.create checks itself.
+		implemented[command.OpEgressGrantCreate] = true
+		implemented[command.OpEgressGrantList] = true
+		implemented[command.OpEgressGrantRevoke] = true
 	}
 	if dispatcher.exact != nil {
 		implemented[command.OpPlanIngest] = true
@@ -595,6 +639,16 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleImageBundleInstall(ctx, env, started)
 	case command.OpSemanticBundleInstall:
 		return d.handleSemanticBundleInstall(ctx, env, started)
+	case command.OpSemanticProviderInstall:
+		return d.handleSemanticProviderInstall(ctx, env, started)
+	case command.OpSemanticProviderList:
+		return d.handleSemanticProviderList(ctx, env, started)
+	case command.OpEgressGrantCreate:
+		return d.handleEgressGrantCreate(ctx, env, started)
+	case command.OpEgressGrantList:
+		return d.handleEgressGrantList(ctx, env, started)
+	case command.OpEgressGrantRevoke:
+		return d.handleEgressGrantRevoke(ctx, env, started)
 	case command.OpContentOpen:
 		return d.handleContentOpen(ctx, env, started)
 	case command.OpContentRead:

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func validOnlineProfileJSON(t *testing.T, endpoint string) []byte {
@@ -46,7 +47,8 @@ func TestParseOnlineEmbeddingProfileRejectsUnsafeManifests(t *testing.T) {
 		want   string
 	}{
 		{"unknown field", func(d map[string]any) { d["surprise"] = true }, "unknown field"},
-		{"schema", func(d map[string]any) { d["schema"] = "restoreweave.online-embedding-profile.v2" }, "schema"},
+		{"legacy schema without an egress scope", func(d map[string]any) { d["schema"] = OnlineEmbeddingProfileSchemaV1 }, "not admitted"},
+		{"unknown schema", func(d map[string]any) { d["schema"] = "restoreweave.online-embedding-profile.v3" }, "schema must be"},
 		{"api style", func(d map[string]any) { d["api_style"] = "grpc-v1" }, "api_style"},
 		{"plain http to remote host", func(d map[string]any) { d["endpoint"] = "http://api.example.invalid/v1/embeddings" }, "https"},
 		{"endpoint userinfo", func(d map[string]any) { d["endpoint"] = "https://user:pass@api.example.invalid/v1/embeddings" }, "userinfo"},
@@ -98,6 +100,7 @@ func TestOnlineProfileFingerprintBindsEverySpaceFact(t *testing.T) {
 		{"instruction", func(p *OnlineEmbeddingProfile) {
 			p.Instruction = "instruct: retrieve"
 			p.InstructionField = "instruction"
+			p.Egress.Minimization.Fields = expectedOnlineEgressRequestFields("instruction", false)
 		}},
 		{"query prefix", func(p *OnlineEmbeddingProfile) { p.QueryPrefix = "query: v2 " }},
 		{"normalization", func(p *OnlineEmbeddingProfile) {
@@ -105,8 +108,38 @@ func TestOnlineProfileFingerprintBindsEverySpaceFact(t *testing.T) {
 			p.Distance = OnlineEmbeddingDistanceDot
 		}},
 		{"provider", func(p *OnlineEmbeddingProfile) { p.Provider = "other-vendor" }},
-		{"endpoint", func(p *OnlineEmbeddingProfile) { p.Endpoint = "https://other.example.invalid/v1/embeddings" }},
+		{"endpoint", func(p *OnlineEmbeddingProfile) {
+			p.Endpoint = "https://other.example.invalid/v1/embeddings"
+			p.Egress.DestinationHost = "other.example.invalid"
+		}},
+		{"egress data classes", func(p *OnlineEmbeddingProfile) {
+			p.Egress.DisclosedDataClasses = []string{EgressDataClassTextQuery}
+		}},
+		{"egress subject classes", func(p *OnlineEmbeddingProfile) {
+			p.Egress.AllowedSubjectClasses = []string{EgressSubjectClassExactProtected}
+		}},
+		{"egress budgets", func(p *OnlineEmbeddingProfile) {
+			p.Egress.Budgets = EgressBudget{MaxRequests: 1, MaxBytes: 1, MaxSeconds: 1}
+		}},
+		{"egress expiry", func(p *OnlineEmbeddingProfile) {
+			p.Egress.Expiry = time.Now().UTC().Add(48 * time.Hour).Format(time.RFC3339)
+		}},
+		{"egress revocation ref", func(p *OnlineEmbeddingProfile) {
+			p.Egress.RevocationRef = "env://RW_REVOKED_OTHER"
+		}},
+		{"egress policy refs", func(p *OnlineEmbeddingProfile) {
+			p.Egress.PolicyRefs.Residency = "other-region"
+		}},
+		{"egress audit requirement", func(p *OnlineEmbeddingProfile) {
+			p.Egress.AuditRequired = false
+		}},
 	}
+	// Space-neutral facts (endpoint identity and the whole egress scope) are
+	// bound by the profile digest and the generation manifest, not by the
+	// vector space fingerprint.
+	spaceNeutral := map[string]bool{"endpoint": true, "egress data classes": true, "egress subject classes": true,
+		"egress budgets": true, "egress expiry": true, "egress revocation ref": true,
+		"egress policy refs": true, "egress audit requirement": true}
 	for _, test := range mutations {
 		t.Run(test.name, func(t *testing.T) {
 			mutated := profile
@@ -118,8 +151,7 @@ func TestOnlineProfileFingerprintBindsEverySpaceFact(t *testing.T) {
 			if mutatedManifest.CanonicalDigest() == baseManifest.CanonicalDigest() {
 				t.Fatalf("changing %s must create a different generation manifest", test.name)
 			}
-			if mutated.Fingerprint().SpaceID() == profile.Fingerprint().SpaceID() &&
-				test.name != "endpoint" {
+			if !spaceNeutral[test.name] && mutated.Fingerprint().SpaceID() == profile.Fingerprint().SpaceID() {
 				t.Fatalf("changing %s must create a different space fingerprint", test.name)
 			}
 			if mutated.ProviderProfileDigest() == profile.ProviderProfileDigest() {

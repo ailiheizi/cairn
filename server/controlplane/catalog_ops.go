@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -47,6 +48,78 @@ type searchQueryInput struct {
 	Axes         []string        `json:"construct_axes,omitempty"`
 	Fuse         []string        `json:"fuse,omitempty"`
 	Filters      search.Filters  `json:"filters,omitempty"`
+	// EgressConfirmation is the optional typed per-request authorization for
+	// remote embedding. When semantic.send_content_without_confirmation is
+	// false and the semantic component would egress, a missing confirmation is
+	// a typed EGRESS_CONFIRMATION_REQUIRED outcome, never a silent fallback.
+	EgressConfirmation json.RawMessage `json:"egress_confirmation,omitempty"`
+}
+
+// egressConfirmationInput is the typed per-request egress confirmation carried
+// by search.query and search.rebuild. It binds the disclosure to an installed
+// profile, its destination host, model, purpose, and the live grant; the
+// daemon fills the content digest when the caller leaves it empty because only
+// the daemon assembles the exact inputs.
+type egressConfirmationInput struct {
+	ProfileID     string `json:"profile_id,omitempty"`
+	ProfileDigest string `json:"profile_digest,omitempty"`
+	Endpoint      string `json:"endpoint,omitempty"`
+	EndpointHost  string `json:"endpoint_host,omitempty"`
+	Model         string `json:"model,omitempty"`
+	Purpose       string `json:"purpose,omitempty"`
+	ContentDigest string `json:"content_digest,omitempty"`
+	ExpiresAt     string `json:"expires_at,omitempty"`
+	GrantID       string `json:"grant_id"`
+}
+
+// semanticEgressConfirmationFromInput strictly decodes the optional
+// confirmation object. A partial confirmation is refused rather than silently
+// ignored: the operator either authorizes this exact disclosure or does not.
+func semanticEgressConfirmationFromInput(raw json.RawMessage) (*search.SemanticEgressConfirmation, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, nil
+	}
+	var input egressConfirmationInput
+	if err := decodeStrictOperationInput(raw, &input); err != nil {
+		return nil, fmt.Errorf("egress_confirmation: %w", err)
+	}
+	confirmation := &search.SemanticEgressConfirmation{
+		ProviderProfileID: strings.TrimSpace(input.ProfileID),
+		ProfileDigest:     strings.TrimSpace(input.ProfileDigest),
+		Endpoint:          strings.TrimSpace(input.Endpoint),
+		EndpointHost:      strings.TrimSpace(input.EndpointHost),
+		ModelID:           strings.TrimSpace(input.Model),
+		GrantID:           strings.TrimSpace(input.GrantID),
+		ContentDigest:     strings.TrimSpace(input.ContentDigest),
+	}
+	if confirmation.GrantID == "" {
+		return nil, errors.New("egress_confirmation.grant_id is required")
+	}
+	if confirmation.ProviderProfileID == "" && confirmation.ProfileDigest == "" {
+		return nil, errors.New("egress_confirmation must name profile_id or profile_digest")
+	}
+	if confirmation.Endpoint == "" && confirmation.EndpointHost == "" {
+		return nil, errors.New("egress_confirmation must name endpoint or endpoint_host")
+	}
+	if confirmation.ModelID == "" {
+		return nil, errors.New("egress_confirmation.model is required")
+	}
+	switch strings.ToUpper(strings.TrimSpace(input.Purpose)) {
+	case string(search.SemanticEmbeddingDocument):
+		confirmation.Purpose = search.SemanticEmbeddingDocument
+	case string(search.SemanticEmbeddingQuery):
+		confirmation.Purpose = search.SemanticEmbeddingQuery
+	default:
+		return nil, errors.New("egress_confirmation.purpose must be DOCUMENT or QUERY")
+	}
+	if strings.TrimSpace(input.ExpiresAt) != "" {
+		expiresAt, err := time.Parse(time.RFC3339, strings.TrimSpace(input.ExpiresAt))
+		if err != nil {
+			return nil, errors.New("egress_confirmation.expires_at must be an RFC3339 instant")
+		}
+		confirmation.ExpiresAt = expiresAt.UTC()
+	}
+	return confirmation, nil
 }
 
 func (d *Dispatcher) handleAnnotationList(ctx context.Context, env command.Envelope, started time.Time) command.Result {
@@ -371,11 +444,18 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 	if err := decodeInput(env.Input, &input); err != nil {
 		return invalidInputResult(env, started, err)
 	}
+	confirmation, err := semanticEgressConfirmationFromInput(input.EgressConfirmation)
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
+	if confirmation != nil {
+		ctx = search.WithSemanticEgressConfirmation(ctx, *confirmation)
+	}
 	queryText, dimensionID, requestedAxes, fuseIDs, filters := parseSearchRequest(input)
 	if queryText == "" && !filters.Has() {
 		return invalidInputResult(env, started, errString("query or filters are required"))
 	}
-	filters, err := search.NormalizeFilters(filters)
+	filters, err = search.NormalizeFilters(filters)
 	if err != nil {
 		return invalidInputResult(env, started, err)
 	}
@@ -448,6 +528,10 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		}
 		if errors.Is(err, search.ErrUnavailable) {
 			empty.GenerationID = generation.ID
+			if reason := search.SemanticEgressReasonOf(err); reason != "" {
+				return degradedResult(env, started, empty,
+					"semantic search requires an egress authorization ("+string(reason)+"); lexical search, namespace, annotations, and restore are unaffected")
+			}
 			return degradedResult(env, started, empty, "search index is unavailable; namespace, annotations, and restore are unaffected")
 		}
 		return catalogErrorResult(env, started, err)
@@ -527,16 +611,34 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 		Hits:            d.authorizeHits(ctx, authorizedWorkspaceID, "", hits, dimBySubject),
 	}
 	if !search.FuseSucceeded(fused) {
-		return degradedResult(env, started, data, "all fused dimensions were unavailable; namespace, annotations, and restore are unaffected")
+		return degradedResult(env, started, data, fusedDegradedMessage(fused.Components,
+			"all fused dimensions were unavailable; namespace, annotations, and restore are unaffected"))
 	}
 	if defaultBroker {
 		for _, component := range fused.Components {
 			if component.Status != string(command.StatusSucceeded) {
-				return degradedResult(env, started, data, "one or more default search components are unavailable; available component results are still returned")
+				return degradedResult(env, started, data, fusedDegradedMessage(fused.Components,
+					"one or more default search components are unavailable; available component results are still returned"))
 			}
 		}
 	}
 	return succeeded(env, started, data)
+}
+
+// fusedDegradedMessage names the stable egress reason of any failed fused
+// component. A remote-provider authorization problem is reported as
+// EGRESS_CONFIRMATION_REQUIRED (or its sibling), never as generic
+// unavailability, and never as a silent fallback to another provider.
+func fusedDegradedMessage(components []search.Component, fallback string) string {
+	for _, component := range components {
+		if component.Status == string(command.StatusSucceeded) {
+			continue
+		}
+		if search.IsSemanticEgressReason(component.Reason) {
+			return component.Dimension + " requires an egress authorization (" + component.Reason + "); " + fallback
+		}
+	}
+	return fallback
 }
 
 func (d *Dispatcher) resolveFusedWorkspace(ctx context.Context, requested string, components []search.Component) (string, error) {
