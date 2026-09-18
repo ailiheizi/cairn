@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- An installed search provider is no longer reported as "nothing is wired", and
+  a filter-only browse no longer tears the vector dimensions down. The semantic
+  dimension reports `NOT_BUILT` with `SEMANTIC_INDEX_NOT_BUILT` when a real
+  provider and vector binding are installed but no generation is served, and
+  keeps `SEMANTIC_INDEX_UNAVAILABLE` for the genuinely unbound or unusable case;
+  a failed image generation is reported `UNAVAILABLE` with its failure named
+  instead of being collapsed into "not built". A query with no text (the normal
+  filter-only browse) reports a text-embedding dimension as `SKIPPED` with
+  `QUERY_TEXT_REQUIRED` instead of failing it, and a caller-side input error no
+  longer revokes a verified generation — before this, one browse request cleared
+  the image dimension's readiness until the next rebuild. The image generation
+  is also reopened on daemon start beside the semantic one, so a built image
+  space survives a restart instead of being dropped from fused queries. The
+  status panel's headline names the proven form of the fact it reports, the
+  settings model cards keep their label and value on one line each, and the
+  shell serves its own favicon.
 - The image bundle installs from the settings dialog. The search category shows
   the image profile's own state with the daemon's reason, an archive path field
   for a file already on the host (the browser never uploads), and an install

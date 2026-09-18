@@ -1390,10 +1390,13 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 				querySucceeded = false
 			}
 		}
-		if !querySucceeded {
+		if !querySucceeded && !errors.Is(err, ErrInvalidQuery) {
 			idx.revokeSemanticGeneration(generation.ID)
 		}
 	}()
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidQuery, QueryTextRequiredReason)
+	}
 	if idx.SemanticProvider == nil || idx.SemanticZvec == nil {
 		return nil, ErrUnavailable
 	}

@@ -107,5 +107,10 @@
 @media (max-width: 640px) {
   .status-panel-summary { padding: 0 14px; }
   .status-panel-body { padding: 6px 14px 12px; }
-  .status-panel-summary .status-panel-summary-text { white-space: normal; }
+  /* On a phone the fact gets the whole first line and the browser read time
+     moves to its own line, so a short fact is never broken mid-word beside
+     the clock. */
+  .status-panel-summary { flex-wrap: wrap; row-gap: 2px; min-height: 40px; padding-top: 5px; padding-bottom: 5px; align-items: baseline; }
+  .status-panel-summary .status-panel-summary-text { white-space: normal; flex: 1 1 auto; }
+  .status-panel-summary .status-panel-asof { flex: 1 1 100%; }
 }

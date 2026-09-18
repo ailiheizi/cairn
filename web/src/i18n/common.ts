@@ -37,4 +37,5 @@ export const common: Record<string, string> = {
   "Not reported": "未报告",
   "Close": "关闭",
   "unavailable": "不可用",
+  "Duplicates": "重复",
 };

@@ -143,3 +143,44 @@ if (baselineArg) {
 }
 
 console.log("PASS: i18n catalogs are complete and duplicate-free");
+
+// A second, independent check: every literal handed to t() in the client source
+// must exist in exactly one catalog. Without this, a surface can ship a label
+// that silently renders in the source language — which is how the workspace rail
+// showed "Duplicates" in an otherwise Chinese interface.
+{
+  const sourceRoot = path.join(root, "web", "src");
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "i18n" || entry.name === "node_modules") continue;
+        walk(full);
+      } else if (/\.(ts|tsx)$/.test(entry.name)) {
+        files.push(full);
+      }
+    }
+  };
+  walk(sourceRoot);
+  const used = new Map();
+  const call = /\bt\(\s*"((?:[^"\\]|\\.)*)"/g;
+  for (const file of files) {
+    for (const match of fs.readFileSync(file, "utf8").matchAll(call)) {
+      // The literal is read from source, so escaped quotes and backslashes have
+      // to be unescaped before the catalog lookup.
+      const key = match[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+      if (!used.has(key)) used.set(key, file);
+    }
+  }
+  const missing = [...used.entries()].filter(([key]) => !merged.has(key)).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [key, file] of missing) {
+    console.error(`  missing translation key: ${JSON.stringify(key)} (used in ${path.relative(root, file)})`);
+  }
+  if (missing.length > 0) {
+    console.error(`FAIL: ${missing.length} key(s) are used by the client but exist in no catalog`);
+    process.exitCode = 1;
+  } else {
+    console.log(`PASS: every t() literal across ${files.length} client source files has a catalog entry`);
+  }
+}

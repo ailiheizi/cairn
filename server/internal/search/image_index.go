@@ -435,10 +435,15 @@ func (idx *Indexer) queryImage(ctx context.Context, generation sqlite.IndexGener
 				querySucceeded = false
 			}
 		}
-		if !querySucceeded {
+		// A caller-side input error says nothing about the generation, so it
+		// must never revoke a verified one.
+		if !querySucceeded && !errors.Is(err, ErrInvalidQuery) {
 			idx.revokeImageGeneration(generation.ID)
 		}
 	}()
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidQuery, QueryTextRequiredReason)
+	}
 	if !idx.imageBindingActive() {
 		return nil, fmt.Errorf("%w: %s", ErrUnavailable, MultimodalIndexNotBuiltReason)
 	}

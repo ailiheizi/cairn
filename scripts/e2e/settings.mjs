@@ -133,7 +133,7 @@ export async function assertMobileWorkspacePanel(ctx) {
   const entries = panel.locator("button.workspace-nav-item");
   assert.equal(await entries.count(), 5, "the panel must hold the five workspace views");
   const entryText = (await entries.allInnerTexts()).join("\n");
-  for (const label of [/内容库|Library/, /来源|Sources/, /Duplicates/, /标签|Tags/, /活动|Activity/]) {
+  for (const label of [/内容库|Library/, /来源|Sources/, /重复|Duplicates/, /标签|Tags/, /活动|Activity/]) {
     assert.match(entryText, label, `the panel must offer the ${label} view: ${entryText}`);
   }
   assert.equal(await entries.nth(0).isEnabled(), true, "every panel entry must be interactive");

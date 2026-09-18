@@ -93,8 +93,15 @@ The settings dialog, its category index, and the configuration controls. */
 .model-card.installed .model-state { color: #b9dce8; background: rgba(121, 185, 209, 0.12); }
 .model-card.offline .model-state { color: #e1c48b; background: rgba(221, 169, 82, 0.1); }
 .model-meta { grid-column: 2 / -1; min-width: 0; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; color: #73808a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
+/* The label keeps its own line; only the value may ellipsize, so a long daemon
+   note can never squeeze the label into one character per row. */
+.model-meta span:first-child { flex: none; white-space: nowrap; }
 .model-meta span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-action { grid-column: 2 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+/* A labeled input inside a model card stacks its label above a full-width
+   field, so a long label and a long path never overlap. */
+.model-action label { flex: 1 1 260px; min-width: 0; display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 560; }
+.model-action label input { width: 100%; min-height: 32px; border-radius: 12px; font-size: 11px; }
 .model-action button { min-height: 32px; font-size: 10px; }
 .model-action button svg { width: 14px; height: 14px; }
 .model-action small { color: #a0a8b0; font-size: 10px; line-height: 1.4; }

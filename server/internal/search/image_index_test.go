@@ -567,3 +567,167 @@ func TestFusionIncludesImageOnlyWhenReadyAndReportsPerComponentStatus(t *testing
 		t.Fatalf("ready image component = %+v", imageComponent)
 	}
 }
+
+func TestImageGenerationWarmUpRestoresReadinessAfterRestart(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	payload := testPNGBytes(t)
+	contentID := seedImageEntry(t, store, seed, "photo.png", payload)
+	manifest := testImageManifest("sha256:config")
+	fingerprint := testImageSpaceFingerprint()
+	provider := &testImageProvider{
+		fingerprint: fingerprint,
+		report: ImageProviderReport{
+			State: ImageProviderReady, Artifact: "test/image-model@rev-1",
+			ProviderDigest: manifest.ProviderDigest, Fingerprint: fingerprint,
+		},
+	}
+	engine := &Engine{Dir: t.TempDir()}
+	indexer := &Indexer{
+		Store: store, Engine: engine, ConfigDigest: "sha256:config",
+		MultimodalManifest: manifest, MultimodalProfileDigest: manifest.CanonicalDigest(),
+		ImageProvider: provider, ImageZvec: &integrationSemanticGenerationDriver{},
+		ImageSource:      &testImageContentSource{contentID: contentID, bytes: payload},
+		ImageLibraryPath: "/private/explicit/libzvec_c_api.dylib", ImageLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:image-warm", seed.RootID); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	// A restarted process keeps the same admitted binding but has no warmed
+	// generation yet. It must report NOT_BUILT instead of claiming the image
+	// space is gone, and the fused query must name that state. The driver is
+	// shared because the in-memory test driver stands in for a backend that
+	// re-reads its persisted generation; the process-local readiness latch is
+	// what this test exercises.
+	restarted := &Indexer{
+		Store: store, Engine: engine, ConfigDigest: "sha256:config",
+		MultimodalManifest: manifest, MultimodalProfileDigest: manifest.CanonicalDigest(),
+		ImageProvider: provider, ImageZvec: indexer.ImageZvec,
+		ImageSource:      &testImageContentSource{contentID: contentID, bytes: payload},
+		ImageLibraryPath: indexer.ImageLibraryPath, ImageLibraryDigest: indexer.ImageLibraryDigest,
+	}
+	if IndexerReadiness(restarted).MultimodalReal {
+		t.Fatal("restarted process reported a ready image generation before warm-up")
+	}
+	dimension, ok := LookupDimension(DimensionMultimodal, IndexerReadiness(restarted))
+	if !ok || dimension.State != IndexStateNotBuilt || dimension.Reason != MultimodalIndexNotBuiltReason {
+		t.Fatalf("image dimension before warm-up = %+v ok=%v", dimension, ok)
+	}
+	fused, err := restarted.Fuse(ctx, QueryRequest{
+		WorkspaceID: seed.WorkspaceID, Text: "photo",
+		Fuse: []string{DimensionLexical, DimensionMultimodal},
+	})
+	if err != nil {
+		t.Fatalf("fuse before warm-up: %v", err)
+	}
+	if len(fused.Components) != 2 || fused.Components[1].Status != ImageProviderNotBuilt ||
+		fused.Components[1].Reason != MultimodalIndexNotBuiltReason {
+		t.Fatalf("image component before warm-up = %+v", fused.Components)
+	}
+	if err := restarted.WarmImageGeneration(ctx, seed.WorkspaceID); err != nil {
+		t.Fatalf("warm image generation: %v", err)
+	}
+	if !IndexerReadiness(restarted).MultimodalReal {
+		t.Fatal("warm-up did not restore image readiness")
+	}
+	if _, hits, err := restarted.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionMultimodal, Text: "a photo"}); err != nil || len(hits) == 0 {
+		t.Fatalf("image query after warm-up = %+v, err=%v", hits, err)
+	}
+}
+
+func TestFilterOnlyQuerySkipsVectorSpacesWithoutRevoking(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	payload := testPNGBytes(t)
+	contentID := seedImageEntry(t, store, seed, "photo.png", payload)
+	manifest := testImageManifest("sha256:config")
+	fingerprint := testImageSpaceFingerprint()
+	provider := &testImageProvider{
+		fingerprint: fingerprint,
+		report: ImageProviderReport{
+			State: ImageProviderReady, Artifact: "test/image-model@rev-1",
+			ProviderDigest: manifest.ProviderDigest, Fingerprint: fingerprint,
+		},
+	}
+	indexer := &Indexer{
+		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config",
+		MultimodalManifest: manifest, MultimodalProfileDigest: manifest.CanonicalDigest(),
+		ImageProvider: provider, ImageZvec: &integrationSemanticGenerationDriver{},
+		ImageSource:      &testImageContentSource{contentID: contentID, bytes: payload},
+		ImageLibraryPath: "/private/explicit/libzvec_c_api.dylib", ImageLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:image-browse", seed.RootID); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	// A filter-only browse carries no text for the vector spaces. They must
+	// report SKIPPED with the reason instead of a failure, and the ready
+	// generation must survive the request.
+	fused, err := indexer.Fuse(ctx, QueryRequest{
+		WorkspaceID: seed.WorkspaceID, Text: "   ",
+		Filters: Filters{MediaClass: "image"},
+		Fuse:    []string{DimensionLexical, DimensionMultimodal},
+	})
+	if err != nil {
+		t.Fatalf("filter-only fuse: %v", err)
+	}
+	if len(fused.Components) != 2 || fused.Components[0].Status != "SUCCEEDED" {
+		t.Fatalf("filter-only components = %+v", fused.Components)
+	}
+	multimodal := fused.Components[1]
+	if multimodal.Status != ComponentSkipped || multimodal.Reason != QueryTextRequiredReason {
+		t.Fatalf("filter-only image component = %+v, want SKIPPED with reason", multimodal)
+	}
+	if multimodal.Hits != 0 {
+		t.Fatalf("filter-only image component reported hits: %+v", multimodal)
+	}
+	if !IndexerReadiness(indexer).MultimodalReal {
+		t.Fatal("a filter-only browse revoked the ready image generation")
+	}
+	// A direct text-less query is a caller error and must not revoke either.
+	if _, _, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionMultimodal}); !errors.Is(err, ErrInvalidQuery) {
+		t.Fatalf("text-less image query error = %v, want ErrInvalidQuery", err)
+	}
+	if !IndexerReadiness(indexer).MultimodalReal {
+		t.Fatal("a text-less direct query revoked the ready image generation")
+	}
+	// The dimension still answers a real text query afterwards.
+	if _, hits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionMultimodal, Text: "a photo"}); err != nil || len(hits) == 0 {
+		t.Fatalf("image query after filter-only browse = %+v, err=%v", hits, err)
+	}
+}
+
+func TestImageFailureIsReportedUnavailableNotNotBuilt(t *testing.T) {
+	manifest := testImageManifest("sha256:config")
+	fingerprint := testImageSpaceFingerprint()
+	provider := &testImageProvider{
+		fingerprint: fingerprint,
+		report: ImageProviderReport{
+			State: ImageProviderReady, Artifact: "test/image-model@rev-1",
+			ProviderDigest: manifest.ProviderDigest, Fingerprint: fingerprint,
+		},
+	}
+	indexer := &Indexer{
+		Store: &sqlite.Store{}, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config",
+		MultimodalManifest: manifest, MultimodalProfileDigest: manifest.CanonicalDigest(),
+		ImageProvider: provider, ImageZvec: &integrationSemanticGenerationDriver{},
+		ImageSource:      &testImageContentSource{},
+		ImageLibraryPath: "/private/explicit/libzvec_c_api.dylib", ImageLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	indexer.setImageFailure(errors.New("open generation: unexpected end of file"))
+	ready := IndexerReadiness(indexer)
+	if ready.MultimodalReal || ready.MultimodalState != ImageProviderUnavailable {
+		t.Fatalf("failed image readiness = %+v, want UNAVAILABLE", ready)
+	}
+	dimension, ok := LookupDimension(DimensionMultimodal, ready)
+	if !ok || dimension.State != "UNAVAILABLE" || dimension.Reason != MultimodalIndexUnavailableReason {
+		t.Fatalf("failed image dimension = %+v ok=%v", dimension, ok)
+	}
+	if !strings.Contains(dimension.Notes, "unexpected end of file") {
+		t.Fatalf("failed image notes = %q, want the provider failure named", dimension.Notes)
+	}
+	if strings.Contains(dimension.Notes, MultimodalIndexNotBuiltReason) {
+		t.Fatalf("failed image notes = %q, must not read as not built", dimension.Notes)
+	}
+}

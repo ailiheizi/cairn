@@ -592,10 +592,21 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		dispatcherOptions = append(dispatcherOptions, semanticOption)
 	}
 	dispatcher := controlplane.NewDispatcher(store, catalogPath, options.socketPath, dispatcherOptions...)
-	if semanticOption != nil {
+	if semanticOption != nil || imageOption != nil {
 		if workspace, workspaceErr := store.GetWorkspaceByName(runCtx, "default"); workspaceErr == nil {
-			if warmErr := dispatcher.WarmSemanticGeneration(runCtx, workspace.ID); warmErr != nil {
-				log.Printf("semantic generation warm-up unavailable: %v", warmErr)
+			if semanticOption != nil {
+				if warmErr := dispatcher.WarmSemanticGeneration(runCtx, workspace.ID); warmErr != nil {
+					log.Printf("semantic generation warm-up unavailable: %v", warmErr)
+				}
+			}
+			// The image space is a separate generation with its own model and
+			// space fingerprint, so it needs its own warm-up: without it a
+			// built image generation would be reported NOT_BUILT and dropped
+			// from fused queries until the next rebuild.
+			if imageOption != nil {
+				if warmErr := dispatcher.WarmImageGeneration(runCtx, workspace.ID); warmErr != nil {
+					log.Printf("image generation warm-up unavailable: %v", warmErr)
+				}
 			}
 		} else if !errors.Is(workspaceErr, sqlite.ErrNotFound) {
 			log.Printf("semantic workspace lookup: %v", workspaceErr)

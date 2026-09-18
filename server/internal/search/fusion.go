@@ -26,6 +26,25 @@ type FusedHit struct {
 	Dimensions []string
 }
 
+const (
+	// ComponentSkipped is reported for a dimension that was deliberately not
+	// queried because the request could not ask it anything. It is never a
+	// silent zero: Reason names why.
+	ComponentSkipped = "SKIPPED"
+	// QueryTextRequiredReason is the stable reason for a text-embedding
+	// dimension in a text-less (filter-only) query. A vector space has no
+	// vector to compare without query text, and a filter-only request is not a
+	// failure of that dimension.
+	QueryTextRequiredReason = "QUERY_TEXT_REQUIRED"
+)
+
+// dimensionNeedsQueryText reports whether one dimension is answered by
+// embedding the query text. The lexical and graph projections answer
+// filter-only requests; the vector spaces cannot.
+func dimensionNeedsQueryText(id string) bool {
+	return id == DimensionSemantic || id == DimensionMultimodal
+}
+
 // FuseResult unions typed component results without inventing a hybrid score.
 type FuseResult struct {
 	Hits       []FusedHit
@@ -75,18 +94,26 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 			ScoreSemantics: dimension.ScoreSemantics,
 			Status:         "DEGRADED",
 		}
-		if id == DimensionMultimodal {
-			// Report the image space's own state instead of a generic DEGRADED
-			// so an operator can tell "not built" from "broken".
+		if dimension.Reason != "" {
+			// A dimension that reports its own stable reason code (an installed
+			// image or semantic binding that is not served) states that code
+			// instead of a generic DEGRADED, so an operator can tell "not
+			// built yet" from "broken".
 			switch dimension.State {
-			case ImageProviderNotBuilt:
-				component.Status = ImageProviderNotBuilt
-			case ImageProviderUnavailable:
-				component.Status = ImageProviderUnavailable
+			case ImageProviderNotBuilt, ImageProviderUnavailable:
+				component.Status = dimension.State
 			}
 			component.Reason = dimension.Reason
 		}
 		if !ok || dimension.State != "AVAILABLE" {
+			result.Components = append(result.Components, component)
+			continue
+		}
+		if strings.TrimSpace(req.Text) == "" && dimensionNeedsQueryText(id) {
+			// A browse request (filters only) is not a failure of the vector
+			// space and must never be reported or remembered as one.
+			component.Status = ComponentSkipped
+			component.Reason = QueryTextRequiredReason
 			result.Components = append(result.Components, component)
 			continue
 		}
@@ -135,7 +162,7 @@ func QueryFailureReason(dimension string, err error) string {
 		return ""
 	}
 	message := err.Error()
-	for _, reason := range []string{MultimodalSpaceMismatchReason, MultimodalIndexNotBuiltReason, MultimodalIndexUnavailableReason} {
+	for _, reason := range []string{MultimodalSpaceMismatchReason, MultimodalIndexNotBuiltReason, MultimodalIndexUnavailableReason, QueryTextRequiredReason} {
 		if strings.Contains(message, reason) {
 			return reason
 		}

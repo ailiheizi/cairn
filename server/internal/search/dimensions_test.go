@@ -29,6 +29,23 @@ func (readinessZvecDriver) Open(context.Context, ZvecGenerationSpec) (ZvecGenera
 	return nil, ErrZvecUnavailable
 }
 
+// readinessUnreadyZvecDriver is an installed binding whose native library
+// cannot be served, so the dimension must report UNAVAILABLE rather than
+// NOT_BUILT.
+type readinessUnreadyZvecDriver struct{}
+
+func (readinessUnreadyZvecDriver) ZvecReady(string, string, EmbeddingGenerationManifest) bool {
+	return false
+}
+
+func (readinessUnreadyZvecDriver) Build(context.Context, ZvecGenerationSpec, []ZvecSegment) (ZvecGenerationReceipt, error) {
+	return ZvecGenerationReceipt{}, nil
+}
+
+func (readinessUnreadyZvecDriver) Open(context.Context, ZvecGenerationSpec) (ZvecGeneration, error) {
+	return nil, ErrZvecUnavailable
+}
+
 func TestDeclaredDimensionsStayHonest(t *testing.T) {
 	ready := DeclaredDimensions(ProviderReadiness{Lexical: true, Acoustic: true, Semantic: true, Multimodal: true, Graph: true})
 	unready := DeclaredDimensions(ProviderReadiness{})
@@ -94,11 +111,64 @@ func TestIndexerReadinessRequiresZvecEvidence(t *testing.T) {
 	if got := IndexerReadiness(idx); got.SemanticReal {
 		t.Fatalf("semantic readiness = %+v, want unavailable before zvec evidence", got)
 	}
+	if got := IndexerReadiness(idx); !got.SemanticInstalled {
+		t.Fatalf("semantic readiness = %+v, want the installed binding reported", got)
+	}
+	// An installed binding without a served generation is NOT_BUILT with its
+	// own reason, never "nothing is wired".
+	if dimension, ok := LookupDimension(DimensionSemantic, IndexerReadiness(idx)); !ok ||
+		dimension.State != IndexStateNotBuilt || dimension.Reason != SemanticIndexNotBuiltReason ||
+		dimension.Provider != ProviderSemanticONNX || strings.Contains(dimension.Notes, "not wired") {
+		t.Fatalf("installed-but-unbuilt semantic dimension = %+v ok=%v", dimension, ok)
+	}
 	idx.semanticIndexReady.Store(true)
 	if got := IndexerReadiness(idx); !got.SemanticReal {
 		t.Fatalf("semantic readiness = %+v, want available after zvec evidence", got)
 	} else if dimension, ok := LookupDimension(DimensionSemantic, got); !ok || dimension.Provider != ProviderSemanticONNX || dimension.ScoreSemantics != ScoreSemanticCosine {
 		t.Fatalf("real semantic dimension = %+v ok=%v", dimension, ok)
+	} else if dimension.State != "AVAILABLE" || dimension.Reason != "" {
+		t.Fatalf("served semantic dimension = %+v, want AVAILABLE with no reason", dimension)
+	}
+}
+
+func TestInstalledSemanticBindingWithoutRunnableBackendIsUnavailable(t *testing.T) {
+	idx := &Indexer{
+		Store: &sqlite.Store{}, Engine: &Engine{}, SemanticProvider: readinessSemanticProvider{},
+		SemanticZvec: readinessUnreadyZvecDriver{}, SemanticManifest: testZvecManifest(),
+		SemanticLibraryPath:   "/private/explicit/libzvec_c_api.dylib",
+		SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	ready := IndexerReadiness(idx)
+	if !ready.SemanticInstalled || ready.SemanticReal {
+		t.Fatalf("semantic readiness = %+v, want installed without a served generation", ready)
+	}
+	dimension, ok := LookupDimension(DimensionSemantic, ready)
+	if !ok || dimension.State != "UNAVAILABLE" || dimension.Reason != SemanticIndexUnavailableReason {
+		t.Fatalf("unrunnable semantic dimension = %+v ok=%v", dimension, ok)
+	}
+	if strings.Contains(dimension.Notes, "not wired") || !strings.Contains(dimension.Notes, "cannot be served") {
+		t.Fatalf("unrunnable semantic notes = %q, want an installed-but-unservable explanation", dimension.Notes)
+	}
+}
+
+func TestDeclaredDimensionsReportInstalledOnlineSemanticBinding(t *testing.T) {
+	ready := ProviderReadiness{
+		Lexical: true, Graph: true, SemanticInstalled: true,
+		SemanticState: IndexStateNotBuilt, SemanticReason: SemanticIndexNotBuiltReason,
+		SemanticOnline: true,
+		SemanticComponents: []SemanticProviderComponentStatus{
+			{Component: "online", State: SemanticComponentUnavailable, Reason: "EGRESS_CONFIRMATION_REQUIRED"},
+		},
+	}
+	dimension, ok := LookupDimension(DimensionSemantic, ready)
+	if !ok || dimension.State != IndexStateNotBuilt || dimension.Provider != ProviderSemanticOnline {
+		t.Fatalf("online installed semantic dimension = %+v ok=%v", dimension, ok)
+	}
+	if !strings.Contains(dimension.Notes, "online="+SemanticComponentUnavailable+"(EGRESS_CONFIRMATION_REQUIRED)") {
+		t.Fatalf("online semantic notes = %q, want the component reason", dimension.Notes)
+	}
+	if !strings.Contains(dimension.Notes, "egress gate") {
+		t.Fatalf("online semantic notes = %q, want the egress disclosure", dimension.Notes)
 	}
 }
 

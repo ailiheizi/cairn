@@ -37,7 +37,7 @@ import type { ExportManifestData, SnapshotSummary } from "../lib/types";
 
 type FactState = "PROVEN" | "UNKNOWN" | "DEGRADED" | "FAILED";
 type FactGroup = "protection" | "discovery" | "not-sourced";
-type HealthFact = { id: string; state: FactState; name: string; line: string; group: FactGroup };
+type HealthFact = { id: string; state: FactState; name: string; provenName?: string; line: string; group: FactGroup };
 type FactValue = [FactState, string];
 
 type DoctorResult = { ok: boolean; checks: { id: string; ok: boolean; message: string }[]; readAt: number };
@@ -152,7 +152,10 @@ export function StatusPanel({ t, status, statusData, capabilities, onRefresh, on
   // present a discovery or scope statement as a protection failure.
   const weakest = weakestFact(facts.filter((fact) => SUMMARY_FACT_IDS.has(fact.id)));
   const summaryState: FactState = weakest?.state ?? "PROVEN";
-  const summaryText = weakest ? t("Health: {{fact}}", { fact: weakest.name }) : t("Health: {{fact}}", { fact: t("all protection and recovery facts proven") });
+  // The name of a fact is its alarm wording, so a proven headline names the
+  // proven form instead of reading "unproven" while the panel says PROVEN.
+  const summaryFact = weakest ? (weakest.state === "PROVEN" ? weakest.provenName ?? weakest.name : weakest.name) : t("all protection and recovery facts proven");
+  const summaryText = t("Health: {{fact}}", { fact: summaryFact });
 
   return <details className="status-panel" open={expanded} onToggle={(event) => setExpanded((event.currentTarget as HTMLDetailsElement).open)}>
     <summary className="status-panel-summary" data-health={summaryState} data-weakest={weakest?.id ?? "none"} data-scope="protection-and-recovery"><span className="health-state" data-state={summaryState}>{summaryState}</span>{summaryState === "PROVEN" ? " · " : " — "}<span className="status-panel-summary-text">{summaryText}</span>{summaryState === "PROVEN" && <span className="status-panel-asof"> · {asOf}</span>}<ChevronRight className="status-panel-chevron" size={14} aria-hidden="true" /><span className="sr-only">{t("System readiness")}</span></summary>
@@ -191,9 +194,9 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
   // One place decides the row string and the row's group, so a state token can
   // never be rendered without its value, and a fact can never change group by
   // accident: the group is an argument of the only constructor.
-  const record = (id: string, state: FactState, name: string, value: string, group: FactGroup) => {
+  const record = (id: string, state: FactState, name: string, value: string, group: FactGroup, provenName?: string) => {
     const line = state === "PROVEN" ? `${value} · ${t("as of {{time}} (this browser)", { time: clockLabel(reads.readAt) })}` : value;
-    facts.push({ id, state, name, line, group });
+    facts.push({ id, state, name, provenName, line, group });
   };
   const serviceDown = !statusData;
   const checking = !statusData && status === "Checking service";
@@ -210,7 +213,7 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
     if (checking) record("service", "UNKNOWN", t("service unreachable"), notAnsweredYet, protection);
     else record("service", "FAILED", t("service unreachable"), t("the service did not answer this browser session"), protection);
   } else {
-    record("service", "PROVEN", t("service unreachable"), t("Service: reachable"), protection);
+    record("service", "PROVEN", t("service unreachable"), t("Service: reachable"), protection, t("service reachable"));
   }
 
   const repository = statusData?.repository;
@@ -231,12 +234,12 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
         path: repository.path || t("Not reported"),
         profile: repository.repository_profile || repository.compression_profile || t("profile not reported"),
         count: typeof repository.snapshots === "number" ? repository.snapshots : 0,
-      }), protection);
+      }), protection, t("repository available"));
     } else {
       record("repository", "FAILED", t("Repository unavailable"), t("the repository at {{path}} did not open", { path: repository.path || t("Not reported") }), protection);
     }
     const [writabilityState, writabilityValue] = writabilityFact(t, repository);
-    record("writability", writabilityState, t("repository unproven"), writabilityValue, protection);
+    record("writability", writabilityState, t("repository unproven"), writabilityValue, protection, t("writability and capacity proven"));
     const [capacityState, capacityValue] = capacityFact(t, repository);
     record("capacity", capacityState, t("repository unproven"), capacityValue, protection);
   }
@@ -249,10 +252,10 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
     record("catalog", "UNKNOWN", t("catalog unproven"), t("this service reports no catalog fact"), protection);
     record("schema", "UNKNOWN", t("catalog schema unproven"), t("this service reports no catalog fact"), protection);
   } else {
-    if (catalog.ok === true) record("catalog", "PROVEN", t("catalog unproven"), t("Catalog: {{path}}", { path: catalog.path || t("Not reported") }), protection);
+    if (catalog.ok === true) record("catalog", "PROVEN", t("catalog unproven"), t("Catalog: {{path}}", { path: catalog.path || t("Not reported") }), protection, t("catalog available"));
     else record("catalog", "FAILED", t("Catalog unavailable"), t("the catalog at {{path}} did not open", { path: catalog.path || t("Not reported") }), protection);
     const [schemaState, schemaValue] = schemaFact(t, catalog);
-    record("schema", schemaState, t("catalog schema unproven"), schemaValue, protection);
+    record("schema", schemaState, t("catalog schema unproven"), schemaValue, protection, t("catalog schema current"));
   }
 
   // 7. Catalog-wide counts. No operation exists in this build, so the honest
@@ -279,13 +282,13 @@ function buildFacts({ t, status, statusData, capabilities, reads }: { t: Transla
   const [verificationState, verificationValue] = serviceDown
     ? ["UNKNOWN", checking ? notAnsweredYet : unreachable] as FactValue
     : verificationFact(t, latest, reads);
-  record("verification", verificationState, t("verification unproven"), verificationValue, protection);
+  record("verification", verificationState, t("verification unproven"), verificationValue, protection, t("verification proven"));
 
   // 11. The protection mix of the newest restore point.
   const [protectionState, protectionValue] = serviceDown
     ? ["UNKNOWN", checking ? notAnsweredYet : unreachable] as FactValue
     : protectionFact(t, latest, reads);
-  record("protection", protectionState, t("protection mix unproven"), protectionValue, protection);
+  record("protection", protectionState, t("protection mix unproven"), protectionValue, protection, t("protection proven"));
 
   // 12. Doctor gates. Repository bytes are read only on request.
   if (reads.doctorError) record("doctor", "UNKNOWN", t("doctor gates unproven"), reads.doctorError, discovery);
@@ -363,20 +366,32 @@ function capabilityFact(t: Translator, { kind, id, label, capabilities, serviceD
   return ["DEGRADED", detail];
 }
 
-function capabilityState(capabilities: any[], id: string) {
+function capabilityState(capabilities: any[], id: string): { state: string; notes: string } {
   const entry = capabilities.find((item) => item?.kind === "index-dimension" && item?.id === id);
-  return entry ? String(entry.state ?? "") : "";
+  return { state: entry ? String(entry.state ?? "") : "", notes: entry ? String(entry.notes ?? "").trim() : "" };
 }
 
-function dimensionFact(t: Translator, { id, label, states, capability, serviceDown, checking, unreachable, notAnsweredYet }: { id: string; label: (state: string) => string; states: string[]; capability: string; serviceDown: boolean; checking: boolean; unreachable: string; notAnsweredYet: string }): FactValue {
+function dimensionFact(t: Translator, { id, label, states, capability, serviceDown, checking, unreachable, notAnsweredYet }: { id: string; label: (state: string) => string; states: string[]; capability: { state: string; notes: string }; serviceDown: boolean; checking: boolean; unreachable: string; notAnsweredYet: string }): FactValue {
   if (serviceDown) return ["UNKNOWN", checking ? notAnsweredYet : unreachable];
-  if (!capability) return ["UNKNOWN", `${label("NOT_REPORTED")} · ${t("capability.list reports no state for this dimension")}`];
-  if (capability !== "AVAILABLE") return ["DEGRADED", `${label(capability)} · ${t("capability.list reports {{id}} as {{state}}", { id, state: capability })}`];
-  if (!states.length) return ["UNKNOWN", `${label("NOT_BUILT")} · ${t("no index generation is published for this workspace")}`];
+  if (!capability.state) return ["UNKNOWN", `${label("NOT_REPORTED")} · ${t("capability.list reports no state for this dimension")}`];
+  // A process-wide NOT_BUILT is an honest absence, not a degradation: the
+  // provider is installed and this workspace's own projection says whether a
+  // generation exists. Only an UNAVAILABLE provider downgrades the dimension.
+  if (capability.state !== "AVAILABLE" && capability.state !== "NOT_BUILT") {
+    return ["DEGRADED", `${label(capability.state)} · ${t("capability.list reports {{id}} as {{state}}", { id, state: capability.state })}`];
+  }
+  // The daemon's own reason explains a process-wide NOT_BUILT; a workspace
+  // that simply has no generation is stated as such, without quoting notes
+  // that describe a generation some other workspace already serves.
+  const absentDetail = capability.state === "NOT_BUILT" && capability.notes
+    ? capability.notes
+    : t("no index generation is published for this workspace");
+  const absent = `${label("NOT_BUILT")} · ${absentDetail}`;
+  if (!states.length) return ["UNKNOWN", absent];
   const unique = [...new Set(states)];
   if (unique.length === 1 && unique[0] === "READY") return ["PROVEN", label("READY")];
   if (unique.includes("UNAVAILABLE")) return ["DEGRADED", label("UNAVAILABLE")];
-  if (unique.includes("NOT_BUILT")) return ["UNKNOWN", `${label("NOT_BUILT")} · ${t("no index generation is published for this workspace")}`];
+  if (unique.includes("NOT_BUILT")) return ["UNKNOWN", absent];
   return ["DEGRADED", label(unique.filter(Boolean).join(" / ") || "NOT_REPORTED")];
 }
 

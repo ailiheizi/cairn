@@ -50,8 +50,8 @@ A **dimension** is a named retrieval space over the same subjects. One `QueryPro
 | --- | --- | --- | --- |
 | `lexical-metadata-fts` | Path, name, suffix, tags, notes, extracted text | **AVAILABLE** when the exact lane built an FTS5 generation | Bundled FTS5 (`query.lexical.fts5.v1`) |
 | `acoustic-fingerprint` | Listen / identify / similar-audio candidates | **UNAVAILABLE** by default; fixture exact-lookup exists only with `EnableFixtureDimensions` in a qualification harness | Later isolated Chromaprint-class processor; lookup is not SHA-256 |
-| `semantic-embedding` | Meaning over extracted or transcribed text | **UNAVAILABLE in the current normal checkout** with `SEMANTIC_INDEX_UNAVAILABLE`; fixture exact-lookup is harness-only | Required Core Phase 4 pinned ONNX/BGE processor plus zvec generation |
-| `multimodal-clip` | Image–text / cover–title joint space | **UNAVAILABLE** by default; fixture exact-lookup is harness-only | Later isolated CLIP-class provider |
+| `semantic-embedding` | Meaning over extracted or transcribed text | **UNAVAILABLE in the current normal checkout** with `SEMANTIC_INDEX_UNAVAILABLE`; an installed real binding without a served generation is `NOT_BUILT` with `SEMANTIC_INDEX_NOT_BUILT` instead; fixture exact-lookup is harness-only | Required Core Phase 4 pinned ONNX/BGE processor plus zvec generation |
+| `multimodal-clip` | Image–text / cover–title joint space | **UNAVAILABLE** by default; an installed image binding without a built generation is `NOT_BUILT`, a failed one is `UNAVAILABLE` with its failure named; fixture exact-lookup is harness-only | Later isolated CLIP-class provider |
 | `graph-relation` | Artist / work / package / collection edges | **AVAILABLE** as a disposable catalog projection when the exact lane is wired | Later graph store is optional; this checkout projects existing facts |
 
 Construct axes on the live lexical dimension (I4):
@@ -166,6 +166,8 @@ Status (2026-08-15): **fixture-contract-complete**.
 | Two dimensions | `fuse=["lexical-metadata-fts","semantic-embedding"]` | Components array has both; a shared subject lists both IDs |
 | No hybrid score | `score_semantics=component-union` | Result has no invented fused rank field |
 | Partial loss | One generation file deleted | That component is `DEGRADED`; the other can still `SUCCEEDED` |
+| Filter-only browse | Empty query text with structured filters | A text-embedding dimension reports `SKIPPED` with `QUERY_TEXT_REQUIRED`; the lexical dimension still lists, and the skipped generation is not revoked |
+| Installed, no generation | Real provider bound, no built generation | That dimension reports `NOT_BUILT` with its own reason; only a failed or unusable binding is `UNAVAILABLE` |
 | Contract | `fuse` plus `dimension`, or `fuse` plus one generation | Invalid input |
 
 ### I8 — Facade mapping for identify-by-sample

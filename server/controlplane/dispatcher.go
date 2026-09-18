@@ -297,6 +297,16 @@ func (d *Dispatcher) WarmSemanticGeneration(ctx context.Context, workspaceID str
 	return d.search.WarmSemanticGeneration(ctx, workspaceID)
 }
 
+// WarmImageGeneration reopens a previously built image generation for one
+// workspace after process restart. Readiness is granted only after the
+// generation's bindings and receipt verify against the current binding.
+func (d *Dispatcher) WarmImageGeneration(ctx context.Context, workspaceID string) error {
+	if d == nil || d.search == nil {
+		return search.ErrUnavailable
+	}
+	return d.search.WarmImageGeneration(ctx, workspaceID)
+}
+
 // NewDispatcher wires the control plane to the opened catalog. catalogPath is
 // reported by status.get; socketPath is reported as the listen address.
 func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...DispatcherOption) *Dispatcher {

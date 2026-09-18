@@ -454,7 +454,7 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
             </button>
           </li>)}</ul>
           {destinationRequired && <label className="verification-destination">{t("Restore destination on the RestoreWeave host")}
-            <input aria-label={t("Restore destination on the RestoreWeave host")} value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={t("/data/verify-drill")} disabled={running} />
+            <input aria-label={t("Restore destination on the RestoreWeave host")} value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={"/data/verify-drill"} disabled={running} />
             <small>{t("restore-drill writes the restored members to this directory; it never writes to the repository.")}</small>
           </label>}
           <div className="verification-run-controls">

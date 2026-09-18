@@ -88,6 +88,58 @@ rebuild" and `lexical_coverage.complete=false` (`descriptions: false`) on this
 development corpus, which is the coverage metric working as designed rather
 than a search failure.
 
+## 2026-09-18 Darwin arm64 installed-state and browse-path honesty check
+
+A live check on the same development host, again **not** a qualification run.
+It fixes and records three reported-state defects around the installed
+bindings.
+
+**Installed is not the same fact as unbuilt.** `capability.list` reported the
+semantic dimension as `UNAVAILABLE` with "real embedding model and vector
+IndexProvider are not wired" while the BGE provider and zvec binding were
+installed and a `search.rebuild` produced a served generation. The dimension
+now reports `NOT_BUILT` with `SEMANTIC_INDEX_NOT_BUILT` for an installed
+binding that serves no generation, and keeps `SEMANTIC_INDEX_UNAVAILABLE` for
+the unbound or unusable case. `IndexerReadiness` gained `SemanticInstalled`,
+`SemanticState`, and `SemanticReason` beside the image dimension's existing
+installed/state/reason fields, and a hybrid online binding is described as
+online in both the served and the not-yet-served case. An image generation
+that failed is reported `UNAVAILABLE` with the failure named in the notes; it
+is no longer collapsed into `NOT_BUILT`.
+
+**A built image generation survives a restart.** The daemon reopened only the
+semantic generation at startup, so after a restart the image dimension was
+reported `NOT_BUILT` ("no image generation is built for this workspace") and
+dropped out of fused queries although the generation and its receipt were
+intact. `WarmImageGeneration` now runs beside the semantic warm-up, and the
+live daemon reports `multimodal-clip` as `AVAILABLE` after a restart without a
+rebuild.
+
+**A filter-only browse is not a failure.** An empty query text with structured
+filters reached the vector dimensions, failed provider input validation, and
+revoked the verified generation through the query's failure path: one browse
+request left `capability.list` reporting the image dimension `NOT_BUILT` until
+the next rebuild. `Fuse` now reports a text-embedding dimension as `SKIPPED`
+with `QUERY_TEXT_REQUIRED` for a text-less request, and both query paths reject
+an empty text with `ErrInvalidQuery` without revoking a generation.
+
+Live transcript on the development corpus (11 files, semantic generation 15
+segments, image generation 4 subjects):
+
+| Request | lexical | semantic | image |
+| --- | --- | --- | --- |
+| `search.query` with `media_class=image`, no text | `SUCCEEDED`, 4 hits | `SKIPPED` / `QUERY_TEXT_REQUIRED` | `SKIPPED` / `QUERY_TEXT_REQUIRED` |
+| `search.query` "蓝色的海" | `SUCCEEDED`, 0 hits | `SUCCEEDED`, 15 hits | `SUCCEEDED`, 4 hits |
+
+`capability.list` reported `semantic-embedding` and `multimodal-clip` as
+`AVAILABLE` before and after the browse request. The regression tests are
+`TestIndexerReadinessRequiresZvecEvidence`,
+`TestInstalledSemanticBindingWithoutRunnableBackendIsUnavailable`,
+`TestDeclaredDimensionsReportInstalledOnlineSemanticBinding`,
+`TestImageGenerationWarmUpRestoresReadinessAfterRestart`,
+`TestFilterOnlyQuerySkipsVectorSpacesWithoutRevoking`, and
+`TestImageFailureIsReportedUnavailableNotNotBuilt`.
+
 ## 2026-09-18 Darwin arm64 image dimension bring-up
 
 The image dimension (`multimodal-clip`) went from `NOT_BUILT` to `READY` on this

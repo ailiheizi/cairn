@@ -20,6 +20,19 @@ const (
 	// embeddings are deliberately not a substitute for this capability.
 	SemanticIndexUnavailableReason = "SEMANTIC_INDEX_UNAVAILABLE"
 
+	// SemanticIndexNotBuiltReason is the stable operator-facing reason used
+	// when a real semantic provider and vector binding are installed but no
+	// verified generation is served for this workspace yet. It is distinct
+	// from SemanticIndexUnavailableReason, which means nothing is installed or
+	// the binding cannot be served at all.
+	SemanticIndexNotBuiltReason = "SEMANTIC_INDEX_NOT_BUILT"
+
+	// IndexStateNotBuilt is the shared dimension state for "the provider is
+	// installed, but no generation is built for this workspace". It is the
+	// same state the image dimension reports, so a caller never has to read
+	// "not built yet" as "nothing is installed".
+	IndexStateNotBuilt = "NOT_BUILT"
+
 	DimensionLexical    = "lexical-metadata-fts"
 	DimensionAcoustic   = "acoustic-fingerprint"
 	DimensionSemantic   = "semantic-embedding"
@@ -326,7 +339,21 @@ type ProviderReadiness struct {
 	MultimodalReal      bool
 	MultimodalState     string
 	MultimodalReason    string
-	Graph               bool
+	// MultimodalFailure is the image provider's latest payload-free failure
+	// summary. A failed generation is reported UNAVAILABLE with this reason in
+	// the notes, never as "not built".
+	MultimodalFailure string
+	Graph             bool
+	// SemanticInstalled says a real (non-fixture) semantic provider and vector
+	// binding are configured for this process. It is deliberately separate
+	// from SemanticReal: installed with no served generation is reported as
+	// NOT_BUILT with its reason, never as "nothing is wired".
+	SemanticInstalled bool
+	// SemanticState and SemanticReason carry the installed binding's own state
+	// for the served generation ("NOT_BUILT" or "UNAVAILABLE") and its stable
+	// reason code. Both are empty when no real binding is installed.
+	SemanticState  string
+	SemanticReason string
 	// --- online embedding provider (additive wiring) ---
 	// SemanticOnline marks that the real semantic provider is an online
 	// (remote, egress-gated) provider rather than the local ONNX/BGE worker,
@@ -360,9 +387,34 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 	semanticState := "UNAVAILABLE"
 	semanticProvider := ProviderSemanticFix
 	semanticScore := ScoreSemanticExact
+	semanticReason := ""
 	semanticNotes := "real embedding model and vector IndexProvider are not wired (" + SemanticIndexUnavailableReason + "); fixture embeddings require explicit opt-in"
+	if ready.SemanticInstalled && !ready.Semantic {
+		// A real provider and vector binding exist. What is missing is a
+		// verified generation for this workspace, so the dimension reports
+		// NOT_BUILT (or the binding's own unavailable reason) instead of
+		// claiming nothing is installed.
+		semanticProvider = ProviderSemanticONNX
+		semanticScore = ScoreSemanticCosine
+		semanticReason = strings.TrimSpace(ready.SemanticReason)
+		if semanticReason == "" {
+			semanticReason = SemanticIndexNotBuiltReason
+		}
+		if ready.SemanticState == ImageProviderUnavailable || semanticReason == SemanticIndexUnavailableReason {
+			semanticState = "UNAVAILABLE"
+			semanticNotes = "real embedding provider or vector binding is installed but cannot be served (" + semanticReason + ")"
+		} else {
+			semanticState = IndexStateNotBuilt
+			semanticNotes = "real embedding provider and vector binding are installed, but no semantic generation is built for this workspace (" + semanticReason + "); rebuild the semantic generation to serve this dimension"
+		}
+		if ready.SemanticOnline {
+			semanticProvider = ProviderSemanticOnline
+			semanticNotes += "; disclosed only through the egress gate (confirmation, credential, protection, and append-only receipt)" + semanticOnlineDetail(ready)
+		}
+	}
 	if ready.Semantic {
 		semanticState = "AVAILABLE"
+		semanticReason = ""
 		semanticNotes = "explicitly enabled fixture-embedding generation over admitted ENRICH artifacts; not a model runtime, not SHA-256, not recovery authority"
 		if ready.SemanticReal {
 			semanticProvider = ProviderSemanticONNX
@@ -373,23 +425,7 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 			// worker, and its per-component status is named with its reason.
 			if ready.SemanticOnline {
 				semanticProvider = ProviderSemanticOnline
-				semanticNotes = "host-owned online embedding provider over durable semantic segments, disclosed only through the egress gate (confirmation, credential, protection, and append-only receipt); disposable index, not recovery authority"
-				for _, component := range ready.SemanticComponents {
-					if component.State == SemanticComponentReady {
-						continue
-					}
-					detail := strings.TrimSpace(component.Reason)
-					if detail == "" {
-						detail = strings.TrimSpace(component.Failure)
-					}
-					if detail == "" {
-						detail = SemanticIndexUnavailableReason
-					}
-					semanticNotes += "; " + component.Component + "=" + SemanticComponentUnavailable + "(" + detail + ")"
-				}
-				if failure := strings.TrimSpace(ready.SemanticFailure); failure != "" {
-					semanticNotes += "; last failure: " + failure
-				}
+				semanticNotes = "host-owned online embedding provider over durable semantic segments, disclosed only through the egress gate (confirmation, credential, protection, and append-only receipt); disposable index, not recovery authority" + semanticOnlineDetail(ready)
 			}
 		}
 	}
@@ -421,6 +457,9 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 				multimodalReason = MultimodalIndexUnavailableReason
 			}
 			multimodalNotes = "image model artifact, provider, or vector backend is unavailable (" + multimodalReason + ")"
+			if failure := strings.TrimSpace(ready.MultimodalFailure); failure != "" {
+				multimodalNotes += "; last failure: " + failure
+			}
 		}
 	}
 	if ready.Multimodal {
@@ -460,6 +499,7 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 			State:          semanticState,
 			Version:        "1",
 			ScoreSemantics: semanticScore,
+			Reason:         semanticReason,
 			Notes:          semanticNotes,
 		},
 		{
@@ -555,6 +595,44 @@ func LexicalCoverageFields() []string {
 	return fields
 }
 
+// semanticOnlineDetail names each non-ready component of a hybrid online
+// provider and its latest payload-free failure summary, so a refused or failed
+// egress is visible without claiming the dimension is fine.
+// --- online embedding provider (additive wiring) ---
+func semanticOnlineDetail(ready ProviderReadiness) string {
+	detail := ""
+	for _, component := range ready.SemanticComponents {
+		if component.State == SemanticComponentReady {
+			continue
+		}
+		reason := strings.TrimSpace(component.Reason)
+		if reason == "" {
+			reason = strings.TrimSpace(component.Failure)
+		}
+		if reason == "" {
+			reason = SemanticIndexUnavailableReason
+		}
+		detail += "; " + component.Component + "=" + SemanticComponentUnavailable + "(" + reason + ")"
+	}
+	if failure := strings.TrimSpace(ready.SemanticFailure); failure != "" {
+		detail += "; last failure: " + failure
+	}
+	return detail
+}
+
+// semanticBindingActive reports whether a real (non-fixture) semantic provider
+// binding is configured. It mirrors imageBindingActive: a real binding needs a
+// provider, a vector backend, a validated non-fixture manifest, and the
+// digest-pinned native library binding. It says nothing about whether a
+// generation is built; that is SemanticReal.
+func (idx *Indexer) semanticBindingActive() bool {
+	return idx != nil && idx.SemanticProvider != nil && idx.SemanticZvec != nil &&
+		idx.SemanticManifest != (EmbeddingGenerationManifest{}) &&
+		strings.TrimSpace(idx.SemanticManifest.SemanticSpace) != SemanticFixtureProfileV1 &&
+		strings.TrimSpace(idx.SemanticLibraryPath) != "" &&
+		strings.TrimSpace(idx.SemanticLibraryDigest) != ""
+}
+
 func IndexerReadiness(idx *Indexer) ProviderReadiness {
 	ready := idx != nil && idx.Store != nil && idx.Engine != nil
 	fixtures := ready && idx.fixtureDimensionsActive()
@@ -579,6 +657,7 @@ func IndexerReadiness(idx *Indexer) ProviderReadiness {
 	imageInstalled := ready && idx.imageBindingActive()
 	imageState := ""
 	imageReason := ""
+	imageFailure := ""
 	imageReal := false
 	if imageInstalled {
 		report := idx.imageProviderReport()
@@ -596,7 +675,14 @@ func IndexerReadiness(idx *Indexer) ProviderReadiness {
 			idx.MultimodalManifest.Validate() != nil:
 			imageState = ImageProviderUnavailable
 			imageReason = MultimodalIndexUnavailableReason
-		case !idx.imageIndexReady.Load() || idx.ImageFailure() != "":
+		case strings.TrimSpace(idx.ImageFailure()) != "":
+			// A failed image generation or provider is UNAVAILABLE with its
+			// reason. It is never collapsed into "nothing is built", which
+			// would hide the failure.
+			imageState = ImageProviderUnavailable
+			imageReason = MultimodalIndexUnavailableReason
+			imageFailure = strings.TrimSpace(idx.ImageFailure())
+		case !idx.imageIndexReady.Load():
 			imageState = ImageProviderNotBuilt
 			imageReason = MultimodalIndexNotBuiltReason
 		default:
@@ -613,11 +699,33 @@ func IndexerReadiness(idx *Indexer) ProviderReadiness {
 			}
 		}
 	}
-	semanticOnline, semanticComponents, semanticFailure := semanticProviderReport(idx, realSemantic)
+	semanticInstalled := idx.semanticBindingActive()
+	semanticState := ""
+	semanticReason := ""
+	if semanticInstalled && !realSemantic {
+		// The model, the vector backend, and the native library binding are all
+		// present. Distinguish "no generation is built for this workspace yet"
+		// from "the binding cannot be served": only the first is NOT_BUILT, and
+		// a failure latch or an unusable binding is reported as UNAVAILABLE.
+		switch {
+		case providerReady && zvecReady && !idx.semanticUnavailable.Load():
+			semanticState = IndexStateNotBuilt
+			semanticReason = SemanticIndexNotBuiltReason
+		default:
+			semanticState = "UNAVAILABLE"
+			semanticReason = SemanticIndexUnavailableReason
+		}
+	}
+	// An installed online binding is described as online even before a
+	// generation is built: its component statuses and payload-free failure
+	// summary are exactly what an operator needs to read a NOT_BUILT or
+	// UNAVAILABLE semantic dimension honestly.
+	semanticOnline, semanticComponents, semanticFailure := semanticProviderReport(idx, realSemantic || semanticInstalled)
 	return ProviderReadiness{
 		Lexical: ready, Acoustic: fixtures, Semantic: fixtureSemantic || realSemantic, SemanticReal: realSemantic,
 		Multimodal: fixtures, MultimodalInstalled: imageInstalled, MultimodalReal: imageReal,
-		MultimodalState: imageState, MultimodalReason: imageReason, Graph: ready,
+		MultimodalState: imageState, MultimodalReason: imageReason, MultimodalFailure: imageFailure, Graph: ready,
+		SemanticInstalled: semanticInstalled, SemanticState: semanticState, SemanticReason: semanticReason,
 		SemanticOnline: semanticOnline, SemanticComponents: semanticComponents, SemanticFailure: semanticFailure,
 	}
 }
