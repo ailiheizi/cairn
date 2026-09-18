@@ -30,12 +30,13 @@ const (
 )
 
 type onnxImageTowerRunner struct {
-	mu        sync.Mutex
-	vision    *ort.DynamicAdvancedSession
-	text      *ort.DynamicAdvancedSession
-	dimension int
-	imageSize int
-	closed    bool
+	textHasTokenTypes bool
+	mu                sync.Mutex
+	vision            *ort.DynamicAdvancedSession
+	text              *ort.DynamicAdvancedSession
+	dimension         int
+	imageSize         int
+	closed            bool
 }
 
 func newImageTowerRunner(ctx context.Context, assets imageTowerAssets) (imageTowerRunner, error) {
@@ -83,7 +84,16 @@ func newImageTowerRunner(ctx context.Context, assets imageTowerAssets) (imageTow
 		cleanup()
 		return nil, fmt.Errorf("%w: create text tower session: %v", ErrImageTowerUnavailable, err)
 	}
-	return &onnxImageTowerRunner{vision: vision, text: text, dimension: assets.dimension, imageSize: assets.imageSize}, nil
+	hasTokenTypes := false
+	for _, name := range textInputs {
+		if name == imageTextOptionalInputName {
+			hasTokenTypes = true
+		}
+	}
+	return &onnxImageTowerRunner{
+		vision: vision, text: text, dimension: assets.dimension, imageSize: assets.imageSize,
+		textHasTokenTypes: hasTokenTypes,
+	}, nil
 }
 
 // imageTextSessionInputs returns the admitted text inputs in the order the model
@@ -126,8 +136,12 @@ func validateImageVisionModelInfo(model []byte, imageSize, dimension int) error 
 		inputs[0].DataType != ort.TensorElementDataTypeFloat || len(inputs[0].Dimensions) != 4 {
 		return errors.New("vision model input does not match the admitted float32 rank-4 pixel profile")
 	}
+	// A symbolic dimension (0 or negative) means the export did not pin that
+	// axis, which is fine: this host always feeds 3 x imageSize x imageSize from
+	// its declared preprocessing profile. A pinned dimension that disagrees is
+	// still refused, because that model was built for different input.
 	dims := inputs[0].Dimensions
-	if dims[1] != 3 || (dims[2] > 0 && dims[2] != int64(imageSize)) || (dims[3] > 0 && dims[3] != int64(imageSize)) {
+	if (dims[1] > 0 && dims[1] != 3) || (dims[2] > 0 && dims[2] != int64(imageSize)) || (dims[3] > 0 && dims[3] != int64(imageSize)) {
 		return fmt.Errorf("vision model input shape %v does not match 3x%dx%d", dims, imageSize, imageSize)
 	}
 	if len(outputs) != 1 || outputs[0].Name != imageVisionOutputName || outputs[0].OrtValueType != ort.ONNXTypeTensor ||
@@ -215,7 +229,10 @@ func (r *onnxImageTowerRunner) RunText(ctx context.Context, ids, attention, toke
 	if r.closed || r.text == nil {
 		return nil, errors.New("text tower session is closed")
 	}
-	if len(ids) == 0 || len(ids) != len(attention) || len(ids) != len(tokenTypes) {
+	if len(ids) == 0 || len(ids) != len(attention) {
+		return nil, errors.New("text tower inputs are inconsistent")
+	}
+	if r.textHasTokenTypes && len(ids) != len(tokenTypes) {
 		return nil, errors.New("text tower inputs are inconsistent")
 	}
 	shape := ort.NewShape(1, int64(len(ids)))
@@ -229,13 +246,17 @@ func (r *onnxImageTowerRunner) RunText(ctx context.Context, ids, attention, toke
 		return nil, fmt.Errorf("create attention_mask tensor: %w", err)
 	}
 	defer mask.Destroy()
-	types, err := ort.NewTensor(shape, tokenTypes)
-	if err != nil {
-		return nil, fmt.Errorf("create token_type_ids tensor: %w", err)
+	feeds := []ort.Value{inputIDs, mask}
+	if r.textHasTokenTypes {
+		types, err := ort.NewTensor(shape, tokenTypes)
+		if err != nil {
+			return nil, fmt.Errorf("create token_type_ids tensor: %w", err)
+		}
+		defer types.Destroy()
+		feeds = append(feeds, types)
 	}
-	defer types.Destroy()
 	outputs := []ort.Value{nil}
-	if err := runImageSession(ctx, r.text, []ort.Value{inputIDs, mask, types}, outputs); err != nil {
+	if err := runImageSession(ctx, r.text, feeds, outputs); err != nil {
 		return nil, err
 	}
 	if outputs[0] != nil {

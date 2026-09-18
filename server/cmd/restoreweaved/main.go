@@ -54,6 +54,8 @@ func run() error {
 			"Exact-lane repository path (overrides persisted config and RESTOREWEAVE_REPOSITORY)")
 		semanticBundle = flag.String("semantic-bundle", os.Getenv("RESTOREWEAVE_SEMANTIC_BUNDLE"),
 			"operator-provided custom semantic bundle root (overrides configured paths.models profile; not the release-pinned default; disables fixed bundle installation)")
+		imageBundle = flag.String("image-bundle", os.Getenv("RESTOREWEAVE_IMAGE_BUNDLE"),
+			"operator-provided custom image bundle root (overrides configured paths.models profile; not the release-pinned default)")
 		apiListen               = flag.String("api-listen", "", "HTTP /api/v1 listen address (overrides api.listen; empty uses config)")
 		webRoot                 = flag.String("web-root", "", "explicit absolute pre-built WebUI root served on the loopback API listener")
 		apiToken                = flag.String("api-token", os.Getenv("RESTOREWEAVE_API_TOKEN"), "Bearer token for HTTP /api/v1")
@@ -77,6 +79,7 @@ func run() error {
 		catalogPath:            *catalogPath,
 		repositoryPath:         *repositoryPath,
 		semanticBundle:         *semanticBundle,
+		imageBundle:            *imageBundle,
 		semanticBundleOverride: semanticBundleOverride,
 		apiListen:              *apiListen,
 		webRoot:                *webRoot,
@@ -94,6 +97,7 @@ type daemonOptions struct {
 	repositoryPath         string
 	semanticBundle         string
 	semanticBundleOverride bool
+	imageBundle            string
 	apiListen              string
 	webRoot                string
 	apiToken               string
@@ -271,6 +275,40 @@ func configureHybridSemanticBinding(ctx context.Context, resolved rwconfig.Resol
 		return nil, nil, err
 	}
 	return controlplane.WithSemanticIndexerBinding(hybrid, local.zvec, local.libraryPath, local.libraryDigest, local.manifest), local.release, nil
+}
+
+// configureImageBinding admits the installed Chinese-CLIP image bundle and binds
+// it to the image dimension. The binding is optional: without an admitted bundle
+// the dimension reports NOT_BUILT with its reason, and exact save, lexical
+// search, and the text semantic dimension are unaffected. The vector backend is
+// the in-process zvec library the admitted text bundle already ships, because
+// the image bundle admits no vector library of its own.
+func configureImageBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, repo repository.Driver, textBundleRoot, imageBundleRoot string, textBundleOverride bool) (controlplane.DispatcherOption, error) {
+	if strings.TrimSpace(imageBundleRoot) == "" {
+		return nil, nil
+	}
+	admission, err := search.LoadImageBundle(imageBundleRoot)
+	if err != nil {
+		return nil, err
+	}
+	provider, err := processor.NewChineseCLIPImageEmbeddingProvider(ctx, admission, processor.ImageEmbeddingProviderOptions{
+		ConfigDigest: resolved.Digest,
+	})
+	if err != nil {
+		return nil, err
+	}
+	textBundle, err := loadSemanticBundleAdmission(textBundleRoot, textBundleOverride)
+	if err != nil {
+		_ = provider.Close()
+		return nil, fmt.Errorf("image vector backend: %w", err)
+	}
+	libraryPath := filepath.Join(textBundleRoot, filepath.FromSlash(textBundle.Descriptor.Zvec.Path))
+	libraryDigest := "sha256:" + textBundle.AssetDigests["zvec"]
+	source := controlplane.NewRepositoryImageContentSource(repo, 0)
+	return controlplane.WithImageIndexerBinding(
+		provider, search.NewZvecGenerationDriver(libraryPath), source,
+		libraryPath, libraryDigest, provider.Manifest(),
+	), nil
 }
 
 func buildOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (*search.OnlineEmbeddingProvider, search.ZvecGenerationDriver, string, string, search.EmbeddingGenerationManifest, error) {
@@ -470,6 +508,14 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		bundleRoot = filepath.Join(resolved.Config.Paths.Models, search.SemanticBundleBGEProfileID, runtime.GOOS+"-"+runtime.GOARCH)
 	}
 	bundleCapability := semanticBundleCapability(bundleRoot, options.semanticBundleOverride)
+	imageBundleRoot := strings.TrimSpace(options.imageBundle)
+	if imageBundleRoot == "" {
+		imageBundleRoot = filepath.Join(resolved.Config.Paths.Models, search.ImageBundleDefaultProfileID, runtime.GOOS+"-"+runtime.GOARCH)
+	}
+	imageOption, imageErr := configureImageBinding(runCtx, resolved, repo, bundleRoot, imageBundleRoot, options.semanticBundleOverride)
+	if imageErr != nil {
+		log.Printf("image capability unavailable: %v", imageErr)
+	}
 	semanticOption, semanticCleanup, semanticErr := configureSemanticBindingForMode(
 		runCtx, resolved, store, resolved.Config.Paths.Models, bundleRoot, options.semanticBundleOverride)
 	if semanticErr != nil {
@@ -492,6 +538,9 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		controlplane.WithOperatorConfig(resolved),
 		controlplane.WithSemanticBundleCapability(bundleCapability),
 		controlplane.WithVectorPath(resolved.Config.Paths.Vectors), controlplane.WithExact(exactLane),
+	}
+	if imageOption != nil {
+		dispatcherOptions = append(dispatcherOptions, imageOption)
 	}
 	if semanticBundleInstallerEnabled(options) {
 		modelsRoot := resolved.Config.Paths.Models

@@ -34,8 +34,14 @@ func loadClipTextTokenizer(data []byte, maxTokens int) (*bertTokenizer, error) {
 	if raw.Version != "1.0" || string(raw.Truncation) != "null" || string(raw.Padding) != "null" {
 		return nil, fmt.Errorf("%w: unsupported tokenizer envelope", errInvalidClipTextTokenizer)
 	}
+	// The case-folding flag is accepted either way. It is a declared fact rather
+	// than a property of the admitted profile, because the admitted tokenizer
+	// bytes are pinned by asset digest: a bundle that declares a different flag
+	// has different bytes, a different digest, and therefore a different space
+	// and generation. Rejecting one value would refuse a correct Chinese
+	// tokenizer, where case folding is a no-op for the scripts in scope.
 	if raw.Normalizer.Type != "BertNormalizer" || !raw.Normalizer.CleanText || !raw.Normalizer.HandleChineseChars ||
-		string(raw.Normalizer.StripAccents) != "null" || raw.Normalizer.Lowercase {
+		string(raw.Normalizer.StripAccents) != "null" {
 		return nil, fmt.Errorf("%w: unsupported normalizer for the %s profile", errInvalidClipTextTokenizer, ImageTextTokenizerProfileID)
 	}
 	if raw.PreTokenizer.Type != "BertPreTokenizer" || raw.PostProcessor.Type != "TemplateProcessing" ||

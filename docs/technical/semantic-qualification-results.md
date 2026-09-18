@@ -88,6 +88,50 @@ rebuild" and `lexical_coverage.complete=false` (`descriptions: false`) on this
 development corpus, which is the coverage metric working as designed rather
 than a search failure.
 
+## 2026-09-18 Darwin arm64 image dimension bring-up
+
+The image dimension (`multimodal-clip`) went from `NOT_BUILT` to `READY` on this
+development host. This records what was assembled, what broke, and what the live
+retrieval looked like; it is a development bring-up, not a qualification run.
+
+**Artifact.** Chinese-CLIP ViT-B/16 from the community ONNX conversion
+(`Xenova/chinese-clip-vit-base-patch16` @ `f26904860903`; upstream
+`OFA-Sys/chinese-clip-vit-base-patch16`, MIT). The published export is one
+combined graph, so it was split offline into the two towers this bundle admits:
+`vision.onnx` (87.5 MB, `pixel_values` → `image_embeds`) and `text.onnx`
+(103.4 MB, `input_ids` + `attention_mask` → `text_embeds`), both 512-d and
+L2-normalized. The split used onnx 1.22.0 in an isolated environment and was
+verified with onnxruntime 1.30.0 before pinning; the admitted runtime is the
+same ORT 1.29.0 build the text bundle already ships (C API 29). The tokenizer is
+WordPiece with a BERT normalizer (vocab 21128), and its declared
+`do_lower_case=true` is recorded in `tokenizer_version` as `+lowercase`.
+
+**What the bring-up fixed.** Three assumptions in the image code were too
+strict for a real artifact and one was a real bug: the text tower contract
+required three inputs (the admitted export declares two, and the attention mask
+is the correctness-critical one); the vision input validator refused symbolic
+axes (a dynamic export is fine because this host always feeds
+3 × 224 × 224); the tokenizer loader refused a case-folding tokenizer; and the
+crop loop in `PreprocessImageTensor` addressed pixels four times too far, which
+panicked for any image larger than a few pixels and was not covered by a test
+until now.
+
+**Live retrieval** (image generation built over the development corpus, which
+contains one colorful gradient image and one 1×1 black pixel):
+
+| Query | Lexical hits | Image hits | Top fused result |
+| --- | --- | --- | --- |
+| `彩色渐变` (colorful gradient) | 0 | 2 | `demo-photo.png` |
+| `彩虹` (rainbow) | 0 | 2 | `demo-photo.png` |
+| `彩色照片` (colorful photo) | 0 | 2 | `demo-swatch.png` (the 1×1 pixel ranked first) |
+| `photo.png` | 1 | 2 | `demo-photo.png` |
+
+Honest reading of that table: the dimension retrieves and ranks correctly for
+queries that describe the image, and it can also rank a degenerate 1×1 pixel
+above a rich image for an ambiguous query. The 1×1 fixture is a poor evaluation
+item; recall on a representative photo corpus remains unmeasured, and the
+release SBOM and redistribution review for this artifact remain open work.
+
 ## Final candidate package and clean UI rerun
 
 The final candidate-only artifact was assembled with archive digest

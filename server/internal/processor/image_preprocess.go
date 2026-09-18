@@ -112,7 +112,9 @@ func PreprocessImageTensor(data []byte, mediaType string, size int) ([]float32, 
 	tensor := make([]float32, 3*size*size)
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			offset := 4 * ((y+cropY)*resized.Stride + (x+cropX)*4)
+			// NRGBA.Stride is already bytes per row, so the pixel address is
+			// row*Stride + column*4; only the channel index is added on top.
+			offset := (y+cropY)*resized.Stride + (x+cropX)*4
 			for channel := 0; channel < 3; channel++ {
 				value := float64(resized.Pix[offset+channel]) / 255.0
 				normalized := (value - imagePreprocessMean[channel]) / imagePreprocessStd[channel]
