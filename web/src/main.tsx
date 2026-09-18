@@ -97,6 +97,14 @@ function App() {
   const semanticBundleRestartRequired = useMemo(() => semanticBundleReady && /restart required before semantic worker\/index use/i.test(String(semanticBundleCapability?.notes ?? "")), [semanticBundleCapability, semanticBundleReady]);
   const semanticBundleOperatorProvided = useMemo(() => /operator-provided/i.test(String(semanticBundleCapability?.source ?? "")), [semanticBundleCapability]);
   const semanticInstallAvailable = useMemo(() => capabilities.some((item) => item.kind === "operation" && item.id === "semantic.bundle.install" && item.state === "AVAILABLE"), [capabilities]);
+  // The image bundle installs from a local archive and is only implemented when
+  // the daemon is configured with an installer, so the control follows the
+  // daemon rather than the browser.
+  const imageInstallAvailable = useMemo(() => capabilities.some((item) => item.kind === "operation" && item.id === "image.bundle.install" && item.state === "AVAILABLE"), [capabilities]);
+  const imageBundle = useMemo(() => {
+    const entry = capabilities.find((item) => item.kind === "index-dimension" && item.id === "multimodal-clip");
+    return { state: entry ? String(entry.state ?? "") : "", reason: String(entry?.notes ?? "").trim() };
+  }, [capabilities]);
   const searchRebuildAvailable = useMemo(() => capabilities.some((item) => item.kind === "operation" && item.id === "search.rebuild" && item.state === "AVAILABLE"), [capabilities]);
   const isConnected = status === "Connected";
   const isUnavailable = status === "Unavailable";
@@ -225,7 +233,7 @@ function App() {
     }
   }
 
-  const settings = useSettings({ t, settingsOpen, workspaceID, semanticInstallAvailable, searchRebuildAvailable, refreshCapabilities, notify: setNotice });
+  const settings = useSettings({ t, settingsOpen, workspaceID, semanticInstallAvailable, imageInstallAvailable, searchRebuildAvailable, refreshCapabilities, notify: setNotice });
   const recents = useRecents();
   const view = useViewMode();
   const drafts = useLibraryDrafts({ t });
@@ -564,6 +572,9 @@ function App() {
       semanticBundleRestartRequired={semanticBundleRestartRequired}
       semanticBundleOperatorProvided={semanticBundleOperatorProvided}
       semanticInstallAvailable={semanticInstallAvailable}
+      imageInstallAvailable={imageInstallAvailable}
+      imageBundleState={imageBundle.state}
+      imageBundleReason={imageBundle.reason}
       searchRebuildAvailable={searchRebuildAvailable}
       onLocale={setLocale}
       onClose={closeSettings}

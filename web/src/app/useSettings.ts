@@ -16,6 +16,8 @@ export type SettingsFlow = {
   configLoading: boolean;
   configDirty: boolean;
   semanticInstall: ActionFeedback;
+  imageInstall: ActionFeedback;
+  installImageBundle: (archivePath: string) => Promise<void>;
   searchRebuild: ActionFeedback;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
@@ -28,11 +30,12 @@ export type SettingsFlow = {
   resetSemanticActions: () => void;
 };
 
-export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvailable, searchRebuildAvailable, refreshCapabilities, notify }: {
+export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvailable, imageInstallAvailable, searchRebuildAvailable, refreshCapabilities, notify }: {
   t: Translator;
   settingsOpen: boolean;
   workspaceID: string;
   semanticInstallAvailable: boolean;
+  imageInstallAvailable: boolean;
   searchRebuildAvailable: boolean;
   refreshCapabilities: () => Promise<void>;
   notify: (notice: Notice | undefined) => void;
@@ -41,6 +44,7 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
   const [configDraft, setConfigDraft] = useState<any>();
   const [configLoading, setConfigLoading] = useState(false);
   const [semanticInstall, setSemanticInstall] = useState<ActionFeedback>({ state: "IDLE" });
+  const [imageInstall, setImageInstall] = useState<ActionFeedback>({ state: "IDLE" });
   const [searchRebuild, setSearchRebuild] = useState<ActionFeedback>({ state: "IDLE" });
   const configDirty = useMemo(() => Boolean(configDraft && configData?.config && JSON.stringify(configDraft) !== JSON.stringify(configData.config)), [configDraft, configData]);
 
@@ -63,6 +67,29 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
     } catch (error) {
       notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not save settings") });
     } finally { setConfigLoading(false); }
+  }
+  // The image bundle installs from an archive the operator has already put on
+  // this host: the daemon never downloads an image model, so the action needs a
+  // path and reports the daemon's own admission (profile, digest, asset count,
+  // restart) rather than a client-side summary.
+  async function installImageBundle(archivePath: string) {
+    const trimmed = archivePath.trim();
+    if (!imageInstallAvailable || !trimmed || configDirty || configData?.restart_required) return;
+    setImageInstall({ state: "RUNNING" });
+    try {
+      const response = await command(operations.image.bundleInstall, { archive_path: trimmed });
+      const data = response.data ?? {};
+      const parts = [
+        t("Image bundle admitted: {{profile}}", { profile: String(data.profile_id ?? "") }),
+        t("{{count}} verified assets", { count: Number(data.asset_count ?? 0) }),
+      ];
+      if (data.changed === false) parts.push(t("already installed"));
+      if (data.restart_required) parts.push(t("restart required"));
+      setImageInstall({ state: "SUCCEEDED", message: `${parts.join(" · ")}${data.destination ? ` · ${String(data.destination)}` : ""}` });
+      await refreshCapabilities();
+    } catch (error) {
+      setImageInstall({ state: "FAILED", message: error instanceof Error ? error.message : t("Image bundle installation failed.") });
+    }
   }
   async function installSemanticBundle() {
     if (!semanticInstallAvailable || configDirty || configData?.restart_required) return;
@@ -129,6 +156,8 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
     configLoading,
     configDirty,
     semanticInstall,
+    imageInstall,
+    installImageBundle,
     searchRebuild,
     loadSettings,
     saveSettings,

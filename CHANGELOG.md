@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- The image bundle installs from the settings dialog. The search category shows
+  the image profile's own state with the daemon's reason, an archive path field
+  for a file already on the host (the browser never uploads), and an install
+  action that is disabled without a path and follows the daemon's availability.
+  The result is the daemon's own admission — profile, verified asset count,
+  whether it was already installed, the destination, and that a restart is
+  required — rather than a client-side summary, and a missing or invalid archive
+  renders the daemon's reason with no success claim.
 - The browser surfaces the capabilities this build now has. The trusted status
   panel reports the image index and the OCR processor as their own discovery
   facts, read from capability.list with the daemon's own reason, so an installed

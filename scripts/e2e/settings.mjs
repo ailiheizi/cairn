@@ -245,3 +245,41 @@ export async function assertNarrowDrawers(ctx) {
   await restoreDrawer.getByRole("button", { name: /关闭恢复|Close restore/ }).click();
   await assertFocusReturned(ctx, restoreTrigger);
 }
+
+// The image bundle installs from an archive the operator placed on this host, so
+// the control must follow the daemon and the settings state: it is disabled with
+// a named reason when the daemon does not implement the operation or the config
+// still needs saving, and a bad archive path must surface the daemon's own
+// admission failure rather than a client-side guess.
+export async function assertImageBundleInstallControl(ctx) {
+  const { page } = ctx;
+  await page.getByRole("button", { name: /打开设置|Open settings/ }).click();
+  const settings = page.getByRole("dialog", { name: /设置|Settings/ });
+  await settings.waitFor({ state: "visible", timeout: 10000 });
+  await settings.getByRole("button", { name: /搜索|Search/ }).first().click();
+  const field = settings.getByLabel(/本机上的图片包归档路径|Image bundle archive path on this host/);
+  await field.waitFor({ state: "visible", timeout: 10000 });
+  const install = settings.getByRole("button", { name: /从归档安装图片包|Install image bundle from archive/ });
+  assert.ok(await install.isVisible(), "the image install control must render in the search category");
+  assert.equal(await install.isDisabled(), true, "an empty archive path must not reach the daemon");
+  if (await install.isDisabled()) {
+    const reasons = (await settings.locator(".model-action small").allInnerTexts()).join(" ");
+    if (/无法安装图片包|cannot install an image bundle|Restart required|Save settings|重启|保存设置/i.test(reasons)) {
+      // The daemon does not offer the operation, or the config is not saved yet:
+      // both are honest states the dialog must name, and neither may look like a
+      // working install. Nothing further to assert in this configuration.
+      assert.equal(await settings.locator(".model-action-message.success").count(), 0, "no install may be reported without installing");
+      await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
+      return;
+    }
+  }
+  await field.fill("/nonexistent/restoreweave-image-bundle.tar.gz");
+  assert.equal(await install.isDisabled(), false, "a path must enable the install control when the daemon offers the operation");
+  await install.click();
+  const failure = settings.locator(".model-action-message.error");
+  await failure.first().waitFor({ state: "visible", timeout: 15000 });
+  const detail = await failure.first().innerText();
+  assert.match(detail, /archive|归档|no such file|not exist/i, `a missing archive must name the daemon's reason: ${detail}`);
+  assert.equal(await settings.locator(".model-action-message.success").count(), 0, "a failed install must not report success");
+  await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
+}

@@ -18,7 +18,7 @@ import { assertLibraryTiles, assertDetailsViewerNotesAndGuard, assertLibrarySort
 import { seedFixtureAndConnect, assertSourcePlanAndSave, assertSourcePreviewOnEnter, assertSourceSuggestionRecheck, assertSourcesView } from "./e2e/sources.mjs";
 import { assertExportSidecarPolicy, assertRestoreDrawer, assertRestoreFromRecentDestination, assertRestoreUnknownOutcome, assertSelectedExport, assertViewExportWithVerifyRetry, assertDurableSavedViewsAfterReload } from "./e2e/drawers.mjs";
 import { assertSearchResultSurface, assertSearchQueryReexecuted, assertSearchRecents } from "./e2e/search.mjs";
-import { assertResponsiveLayout, assertNarrowDrawers } from "./e2e/settings.mjs";
+import { assertResponsiveLayout, assertNarrowDrawers, assertImageBundleInstallControl } from "./e2e/settings.mjs";
 import { assertOfflinePhase, assertRecoveredPhase } from "./e2e/session.mjs";
 import { assertSearchOperators } from "./e2e/searchops.mjs";
 import { assertDuplicateReview } from "./e2e/duplicates.mjs";
@@ -104,6 +104,7 @@ async function assertOnline(ctx) {
   await assertTagsSurface(ctx);
   await assertSelectionReport(ctx);
   await assertExportSidecarPolicy(ctx);
+  await assertImageBundleInstallControl(ctx);
   await assertVerificationSurface(ctx);
   await assertActivitySurface(ctx);
   await assertDescriptionAction(ctx);

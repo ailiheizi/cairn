@@ -75,6 +75,11 @@ export const operations = {
     list: "description.list",
     get: "description.get",
   },
+  // The image bundle installs from a local archive only: it is a write into the
+  // models root, offered by exactly the vocabulary the daemon implements.
+  image: {
+    bundleInstall: "image.bundle.install",
+  },
   semantic: {
     bundleInstall: "semantic.bundle.install",
   },
