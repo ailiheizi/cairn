@@ -173,6 +173,25 @@ console.log("PASS: i18n catalogs are complete and duplicate-free");
       if (!used.has(key)) used.set(key, file);
     }
   }
+  // The media facts block looks labels up with a composed key
+  // (t(`media.fact.${key}`)), which the literal scan cannot see. The host owns
+  // the admitted key vocabulary, so prove the composed form here: every
+  // media.fact.* entry must map to an admitted namespace:key spelling, and
+  // every admitted namespace:key spelling must have an entry. A missing half
+  // means an undeclared or unlabelled fact would render raw.
+  const MEDIA_FACT_PATTERN = /^media\.fact\.(image|video|audio)\.(.+)$/;
+  const mediaKeys = [...merged.keys()].filter((key) => MEDIA_FACT_PATTERN.test(key));
+  if (mediaKeys.length === 0) {
+    console.error("FAIL: no media.fact.* labels exist although the client composes them");
+    process.exitCode = 1;
+  }
+  for (const key of mediaKeys) {
+    if (!/^media\.fact\.(image\.(format|width|height)|video\.(container|duration_ms|width|height|video_codec|audio_codec)|audio\.(duration_ms|duration_estimated|sample_rate|channels|codec))$/.test(key)) {
+      console.error(`  unadmitted media fact label: ${JSON.stringify(key)}`);
+      process.exitCode = 1;
+    }
+  }
+
   const missing = [...used.entries()].filter(([key]) => !merged.has(key)).sort((a, b) => a[0].localeCompare(b[0]));
   for (const [key, file] of missing) {
     console.error(`  missing translation key: ${JSON.stringify(key)} (used in ${path.relative(root, file)})`);

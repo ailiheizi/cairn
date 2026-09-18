@@ -1201,6 +1201,32 @@ type BookWork struct {
 	ArtifactID string `json:"artifact_id"`
 }
 
+// SubjectFactsData is the subject.facts.list payload: the durable typed facts
+// one subject carries, each with its namespace, key, typed JSON value, value
+// type, authority class, producing artifact reference, and immutable revision.
+// The reader reports the latest revision of every key the subject holds and
+// invents nothing for a key that was never declared.
+type SubjectFactsData struct {
+	WorkspaceID string            `json:"workspace_id"`
+	SubjectRef  string            `json:"subject_ref"`
+	Facts       []SubjectFactData `json:"facts"`
+}
+
+// SubjectFactData is one durable metadata_facts row as the typed read projects
+// it. ValueJSON is the stored typed value, never a rendered string.
+type SubjectFactData struct {
+	MetadataFactID string          `json:"metadata_fact_id"`
+	SubjectRef     string          `json:"subject_ref"`
+	Namespace      string          `json:"namespace"`
+	Key            string          `json:"key"`
+	ValueJSON      json.RawMessage `json:"value_json"`
+	ValueType      string          `json:"value_type"`
+	AuthorityClass string          `json:"authority_class"`
+	SourceRef      string          `json:"source_ref"`
+	Revision       int64           `json:"revision"`
+	CreatedAt      string          `json:"created_at"`
+}
+
 // RecoveryImportInput is the recovery.import input. It names a portable
 // recovery artifact produced by recovery.export plus an independently retained
 // trust anchor path. The operation verifies and admits the closure into a

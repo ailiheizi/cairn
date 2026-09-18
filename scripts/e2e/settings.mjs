@@ -283,3 +283,50 @@ export async function assertImageBundleInstallControl(ctx) {
   assert.equal(await settings.locator(".model-action-message.success").count(), 0, "a failed install must not report success");
   await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
 }
+
+// The online provider and egress surface. A remote provider may only be used
+// under an operator-issued, expiring grant, so the dialog must state the
+// installed profiles and live grants as facts read from the daemon, must never
+// present an installed profile as authorized, and must keep the egress counts
+// honest when the daemon reports neither.
+export async function assertOnlineProviderEgressControl(ctx) {
+  const { page } = ctx;
+  await page.getByRole("button", { name: /打开设置|Open settings/ }).click();
+  const settings = page.getByRole("dialog", { name: /设置|Settings/ });
+  await settings.waitFor({ state: "visible", timeout: 10000 });
+  await settings.getByRole("button", { name: /搜索|Search/ }).first().click();
+  const group = settings.locator(".config-group", { hasText: /在线提供者与出网授权|Online providers and egress/ });
+  await group.waitFor({ state: "visible", timeout: 10000 });
+  const body = (await group.innerText()).trim();
+  if (/未报告已安装的在线提供者|does not report installed online providers/.test(body)) {
+    // This daemon offers no online provider listing: the dialog must say so and
+    // must not claim a profile or a grant exists.
+    assert.doesNotMatch(body, /有效出网授权|Live egress grants/, `an unavailable listing must not claim grant counts: ${body}`);
+    await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
+    return;
+  }
+  const profileRows = await group.locator("[data-egress-profile]").count();
+  const grantRows = await group.locator("[data-egress-grant]").count();
+  const liveGrants = await group.locator("[data-egress-grant]").evaluateAll((nodes) => nodes.filter((node) => /有效至|Live until/.test(node.innerText || "")).length);
+  // The counts in the header must agree with the rows the daemon returned.
+  const counts = await group.locator(".provider-status strong").allInnerTexts();
+  assert.equal(String(counts[0] ?? "").trim(), String(profileRows), `the installed-profile count must equal the rows rendered: ${JSON.stringify(counts)}`);
+  assert.equal(String(counts[1] ?? "").trim(), String(liveGrants), `the live-grant count must equal the live rows rendered: ${JSON.stringify(counts)}`);
+  if (liveGrants === 0) {
+    // Nothing may look authorized while no grant is live.
+    assert.match(body, /没有有效出网授权|No live egress grant exists/, `an ungr grant state must be stated: ${body}`);
+    const notices = (await group.locator(".config-notice").allInnerTexts()).join(" ");
+    assert.match(notices, /没有有效出网授权|No live egress grant exists/, `the warning notice must state that nothing can be sent: ${notices}`);
+  } else {
+    assert.match(body, /有效授权只允许|A live grant authorizes exactly/, `a live grant must state its exact scope: ${body}`);
+  }
+  // An installed profile is not an authorization: the authorize action is a
+  // separate, explicit operator act and no row may claim a grant it does not have.
+  for (const row of await group.locator("[data-egress-profile]").all()) {
+    const text = (await row.innerText()).trim();
+    assert.doesNotMatch(text, /有效至|Live until/, `an installed profile row must not claim a live grant: ${text}`);
+    assert.ok(await row.getByRole("button", { name: /授权 30 天|Authorize for 30 days/ }).count() === 1, `an installed profile must offer its own authorization: ${text}`);
+  }
+  assert.equal(grantRows >= 0, true);
+  await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
+}

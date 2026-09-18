@@ -361,7 +361,7 @@ function App() {
     // backdrop dismissal) returns keyboard users to the control that opened
     // it, just like the add/restore drawers do.
     rememberDrawerTrigger(trigger);
-    setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setExportOpen(false); setSettingsOpen(true); void settings.loadSettings();
+    setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setExportOpen(false); setSettingsOpen(true); void settings.loadSettings(); void settings.loadEgressFacts();
   }
   function closeSettings() {
     if (!settings.canLeaveSettings()) return;
@@ -532,6 +532,10 @@ function App() {
         representations={details.representations}
         descriptions={details.descriptions}
         descriptionsTruncated={details.descriptionsTruncated}
+        mediaFacts={details.mediaFacts}
+        mediaFactsState={details.mediaFactsState}
+        track={details.track}
+        work={details.work}
         annotationStatus={details.detailState.annotations}
         representationsStatus={details.detailState.representations}
         descriptionsStatus={details.detailState.descriptions}

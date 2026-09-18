@@ -218,4 +218,28 @@ export const library: Record<string, string> = {
   "This item has no stable subject reference.": "该项目没有稳定的主体引用。",
   "Library results": "内容库结果",
   "Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.": "使用方向键在项目之间移动，空格键选择当前项目，回车键打开详情，Escape 清除选择。",
+  // Durable media facts: one label per admitted metadata_facts key. The
+  // composed media.fact.<key> lookup is deliberate; every key the host
+  // admits has an entry here so an undeclared key can never render.
+  "Media information": "媒体信息",
+  "Media facts are unavailable in this build.": "本构建无法提供媒体事实。",
+  "No media facts are declared for this file.": "该文件没有声明任何媒体事实。",
+  "Track": "曲目",
+  "Work": "作品",
+  "{{ms}} ms": "{{ms}} 毫秒",
+  "estimated": "估算值",
+  "media.fact.image.format": "图像格式",
+  "media.fact.image.width": "宽度",
+  "media.fact.image.height": "高度",
+  "media.fact.video.container": "容器",
+  "media.fact.video.duration_ms": "时长（毫秒）",
+  "media.fact.video.width": "宽度",
+  "media.fact.video.height": "高度",
+  "media.fact.video.video_codec": "视频编码",
+  "media.fact.video.audio_codec": "音频编码",
+  "media.fact.audio.duration_ms": "时长（毫秒）",
+  "media.fact.audio.duration_estimated": "时长为估算",
+  "media.fact.audio.sample_rate": "采样率",
+  "media.fact.audio.channels": "声道数",
+  "media.fact.audio.codec": "音频编码",
 };

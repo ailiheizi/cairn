@@ -114,11 +114,14 @@ var frozenAdmitted = map[string]bool{
 	command.OpImageBundleInstall: false,
 	command.OpAudioList:          false,
 	command.OpBooksList:          false,
-	command.OpDescriptionCreate:  false,
-	command.OpViewSave:           false,
-	command.OpExportPlan:         false,
-	command.OpExportApply:        false,
-	command.OpExportVerify:       false,
+	// subject.facts.list is read-only, but this four-tool surface keeps one
+	// tool per projection; the browser reads subject facts directly.
+	command.OpSubjectFactsList:  false,
+	command.OpDescriptionCreate: false,
+	command.OpViewSave:          false,
+	command.OpExportPlan:        false,
+	command.OpExportApply:       false,
+	command.OpExportVerify:      false,
 }
 
 // TestReadOnlyAllowlistIsFrozenAndClassified proves the read-only property

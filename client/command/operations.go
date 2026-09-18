@@ -48,6 +48,7 @@ const (
 	OpImageBundleInstall      = "image.bundle.install"
 	OpAudioList               = "audio.list"
 	OpBooksList               = "books.list"
+	OpSubjectFactsList        = "subject.facts.list"
 	OpDescriptionList         = "description.list"
 	OpDescriptionGet          = "description.get"
 	OpDescriptionCreate       = "description.create"
@@ -112,6 +113,7 @@ func KnownOperations() []string {
 		OpImageBundleInstall,
 		OpAudioList,
 		OpBooksList,
+		OpSubjectFactsList,
 		OpDescriptionList,
 		OpDescriptionGet,
 		OpDescriptionCreate,

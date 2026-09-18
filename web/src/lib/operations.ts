@@ -82,6 +82,27 @@ export const operations = {
   },
   semantic: {
     bundleInstall: "semantic.bundle.install",
+    providerList: "semantic.provider.list",
+  },
+  // Durable typed media facts: one subject-scoped read of the same
+  // metadata_facts rows the processor host writes. Track and work metadata
+  // stay in their own projections the daemon already keeps.
+  subjectFacts: {
+    list: "subject.facts.list",
+  },
+  audio: {
+    list: "audio.list",
+  },
+  books: {
+    list: "books.list",
+  },
+  // Remote egress is authorized by an immutable operator-issued grant. The
+  // browser can list what exists and issue or revoke one; it never carries a
+  // credential or a destination of its own.
+  egress: {
+    grantCreate: "egress.grant.create",
+    grantList: "egress.grant.list",
+    grantRevoke: "egress.grant.revoke",
   },
   config: {
     get: "config.get",

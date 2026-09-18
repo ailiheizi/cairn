@@ -832,3 +832,9 @@ selection bar, and the details inspector column. */
 .describe-status .muted { margin: 0; }
 .describe-reasons { min-width: 0; display: grid; gap: 4px; margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .describe-reasons li { overflow-wrap: anywhere; }
+/* Media facts: the durable typed facts a file declared, beside the protection
+   facts. The dl reuses .facts spacing; the extractor line stays monospace so a
+   long codec id or title never rewraps the row. */
+.media-section { margin-top: 18px; }
+.media-section .media-facts { margin-top: 10px; }
+.media-extract { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }

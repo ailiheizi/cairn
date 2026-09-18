@@ -10,6 +10,14 @@ import type { ActionFeedback, Notice } from "../lib/types";
 // configuration, and it is written against the digest the dialog loaded. A
 // restart-required answer stays visible instead of being reported as applied.
 
+export type EgressFacts = {
+  state: "IDLE" | "LOADING" | "READY" | "UNAVAILABLE";
+  reason?: string;
+  modelsRoot: string;
+  profiles: any[];
+  grants: any[];
+};
+
 export type SettingsFlow = {
   configData: any;
   configDraft: any;
@@ -19,7 +27,12 @@ export type SettingsFlow = {
   imageInstall: ActionFeedback;
   installImageBundle: (archivePath: string) => Promise<void>;
   searchRebuild: ActionFeedback;
+  egressFacts: EgressFacts;
+  egressAction: ActionFeedback;
   loadSettings: () => Promise<void>;
+  loadEgressFacts: () => Promise<void>;
+  authorizeProfile: (profile: any) => Promise<void>;
+  revokeGrant: (grantId: string) => Promise<void>;
   saveSettings: () => Promise<void>;
   reloadSettings: () => void;
   installSemanticBundle: () => Promise<void>;
@@ -46,6 +59,8 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
   const [semanticInstall, setSemanticInstall] = useState<ActionFeedback>({ state: "IDLE" });
   const [imageInstall, setImageInstall] = useState<ActionFeedback>({ state: "IDLE" });
   const [searchRebuild, setSearchRebuild] = useState<ActionFeedback>({ state: "IDLE" });
+  const [egressFacts, setEgressFacts] = useState<EgressFacts>({ state: "IDLE", modelsRoot: "", profiles: [], grants: [] });
+  const [egressAction, setEgressAction] = useState<ActionFeedback>({ state: "IDLE" });
   const configDirty = useMemo(() => Boolean(configDraft && configData?.config && JSON.stringify(configDraft) !== JSON.stringify(configData.config)), [configDraft, configData]);
 
   async function loadSettings() {
@@ -127,6 +142,85 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
       setSearchRebuild({ state: "FAILED", message: error instanceof Error ? error.message : t("Search rebuild failed.") });
     }
   }
+  // Remote egress facts are read from the daemon, never assumed: an installed
+  // provider profile and a live grant are two different things, and a build
+  // without an installer or a grant store reports its own reason here.
+  async function loadEgressFacts() {
+    setEgressFacts((current) => ({ ...current, state: "LOADING" }));
+    try {
+      const [providers, grants] = await Promise.all([
+        command(operations.semantic.providerList, {}),
+        command(operations.egress.grantList, workspaceID ? { workspace_id: workspaceID } : {}),
+      ]);
+      setEgressFacts({
+        state: "READY",
+        modelsRoot: String(providers.data?.models_root ?? ""),
+        profiles: Array.isArray(providers.data?.profiles) ? providers.data.profiles : [],
+        grants: Array.isArray(grants.data?.grants) ? grants.data.grants : [],
+      });
+    } catch (error) {
+      setEgressFacts({
+        state: "UNAVAILABLE",
+        reason: error instanceof Error ? error.message : t("Egress facts are unavailable"),
+        modelsRoot: "",
+        profiles: [],
+        grants: [],
+      });
+    }
+  }
+  // One authorization covers one purpose. The daemon needs the document lane
+  // for a rebuild and the query lane for a search, so the action issues both
+  // and names exactly what it authorized.
+  async function authorizeProfile(profile: any) {
+    if (!workspaceID) return;
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    setEgressAction({ state: "RUNNING" });
+    try {
+      const shared = {
+        workspace_id: workspaceID,
+        profile_id: String(profile?.profile_id ?? ""),
+        profile_digest: String(profile?.profile_digest ?? ""),
+        endpoint_host: String(profile?.endpoint_host ?? ""),
+        model_id: String(profile?.model_id ?? ""),
+        data_classes: Array.isArray(profile?.disclosed_data_classes) ? profile.disclosed_data_classes : [],
+        subject_classes: Array.isArray(profile?.allowed_subject_classes) ? profile.allowed_subject_classes : [],
+        max_requests: 500,
+        max_bytes: 256 << 20,
+        max_seconds: 600,
+        expires_at: expiresAt,
+      };
+      const created: string[] = [];
+      for (const purpose of ["DOCUMENT", "QUERY"]) {
+        const response = await command(operations.egress.grantCreate, { ...shared, purpose });
+        created.push(String(response.data?.grant_id ?? ""));
+      }
+      setEgressAction({
+        state: "SUCCEEDED",
+        message: t("Authorized {{count}} grants for {{profile}} until {{date}}", {
+          count: created.length, profile: String(profile?.profile_id ?? ""), date: expiresAt.slice(0, 10),
+        }),
+      });
+      await loadEgressFacts();
+    } catch (error) {
+      setEgressAction({ state: "FAILED", message: error instanceof Error ? error.message : t("Egress authorization failed") });
+    }
+  }
+  async function revokeGrant(grantId: string) {
+    const reason = window.prompt(t("Reason for revoking this egress grant"), t("Revoked from the settings dialog"));
+    if (reason === null) return;
+    setEgressAction({ state: "RUNNING" });
+    try {
+      await command(operations.egress.grantRevoke, {
+        workspace_id: workspaceID,
+        grant_id: grantId,
+        reason: reason.trim() || t("Revoked from the settings dialog"),
+      });
+      setEgressAction({ state: "SUCCEEDED", message: t("Egress grant revoked; nothing further is sent under it.") });
+      await loadEgressFacts();
+    } catch (error) {
+      setEgressAction({ state: "FAILED", message: error instanceof Error ? error.message : t("Egress revocation failed") });
+    }
+  }
   function setConfigField(section: string, field: string, value: unknown) {
     setConfigDraft((current: any) => current ? { ...current, [section]: { ...current[section], [field]: value } } : current);
   }
@@ -159,7 +253,12 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
     imageInstall,
     installImageBundle,
     searchRebuild,
+    egressFacts,
+    egressAction,
     loadSettings,
+    loadEgressFacts,
+    authorizeProfile,
+    revokeGrant,
     saveSettings,
     reloadSettings,
     installSemanticBundle,

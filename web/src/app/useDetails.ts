@@ -40,6 +40,10 @@ export type DetailsFlow = {
   representations: any[];
   descriptions: any[];
   descriptionsTruncated: boolean;
+  mediaFacts: any[];
+  mediaFactsState: "idle" | "loading" | "ready" | "error";
+  track: any | undefined;
+  work: any | undefined;
   detailState: DetailState;
   detailSubjectRef: { current: string };
   loadDetails: (hit: SearchHit) => Promise<void>;
@@ -69,6 +73,10 @@ export function useDetails({ t, workspaceID, selected, setSelected, drafts, libr
   const [representations, setRepresentations] = useState<any[]>([]);
   const [descriptions, setDescriptions] = useState<any[]>([]);
   const [descriptionsTruncated, setDescriptionsTruncated] = useState(false);
+  const [mediaFacts, setMediaFacts] = useState<any[]>([]);
+  const [mediaFactsState, setMediaFactsState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [track, setTrack] = useState<any | undefined>(undefined);
+  const [work, setWork] = useState<any | undefined>(undefined);
   const [detailState, setDetailState] = useState<DetailState>({ subjectRef: "", annotations: "idle", representations: "idle", descriptions: "idle" });
   const detailRequestRef = useRef(0);
   const detailSubjectRef = useRef("");
@@ -88,12 +96,51 @@ export function useDetails({ t, workspaceID, selected, setSelected, drafts, libr
     const requestToken = ++detailRequestRef.current;
     detailSubjectRef.current = subjectRef;
     setSelected(hit); setAnnotations([]); setRepresentations([]); setDescriptions([]); setDescriptionsTruncated(false);
+    setMediaFacts([]); setMediaFactsState("loading"); setTrack(undefined); setWork(undefined);
     drafts.discardDetailDrafts();
     setDetailState({ subjectRef, annotations: "loading", representations: "loading", descriptions: "loading" });
     if (!workspaceID || !subjectRef) {
       setDetailState({ subjectRef, annotations: "error", representations: "error", descriptions: "error" });
+      setMediaFactsState("error");
       return;
     }
+    // Media facts are a background read on the same subject: an operation this
+    // build does not implement (or a subject with no declared facts) renders
+    // as an honest absence, never as a fabricated row.
+    void (async () => {
+      try {
+        const factsResponse = await command(operations.subjectFacts.list, { workspace_id: workspaceID, subject_ref: subjectRef });
+        if (detailRequestRef.current !== requestToken || detailSubjectRef.current !== subjectRef) return;
+        const facts = Array.isArray(factsResponse.data?.facts) ? factsResponse.data.facts : [];
+        setMediaFacts(facts);
+        setMediaFactsState("ready");
+      } catch {
+        if (detailRequestRef.current !== requestToken || detailSubjectRef.current !== subjectRef) return;
+        setMediaFacts([]); setMediaFactsState("error");
+      }
+    })();
+    // Track and work metadata come from the daemon's own audio/books
+    // projections. Their failure degrades to "no declared track/work", which
+    // is exactly what an unextracted file means.
+    void (async () => {
+      try {
+        const [audioResult, booksResult] = await Promise.allSettled([
+          command(operations.audio.list, { workspace_id: workspaceID }),
+          command(operations.books.list, { workspace_id: workspaceID }),
+        ]);
+        if (detailRequestRef.current !== requestToken || detailSubjectRef.current !== subjectRef) return;
+        if (audioResult.status === "fulfilled" && audioResult.value.status === "SUCCEEDED") {
+          const tracks = audioResult.value.data?.tracks ?? [];
+          const matched = tracks.find((item: any) => item?.subject_ref?.trim() === subjectRef);
+          if (matched) setTrack(matched);
+        }
+        if (booksResult.status === "fulfilled" && booksResult.value.status === "SUCCEEDED") {
+          const works = booksResult.value.data?.works ?? [];
+          const matched = works.find((item: any) => item?.subject_ref?.trim() === subjectRef);
+          if (matched) setWork(matched);
+        }
+      } catch { /* an absent projection stays an absent row */ }
+    })();
     const requests = await Promise.allSettled([
       command(operations.annotation.list, { workspace_id: workspaceID, subject_ref: subjectRef }),
       command(operations.representation.list, { workspace_id: workspaceID, subject_ref: subjectRef }),
@@ -235,6 +282,7 @@ export function useDetails({ t, workspaceID, selected, setSelected, drafts, libr
     detailRequestRef.current += 1;
     detailSubjectRef.current = "";
     setDetailState({ subjectRef: "", annotations: "idle", representations: "idle", descriptions: "idle" });
+    setMediaFacts([]); setMediaFactsState("idle"); setTrack(undefined); setWork(undefined);
     drafts.discardDetailDrafts();
     setSelected(undefined);
     requestAnimationFrame(() => window.scrollTo({ top: libraryReturnScrollY.current, left: 0, behavior: "auto" }));
@@ -242,6 +290,7 @@ export function useDetails({ t, workspaceID, selected, setSelected, drafts, libr
   function resetDetailProjection() {
     detailRequestRef.current += 1; detailSubjectRef.current = "";
     setAnnotations([]); setRepresentations([]); setDescriptions([]); setDescriptionsTruncated(false);
+    setMediaFacts([]); setMediaFactsState("idle"); setTrack(undefined); setWork(undefined);
     setDetailState({ subjectRef: "", annotations: "idle", representations: "idle", descriptions: "idle" });
   }
 
@@ -251,6 +300,10 @@ export function useDetails({ t, workspaceID, selected, setSelected, drafts, libr
     representations,
     descriptions,
     descriptionsTruncated,
+    mediaFacts,
+    mediaFactsState,
+    track,
+    work,
     detailState,
     detailSubjectRef,
     loadDetails,

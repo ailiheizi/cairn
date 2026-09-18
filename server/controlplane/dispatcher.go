@@ -347,6 +347,7 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		command.OpNamespaceList:      true,
 		command.OpSourceList:         true,
 		command.OpContentList:        true,
+		command.OpSubjectFactsList:   true,
 		command.OpNamespaceResolve:   true,
 		command.OpNamespaceStat:      true,
 		command.OpNamespaceReadlink:  true,
@@ -659,6 +660,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleAudioList(ctx, env, started)
 	case command.OpBooksList:
 		return d.handleBooksList(ctx, env, started)
+	case command.OpSubjectFactsList:
+		return d.handleSubjectFactsList(ctx, env, started)
 	default:
 		if command.IsKnown(env.Operation) {
 			return unimplementedResult(env, started)

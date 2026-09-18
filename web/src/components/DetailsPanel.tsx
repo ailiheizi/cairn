@@ -31,7 +31,7 @@ type DescribeProbe =
   | { state: "ready"; descriptions: { enabled?: boolean; generate?: string; provider_profile?: string; credential_ref?: string }; generationAdvertised: boolean }
   | { state: "unreadable"; message: string };
 
-export function Details({ workspaceId, hit, annotations, representations, descriptions, descriptionsTruncated, annotationStatus, representationsStatus, descriptionsStatus, annotationMutationEnabled, noteDraft, tagDraft, tagVocabulary, editingNoteID, editingBody, busy, t, locale, onBack, onExport, onDraft, onTagDraft, onAddTag, onDeleteTag, onAdd, onEdit, onDeleteNote, onEditBody, onSaveEdit, onCancelEdit }: { workspaceId: string; hit: SearchHit; annotations: any[]; representations: any[]; descriptions: any[]; descriptionsTruncated: boolean; annotationStatus: DetailResourceStatus; representationsStatus: DetailResourceStatus; descriptionsStatus: DetailResourceStatus; annotationMutationEnabled: boolean; noteDraft: string; tagDraft: string; tagVocabulary: string[]; editingNoteID: string; editingBody: string; busy: boolean; t: Translator; locale: Locale; onBack: () => void; onExport?: () => void; onDraft: (value: string) => void; onTagDraft: (value: string) => void; onAddTag: () => void; onDeleteTag: (tag: any) => void; onAdd: () => void; onEdit: (note: any) => void; onDeleteNote: (note: any) => void; onEditBody: (value: string) => void; onSaveEdit: (note: any) => void; onCancelEdit: () => void }) {
+export function Details({ workspaceId, hit, annotations, representations, descriptions, descriptionsTruncated, mediaFacts, mediaFactsState, track, work, annotationStatus, representationsStatus, descriptionsStatus, annotationMutationEnabled, noteDraft, tagDraft, tagVocabulary, editingNoteID, editingBody, busy, t, locale, onBack, onExport, onDraft, onTagDraft, onAddTag, onDeleteTag, onAdd, onEdit, onDeleteNote, onEditBody, onSaveEdit, onCancelEdit }: { workspaceId: string; hit: SearchHit; annotations: any[]; representations: any[]; descriptions: any[]; descriptionsTruncated: boolean; mediaFacts: any[]; mediaFactsState: "idle" | "loading" | "ready" | "error"; track: any | undefined; work: any | undefined; annotationStatus: DetailResourceStatus; representationsStatus: DetailResourceStatus; descriptionsStatus: DetailResourceStatus; annotationMutationEnabled: boolean; noteDraft: string; tagDraft: string; tagVocabulary: string[]; editingNoteID: string; editingBody: string; busy: boolean; t: Translator; locale: Locale; onBack: () => void; onExport?: () => void; onDraft: (value: string) => void; onTagDraft: (value: string) => void; onAddTag: () => void; onDeleteTag: (tag: any) => void; onAdd: () => void; onEdit: (note: any) => void; onDeleteNote: (note: any) => void; onEditBody: (value: string) => void; onSaveEdit: (note: any) => void; onCancelEdit: () => void }) {
   // The generation action's availability probe: the daemon's persisted
   // description settings plus the operations it advertises. Both are reads. The
   // probe runs once per workspace while the inspector is open, never starts,
@@ -130,6 +130,7 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     <button className="detail-back text-button" onClick={onBack}><ArrowLeft size={15} />{t("Back to results")}</button>
     <div className="detail-title"><span className="file-icon large"><FileSearch size={23} /></span><div className="detail-title-copy"><p className="eyebrow">{t("CONTENT ITEM")}</p><h2>{hit.name || t("Untitled subject")}</h2><small>{formatEntryType(hit.entry_type, t)}</small></div><div className="detail-title-actions">{onExport && <button type="button" className="secondary-button compact detail-export" onClick={onExport}><DownloadIcon size={14} />{t("Export this file")}</button>}<span className={`assurance-seal ${verifiedExact ? "" : "warning"}`}><ShieldCheck size={16} />{t(assuranceLabel)}</span></div></div>
     {hit.entry_type !== "DIRECTORY" && <section className="detail-section preview-section"><div className="section-heading"><h3>{t("Preview")}</h3></div><ContentPreview key={`${workspaceId}:${hit.entry_id || hit.subject_ref || "subject"}:${hit.content_id || ""}`} command={command} locale={locale === "zh-CN" ? "zh-CN" : "en"} workspaceId={workspaceId} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={hit.name || t("Untitled subject")} logicalSize={hit.logical_size} exactAvailable={representationsStatus === "ready" ? previewAvailable : representationsStatus !== "error"} autoOpen /></section>}
+    <MediaFacts facts={mediaFacts} state={mediaFactsState} track={track} work={work} t={t} />
     <dl className="facts"><div><dt>{t("Protection")}</dt><dd><span className={`inline-state ${verifiedExact ? "" : "warning"}`}>{verifiedExact ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{t(exactState)}</span></dd></div>{exact && <div><dt>{t("Logical size")}</dt><dd>{formatBytes(exact.decoded_length)}</dd></div>}</dl>
     <div className="detail-section notes-section"><div className="section-heading"><h3>{t("Notes")}</h3><span>{combinedNotes.length}</span></div>
       <div className="describe-action" data-describe-state={describeChecking ? "checking" : describeEnabled ? "ready" : "disabled"}>
@@ -157,6 +158,46 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     <div className="detail-section source-section"><div className="section-heading"><h3>{t("Source")}</h3></div><p className="source-path-value mono">{hit.path || t("Not recorded")}</p></div>
     <details className="technical-details"><summary><Hash size={14} /><span>{t("Technical details")}</span><small>{t("Full SHA-256 identity and visual fingerprint")}</small><ChevronRight size={14} /></summary><div className="technical-details-body"><div className="identity-band"><div className="identity-label"><span>{t("CONTENT WEAVE")}</span><small>{abbreviateIdentity(hit.content_id)}</small></div><IdentityWeave value={hit.content_id || hit.subject_ref} t={t} /></div><div className="technical-identity"><span>{t("Content identity (SHA-256 + length)")}</span><strong className="mono">{hit.content_id || t("Not available in this result")}</strong></div></div></details>
     <div className="detail-footer"><span><ShieldCheck size={14} />{t("Recovery remains independent of search indexes")}</span></div>
+  </div>;
+}
+
+// MediaFacts renders the durable typed facts one subject declared, read from
+// the same metadata_facts rows the processor host writes. Only a fact the file
+// itself declared is shown: an absent fact is an absent row, never a zero, and
+// an estimated duration says so instead of posing as a measured one. Track and
+// work metadata come from the daemon's own audio/books projections and are
+// labelled as extractor facts with their source.
+function MediaFacts({ facts, state, track, work, t }: { facts: any[]; state: "idle" | "loading" | "ready" | "error"; track: any | undefined; work: any | undefined; t: Translator }) {
+  const mediaState = String(t("Media information"));
+  const rows = (labels: Record<string, string>) => {
+    const out: Array<{ key: string; label: string; value: string }> = [];
+    for (const fact of facts) {
+      const label = labels[`${fact.namespace}:${fact.key}`];
+      if (!label) continue;
+      let value = fact.value_json;
+      if (fact.value_type === "string") value = String(value ?? "").replace(/^"|"$/g, "");
+      if (value === undefined || value === null || value === "") continue;
+      out.push({ key: `${fact.namespace}:${fact.key}:${fact.revision}`, label, value: String(value) });
+    }
+    return out;
+  };
+  const label = (key: string) => t(`media.fact.${key}`);
+  const imageLabels = Object.fromEntries(["image.format", "image.width", "image.height"].map((key) => [`restoreweave.domain.image:${key}`, label(key)]));
+  const videoLabels = Object.fromEntries(["video.container", "video.duration_ms", "video.width", "video.height", "video.video_codec", "video.audio_codec"].map((key) => [`restoreweave.domain.video:${key}`, label(key)]));
+  const audioLabels = Object.fromEntries(["audio.duration_ms", "audio.duration_estimated", "audio.sample_rate", "audio.channels", "audio.codec"].map((key) => [`restoreweave.domain.audio:${key}`, label(key)]));
+  const rowsAll = [...rows(imageLabels), ...rows(videoLabels), ...rows(audioLabels)];
+  const estimated = facts.some((fact) => `${fact.namespace}:${fact.key}` === "restoreweave.domain.audio:audio.duration_estimated" && fact.value_json === true);
+  const trackParts = track ? [track.title || track.name, track.artist, track.album, track.year, track.duration_ms ? t("{{ms}} ms", { ms: track.duration_ms }) : ""].filter(Boolean) : [];
+  const workParts = work ? [work.title || work.name, work.author, work.year].filter(Boolean) : [];
+  const nothing = state === "ready" && rowsAll.length === 0 && !trackParts.length && !workParts.length;
+  return <div className="detail-section media-section" data-media-state={state}>
+    <div className="section-heading"><h3>{mediaState}</h3>{trackParts.length > 0 && <span>{t("Track")}</span>}{workParts.length > 0 && <span>{t("Work")}</span>}</div>
+    {state === "loading" && <p className="muted" role="status">{t("Checking service")}</p>}
+    {state === "error" && <p className="muted" role="status">{t("Media facts are unavailable in this build.")}</p>}
+    {nothing && <p className="muted">{t("No media facts are declared for this file.")}</p>}
+    {rowsAll.length > 0 && <dl className="facts media-facts">{rowsAll.map((row) => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}{row.key.endsWith("audio.duration_ms") && estimated ? ` · ${t("estimated")}` : ""}</dd></div>)}</dl>}
+    {trackParts.length > 0 && <p className="media-extract mono">{t("Track")}: {trackParts.join(" · ")}</p>}
+    {workParts.length > 0 && <p className="media-extract mono">{t("Work")}: {workParts.join(" · ")}</p>}
   </div>;
 }
 

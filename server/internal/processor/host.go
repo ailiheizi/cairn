@@ -640,6 +640,7 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 	var attemptID string
 	var processorReason string
 	var admittedArtifact *sqlite.ProcessorArtifact
+	var admittedFacts []sqlite.MetadataFact
 	startedAt := h.opts.Now().UTC()
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -654,11 +655,13 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 		}
 		reasonCode, reason := processorAttemptReason(status, processorReason, err)
 		artifact := admittedArtifact
+		facts := admittedFacts
 		if status != StatusSucceeded {
 			artifact = nil
+			facts = nil
 		}
 		if recordErr := h.recordProcessorAttemptWithArtifact(context.WithoutCancel(ctx), attemptID, workspaceID, snapshotRef,
-			entry, classification, route, node, status, reasonCode, reason, startedAt, artifact, attemptCtx); recordErr != nil {
+			entry, classification, route, node, status, reasonCode, reason, startedAt, artifact, facts, attemptCtx); recordErr != nil {
 			status = StatusFailed
 			if err == nil {
 				err = recordErr
@@ -755,6 +758,15 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 		Envelope:       envelope,
 		CreatedAt:      h.opts.Now().UTC(),
 	}
+	// The typed facts a processor declares are part of the same durable result
+	// as the artifact that declared them: they are validated here and written
+	// in the artifact's transaction. A processor that declares an unadmitted
+	// key fails the attempt visibly instead of writing a naked row.
+	facts, err := h.durableFactsFor(proc, body, workspaceID, entry.SubjectRef, artifactID)
+	if err != nil {
+		return StatusFailed, err
+	}
+	admittedFacts = facts
 	return StatusSucceeded, nil
 }
 
@@ -787,12 +799,13 @@ func (h *Host) recordProcessorAttempt(ctx context.Context, attemptID, workspaceI
 	entry sqlite.NamespaceEntry, classification ClassificationRecord, route Route, node RouteNode,
 	status ResultStatus, reasonCode, reason string, startedAt time.Time) error {
 	return h.recordProcessorAttemptWithArtifact(ctx, attemptID, workspaceID, snapshotRef, entry,
-		classification, route, node, status, reasonCode, reason, startedAt, nil, attemptContext{fenceToken: 1})
+		classification, route, node, status, reasonCode, reason, startedAt, nil, nil, attemptContext{fenceToken: 1})
 }
 
 func (h *Host) recordProcessorAttemptWithArtifact(ctx context.Context, attemptID, workspaceID, snapshotRef string,
 	entry sqlite.NamespaceEntry, classification ClassificationRecord, route Route, node RouteNode,
-	status ResultStatus, reasonCode, reason string, startedAt time.Time, artifact *sqlite.ProcessorArtifact, attemptCtx attemptContext) error {
+	status ResultStatus, reasonCode, reason string, startedAt time.Time, artifact *sqlite.ProcessorArtifact,
+	facts []sqlite.MetadataFact, attemptCtx attemptContext) error {
 	provenanceFields := map[string]any{
 		"attempt_id":        attemptID,
 		"source_content_id": entry.ContentID,
@@ -854,7 +867,20 @@ func (h *Host) recordProcessorAttemptWithArtifact(ctx context.Context, attemptID
 			artifact.CapabilityID != attempt.CapabilityID || artifact.FenceToken != attempt.FenceToken {
 			return errors.New("processor artifact does not match its terminal attempt")
 		}
-		return tx.InsertProcessorArtifact(ctx, artifact)
+		if err := tx.InsertProcessorArtifact(ctx, artifact); err != nil {
+			return err
+		}
+		// Facts are immutable rows beside the artifact that declared them. The
+		// writer appends a new revision for a changed value and writes nothing
+		// for an unchanged one, so a re-read of the same file is idempotent.
+		for index := range facts {
+			if facts[index].WorkspaceID != attempt.WorkspaceID || facts[index].SubjectRef != attempt.SubjectRef ||
+				facts[index].SourceRef != artifact.ID {
+				return errors.New("processor fact does not match its admitted artifact")
+			}
+		}
+		_, err := tx.RecordMetadataFactRevisions(ctx, facts)
+		return err
 	})
 }
 
@@ -891,13 +917,23 @@ func buildProcessingRoute(classification ClassificationRecord) Route {
 			},
 		}
 	}
-	if hasOCRImageEvidence(classification) {
-		// OCR is an optional operator-installed capability. The node is part of
-		// the declared image route so an uninstalled engine is reported as an
-		// unavailable/inapplicable capability instead of disappearing.
+	if hasVideoEvidence(classification) {
 		return Route{
 			Kind: RouteProcessing,
 			Nodes: []RouteNode{
+				{Stage: StageExtract, CapabilityID: CapabilityVideoMeta},
+			},
+		}
+	}
+	if hasImageEvidence(classification) {
+		// The bundled byte-deterministic image header reader answers the
+		// ordinary dimensions/format question. OCR stays an optional
+		// operator-installed capability on the same route so an uninstalled
+		// engine is reported as unavailable instead of disappearing.
+		return Route{
+			Kind: RouteProcessing,
+			Nodes: []RouteNode{
+				{Stage: StageExtract, CapabilityID: CapabilityImageMeta},
 				{Stage: StageExtract, CapabilityID: CapabilityOCRImageText},
 			},
 		}
@@ -905,13 +941,30 @@ func buildProcessingRoute(classification ClassificationRecord) Route {
 	return Route{Kind: RouteProcessing}
 }
 
-func hasOCRImageEvidence(classification ClassificationRecord) bool {
+func hasImageEvidence(classification ClassificationRecord) bool {
 	for _, item := range classification.Evidence {
 		if strings.HasPrefix(strings.ToLower(item.Candidate.MIME), "image/") {
 			return true
 		}
 		switch item.Candidate.FormatID {
-		case "png", "jpeg", "gif":
+		case "png", "jpeg", "gif", "webp":
+			return true
+		}
+	}
+	return false
+}
+
+// hasVideoEvidence routes a declared video container to the structural video
+// reader. Generic magic-only evidence (iso-bmff, ebml with no declared video
+// type) deliberately does not select this route: an m4a must stay on the audio
+// route, and an unidentified file must not receive video facts.
+func hasVideoEvidence(classification ClassificationRecord) bool {
+	for _, item := range classification.Evidence {
+		if strings.HasPrefix(strings.ToLower(item.Candidate.MIME), "video/") {
+			return true
+		}
+		switch item.Candidate.FormatID {
+		case "mp4", "quicktime", "matroska", "webm", "avi":
 			return true
 		}
 	}
@@ -953,6 +1006,10 @@ func admittedSchema(schemaRef, mediaType string) bool {
 		return true
 	case schemaRef == SchemaRefBookWork() && mediaType == MediaTypeBookJSON:
 		return true
+	case schemaRef == SchemaRefImageMeta() && mediaType == MediaTypeImageJSON:
+		return true
+	case schemaRef == SchemaRefVideoMeta() && mediaType == MediaTypeVideoJSON:
+		return true
 	case schemaRef == SchemaRefAcousticFingerprint() && mediaType == MediaTypeFingerprintJSON:
 		return true
 	case schemaRef == SchemaRefTextEmbedding() && mediaType == MediaTypeEmbeddingJSON:
@@ -964,6 +1021,66 @@ func admittedSchema(schemaRef, mediaType string) bool {
 	default:
 		return false
 	}
+}
+
+// durableFactsFor turns a processor's declared facts into durable rows. It is
+// host-owned: a key outside the admitted vocabulary, a namespace that does not
+// own its key, an unknown value type, a nil value, or a duplicate key fails the
+// attempt instead of writing an unvalidated row. The source reference is the
+// admitted artifact, so every fact points back at the bytes that declared it.
+func (h *Host) durableFactsFor(proc Processor, body []byte, workspaceID, subjectRef, artifactID string) ([]sqlite.MetadataFact, error) {
+	source, ok := proc.(FactSource)
+	if !ok {
+		return nil, nil
+	}
+	declared := source.DurableFacts(body)
+	if len(declared) == 0 {
+		return nil, nil
+	}
+	if len(declared) > maxDurableFactsPerArtifact {
+		return nil, fmt.Errorf("processor %s declared %d facts, above the admitted maximum %d", proc.CapabilityID(), len(declared), maxDurableFactsPerArtifact)
+	}
+	facts := make([]sqlite.MetadataFact, 0, len(declared))
+	seen := make(map[string]struct{}, len(declared))
+	for _, fact := range declared {
+		namespace, admitted := admittedFactNamespaces[fact.Key]
+		if !admitted {
+			return nil, fmt.Errorf("processor %s declared unadmitted fact key %q", proc.CapabilityID(), fact.Key)
+		}
+		if fact.Namespace != namespace {
+			return nil, fmt.Errorf("processor %s declared fact %q in namespace %q, want %q", proc.CapabilityID(), fact.Key, fact.Namespace, namespace)
+		}
+		if !admittedFactValueTypes[fact.ValueType] {
+			return nil, fmt.Errorf("processor %s declared fact %q with value type %q", proc.CapabilityID(), fact.Key, fact.ValueType)
+		}
+		if fact.Value == nil {
+			return nil, fmt.Errorf("processor %s declared fact %q with no value", proc.CapabilityID(), fact.Key)
+		}
+		if _, duplicate := seen[fact.Key]; duplicate {
+			return nil, fmt.Errorf("processor %s declared fact %q twice", proc.CapabilityID(), fact.Key)
+		}
+		seen[fact.Key] = struct{}{}
+		value, err := json.Marshal(fact.Value)
+		if err != nil {
+			return nil, fmt.Errorf("encode fact %q: %w", fact.Key, err)
+		}
+		factID, err := sqlite.NewStableID(sqlite.IDPrefixMetadataFact)
+		if err != nil {
+			return nil, err
+		}
+		facts = append(facts, sqlite.MetadataFact{
+			ID:             factID,
+			WorkspaceID:    workspaceID,
+			SubjectRef:     subjectRef,
+			Namespace:      fact.Namespace,
+			Key:            fact.Key,
+			Value:          value,
+			ValueType:      fact.ValueType,
+			AuthorityClass: AuthorityStagedArtifact,
+			SourceRef:      artifactID,
+		})
+	}
+	return facts, nil
 }
 
 func hasPlainTextEvidence(classification ClassificationRecord) bool {

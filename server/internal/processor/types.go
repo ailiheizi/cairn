@@ -22,6 +22,8 @@ const (
 	CapabilityTextExtract       = "extract.text.v1"
 	CapabilityAudioTags         = "extract.audio.tags.v1"
 	CapabilityBookMeta          = "extract.book.meta.v1"
+	CapabilityImageMeta         = "extract.image.meta.v1"
+	CapabilityVideoMeta         = "extract.video.meta.v1"
 	CapabilityAudioFingerprint  = "fingerprint.audio.fixture.v1"
 	CapabilityTextEmbedding     = "embed.text.fixture.v1"
 	CapabilityClipEmbedding     = "embed.clip.fixture.v1"
@@ -29,6 +31,8 @@ const (
 	SchemaExtractedTextV1       = "restoreweave.artifact.extracted-text.v1"
 	SchemaAudioTrackV1          = "restoreweave.domain.audio.track/v1"
 	SchemaBookWorkV1            = "restoreweave.domain.book.work/v1"
+	SchemaImageMetaV1           = "restoreweave.domain.image.meta/v1"
+	SchemaVideoMetaV1           = "restoreweave.domain.video.meta/v1"
 	SchemaAcousticFingerprintV1 = "restoreweave.artifact.acoustic-fingerprint.v1"
 	SchemaTextEmbeddingV1       = "restoreweave.artifact.text-embedding.v1"
 	SchemaClipEmbeddingV1       = "restoreweave.artifact.clip-embedding.v1"
@@ -36,6 +40,8 @@ const (
 	MediaTypeUTF8Text           = "text/plain; charset=utf-8"
 	MediaTypeAudioJSON          = "application/json"
 	MediaTypeBookJSON           = "application/json"
+	MediaTypeImageJSON          = "application/json"
+	MediaTypeVideoJSON          = "application/json"
 	MediaTypeFingerprintJSON    = "application/json"
 	MediaTypeEmbeddingJSON      = "application/json"
 	MediaTypeOCRJSON            = "application/json"
@@ -149,6 +155,98 @@ type Processor interface {
 	RunStage(ctx context.Context, inv Invocation) (StageResult, error)
 }
 
+// Durable fact namespaces. One namespace per durable fact vocabulary; the key
+// names the field inside it. The host, not the processor, decides which keys
+// may become durable rows.
+const (
+	FactNamespaceImage = "restoreweave.domain.image"
+	FactNamespaceVideo = "restoreweave.domain.video"
+	FactNamespaceAudio = "restoreweave.domain.audio"
+)
+
+// Admitted durable fact keys. A key outside this table is a processor defect
+// and fails the attempt; it never becomes a catalog row.
+const (
+	FactImageFormat = "image.format"
+	FactImageWidth  = "image.width"
+	FactImageHeight = "image.height"
+
+	FactVideoContainer  = "video.container"
+	FactVideoDuration   = "video.duration_ms"
+	FactVideoWidth      = "video.width"
+	FactVideoHeight     = "video.height"
+	FactVideoCodec      = "video.video_codec"
+	FactVideoAudioCodec = "video.audio_codec"
+
+	FactAudioDuration          = "audio.duration_ms"
+	FactAudioDurationEstimated = "audio.duration_estimated"
+	FactAudioSampleRate        = "audio.sample_rate"
+	FactAudioChannels          = "audio.channels"
+	FactAudioCodec             = "audio.codec"
+)
+
+// Fact value types accepted by the metadata_facts writer.
+const (
+	FactValueInteger = "integer"
+	FactValueNumber  = "number"
+	FactValueString  = "string"
+	FactValueBoolean = "boolean"
+)
+
+// admittedFactNamespaces is the host-owned vocabulary: it maps every admitted
+// fact key to its one namespace. It is the only place a key becomes writable.
+var admittedFactNamespaces = map[string]string{
+	FactImageFormat: FactNamespaceImage,
+	FactImageWidth:  FactNamespaceImage,
+	FactImageHeight: FactNamespaceImage,
+
+	FactVideoContainer:  FactNamespaceVideo,
+	FactVideoDuration:   FactNamespaceVideo,
+	FactVideoWidth:      FactNamespaceVideo,
+	FactVideoHeight:     FactNamespaceVideo,
+	FactVideoCodec:      FactNamespaceVideo,
+	FactVideoAudioCodec: FactNamespaceVideo,
+
+	FactAudioDuration:          FactNamespaceAudio,
+	FactAudioDurationEstimated: FactNamespaceAudio,
+	FactAudioSampleRate:        FactNamespaceAudio,
+	FactAudioChannels:          FactNamespaceAudio,
+	FactAudioCodec:             FactNamespaceAudio,
+}
+
+var admittedFactValueTypes = map[string]bool{
+	FactValueInteger: true,
+	FactValueNumber:  true,
+	FactValueString:  true,
+	FactValueBoolean: true,
+}
+
+// maxDurableFactsPerArtifact bounds one artifact's fact set.
+const maxDurableFactsPerArtifact = 32
+
+// DurableFact is one typed key/value fact declared by an admitted artifact
+// body. A fact is emitted only when the source file declared it; the host
+// rejects a fact whose value is nil instead of writing a zero or a guess.
+type DurableFact struct {
+	Namespace string
+	Key       string
+	Value     any
+	ValueType string
+}
+
+// FactSource is implemented by a processor whose artifact body also expresses
+// typed durable facts. The host validates the body's schema first and then
+// records these facts as immutable metadata_facts revisions in the same
+// transaction that admits the artifact.
+type FactSource interface {
+	DurableFacts(body []byte) []DurableFact
+}
+
+// estimateFactSuffix marks a fact whose value is derived rather than declared
+// by the file itself. It is appended to the key so a reader can never mistake
+// an estimate for a declared field.
+const estimateFactSuffix = "_estimated"
+
 // SchemaRefExtractedText pins the bundled extracted-text schema by digest.
 func SchemaRefExtractedText() string {
 	sum := sha256.Sum256([]byte(SchemaExtractedTextV1))
@@ -157,6 +255,16 @@ func SchemaRefExtractedText() string {
 
 func SchemaRefAudioTrack() string {
 	sum := sha256.Sum256([]byte(SchemaAudioTrackV1))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func SchemaRefImageMeta() string {
+	sum := sha256.Sum256([]byte(SchemaImageMetaV1))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func SchemaRefVideoMeta() string {
+	sum := sha256.Sum256([]byte(SchemaVideoMetaV1))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
@@ -191,7 +299,7 @@ func SchemaRefOCRText() string {
 // DefaultProcessors are the in-process EXTRACT pack. Fixture fingerprint
 // and embedding processors are opt-in and are not part of default ingest.
 func DefaultProcessors() []Processor {
-	return []Processor{TextExtract{}, AudioTags{}, BookMeta{}}
+	return []Processor{TextExtract{}, AudioTags{}, BookMeta{}, ImageMeta{}, VideoMeta{}}
 }
 
 func ProducerDigest(capabilityID string) string {

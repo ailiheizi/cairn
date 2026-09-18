@@ -173,9 +173,22 @@ func TestOCRImageTextWithoutTextIsAnExplicitEmptyResult(t *testing.T) {
 	// An explicit empty result is still an admitted, searchable artifact: it
 	// is not an error and not a silent success.
 	assertAttempt(t, harness.attemp, CapabilityOCRImageText, string(StatusSucceeded), "ADMITTED_ARTIFACT")
-	if len(harness.arts) != 1 {
-		t.Fatalf("admitted artifacts = %d, want 1", len(harness.arts))
+	if count := artifactsForCapability(harness.arts, CapabilityOCRImageText); count != 1 {
+		t.Fatalf("admitted OCR artifacts = %d, want 1", count)
 	}
+}
+
+// artifactsForCapability counts admitted artifacts of one capability. The
+// image route carries both the bundled header reader and the optional OCR
+// engine, so an OCR assertion must never be written against the route total.
+func artifactsForCapability(artifacts []sqlite.ProcessorArtifact, capability string) int {
+	count := 0
+	for _, artifact := range artifacts {
+		if artifact.CapabilityID == capability {
+			count++
+		}
+	}
+	return count
 }
 
 // ocrStubEngine is a test seam that returns caller-supplied regions without
@@ -241,8 +254,8 @@ func TestOCRImageTextReportsMissingBundleAsNotBuilt(t *testing.T) {
 	// No bundle root at all: an unconfigured optional capability.
 	harness := ocrRunHarness(t, NewOCRImageText(""), map[string][]byte{"scan.png": encodeOCRFixturePNG(t, []string{"OCR"}, 3)})
 	assertAttempt(t, harness.attemp, CapabilityOCRImageText, string(StatusInapplicable), "PROCESSOR_INAPPLICABLE")
-	if len(harness.arts) != 0 {
-		t.Fatalf("a missing engine admitted %d artifacts", len(harness.arts))
+	if count := artifactsForCapability(harness.arts, CapabilityOCRImageText); count != 0 {
+		t.Fatalf("a missing engine admitted %d OCR artifacts", count)
 	}
 	if !ocrAttemptReason(t, harness.attemp, CapabilityOCRImageText, StatusInapplicable, OCRReasonBundleNotBuilt) {
 		t.Fatalf("attempts = %+v", harness.attemp)
@@ -273,8 +286,8 @@ func TestOCRImageTextReportsMissingBundleAsNotBuilt(t *testing.T) {
 	if !ocrAttemptReason(t, harness.attemp, CapabilityOCRImageText, StatusFailed, OCRReasonBundleUnavailable) {
 		t.Fatalf("attempts = %+v", harness.attemp)
 	}
-	if len(harness.arts) != 0 {
-		t.Fatalf("a broken bundle admitted %d artifacts", len(harness.arts))
+	if count := artifactsForCapability(harness.arts, CapabilityOCRImageText); count != 0 {
+		t.Fatalf("a broken bundle admitted %d OCR artifacts", count)
 	}
 }
 
@@ -316,8 +329,8 @@ func TestOCRImageTextBoundsOversizedImageWithReason(t *testing.T) {
 	processor := ocrFixtureProcessor(fixtureOCREngine{})
 	processor.maxPixels = 64
 	harness := ocrRunHarness(t, processor, map[string][]byte{"large.png": encodeOCRFixturePNG(t, []string{"OCR"}, 3)})
-	if len(harness.arts) != 0 {
-		t.Fatalf("an over-bound image admitted %d artifacts", len(harness.arts))
+	if count := artifactsForCapability(harness.arts, CapabilityOCRImageText); count != 0 {
+		t.Fatalf("an over-bound image admitted %d OCR artifacts", count)
 	}
 	assertAttempt(t, harness.attemp, CapabilityOCRImageText, string(StatusInapplicable), "PROCESSOR_INAPPLICABLE")
 	if !ocrAttemptReason(t, harness.attemp, CapabilityOCRImageText, StatusInapplicable, OCRReasonInputBound) ||
@@ -334,8 +347,8 @@ func TestOCRImageTextTimeoutIsBoundedAndReported(t *testing.T) {
 	if !ocrAttemptReason(t, harness.attemp, CapabilityOCRImageText, StatusCancelled, OCRReasonTimeout) {
 		t.Fatalf("attempts = %+v", harness.attemp)
 	}
-	if len(harness.arts) != 0 {
-		t.Fatalf("a cancelled run admitted %d artifacts", len(harness.arts))
+	if count := artifactsForCapability(harness.arts, CapabilityOCRImageText); count != 0 {
+		t.Fatalf("a cancelled run admitted %d OCR artifacts", count)
 	}
 }
 

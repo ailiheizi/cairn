@@ -109,6 +109,18 @@ The settings dialog, its category index, and the configuration controls. */
 .model-action-message.success { color: #a7dec6; background: rgba(85, 214, 164, 0.08); }
 .model-action-message.error { color: #e2b9a8; background: rgba(244, 119, 107, 0.08); }
 .provider-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 18px; margin-bottom: 22px; padding: 0 17px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: var(--surface-container); box-shadow: inset 0 1px rgba(255, 255, 255, 0.03); }
+/* One installed online provider profile or one durable egress grant. The
+   head keeps the identity on one line and the declared scope below it, so a
+   long endpoint or model id can never squeeze the label column. */
+.egress-list { display: grid; gap: 8px; margin-top: 10px; }
+.egress-row { display: grid; gap: 4px; min-width: 0; border: 1px solid var(--hairline); border-radius: 14px; padding: 10px 12px; background: var(--card-fill-quiet); }
+.egress-row-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.egress-row-head strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 640; overflow-wrap: anywhere; }
+.egress-row-head small { min-width: 0; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.egress-row > small { color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.egress-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.egress-row-actions small { color: #a0a8b0; font-size: 10px; line-height: 1.4; }
+
 .provider-status span, .provider-status strong { min-height: 48px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
 .provider-status span { color: #b8c0c7; }
 .provider-status span svg { color: var(--primary); }
