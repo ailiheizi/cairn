@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- Online API access is real now. An online embedding provider is admitted from
+  an operator-installed profile whose manifest carries the egress scope the
+  requirements name: destination host, disclosed data classes, allowed subject
+  classes, minimization, request/byte/time budgets, expiry, revocation
+  reference, and policy references. Authorization is a durable, append-only
+  egress grant (migration 25) issued per destination/model/purpose with its own
+  expiry and budget; the gate refuses before any network call without one, and
+  every attempt writes an append-only receipt carrying the destination,
+  redacted credential reference, data classes, budget consumption, and input
+  and output digests. The operations are `semantic.provider.install|list` and
+  `egress.grant.create|list|revoke`, reachable from `rw semantic`.
+- Files now declare their media facts durably. Image dimensions and format,
+  video container/duration/dimensions/codecs (ISO-BMFF, Matroska/WebM,
+  RIFF-AVI), and audio duration/sample rate/channels/codec (m4a, mp3 with
+  bitrate estimates labelled as such, wave, ogg/opus/flac) are extracted by
+  byte-deterministic header readers in the default pack, validated against a
+  closed namespace/key/type vocabulary, and written as immutable
+  `metadata_facts` revisions beside the admitted artifact. `subject.facts.list`
+  reads them per subject, and the browser inspector renders a Media
+  information block that shows only what the file declared — an estimated
+  duration says so, and an undeclared fact is an absent row, never a zero.
+- The settings dialog is polished: the image card reflects the dimension's
+  real state, recovery and storage rows state the persisted values, the local
+  bundle card stays visible in online mode because it still supplies the zvec
+  backend, the rebuild action survives a successful install, the Notes
+  category says plainly that no description provider is bound yet, and a new
+  online-providers-and-egress panel lists installed profiles and live grants
+  with an explicit authorize action and per-grant revoke.
 - An installed search provider is no longer reported as "nothing is wired", and
   a filter-only browse no longer tears the vector dimensions down. The semantic
   dimension reports `NOT_BUILT` with `SEMANTIC_INDEX_NOT_BUILT` when a real
