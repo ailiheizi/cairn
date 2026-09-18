@@ -16,73 +16,184 @@ import type { DetailResourceStatus, SearchHit } from "../lib/types";
 // into the single Notes surface; the durable records keep their own provenance.
 
 // On-demand description generation is one explicit action for one subject, and
-// it can only run when the daemon defines an operation for it. `capability.list`
-// advertises one row per known operation; the client can dispatch only a verb
-// its typed map (`lib/operations.ts`) contains. That map holds description reads
-// only, the daemon's single description write (`description.create`) stores a
-// caller-supplied body and runs no provider, and no `DESCRIBE_SUBJECT`
-// operation is advertised today. The closed set below is therefore empty: the
-// action reports the missing capability with the daemon's own configuration
-// state instead of sending a request the daemon does not define.
-const describeGenerationOperationIDs: readonly string[] = [];
+// it can only run when the daemon defines the operation for it and its own
+// gates pass. `capability.list` advertises one row per known operation; the
+// client can dispatch only a verb its typed map (`lib/operations.ts`)
+// contains. `description.generate` is wired when the daemon loaded a describe
+// provider profile, so the action additionally requires a live DESCRIBE egress
+// grant (resolved from the daemon's own grant list) and one explicit
+// confirmation step that names exactly what will be sent before any request.
+const describeGenerationOperationIDs: readonly string[] = ["description.generate"];
+
+// The covering egress grant row the confirmation step binds the dispatch to.
+type DescribeGrant = {
+  grant_id?: string;
+  profile_id?: string;
+  profile_digest?: string;
+  endpoint_host?: string;
+  model_id?: string;
+  purpose?: string;
+  live?: boolean;
+  revoked?: boolean;
+};
 
 type DescribeProbe =
   | { state: "checking" }
-  | { state: "ready"; descriptions: { enabled?: boolean; generate?: string; provider_profile?: string; credential_ref?: string }; generationAdvertised: boolean }
+  | { state: "ready"; descriptions: { enabled?: boolean; generate?: string; provider_profile?: string; credential_ref?: string }; generationAdvertised: boolean; coveringGrant: DescribeGrant | null }
   | { state: "unreadable"; message: string };
+
+// A subject whose admitted image bytes may be part of the disclosure. The
+// daemon decides from its own profile and facts; this only decides whether the
+// confirmation dialog names image bytes as a possible payload.
+function subjectMayDiscloseImageBytes(hit: SearchHit): boolean {
+  return hit.entry_type === "FILE" && /\.(jpe?g|png)$/i.test(hit.name || "");
+}
 
 export function Details({ workspaceId, hit, annotations, representations, descriptions, descriptionsTruncated, mediaFacts, mediaFactsState, track, work, annotationStatus, representationsStatus, descriptionsStatus, annotationMutationEnabled, noteDraft, tagDraft, tagVocabulary, editingNoteID, editingBody, busy, t, locale, onBack, onExport, onDraft, onTagDraft, onAddTag, onDeleteTag, onAdd, onEdit, onDeleteNote, onEditBody, onSaveEdit, onCancelEdit }: { workspaceId: string; hit: SearchHit; annotations: any[]; representations: any[]; descriptions: any[]; descriptionsTruncated: boolean; mediaFacts: any[]; mediaFactsState: "idle" | "loading" | "ready" | "error"; track: any | undefined; work: any | undefined; annotationStatus: DetailResourceStatus; representationsStatus: DetailResourceStatus; descriptionsStatus: DetailResourceStatus; annotationMutationEnabled: boolean; noteDraft: string; tagDraft: string; tagVocabulary: string[]; editingNoteID: string; editingBody: string; busy: boolean; t: Translator; locale: Locale; onBack: () => void; onExport?: () => void; onDraft: (value: string) => void; onTagDraft: (value: string) => void; onAddTag: () => void; onDeleteTag: (tag: any) => void; onAdd: () => void; onEdit: (note: any) => void; onDeleteNote: (note: any) => void; onEditBody: (value: string) => void; onSaveEdit: (note: any) => void; onCancelEdit: () => void }) {
   // The generation action's availability probe: the daemon's persisted
-  // description settings plus the operations it advertises. Both are reads. The
-  // probe runs once per workspace while the inspector is open, never starts,
-  // schedules, or implies a generation, and reports every unmet gate by name.
+  // description settings, the operations it advertises, and its live egress
+  // grant list. All three are reads. The probe runs once per workspace while
+  // the inspector is open, never starts, schedules, or implies a generation,
+  // and reports every unmet gate by name.
   const describeReasonID = useId();
   const [describeProbe, setDescribeProbe] = useState<DescribeProbe>({ state: "checking" });
+  const [describeConfirmOpen, setDescribeConfirmOpen] = useState(false);
+  const [describeBusy, setDescribeBusy] = useState(false);
+  const [describeError, setDescribeError] = useState("");
+  // The generated candidate (and its accepted successor after Accept) is held
+  // locally so the one Notes surface renders the daemon's own result
+  // immediately, with its AI label, non-accepted state, and revision.
+  const [generatedDocument, setGeneratedDocument] = useState<any | null>(null);
   const describeProbeToken = useRef(0);
   useEffect(() => {
     const token = ++describeProbeToken.current;
     setDescribeProbe({ state: "checking" });
+    setDescribeConfirmOpen(false);
+    setDescribeError("");
+    setGeneratedDocument(null);
     void (async () => {
-      const [configResult, capabilityResult] = await Promise.allSettled([
+      const [configResult, capabilityResult, grantResult] = await Promise.allSettled([
         command(operations.config.get, {}),
         command(operations.capability.list, {}),
+        command(operations.egress.grantList, { workspace_id: workspaceId }),
       ]);
       if (describeProbeToken.current !== token) return;
-      if (configResult.status === "rejected" || capabilityResult.status === "rejected") {
-        const failure = configResult.status === "rejected" ? configResult.reason : (capabilityResult as PromiseRejectedResult).reason;
-        setDescribeProbe({ state: "unreadable", message: failure instanceof Error ? failure.message : String(failure) });
+      const failure = [configResult, capabilityResult, grantResult].find((result) => result.status === "rejected");
+      if (failure) {
+        const reason = (failure as PromiseRejectedResult).reason;
+        setDescribeProbe({ state: "unreadable", message: reason instanceof Error ? reason.message : String(reason) });
         return;
       }
-      const capabilities = capabilityResult.value.data?.capabilities ?? [];
+      const capabilities = capabilityResult.status === "fulfilled" ? capabilityResult.value.data?.capabilities ?? [] : [];
+      const grants = grantResult.status === "fulfilled" ? grantResult.value.data?.grants ?? [] : [];
       setDescribeProbe({
         state: "ready",
-        descriptions: configResult.value.data?.config?.descriptions ?? {},
+        descriptions: configResult.status === "fulfilled" ? configResult.value.data?.config?.descriptions ?? {} : {},
         generationAdvertised: capabilities.some((capability: any) => capability?.kind === "operation"
           && capability?.state === "AVAILABLE"
           && describeGenerationOperationIDs.includes(String(capability?.id ?? ""))),
+        coveringGrant: grants.find((grant: DescribeGrant) => grant?.live && !grant?.revoked
+          && String(grant?.purpose ?? "").toUpperCase() === "DESCRIBE") ?? null,
       });
     })();
   }, [workspaceId]);
+  const describeSubjectRef = hit.subject_ref?.trim() ?? "";
+  // A generated result belongs to exactly one subject: switching the inspected
+  // subject drops the local candidate rather than carrying it over.
+  useEffect(() => {
+    setGeneratedDocument(null);
+    setDescribeConfirmOpen(false);
+    setDescribeError("");
+  }, [describeSubjectRef]);
   const describeReasons: string[] = [];
   if (describeProbe.state === "unreadable") {
     describeReasons.push(t("Could not read the daemon's description settings and capabilities: {{message}}", { message: describeProbe.message }));
   } else if (describeProbe.state === "ready") {
     // Every unmet gate is named, deepest last: the settings the operator owns,
-    // then the capability the daemon has to publish before a request could be
-    // dispatched at all.
+    // the capability the daemon has to publish before a request could be
+    // dispatched at all, and the live egress grant the gate itself requires.
     if (describeProbe.descriptions.enabled !== true) describeReasons.push(t("Descriptions are turned off in the settings (descriptions.enabled)."));
     if (String(describeProbe.descriptions.generate ?? "").trim() === "disabled") describeReasons.push(t("On-demand generation is turned off in the settings (descriptions.generate)."));
     if (!String(describeProbe.descriptions.provider_profile ?? "").trim()) describeReasons.push(t("No description provider profile is selected (descriptions.provider_profile)."));
     if (!String(describeProbe.descriptions.credential_ref ?? "").trim()) describeReasons.push(t("No credential reference is configured for the description provider (descriptions.credential_ref)."));
     if (!describeProbe.generationAdvertised) describeReasons.push(t("This daemon does not implement on-demand description generation (no DESCRIBE_SUBJECT operation)."));
+    if (describeProbe.generationAdvertised && !describeProbe.coveringGrant) describeReasons.push(t("No live egress grant covers description generation (egress.grant.list)."));
   }
   const describeChecking = describeProbe.state === "checking";
-  const describeEnabled = describeProbe.state === "ready" && describeReasons.length === 0;
+  const describeGrant = describeProbe.state === "ready" ? describeProbe.coveringGrant : null;
+  const describeEnabled = describeProbe.state === "ready" && describeReasons.length === 0 && describeGrant !== null;
+  // runDescribeGeneration is the ONLY dispatch site of description.generate in
+  // this surface. It fires exactly once per confirmed click, carrying the
+  // egress confirmation the daemon's gate resolves against its live grant.
+  const runDescribeGeneration = async () => {
+    if (!describeEnabled || !describeGrant || !hit.subject_ref) return;
+    setDescribeBusy(true);
+    setDescribeError("");
+    try {
+      const result = await command(operations.description.generate, {
+        workspace_id: workspaceId,
+        subject_ref: hit.subject_ref,
+        kind: "AI_SUMMARY",
+        egress_confirmation: {
+          profile_id: describeGrant.profile_id ?? "",
+          profile_digest: describeGrant.profile_digest ?? "",
+          endpoint_host: describeGrant.endpoint_host ?? "",
+          model: describeGrant.model_id ?? "",
+          purpose: "DESCRIBE",
+          grant_id: describeGrant.grant_id ?? "",
+        },
+      });
+      const document = result.data?.document;
+      if (document) setGeneratedDocument(document);
+      setDescribeConfirmOpen(false);
+    } catch (error) {
+      setDescribeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDescribeBusy(false);
+    }
+  };
+  // acceptGeneratedDocument creates the accepted successor the user decided
+  // on: description.create with the candidate's own body, kind, and
+  // predecessor. The model can never mark its own revision user-accepted.
+  const acceptGeneratedDocument = async () => {
+    const document = generatedDocument;
+    if (!document || !hit.subject_ref) return;
+    setDescribeBusy(true);
+    setDescribeError("");
+    try {
+      const result = await command(operations.description.create, {
+        workspace_id: workspaceId,
+        subject_ref: hit.subject_ref,
+        kind: document.kind,
+        body: document.body,
+        predecessor_id: document.description_document_id || document.id,
+        accepted: true,
+      });
+      const successor = result.data?.document;
+      if (successor) setGeneratedDocument(successor);
+    } catch (error) {
+      setDescribeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDescribeBusy(false);
+    }
+  };
   const notes = annotations.filter((item) => item.kind === "NOTE" && !item.tombstoned);
   // A successor replaces a previous generated/imported note in the daily
-  // view. The complete revision chain remains durable in the catalog.
+  // view. The complete revision chain remains durable in the catalog. The
+  // locally generated candidate (and its accepted successor) is rendered by
+  // its own row below; a daemon list that already contains that revision must
+  // not render it twice.
   const supersededDescriptionIDs = new Set(descriptions.map((item) => item.predecessor_id).filter(Boolean));
-  const currentDescriptions = descriptions.filter((item) => !item.tombstoned && !supersededDescriptionIDs.has(item.description_document_id));
+  // The locally held generated revision (or its accepted successor) is
+  // rendered by its own row below; a daemon list that already carries that
+  // same revision must not render it twice. Its predecessor is already
+  // superseded by it either way.
+  const generatedDocumentID = generatedDocument ? String(generatedDocument.description_document_id || generatedDocument.id || "") : "";
+  const generatedPredecessorID = generatedDocument ? String(generatedDocument.predecessor_id || "") : "";
+  const currentDescriptions = descriptions.filter((item) => !item.tombstoned
+    && !supersededDescriptionIDs.has(item.description_document_id)
+    && item.description_document_id !== generatedDocumentID
+    && item.description_document_id !== generatedPredecessorID);
   const descriptionNotes = currentDescriptions.map((item) => {
     const body = typeof item.body === "string" && item.body.trim()
       ? item.body
@@ -134,20 +245,44 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     <dl className="facts"><div><dt>{t("Protection")}</dt><dd><span className={`inline-state ${verifiedExact ? "" : "warning"}`}>{verifiedExact ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{t(exactState)}</span></dd></div>{exact && <div><dt>{t("Logical size")}</dt><dd>{formatBytes(exact.decoded_length)}</dd></div>}</dl>
     <div className="detail-section notes-section"><div className="section-heading"><h3>{t("Notes")}</h3><span>{combinedNotes.length}</span></div>
       <div className="describe-action" data-describe-state={describeChecking ? "checking" : describeEnabled ? "ready" : "disabled"}>
-        <button type="button" className="secondary-button compact describe-trigger" aria-describedby={describeReasonID} disabled={!describeEnabled}><Sparkles size={14} />{t("Generate a description")}</button>
+        <button type="button" className="secondary-button compact describe-trigger" aria-describedby={describeReasonID} disabled={!describeEnabled || describeBusy} onClick={() => setDescribeConfirmOpen(true)}><Sparkles size={14} />{t("Generate a description")}</button>
         <div className="describe-status" id={describeReasonID} role="status">
           {describeChecking && <p className="muted">{t("Checking whether this daemon can generate a description...")}</p>}
           {!describeChecking && describeReasons.length > 0 && <><p className="muted">{t("Generation is unavailable:")}</p><ul className="describe-reasons">{describeReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></>}
-          {describeEnabled && <p className="muted">{t("Generation runs only from this action, for this one subject; it never starts on selection or ingest.")}</p>}
+          {describeEnabled && !describeConfirmOpen && !generatedDocument && <p className="muted">{t("Generation runs only from this action, for this one subject; it never starts on selection or ingest.")}</p>}
+          {describeEnabled && describeConfirmOpen && describeGrant && <div className="describe-confirm">
+            <p>{t("Send one description request for this subject to the model provider?")}</p>
+            <ul className="describe-reasons">
+              <li>{t("What is sent: this subject's extracted text")}{subjectMayDiscloseImageBytes(hit) ? t("; because this is an image file, its image bytes may be sent") : ""}{t(". Private notes and other descriptions are never sent.")}</li>
+              <li>{t("Provider: {{profile}} ({{digest}}) at {{host}}", { profile: String(describeGrant.profile_id ?? ""), digest: String(describeGrant.profile_digest ?? ""), host: String(describeGrant.endpoint_host ?? "") })}</li>
+              <li>{t("Model: {{model}} · purpose DESCRIBE · egress grant {{grant}}", { model: String(describeGrant.model_id ?? ""), grant: String(describeGrant.grant_id ?? "") })}</li>
+            </ul>
+            <div className="note-actions">
+              <button type="button" className="text-button" onClick={() => setDescribeConfirmOpen(false)} disabled={describeBusy}>{t("Cancel")}</button>
+              <button type="button" className="primary-button compact" onClick={runDescribeGeneration} disabled={describeBusy}>{t("Send to the model provider")}</button>
+            </div>
+          </div>}
+          {describeError && <p className="muted" role="alert">{t("Generation failed: {{message}}", { message: describeError })}</p>}
         </div>
       </div>
       <div className="notes-list">
+        {generatedDocument && (() => {
+          const body = typeof generatedDocument.body === "string" && generatedDocument.body.trim() ? generatedDocument.body : t("Note content unavailable");
+          const revision = generatedDocument.revision;
+          return <div className="note-row source-note" data-generated-description={String(generatedDocumentID)}>
+            <p>{body}</p>
+            <div className="note-meta">
+              <span>{[descriptionKindLabel(generatedDocument.kind, t), generatedDocument.accepted ? t("Accepted") : t("Not accepted"), revision ? t("revision {{revision}}", { revision }) : ""].filter(Boolean).join(" · ")}</span>
+              {!generatedDocument.accepted && <span className="note-icon-actions"><button type="button" className="text-button" onClick={acceptGeneratedDocument} disabled={describeBusy}>{t("Accept")}</button></span>}
+            </div>
+          </div>;
+        })()}
         {annotationStatus !== "ready" && <p className="muted" role="status">{detailStatus(annotationStatus)}</p>}
         {descriptionsStatus === "loading" && <p className="muted" role="status">{t("Loading additional notes...")}</p>}
         {descriptionsTruncated && descriptionsStatus === "ready" && <p className="muted" role="status">{t("Showing the latest notes; older note history is not loaded yet.")}</p>}
         {descriptionsStatus === "error" && <p className="muted" role="status">{t("Some imported or generated notes are unavailable.")}</p>}
         {(annotationStatus === "ready" || descriptionsStatus === "ready") && combinedNotes.length > 0 && combinedNotes.map(renderNote)}
-        {annotationStatus === "ready" && descriptionsStatus === "ready" && combinedNotes.length === 0 && <p className="muted">{t("No notes yet.")}</p>}
+        {annotationStatus === "ready" && descriptionsStatus === "ready" && combinedNotes.length === 0 && !generatedDocument && <p className="muted">{t("No notes yet.")}</p>}
       </div>
       <div className="note-composer"><textarea aria-label={t("New note")} value={noteDraft} onChange={(event) => onDraft(event.target.value)} placeholder={t("Add useful context about this file")} disabled={!canMutateAnnotations} /><button className="primary-button compact" onClick={onAdd} disabled={busy || !canMutateAnnotations || !noteDraft.trim()}><Plus size={14} />{t("Add note")}</button></div>
     </div>

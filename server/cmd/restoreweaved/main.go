@@ -439,6 +439,47 @@ func renewAndValidateSemanticLease(ctx context.Context, fencer exact.Publication
 	return fencer.Validate(ctx, domain, owner, leaseToken, fenceToken, now)
 }
 
+// configureDescribeBinding admits the configured DESCRIBE_SUBJECT profile and
+// binds the on-demand description generation provider. The binding is
+// optional: an empty descriptions.provider_profile (or generate=disabled)
+// keeps description.generate unimplemented, and a profile that cannot be
+// admitted fails the daemon's describe capability honestly instead of being
+// silently replaced. The provider is egress-gated like every remote
+// disclosure: it requires a live durable grant and — unless the operator's
+// remote-egress safety switch says otherwise — an explicit per-request
+// confirmation naming that grant.
+func configureDescribeBinding(resolved rwconfig.ResolvedConfig, store *sqlite.Store) (controlplane.DispatcherOption, error) {
+	descriptions := resolved.Config.Descriptions
+	profileID := strings.TrimSpace(descriptions.ProviderProfile)
+	if profileID == "" || strings.TrimSpace(descriptions.Generate) == "disabled" {
+		return nil, nil
+	}
+	profile, err := search.LoadOnlineDescribeProfile(resolved.Config.Paths.Models, profileID)
+	if err != nil {
+		return nil, err
+	}
+	provider, err := search.NewOnlineDescribeProvider(search.OnlineDescribeProviderOptions{
+		Profile: profile,
+		// The provider-neutral remote egress safety switch governs every
+		// remote disclosure; per-request confirmations stay required while it
+		// is false.
+		SendWithoutConfirmation: resolved.Config.Semantic.SendContentWithoutConfirmation,
+		AuditSink:               controlplane.NewDescribeEgressAuditSink(store),
+		SubjectPolicy:           controlplane.NewSemanticEgressSubjectPolicy(store),
+		Grants:                  controlplane.NewSemanticEgressGrantLookup(store),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if readinessErr := provider.CheckDescribeReadiness(context.Background()); readinessErr != nil {
+		// The provider stays bound so capability and status name the exact
+		// failed condition; the daemon starts with the describe operation
+		// present but failing closed, not silently enabled.
+		log.Printf("describe provider egress not ready: %v", readinessErr)
+	}
+	return controlplane.WithDescribeProvider(provider, resolved.Config.Paths.Models), nil
+}
+
 func runWithOptions(ctx context.Context, options daemonOptions) error {
 	if options.recoveryReader {
 		return runRecoveryReader(ctx, options)
@@ -606,6 +647,16 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	}
 	if semanticOption != nil {
 		dispatcherOptions = append(dispatcherOptions, semanticOption)
+	}
+	// Description generation is an explicit, on-demand operation bound to its
+	// own separately admitted profile. A missing or unadmittable profile is a
+	// logged, visible condition; it never blocks the daemon or the exact lane.
+	describeOption, describeErr := configureDescribeBinding(resolved, store)
+	if describeErr != nil {
+		log.Printf("description generation unavailable: %v", describeErr)
+	}
+	if describeOption != nil {
+		dispatcherOptions = append(dispatcherOptions, describeOption)
 	}
 	dispatcher := controlplane.NewDispatcher(store, catalogPath, options.socketPath, dispatcherOptions...)
 	if semanticOption != nil || imageOption != nil {

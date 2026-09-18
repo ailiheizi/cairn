@@ -435,10 +435,12 @@ func TestSemanticEgressOutputDigestIsDeterministicAndBound(t *testing.T) {
 }
 
 func TestEgressScopeVocabularyIsClosed(t *testing.T) {
-	if len(EgressDataClasses()) != 2 {
+	// The closed data-class vocabulary is the two embedding classes plus the
+	// two additive describe-family classes.
+	if len(EgressDataClasses()) != 4 {
 		t.Fatalf("data classes = %+v", EgressDataClasses())
 	}
-	for _, class := range []string{EgressDataClassTextSegment, EgressDataClassTextQuery} {
+	for _, class := range []string{EgressDataClassTextSegment, EgressDataClassTextQuery, EgressDataClassTextSubjectContext, EgressDataClassImageBytes} {
 		if !ValidEgressDataClass(class) {
 			t.Fatalf("data class %q must be valid", class)
 		}
@@ -452,8 +454,9 @@ func TestEgressScopeVocabularyIsClosed(t *testing.T) {
 	if ValidEgressSubjectClass("EXACT_MAYBE") {
 		t.Fatal("an unknown subject class must be refused")
 	}
-	if !ValidEgressPurpose(EgressPurposeDocument) || !ValidEgressPurpose(EgressPurposeQuery) || ValidEgressPurpose("OTHER") {
-		t.Fatal("purpose vocabulary must be exactly DOCUMENT and QUERY")
+	if !ValidEgressPurpose(EgressPurposeDocument) || !ValidEgressPurpose(EgressPurposeQuery) ||
+		!ValidEgressPurpose(EgressPurposeDescribe) || ValidEgressPurpose("OTHER") {
+		t.Fatal("purpose vocabulary must be exactly DOCUMENT, QUERY, and DESCRIBE")
 	}
 	if EgressDataClassForPurpose(EgressPurposeQuery) != EgressDataClassTextQuery ||
 		EgressDataClassForPurpose(EgressPurposeDocument) != EgressDataClassTextSegment {

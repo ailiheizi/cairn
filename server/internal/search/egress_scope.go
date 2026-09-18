@@ -27,11 +27,26 @@ const (
 	EgressDataClassTextSegment = "text.segment"
 	// EgressDataClassTextQuery names one query string sent for embedding.
 	EgressDataClassTextQuery = "text.query"
+	// EgressDataClassTextSubjectContext names the subject's admitted EXTRACT
+	// text the host assembles for a DESCRIBE_SUBJECT request. The class lives
+	// in the describe family; an embedding request never carries it.
+	EgressDataClassTextSubjectContext = "text.subject_context"
+	// EgressDataClassImageBytes names the subject's admitted image bytes a
+	// DESCRIBE_SUBJECT request may carry as a base64 data URL part. The class
+	// lives in the describe family; an embedding request never carries it.
+	EgressDataClassImageBytes = "image.bytes"
 )
 
 // EgressDataClasses returns the closed data-class vocabulary in stable order.
+// The first two entries are the embedding family's classes; the last two are
+// the describe family's classes (EgressDataClassTextSubjectContext and
+// EgressDataClassImageBytes). The vocabulary stays closed: neither a profile
+// nor a grant may name a class outside it.
 func EgressDataClasses() []string {
-	return []string{EgressDataClassTextSegment, EgressDataClassTextQuery}
+	return []string{
+		EgressDataClassTextSegment, EgressDataClassTextQuery,
+		EgressDataClassTextSubjectContext, EgressDataClassImageBytes,
+	}
 }
 
 // Egress subject classes are exactly the protection outcomes the host policy

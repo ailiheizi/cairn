@@ -47,14 +47,22 @@ type Dispatcher struct {
 	onlineProviderModelsRoot       string
 	onlineProviderInstaller        OnlineProviderProfileInstaller
 	onlineProviderInstallMu        sync.Mutex
-	now                            func() time.Time
-	exact                          *exact.Service
-	search                         *search.Indexer
-	fixtureDimensions              bool
-	sessions                       *contentSessions
-	access                         *access.Service
-	recoveryReader                 *recoveryReaderState
-	operatorConfig                 *operatorConfigState
+	// describeProvider is the on-demand DESCRIBE_SUBJECT provider bound at
+	// daemon startup. A nil provider keeps description.generate visible but
+	// unimplemented, which keeps the operation's capability row honest.
+	describeProvider search.DescribeProvider
+	// describeModelsRoot is the models root the describe provider's profile
+	// was admitted from. Egress grant creation verifies a grant against the
+	// installed profile there when no embedding profile matches.
+	describeModelsRoot string
+	now                func() time.Time
+	exact              *exact.Service
+	search             *search.Indexer
+	fixtureDimensions  bool
+	sessions           *contentSessions
+	access             *access.Service
+	recoveryReader     *recoveryReaderState
+	operatorConfig     *operatorConfigState
 	// ocrBundleRoot is the single operator-installed OCR profile location
 	// below the resolved paths.models root. It is empty when no persisted
 	// profile was supplied; OCR then reports NOT_BUILT and never runs.
@@ -285,6 +293,21 @@ func WithOnlineProviderInstaller(modelsRoot string, installer OnlineProviderProf
 	}
 }
 
+// WithDescribeProvider binds the on-demand DESCRIBE_SUBJECT provider the
+// daemon admitted at startup and enables the description.generate operation.
+// A nil provider leaves the operation unimplemented so capability.list keeps
+// reporting the honest state. modelsRoot is where the provider's immutable
+// profile is installed; egress grant creation verifies against it.
+func WithDescribeProvider(provider search.DescribeProvider, modelsRoot string) DispatcherOption {
+	return func(d *Dispatcher) {
+		if provider == nil {
+			return
+		}
+		d.describeProvider = provider
+		d.describeModelsRoot = strings.TrimSpace(modelsRoot)
+	}
+}
+
 // WithExact enables capture-qualified ingest, snapshot list/diff/verify,
 // recovery.export, and catalog-free restore when a repository-backed exact
 // service is available.
@@ -392,6 +415,12 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 	}
 	if dispatcher.onlineProviderInstaller != nil && dispatcher.onlineProviderModelsRoot != "" {
 		implemented[command.OpSemanticProviderInstall] = true
+	}
+	// description.generate is implemented only when a describe provider was
+	// admitted at startup; otherwise the operation stays unimplemented and
+	// capability.list reports it as unavailable.
+	if dispatcher.describeProvider != nil {
+		implemented[command.OpDescriptionGenerate] = true
 	}
 	if dispatcher.store != nil {
 		// Egress grant operations are durable catalog facts; they need no
@@ -590,6 +619,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleDescriptionGet(ctx, env, started)
 	case command.OpDescriptionCreate:
 		return d.handleDescriptionCreate(ctx, env, started)
+	case command.OpDescriptionGenerate:
+		return d.handleDescriptionGenerate(ctx, env, started)
 	case command.OpPlanRestore:
 		return d.handlePlanRestore(ctx, env, started)
 	case command.OpSnapshotList:

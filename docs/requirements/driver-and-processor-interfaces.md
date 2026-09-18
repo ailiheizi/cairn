@@ -548,7 +548,7 @@ Every invocation has hard limits for CPU, accelerator, memory, temporary storage
 
 Attempt fencing covers staging allocation and seal, artifact admission, derivative-preference changes, and index-feed publication. A stale worker cannot seal or admit output after its lease or fence has been replaced.
 
-Remote processing requires an immutable egress grant naming the destination, disclosed data classes, allowed subject classes, minimization, credentials, request and byte budgets, expiry, and audit requirements. Redirects and reconnects remain within the declared destination policy.
+Remote processing requires an immutable egress grant naming the destination, disclosed data classes, allowed subject classes, minimization, credentials, request and byte budgets, expiry, and audit requirements. The implemented grant ledger serves both remote provider families and its purpose vocabulary is `DOCUMENT | QUERY | DESCRIBE`. Redirects and reconnects remain within the declared destination policy.
 
 File bytes, metadata, extracted text, model output, and external descriptions are untrusted data. They MUST NOT be interpreted as instructions that broaden capabilities or modify the route.
 

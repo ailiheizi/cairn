@@ -6,23 +6,25 @@
 //
 // What the daemon actually defines (probed against a real temporary daemon):
 // `capability.list` advertises `description.list`, `description.get`, and
-// `description.create`; there is no `description.generate`, no
-// `subject.describe`, and no `DESCRIBE_SUBJECT` operation. `description.create`
-// stores a caller-supplied body (`source_ref: "command:description.create"`,
-// `producer_profile: "command"`, `accepted: false`) and runs no provider, and an
-// empty body is rejected with `invalid_input: body is required`. The default
-// profile has `descriptions.enabled: true`, `generate: "on_demand"`, and an
-// empty `provider_profile`/`credential_ref`.
+// `description.create`; a daemon that started without a describe provider
+// profile leaves `description.generate` unimplemented, so its capability row
+// is UNAVAILABLE. `description.create` stores a caller-supplied body
+// (`source_ref: "command:description.create"`, `producer_profile: "command"`,
+// `accepted: false`) and runs no provider, and an empty body is rejected with
+// `invalid_input: body is required`. The default profile has
+// `descriptions.enabled: true`, `generate: "on_demand"`, and an empty
+// `provider_profile`/`credential_ref`.
 //
-// These assertions therefore prove the honest shape instead of a fake one: the
-// action exists for the inspected subject, is disabled, names every unmet gate
-// (including the missing DESCRIBE_SUBJECT operation) on the button's own
-// described-by element, and never sends a generation request - not on
-// selection, not with a fully configured provider profile, not even when the
-// settings read fails. Model-produced text that the daemon *does* return is
-// asserted to render exactly, once, in the one Notes list with its source label
-// and its non-accepted state, and a failed read is asserted to render the
-// unavailable status with no fabricated record.
+// These assertions prove the honest shape end to end: the action is disabled
+// with every unmet gate named (no provider profile, no DESCRIBE_SUBJECT
+// operation, no live egress grant), it never sends a generation request on
+// open or selection, and when the daemon does advertise the operation the
+// action still needs one live DESCRIBE egress grant plus one explicit
+// confirmation step that names what will be sent. The enabled path then
+// dispatches `description.generate` exactly once with the egress confirmation,
+// renders the daemon's own non-accepted result in the one Notes list, and the
+// Accept action creates the accepted successor through `description.create`
+// (same body, kind, and predecessor) - the model never self-accepts.
 
 import assert from "node:assert/strict";
 import { escapeRegExp } from "./support.mjs";
@@ -44,16 +46,52 @@ function waitForCondition(check, message, timeout = 10000) {
 }
 
 // A generation request is any description write or any describe/generate verb.
-// The inspector's own reads (`description.list`/`description.get`) are the only
-// description operations this feature may ever send today.
+// The inspector's own reads (`description.list`/`description.get`) plus its
+// probe reads (config, capability, grant list) are the only operations this
+// feature may send outside one explicit confirmed generation and its Accept.
 function generationRequests(operations) {
   return operations.filter((operation) => /generate|describe(?!ription\.(list|get))/i.test(operation)
     || (operation.startsWith("description.") && operation !== "description.list" && operation !== "description.get"));
 }
 
+// A configured, healthy-looking settings document for the mocked enabled paths.
+const configuredDescriptions = { enabled: true, generate: "on_demand", provider_profile: "fixture-describe-v1", credential_ref: "keychain://restoreweave/notes", retain_full_text: true };
+
+// The live DESCRIBE egress grant row the enabled paths resolve, shaped like a
+// real `egress.grant.list` entry.
+const fixtureGrant = {
+  grant_id: "egt_0000000000000000000000000000f1ea",
+  workspace_id: "wsp_00000000000000000000000000000000",
+  profile_id: "fixture-describe-v1",
+  profile_digest: "sha256:000000000000000000000000000000000000000000000000000000000000f1ea",
+  endpoint_host: "provider.example.invalid:443",
+  model_id: "fixture-describe-model",
+  purpose: "DESCRIBE",
+  data_classes: ["text.subject_context"],
+  subject_classes: ["EXACT_PROTECTED", "EXACT_FALLBACK", "EXTERNAL_REPLAYABLE"],
+  max_requests: 4, max_bytes: 1048576, max_seconds: 120,
+  expires_at: "2027-09-19T00:00:00Z",
+  granted_by: "operator",
+  created_at: "2026-09-18T00:00:00Z",
+  live: true,
+  revoked: false,
+};
+
+// capability.list mock that augments the daemon's real rows with an AVAILABLE
+// description.generate operation, so the probe sees an honest wired daemon.
+async function fulfillCapabilitiesWithGenerate(route) {
+  const response = await route.fetch();
+  let payload;
+  try { payload = await response.json(); } catch { await route.fulfill({ response }); return; }
+  payload.data = payload.data ?? {};
+  payload.data.capabilities = payload.data.capabilities ?? [];
+  payload.data.capabilities.push({ kind: "operation", id: "description.generate", state: "AVAILABLE", notes: "implemented by restoreweaved" });
+  await route.fulfill({ status: response.status(), contentType: "application/json", body: JSON.stringify(payload) });
+}
+
 export async function assertDescriptionAction(ctx) {
   const { page } = ctx;
-  const observed = { operations: [], descriptionListInputs: [] };
+  const observed = { operations: [], descriptionListInputs: [], generateInputs: [], createInputs: [] };
   const onRequest = (request) => {
     if (request.method() !== "POST" || !request.url().endsWith("/api/v1/command")) return;
     let payload;
@@ -61,6 +99,8 @@ export async function assertDescriptionAction(ctx) {
     const operation = String(payload?.operation ?? "");
     observed.operations.push(operation);
     if (operation === "description.list") observed.descriptionListInputs.push(payload?.input ?? {});
+    if (operation === "description.generate") observed.generateInputs.push(payload?.input ?? {});
+    if (operation === "description.create") observed.createInputs.push(payload?.input ?? {});
   };
   page.on("request", onRequest);
   const subjectButton = (name) => page.getByRole("main").getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}$`) }).first();
@@ -274,6 +314,164 @@ export async function assertDescriptionAction(ctx) {
     assert.doesNotMatch(configuredReason, /descriptions\.provider_profile|descriptions\.credential_ref/, `a configured profile and credential must clear their own gate: ${configuredReason}`);
     assert.equal(await describeTrigger().isDisabled(), true, "a configured profile must not enable a generation the daemon cannot run");
     assert.deepEqual(generationRequests(observed.operations), [], `a configured profile must not produce a made-up generation request: ${JSON.stringify(observed.operations)}`);
+    await page.unroute("**/api/v1/command");
+    await closeDetails();
+
+    // 7. The daemon advertises description.generate and the settings select a
+    // provider profile, but no live DESCRIBE egress grant exists: the action
+    // stays disabled and names the missing grant, and still nothing is sent.
+    await page.route("**/api/v1/command", async (route) => {
+      let payload;
+      try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
+      if (payload?.operation === "config.get") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
+        return;
+      }
+      if (payload?.operation === "capability.list") { await fulfillCapabilitiesWithGenerate(route); return; }
+      if (payload?.operation === "egress.grant.list") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [] } }) });
+        return;
+      }
+      await route.continue();
+    });
+    observed.operations.length = 0;
+    await subjectButton("alpha.txt").click();
+    await page.getByRole("main").getByRole("heading", { name: /^alpha\.txt$/ }).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('.describe-action[data-describe-state="disabled"]').waitFor({ state: "visible", timeout: 10000 });
+    const noGrantReason = await describeAction().locator(".describe-reasons").innerText();
+    assert.match(noGrantReason, /egress\.grant\.list/, `a missing live grant must be named on the action: ${noGrantReason}`);
+    assert.doesNotMatch(noGrantReason, /DESCRIBE_SUBJECT/, `a wired daemon clears its own capability gate: ${noGrantReason}`);
+    assert.equal(await describeTrigger().isDisabled(), true, "no live egress grant must leave the action disabled");
+    assert.deepEqual(generationRequests(observed.operations), [], `a missing grant must not be answered with a generation request: ${JSON.stringify(observed.operations)}`);
+    await page.unroute("**/api/v1/command");
+    await closeDetails();
+
+    // 8. The full honest enabled path: wired daemon, configured profile, one
+    // live DESCRIBE grant. Clicking shows ONE confirmation step that names
+    // exactly what will be sent and which grant authorizes it; only the
+    // explicit confirm dispatches description.generate, the daemon's own
+    // non-accepted result renders in the one Notes list, and the Accept action
+    // creates the accepted successor through description.create.
+    const candidateID = "dsc_0000000000000000000000000000000f01";
+    const candidateBody = "Fixture generated description: the archive item is a text note.";
+    const successorID = "dsc_0000000000000000000000000000000f02";
+    let alphaSubjectRefForFixture = "";
+    await page.route("**/api/v1/command", async (route) => {
+      let payload;
+      try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
+      if (payload?.operation === "config.get") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
+        return;
+      }
+      if (payload?.operation === "capability.list") { await fulfillCapabilitiesWithGenerate(route); return; }
+      if (payload?.operation === "egress.grant.list") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [fixtureGrant] } }) });
+        return;
+      }
+      if (payload?.operation === "description.list") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.list", status: "SUCCEEDED", data: { documents: [], truncated: false } }) });
+        return;
+      }
+      if (payload?.operation === "description.generate") {
+        assert.equal(String(payload?.input?.subject_ref ?? "").length > 0, true, "the generation must name its subject");
+        assert.equal(payload?.input?.kind, "AI_SUMMARY", "the inspector generates AI_SUMMARY candidates");
+        const confirmation = payload?.input?.egress_confirmation ?? {};
+        assert.equal(confirmation.profile_id, fixtureGrant.profile_id, "the egress confirmation must bind the covering grant's profile");
+        assert.equal(confirmation.profile_digest, fixtureGrant.profile_digest, "the egress confirmation must bind the profile digest");
+        assert.equal(confirmation.endpoint_host, fixtureGrant.endpoint_host, "the egress confirmation must bind the destination host");
+        assert.equal(confirmation.model, fixtureGrant.model_id, "the egress confirmation must bind the model");
+        assert.equal(confirmation.purpose, "DESCRIBE", "the egress confirmation must carry the DESCRIBE purpose");
+        assert.equal(confirmation.grant_id, fixtureGrant.grant_id, "the egress confirmation must bind the live grant id");
+        alphaSubjectRefForFixture = String(payload.input.subject_ref);
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.generate", status: "SUCCEEDED", data: { document: {
+          description_document_id: candidateID,
+          workspace_id: "wsp_00000000000000000000000000000000",
+          subject_ref: alphaSubjectRefForFixture,
+          kind: "AI_SUMMARY",
+          language: "und",
+          body: candidateBody,
+          body_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000f01",
+          source_ref: "provider:describe:fixture-describe-v1",
+          producer_profile: "fixture-describe-v1",
+          producer_profile_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+          visibility: "private",
+          accepted: false,
+          revision: 1,
+          predecessor_id: "",
+          created_at: "2026-09-19T00:00:00Z",
+          updated_at: "2026-09-19T00:00:00Z",
+          segments: [],
+        } } }) });
+        return;
+      }
+      if (payload?.operation === "description.create") {
+        assert.equal(payload?.input?.predecessor_id, candidateID, "the acceptance successor must name the candidate as its predecessor");
+        assert.equal(payload?.input?.accepted, true, "the acceptance successor must be the user's accepted revision");
+        assert.equal(payload?.input?.kind, "AI_SUMMARY", "the acceptance successor keeps the candidate's kind");
+        assert.equal(payload?.input?.body, candidateBody, "the acceptance successor retains the candidate body");
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.create", status: "SUCCEEDED", data: { document: {
+          description_document_id: successorID,
+          workspace_id: "wsp_00000000000000000000000000000000",
+          subject_ref: alphaSubjectRefForFixture,
+          kind: "AI_SUMMARY",
+          language: "und",
+          body: candidateBody,
+          body_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000f01",
+          source_ref: "command:description.create",
+          producer_profile: "command",
+          visibility: "private",
+          accepted: true,
+          revision: 2,
+          predecessor_id: candidateID,
+          created_at: "2026-09-19T00:00:00Z",
+          updated_at: "2026-09-19T00:00:00Z",
+          segments: [],
+        } } }) });
+        return;
+      }
+      await route.continue();
+    });
+    observed.operations.length = 0;
+    observed.generateInputs.length = 0;
+    observed.createInputs.length = 0;
+    await subjectButton("alpha.txt").click();
+    await page.getByRole("main").getByRole("heading", { name: /^alpha\.txt$/ }).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('.describe-action[data-describe-state="ready"]').waitFor({ state: "visible", timeout: 10000 });
+    const readyTrigger = describeTrigger();
+    assert.equal(await readyTrigger.isEnabled(), true, "a wired daemon with a live grant must enable the action");
+    assert.deepEqual(generationRequests(observed.operations), [], `the ready action must still not send anything on its own: ${JSON.stringify(observed.operations)}`);
+    await readyTrigger.click();
+    const confirmBlock = describeAction().locator(".describe-confirm");
+    await confirmBlock.waitFor({ state: "visible", timeout: 10000 });
+    const confirmText = await confirmBlock.innerText();
+    assert.match(confirmText, new RegExp(escapeRegExp(fixtureGrant.profile_id)), `the confirmation must name the provider profile: ${confirmText}`);
+    assert.match(confirmText, new RegExp(escapeRegExp(fixtureGrant.endpoint_host)), `the confirmation must name the destination host: ${confirmText}`);
+    assert.match(confirmText, new RegExp(escapeRegExp(fixtureGrant.grant_id)), `the confirmation must name the live grant: ${confirmText}`);
+    assert.match(confirmText, /提取文本|extracted text/, `the confirmation must name what is sent: ${confirmText}`);
+    assert.doesNotMatch(confirmText, /keychain:\/\//, "the confirmation must never carry credential material");
+    assert.deepEqual(generationRequests(observed.operations), [], `the confirmation step itself must not dispatch anything: ${JSON.stringify(observed.operations)}`);
+    await confirmBlock.getByRole("button", { name: /发送给模型提供方|Send to the model provider/ }).click();
+    const generatedRow = page.locator('.notes-list .note-row.source-note[data-generated-description]').filter({ hasText: candidateBody });
+    await generatedRow.waitFor({ state: "visible", timeout: 10000 });
+    assert.equal(await generatedRow.count(), 1, "the generated result must render exactly once in the Notes list");
+    const generatedMeta = await generatedRow.locator(".note-meta").innerText();
+    assert.match(generatedMeta, /AI/, `the generated note must carry its AI source label: ${generatedMeta}`);
+    assert.match(generatedMeta, /未接受|Not accepted/, `the daemon's non-accepted state must stay visible: ${generatedMeta}`);
+    assert.match(generatedMeta, /版本 1|revision 1/, `the generated note must keep its durable revision: ${generatedMeta}`);
+    assert.equal(observed.generateInputs.length, 1, "exactly one confirmed generation request must be dispatched");
+    assert.deepEqual(generationRequests(observed.operations), ["description.generate"], `only the confirmed generation may be a write: ${JSON.stringify(observed.operations)}`);
+    await capture("/tmp/rw-describe-generated.png", ".notes-list .note-row.source-note[data-generated-description]");
+    await assertNoOverflow("generated note at 1512x950");
+    // Accept: the user's decision creates the accepted successor; the row then
+    // shows the accepted state and the successor revision, and the candidate is
+    // not duplicated anywhere in the Notes list.
+    await generatedRow.getByRole("button", { name: /接受|Accept/ }).click();
+    const acceptedRow = page.locator('.notes-list .note-row.source-note[data-generated-description]').filter({ hasText: candidateBody });
+    await acceptedRow.getByText(/已接受|Accepted/).waitFor({ state: "visible", timeout: 10000 });
+    const acceptedMeta = await acceptedRow.locator(".note-meta").innerText();
+    assert.match(acceptedMeta, /版本 2|revision 2/, `the accepted successor must carry its own revision: ${acceptedMeta}`);
+    assert.equal(observed.createInputs.length, 1, "the Accept action must dispatch exactly one description.create");
+    assert.equal(await page.getByText(candidateBody, { exact: true }).count(), 1, "the accepted note must not be duplicated in the Notes list");
     await page.unroute("**/api/v1/command");
     await closeDetails();
     await assertNoOverflow("library after the describe assertions at 1512x950");

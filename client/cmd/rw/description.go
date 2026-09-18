@@ -15,10 +15,11 @@ import (
 const descriptionCLIInputLimit = 16 << 20
 
 func newDescriptionCommand(env *clientEnv) *cobra.Command {
-	description := &cobra.Command{Use: "description", Short: "Create and inspect durable description revisions"}
+	description := &cobra.Command{Use: "description", Short: "Create, generate, and inspect durable description revisions"}
 	description.AddCommand(newDescriptionListCommand(env))
 	description.AddCommand(newDescriptionGetCommand(env))
 	description.AddCommand(newDescriptionCreateCommand(env))
+	description.AddCommand(newDescriptionGenerateCommand(env))
 	return description
 }
 

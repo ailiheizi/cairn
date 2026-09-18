@@ -123,10 +123,14 @@ var frozenAdmitted = map[string]bool{
 	command.OpSimilarityScan:    false,
 	command.OpSimilarityGroups:  false,
 	command.OpDescriptionCreate: false,
-	command.OpViewSave:          false,
-	command.OpExportPlan:        false,
-	command.OpExportApply:       false,
-	command.OpExportVerify:      false,
+	// description.generate is a write: it can create a durable description
+	// revision and disclose subject material to a remote provider, so it is
+	// never admitted to the read-only surface.
+	command.OpDescriptionGenerate: false,
+	command.OpViewSave:            false,
+	command.OpExportPlan:          false,
+	command.OpExportApply:         false,
+	command.OpExportVerify:        false,
 }
 
 // TestReadOnlyAllowlistIsFrozenAndClassified proves the read-only property

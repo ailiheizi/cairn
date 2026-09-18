@@ -74,6 +74,16 @@ export const operations = {
   description: {
     list: "description.list",
     get: "description.get",
+    // On-demand DESCRIBE_SUBJECT generation through the daemon's egress gate.
+    // It is a write (it can create a durable revision and disclose subject
+    // material to the configured provider) and runs only from the explicit,
+    // confirmed details-panel action.
+    generate: "description.generate",
+    // The immutable revision write. The details panel uses it for exactly one
+    // user decision: accepting a generated candidate as the accepted successor
+    // (same body, kind, and predecessor). It stores a caller-supplied body and
+    // never runs a provider.
+    create: "description.create",
   },
   // The image bundle installs from a local archive only: it is a write into the
   // models root, offered by exactly the vocabulary the daemon implements.

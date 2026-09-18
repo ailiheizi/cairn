@@ -27,6 +27,9 @@ import (
 const (
 	EgressGrantPurposeDocument = "DOCUMENT"
 	EgressGrantPurposeQuery    = "QUERY"
+	// EgressGrantPurposeDescribe is the additive DESCRIBE_SUBJECT purpose: the
+	// same durable grant ledger serves both provider families.
+	EgressGrantPurposeDescribe = "DESCRIBE"
 )
 
 // EgressGrant is one durable immutable grant row.
@@ -77,7 +80,7 @@ type EgressGrantMatch struct {
 }
 
 func validEgressGrantPurpose(value string) bool {
-	return value == EgressGrantPurposeDocument || value == EgressGrantPurposeQuery
+	return value == EgressGrantPurposeDocument || value == EgressGrantPurposeQuery || value == EgressGrantPurposeDescribe
 }
 
 func normalizeEgressGrantClasses(name string, values []string) ([]string, error) {
@@ -125,7 +128,7 @@ func (tx *Tx) InsertEgressGrant(ctx context.Context, grant *EgressGrant) error {
 		}
 	}
 	if !validEgressGrantPurpose(grant.Purpose) {
-		return fmt.Errorf("egress grant purpose %q must be %s or %s", grant.Purpose, EgressGrantPurposeDocument, EgressGrantPurposeQuery)
+		return fmt.Errorf("egress grant purpose %q must be %s, %s, or %s", grant.Purpose, EgressGrantPurposeDocument, EgressGrantPurposeQuery, EgressGrantPurposeDescribe)
 	}
 	dataClasses, err := normalizeEgressGrantClasses("egress grant data classes", grant.DataClasses)
 	if err != nil {

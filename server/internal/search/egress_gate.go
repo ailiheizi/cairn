@@ -39,15 +39,18 @@ import (
 // Egress grant purpose vocabulary. It is the same purpose vocabulary the
 // embedding provider uses, kept as plain strings so a second provider family
 // can name its own admitted purposes without redefining this gate.
+// EgressPurposeDescribe is the additive DESCRIBE_SUBJECT purpose: it names the
+// same gate, the same durable grant ledger, and the same receipts.
 const (
 	EgressPurposeDocument = string(SemanticEmbeddingDocument)
 	EgressPurposeQuery    = string(SemanticEmbeddingQuery)
+	EgressPurposeDescribe = "DESCRIBE"
 )
 
 // ValidEgressPurpose reports whether value is a grant purpose this build
 // admits.
 func ValidEgressPurpose(value string) bool {
-	return value == EgressPurposeDocument || value == EgressPurposeQuery
+	return value == EgressPurposeDocument || value == EgressPurposeQuery || value == EgressPurposeDescribe
 }
 
 // EgressDataClassForPurpose maps one admitted purpose onto the data class the
@@ -254,9 +257,9 @@ func EgressConfirmationMismatch(confirmation SemanticEgressConfirmation, want Eg
 	case strings.TrimSpace(confirmation.ModelID) != want.ModelID:
 		return "the confirmation names a different model"
 	case confirmation.Purpose == "":
-		return "the confirmation does not bind an embedding purpose"
+		return "the confirmation does not bind an egress purpose"
 	case string(confirmation.Purpose) != want.Purpose:
-		return "the confirmation names a different embedding purpose"
+		return "the confirmation names a different egress purpose"
 	case strings.TrimSpace(confirmation.GrantID) == "":
 		return "the confirmation does not bind an egress grant"
 	case strings.TrimSpace(confirmation.GrantID) != want.GrantID:

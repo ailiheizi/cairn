@@ -833,6 +833,39 @@ type DescriptionCreateData struct {
 	Document DescriptionDocumentData `json:"document"`
 }
 
+// DescriptionGenerateInput is the description.generate input. It names one
+// subject and the requested durable kind (AI_SUMMARY or AI_ANALYSIS only);
+// the daemon selects the configured DESCRIBE_SUBJECT profile, assembles the
+// gated input from admitted facts only, and admits the candidate as a new
+// non-accepted immutable revision. egress_confirmation carries the typed
+// per-request authorization (profile, destination host, model, purpose
+// DESCRIBE, and the live grant id) the egress gate requires unless the
+// operator's remote-egress switch skips confirmations.
+type DescriptionGenerateInput struct {
+	WorkspaceID        string                              `json:"workspace_id"`
+	SubjectRef         string                              `json:"subject_ref"`
+	Kind               string                              `json:"kind"`
+	Language           string                              `json:"language,omitempty"`
+	Title              string                              `json:"title,omitempty"`
+	EgressConfirmation *DescriptionEgressConfirmationInput `json:"egress_confirmation,omitempty"`
+}
+
+// DescriptionEgressConfirmationInput is the typed per-request egress
+// confirmation the caller resolved from the live grant list. The daemon fills
+// the content digest: only the daemon assembles the exact inputs.
+type DescriptionEgressConfirmationInput struct {
+	ProfileID     string `json:"profile_id,omitempty"`
+	ProfileDigest string `json:"profile_digest,omitempty"`
+	EndpointHost  string `json:"endpoint_host,omitempty"`
+	ModelID       string `json:"model,omitempty"`
+	Purpose       string `json:"purpose"`
+	GrantID       string `json:"grant_id"`
+}
+
+type DescriptionGenerateData struct {
+	Document DescriptionDocumentData `json:"document"`
+}
+
 type SearchHitData struct {
 	SubjectRef    string              `json:"subject_ref"`
 	EntryID       string              `json:"entry_id,omitempty"`
