@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- The library answers "find me more like this one": `search.query` accepts an
+  additive `image_subject_ref`, the daemon re-reads that subject's bytes
+  through the identity-checking repository content source, admits them with
+  the same decode rules as ingest, and the image model's own vision tower
+  embeds the query against the stored generation's space fingerprint. Fusion
+  asks what material each dimension received, so an image-only query runs the
+  image space and reports the text space as skipped rather than a silent zero;
+  text-only behavior is unchanged; text and image together are refused as
+  ambiguous; and a missing, oversized, or undecodable query image is a typed
+  refusal that never revokes a verified generation. The browser offers the
+  action when exactly one image is selected.
+- Optional similarity review (candidate groups that are never identity):
+  `similarity.scan` computes a 64-bit dHash per image through an explicit
+  bounded scan, and `similarity.groups` projects candidate groups — images by
+  Hamming distance, audio by declared artist/title and duration only — with
+  the non-identity rule restated on every payload and enforced in the
+  browser's new review section. Exact duplicates are flagged, never merged;
+  no operation offers delete or merge; and the scan stays outside the signed
+  attempt lineage through a narrowly scoped migration-26 exception.
+- The shell is installable on a phone: a web app manifest and apple web-app
+  metas join the existing 390 px layout.
 - Online API access is real now. An online embedding provider is admitted from
   an operator-installed profile whose manifest carries the egress scope the
   requirements name: destination host, disclosed data classes, allowed subject
