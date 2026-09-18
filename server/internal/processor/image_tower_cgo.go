@@ -19,6 +19,14 @@ const (
 	imageVisionInputName  = "pixel_values"
 	imageVisionOutputName = "image_embeds"
 	imageTextOutputName   = "text_embeds"
+	// The text tower must consume the tokens and their attention mask: without
+	// the mask the padded positions would pollute the embedding, which is a
+	// correctness problem rather than a compatibility one. Token type ids are
+	// optional, because the admitted CLIP-family exports differ on whether the
+	// text tower declares them at all.
+	imageTextRequiredInputName = "input_ids"
+	imageTextMaskInputName     = "attention_mask"
+	imageTextOptionalInputName = "token_type_ids"
 )
 
 type onnxImageTowerRunner struct {
@@ -62,14 +70,51 @@ func newImageTowerRunner(ctx context.Context, assets imageTowerAssets) (imageTow
 		cleanup()
 		return nil, fmt.Errorf("%w: create vision session: %v", ErrImageTowerUnavailable, err)
 	}
+	textInputs, err := imageTextSessionInputs(assets.textBytes)
+	if err != nil {
+		_ = vision.Destroy()
+		cleanup()
+		return nil, fmt.Errorf("%w: %v", ErrImageTowerUnavailable, err)
+	}
 	text, err := ort.NewDynamicAdvancedSessionWithONNXData(assets.textBytes,
-		[]string{"input_ids", "attention_mask", "token_type_ids"}, []string{imageTextOutputName}, nil)
+		textInputs, []string{imageTextOutputName}, nil)
 	if err != nil {
 		_ = vision.Destroy()
 		cleanup()
 		return nil, fmt.Errorf("%w: create text tower session: %v", ErrImageTowerUnavailable, err)
 	}
 	return &onnxImageTowerRunner{vision: vision, text: text, dimension: assets.dimension, imageSize: assets.imageSize}, nil
+}
+
+// imageTextSessionInputs returns the admitted text inputs in the order the model
+// declares them, so a tower without token type ids binds a two-input session
+// while a tower that declares them keeps the three-input one.
+func imageTextSessionInputs(model []byte) ([]string, error) {
+	inputs, _, err := ort.GetInputOutputInfoWithONNXData(model)
+	if err != nil {
+		return nil, fmt.Errorf("inspect admitted text model: %w", err)
+	}
+	names := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		switch input.Name {
+		case imageTextRequiredInputName, imageTextMaskInputName, imageTextOptionalInputName:
+			names = append(names, input.Name)
+		default:
+			return nil, fmt.Errorf("text model input %q is outside the admitted text profile", input.Name)
+		}
+	}
+	if len(names) < 2 {
+		return nil, fmt.Errorf("text model must consume %s and %s, got %v", imageTextRequiredInputName, imageTextMaskInputName, names)
+	}
+	return names, nil
+}
+
+func inputNames(inputs []ort.InputOutputInfo) []string {
+	names := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		names = append(names, input.Name)
+	}
+	return names
 }
 
 func validateImageVisionModelInfo(model []byte, imageSize, dimension int) error {
@@ -98,9 +143,10 @@ func validateImageTextModelInfo(model []byte, dimension int) error {
 	if err != nil {
 		return fmt.Errorf("inspect admitted text model: %w", err)
 	}
-	want := map[string]bool{"input_ids": false, "attention_mask": false, "token_type_ids": false}
-	if len(inputs) != len(want) {
-		return fmt.Errorf("text model has %d inputs, want %d", len(inputs), len(want))
+	want := map[string]bool{
+		imageTextRequiredInputName: false,
+		imageTextMaskInputName:     false,
+		imageTextOptionalInputName: false,
 	}
 	for _, input := range inputs {
 		seen, ok := want[input.Name]
@@ -108,6 +154,9 @@ func validateImageTextModelInfo(model []byte, dimension int) error {
 			return fmt.Errorf("text model input %q does not match the admitted int64 rank-2 profile", input.Name)
 		}
 		want[input.Name] = true
+	}
+	if !want[imageTextRequiredInputName] || !want[imageTextMaskInputName] {
+		return fmt.Errorf("text model must consume %s and %s, got %v", imageTextRequiredInputName, imageTextMaskInputName, inputNames(inputs))
 	}
 	if len(outputs) != 1 || outputs[0].Name != imageTextOutputName || outputs[0].OrtValueType != ort.ONNXTypeTensor ||
 		outputs[0].DataType != ort.TensorElementDataTypeFloat || len(outputs[0].Dimensions) != 2 ||
