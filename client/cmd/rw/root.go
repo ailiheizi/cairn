@@ -141,6 +141,7 @@ func NewRootCommand() *exitCommand {
 	root.AddCommand(newExportCommand(env))
 	root.AddCommand(newSearchCommand(env))
 	root.AddCommand(newSemanticCommand(env))
+	root.AddCommand(newImageCommand(env))
 	root.AddCommand(newTagCommand(env))
 	root.AddCommand(newNoteCommand(env))
 	root.AddCommand(newAnnotationCommand(env))

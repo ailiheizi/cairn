@@ -132,6 +132,34 @@ above a rich image for an ambiguous query. The 1×1 fixture is a poor evaluation
 item; recall on a representative photo corpus remains unmeasured, and the
 release SBOM and redistribution review for this artifact remain open work.
 
+### Reproducible assembly and install
+
+The image bundle is rebuilt by `scripts/assemble-image-bundle.sh` rather than
+copied between hosts. The script installs a private ONNX toolchain (no PyTorch),
+downloads the pinned export, splits it into the two admitted towers, copies the
+already-admitted ONNX Runtime, writes the descriptor, notice, and SBOM with
+digests computed from the bytes it produced, and can package a transport
+archive. It refuses to finish without the upstream MIT licence text: an earlier
+version silently fell back to a README fetch and wrote a 14-byte "404: Not
+Found" into the licence asset, which is exactly the kind of dishonest artifact
+this bundle must never contain.
+
+Reproducibility evidence: a script-built bundle and the hand-assembled one agree
+byte-for-byte on every factual asset — `runtime.bin` (43,184,400 bytes),
+`vision.onnx` (87,539,291), `text.onnx` (103,420,097), `tokenizer.json`
+(439,124), and the 1,264-byte licence — and on every declared space fact
+(profile, model version, dimension, image size, token budget, vector schema,
+index and query config, distance, preprocessing digest, tokenizer version).
+Only the notice and SBOM text differ, which changes the provider digest: the
+digest covers the whole descriptor, so a bundle with different documentation is
+a different provider identity, and the image generation is rebuilt for it.
+
+Installing the script-built archive through the daemon
+(`rw image bundle install --archive …`) reports the admitted profile, destination
+and asset count, marks a restart as required, then rebuilds to
+`image_state: READY`, with the same Chinese image queries still returning the
+described image first.
+
 ## Final candidate package and clean UI rerun
 
 The final candidate-only artifact was assembled with archive digest

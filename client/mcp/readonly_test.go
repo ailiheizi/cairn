@@ -98,13 +98,16 @@ var frozenAdmitted = map[string]bool{
 	command.OpAnnotationTagApply:    false,
 	command.OpSearchRebuild:         false,
 	command.OpSemanticBundleInstall: false,
-	command.OpAudioList:             false,
-	command.OpBooksList:             false,
-	command.OpDescriptionCreate:     false,
-	command.OpViewSave:              false,
-	command.OpExportPlan:            false,
-	command.OpExportApply:           false,
-	command.OpExportVerify:          false,
+	// The image bundle install writes into the models root, so it is not admitted
+	// to the read-only surface either.
+	command.OpImageBundleInstall: false,
+	command.OpAudioList:          false,
+	command.OpBooksList:          false,
+	command.OpDescriptionCreate:  false,
+	command.OpViewSave:           false,
+	command.OpExportPlan:         false,
+	command.OpExportApply:        false,
+	command.OpExportVerify:       false,
 }
 
 // TestReadOnlyAllowlistIsFrozenAndClassified proves the read-only property

@@ -539,6 +539,17 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		controlplane.WithSemanticBundleCapability(bundleCapability),
 		controlplane.WithVectorPath(resolved.Config.Paths.Vectors), controlplane.WithExact(exactLane),
 	}
+	// The image bundle installs from a local archive only: the daemon never
+	// downloads a model, and the descriptor inside the archive is what it verifies.
+	dispatcherOptions = append(dispatcherOptions, controlplane.WithImageBundleArchiveInstaller(
+		resolved.Config.Paths.Models,
+		func(installCtx context.Context, modelsRoot, archivePath string) (controlplane.ImageBundleInstallReceipt, error) {
+			admission, destination, changed, err := search.InstallImageBundleFromArchive(installCtx, modelsRoot, archivePath)
+			if err != nil {
+				return controlplane.ImageBundleInstallReceipt{}, err
+			}
+			return controlplane.ImageBundleInstallReceipt{Admission: admission, Destination: destination, Changed: changed}, nil
+		}))
 	if imageOption != nil {
 		dispatcherOptions = append(dispatcherOptions, imageOption)
 	}

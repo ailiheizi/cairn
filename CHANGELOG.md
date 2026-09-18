@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- The image bundle is installable and reproducible instead of hand-placed.
+  `rw image bundle install --archive PATH` admits one Chinese-CLIP bundle from a
+  local archive: the archive is transport, every declared asset is re-hashed
+  against the descriptor inside it, a file the descriptor does not declare makes
+  the install fail, the declared profile facts must be the admitted image
+  profile, an identical bundle is a no-op, and a different one is moved aside
+  rather than deleted. The daemon reports the admitted profile, destination and
+  asset count, marks a restart as required, and never activates a provider or
+  rebuilds a generation by installing. `scripts/assemble-image-bundle.sh`
+  rebuilds the artifact from its pinned source (private ONNX toolchain, no
+  PyTorch), splits the combined export into the two admitted towers, and refuses
+  to finish without the upstream MIT licence text; a rebuilt bundle agrees
+  byte-for-byte with the hand-assembled one on every factual asset and every
+  declared space fact, and installing it rebuilds the dimension to READY. The
+  `image-bundle-archive` tool packages an admitted bundle deterministically, and
+  the operation is marked implemented only when the daemon is configured with an
+  installer, so an override or test configuration stays honest.
 - Image search is a real dimension with its own space instead of a fixture.
   `multimodal-clip` declares an image space fingerprint (schema
   `restoreweave.image-space.v1`) that binds every declared fact of the model,

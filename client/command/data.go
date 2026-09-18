@@ -923,6 +923,24 @@ type SemanticBundleInstallInput struct {
 	ArchivePath string `json:"archive_path,omitempty"`
 }
 
+// ImageBundleInstallInput installs one image bundle from a local archive. The
+// archive is transport: the descriptor inside it is what the daemon verifies.
+type ImageBundleInstallInput struct {
+	ArchivePath string `json:"archive_path"`
+}
+
+// ImageBundleInstallData reports one admitted image bundle installation. It is
+// a model-bundle fact, not a readiness claim: no provider or generation is
+// activated by installing.
+type ImageBundleInstallData struct {
+	ProfileID       string `json:"profile_id"`
+	ProfileDigest   string `json:"profile_digest,omitempty"`
+	Destination     string `json:"destination,omitempty"`
+	AssetCount      int    `json:"asset_count"`
+	Changed         bool   `json:"changed"`
+	RestartRequired bool   `json:"restart_required"`
+}
+
 // SemanticBundleInstallData reports admission of the fixed local BGE bundle.
 // Installing a model bundle never hot-loads an embedding worker or rebuilds a
 // semantic generation; callers must restart the daemon before those services

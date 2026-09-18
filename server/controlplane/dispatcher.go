@@ -41,6 +41,9 @@ type Dispatcher struct {
 	semanticBundleModelsRoot       string
 	semanticBundleInstaller        SemanticBundleInstaller
 	semanticBundleArchiveInstaller SemanticBundleArchiveInstaller
+	imageBundleModelsRoot          string
+	imageBundleArchiveInstaller    ImageBundleArchiveInstaller
+	imageBundleInstallMu           sync.Mutex
 	now                            func() time.Time
 	exact                          *exact.Service
 	search                         *search.Indexer
@@ -112,6 +115,19 @@ type SemanticBundleInstaller func(context.Context, string) (SemanticBundleInstal
 // SemanticBundleInstaller. The archive path is supplied by the operator and
 // the callback remains restricted to the configured models root.
 type SemanticBundleArchiveInstaller func(context.Context, string, string) (SemanticBundleInstallReceipt, error)
+
+// ImageBundleInstallReceipt is the deterministic result of one image bundle
+// archive installation: the admission the daemon verified and where it landed.
+type ImageBundleInstallReceipt struct {
+	Admission   search.ImageBundleAdmission
+	Destination string
+	Changed     bool
+}
+
+// ImageBundleArchiveInstaller installs one image bundle archive into the
+// configured models root. Like its semantic counterpart it is not a general
+// model manager: the callback may only install the admitted image profile there.
+type ImageBundleArchiveInstaller func(context.Context, string, string) (ImageBundleInstallReceipt, error)
 
 // DispatcherOption configures optional exact-lane handlers.
 type DispatcherOption func(*Dispatcher)
@@ -221,6 +237,17 @@ func WithSemanticBundleInstaller(modelsRoot string, installer SemanticBundleInst
 // WithSemanticBundleArchiveInstaller enables archive-backed installs for the
 // same semantic.bundle.install operation. It does not create a second policy
 // or publication path.
+// WithImageBundleArchiveInstaller enables one archive-backed install path for
+// the image dimension's model bundle. It creates no second policy or state: the
+// install admits the archive into the configured models root, and the image
+// dimension keeps reporting NOT_BUILT until a generation is built.
+func WithImageBundleArchiveInstaller(modelsRoot string, installer ImageBundleArchiveInstaller) DispatcherOption {
+	return func(d *Dispatcher) {
+		d.imageBundleModelsRoot = strings.TrimSpace(modelsRoot)
+		d.imageBundleArchiveInstaller = installer
+	}
+}
+
 func WithSemanticBundleArchiveInstaller(modelsRoot string, installer SemanticBundleArchiveInstaller) DispatcherOption {
 	return func(d *Dispatcher) {
 		d.semanticBundleModelsRoot = strings.TrimSpace(modelsRoot)
@@ -315,6 +342,9 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 	}
 	if dispatcher.semanticBundleInstaller != nil && strings.TrimSpace(dispatcher.semanticBundleModelsRoot) != "" {
 		implemented[command.OpSemanticBundleInstall] = true
+	}
+	if dispatcher.imageBundleArchiveInstaller != nil && strings.TrimSpace(dispatcher.imageBundleModelsRoot) != "" {
+		implemented[command.OpImageBundleInstall] = true
 	}
 	if dispatcher.exact != nil {
 		implemented[command.OpPlanIngest] = true
@@ -551,6 +581,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleSearchQuery(ctx, env, started)
 	case command.OpSearchRebuild:
 		return d.handleSearchRebuild(ctx, env, started)
+	case command.OpImageBundleInstall:
+		return d.handleImageBundleInstall(ctx, env, started)
 	case command.OpSemanticBundleInstall:
 		return d.handleSemanticBundleInstall(ctx, env, started)
 	case command.OpContentOpen:

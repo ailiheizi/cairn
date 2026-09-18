@@ -40,6 +40,7 @@ const (
 	OpSearchQuery           = "search.query"
 	OpSearchRebuild         = "search.rebuild"
 	OpSemanticBundleInstall = "semantic.bundle.install"
+	OpImageBundleInstall    = "image.bundle.install"
 	OpAudioList             = "audio.list"
 	OpBooksList             = "books.list"
 	OpDescriptionList       = "description.list"
@@ -98,6 +99,7 @@ func KnownOperations() []string {
 		OpSearchQuery,
 		OpSearchRebuild,
 		OpSemanticBundleInstall,
+		OpImageBundleInstall,
 		OpAudioList,
 		OpBooksList,
 		OpDescriptionList,
