@@ -50,6 +50,44 @@ processes, built and queried a zvec generation, preserved segment provenance,
 reopened the same generation after restart, reported explicit degradation
 after generation deletion, and rebuilt a new healthy generation.
 
+## 2026-09-18 Darwin arm64 development install and live retrieval check
+
+This is a development-host install and a live retrieval check, **not** a
+qualification run: it measures no recall corpus, no latency, and no memory. The
+dated qualification entry above remains the qualification evidence.
+
+The pinned development installer (`rw semantic bundle install`) admitted the
+bundle into `<data>/restoreweave/models/bge-small-zh-v1.5/darwin-arm64` with
+profile digest `sha256:2c660a7dd5d062a75f495f3d5e9d41d2906a0391d3146fa063e41de5434d7892`
+— byte-identical to the profile digest recorded by the 2026-09-03 run.
+
+**Network note.** From this network `github.com` (the ONNX Runtime and zvec
+release assets) resolves directly, while `huggingface.co` (the model and
+tokenizer) and `raw.githubusercontent.com` (the binding header) do not. The
+pinned installer worked when the daemon was started with
+`HTTPS_PROXY=http://127.0.0.1:7890`; after the install the daemon runs without
+the proxy. `hf-mirror.com` also resolves and serves the same model bytes.
+
+**Live retrieval evidence** after `search.rebuild` (lexical generation
+`idx_dc569d5d…`, semantic generation `idx_cea8a057…`, 8 seconds):
+
+| Query | Lexical hits | Semantic hits | Top fused result |
+| --- | --- | --- | --- |
+| `度假` (holiday — absent from every document) | 0 | 7 | `demo-中文-意图.txt`, whose text is "家庭照片与旅行记录" |
+| `holiday` (absent) | 0 | 7 | the same document |
+| `家庭` (present) | 1 | 7 | the same document |
+
+After a daemon restart the same query returns the same result: the semantic
+generation is reopened rather than rebuilt, and `capability.list` reports
+`semantic-embedding` as `AVAILABLE` (host-owned local ONNX/BGE embedding plus an
+in-process zvec generation). `multimodal-clip` stays `NOT_BUILT` with its
+reason, which is the honest state until an image model artifact is installed.
+
+The rebuild reports `DEGRADED` with "lexical field coverage is incomplete after
+rebuild" and `lexical_coverage.complete=false` (`descriptions: false`) on this
+development corpus, which is the coverage metric working as designed rather
+than a search failure.
+
 ## Final candidate package and clean UI rerun
 
 The final candidate-only artifact was assembled with archive digest
