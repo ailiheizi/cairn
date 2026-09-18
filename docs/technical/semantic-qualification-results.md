@@ -140,6 +140,45 @@ segments, image generation 4 subjects):
 `TestFilterOnlyQuerySkipsVectorSpacesWithoutRevoking`, and
 `TestImageFailureIsReportedUnavailableNotNotBuilt`.
 
+## 2026-09-18 Egress grant admission and enforcement evidence
+
+This is a development-host evidence record, **not** release qualification of
+any online provider. The online embedding profile is now schema v2 and carries
+the egress scope the requirements name: destination host, disclosed data
+classes (closed vocabulary `text.segment` / `text.query`), allowed subject
+classes, minimization statement, per-run request/byte/time budgets, expiry,
+revocation reference, and residency/logging/retention/training/output-use
+references. A v1 profile is refused by name because it cannot authorize any
+disclosure.
+
+Authorization is a durable append-only grant (migration 25: `egress_grants` +
+`egress_grant_revocations`, no-UPDATE/no-DELETE triggers); a grant is live only
+while unexpired and unrevoked. The provider-neutral gate
+(`server/internal/search/egress_gate.go`) refuses before any network call with
+stable reasons (`EGRESS_GRANT_MISSING`, `EGRESS_GRANT_EXPIRED`,
+`EGRESS_GRANT_REVOKED`, `EGRESS_PROFILE_EXPIRED`, `EGRESS_PROFILE_REVOKED`,
+`EGRESS_BUDGET_EXCEEDED`, `EGRESS_DATA_CLASS_DENIED`,
+`EGRESS_SUBJECT_CLASS_DENIED`), enforces the run budgets, and requires a
+per-request confirmation bound to the live grant unless the operator set
+`semantic.send_content_without_confirmation`. Every attempt records one
+append-only receipt with the destination host, redacted credential reference,
+disclosed data classes, budget consumption, input and output digests,
+truncation flag, output schema reference, and grant id; receipts never carry
+payload text or secrets.
+
+The profile operations (`semantic.provider.install|list`) follow the local
+bundle installer precedent — absolute local path, strict decode, declared
+digest check, atomic publish, move-aside for a changed profile, restart
+required, and marked implemented only when the daemon is configured with the
+installer. Regression coverage lives in
+`server/internal/search/egress_scope_test.go`, `egress_gate_test.go`,
+`semantic_provider_installer_test.go`,
+`server/internal/store/sqlite/egress_grants_test.go`,
+`server/controlplane/egress_grant_ops_test.go`, and
+`client/cmd/rw/egress_test.go`. Loopback HTTP stubs prove the gate order; a
+real remote endpoint was not exercised and no online provider ships as a
+default.
+
 ## 2026-09-18 Darwin arm64 image dimension bring-up
 
 The image dimension (`multimodal-clip`) went from `NOT_BUILT` to `READY` on this
