@@ -388,8 +388,10 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 	if defaultBroker {
 		// The ordinary query path is host-owned fusion. Structured predicates
 		// remain enforced by the lexical projection while semantic contributes
-		// only when its profile-bound generation is actually available.
-		fuseIDs = []string{search.DimensionLexical, search.DimensionSemantic}
+		// only when its profile-bound generation is actually available. The
+		// separate image space joins the default broker only when its own
+		// generation is ready, so a text-only install behaves exactly as before.
+		fuseIDs = search.DefaultFuseDimensions(search.IndexerReadiness(d.search))
 	}
 	if len(fuseIDs) > 0 {
 		if strings.TrimSpace(dimensionID) != "" {
@@ -496,6 +498,7 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 			GenerationID:   component.GenerationID,
 			ScoreSemantics: component.ScoreSemantics,
 			Status:         component.Status,
+			Reason:         component.Reason,
 			Hits:           component.Hits,
 		})
 	}

@@ -26,13 +26,23 @@ func newPool(size int, timeout time.Duration) *pool {
 }
 
 func (p *pool) run(ctx context.Context, fn func(context.Context) error) error {
+	return p.runWithTimeout(ctx, p.timeout, fn)
+}
+
+// runWithTimeout takes a concurrency slot and runs fn under the given deadline,
+// so a capability that needs longer than the host default can say so while the
+// slot accounting stays in one place.
+func (p *pool) runWithTimeout(ctx context.Context, timeout time.Duration, fn func(context.Context) error) error {
+	if timeout <= 0 {
+		timeout = p.timeout
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-p.slots:
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, p.timeout)
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {

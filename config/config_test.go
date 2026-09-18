@@ -239,3 +239,51 @@ func TestEffectiveJSONKeepsCredentialReferenceWithoutSecret(t *testing.T) {
 		t.Fatalf("effective JSON = %s", text)
 	}
 }
+
+func TestOnlineEmbeddingRequiresSchemeQualifiedCredentialReference(t *testing.T) {
+	resolveValidate := func(t *testing.T, mutate func(*Config)) error {
+		t.Helper()
+		cfg := Default()
+		mutate(&cfg)
+		_, err := Resolve(cfg, ResolveOptions{BaseDir: t.TempDir()})
+		return err
+	}
+	// The default local profile is unchanged and needs no credential.
+	if err := resolveValidate(t, func(*Config) {}); err != nil {
+		t.Fatalf("default local profile rejected: %v", err)
+	}
+	online := func(ref string) func(*Config) {
+		return func(cfg *Config) {
+			cfg.Semantic.EmbeddingMode = "online"
+			cfg.Semantic.OnlineProfile = "operator-online-v1"
+			cfg.Semantic.OnlineCredentialRef = ref
+		}
+	}
+	if err := resolveValidate(t, online("env://RW_ONLINE_KEY")); err != nil {
+		t.Fatalf("env credential reference rejected: %v", err)
+	}
+	if err := resolveValidate(t, online("keychain://restoreweave/online")); err != nil {
+		t.Fatalf("keychain credential reference rejected: %v", err)
+	}
+	for _, ref := range []string{"", "RW_ONLINE_KEY", "vault://secret/online", "api_key=plaintext-secret"} {
+		if err := resolveValidate(t, online(ref)); err == nil {
+			t.Fatalf("credential reference %q was accepted for online mode", ref)
+		}
+	}
+	hybrid := func(cfg *Config) {
+		cfg.Semantic.EmbeddingMode = "hybrid"
+		cfg.Semantic.LocalProfile = "bge-small-zh-v1.5"
+		cfg.Semantic.OnlineProfile = "operator-online-v1"
+		cfg.Semantic.OnlineCredentialRef = "env://RW_ONLINE_KEY"
+	}
+	if err := resolveValidate(t, hybrid); err != nil {
+		t.Fatalf("hybrid credential reference rejected: %v", err)
+	}
+	hybridMissing := func(cfg *Config) {
+		hybrid(cfg)
+		cfg.Semantic.OnlineCredentialRef = ""
+	}
+	if err := resolveValidate(t, hybridMissing); err == nil {
+		t.Fatal("hybrid mode without a credential reference was accepted")
+	}
+}

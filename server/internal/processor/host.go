@@ -25,9 +25,12 @@ type Options struct {
 	MaxSourceBytes int64
 	StageTimeout   time.Duration
 	MaxConcurrent  int
-	Identify       *identify.Detector
-	Processors     []Processor
-	Now            func() time.Time
+	// CapabilityBudgets overrides the host defaults per capability; a capability
+	// that declares a MediaBudget uses its own budget when this map has no entry.
+	CapabilityBudgets map[string]CapabilityBudget
+	Identify          *identify.Detector
+	Processors        []Processor
+	Now               func() time.Time
 }
 
 // Host runs host-owned identification routing and RUN_STAGE admission.
@@ -292,12 +295,13 @@ func (h *Host) RetryPublication(ctx context.Context, workspaceID, snapshotRef, r
 			source.Close()
 			return errors.New("processor retry capability is unavailable")
 		}
+		retryBudget := h.budgetFor(node.CapabilityID)
 		status, runErr := h.admitNode(ctx, workspaceID, snapshotRef, entry, source, classification, route, *node, proc, attemptContext{
 			fenceToken: invocation.FenceToken, retryJobID: invocation.JobID,
 			retryOwner:   invocation.Owner,
 			retryAttempt: invocation.Attempt, retryIdempotencyKey: invocation.IdempotencyKey,
 			retryLeaseToken: invocation.LeaseToken, predecessorAttemptID: previous.ID,
-		})
+		}, retryBudget)
 		source.Close()
 		if status == StatusFailed || status == StatusCancelled || runErr != nil {
 			message := "processor retry did not produce an admitted artifact"
@@ -327,6 +331,72 @@ func retryAttemptBelongsToJob(provenance json.RawMessage, jobID, idempotencyKey 
 		RetryIdempotencyKey string `json:"retry_idempotency_key"`
 	}
 	return json.Unmarshal(provenance, &value) == nil && value.RetryJobID == jobID && value.RetryIdempotencyKey == idempotencyKey
+}
+
+// budgetFor is the effective budget for one capability: an explicit override
+// wins, then a processor that declares a MediaBudget, then the host defaults.
+func (h *Host) budgetFor(capability string) CapabilityBudget {
+	budget := CapabilityBudget{MaxSourceBytes: h.opts.MaxSourceBytes, StageTimeout: h.opts.StageTimeout}
+	if override, ok := h.opts.CapabilityBudgets[capability]; ok {
+		if override.MaxSourceBytes > 0 {
+			budget.MaxSourceBytes = override.MaxSourceBytes
+		}
+		if override.StageTimeout > 0 {
+			budget.StageTimeout = override.StageTimeout
+		}
+		return budget
+	}
+	if proc, ok := h.byCap[capability]; ok {
+		if media, ok := proc.(MediaBudget); ok {
+			declared := media.ProcessingBudget()
+			if declared.MaxSourceBytes > 0 {
+				budget.MaxSourceBytes = declared.MaxSourceBytes
+			}
+			if declared.StageTimeout > 0 {
+				budget.StageTimeout = declared.StageTimeout
+			}
+		}
+	}
+	return budget
+}
+
+// routeBudgets returns one budget per node, in route order.
+func (h *Host) routeBudgets(route Route) []CapabilityBudget {
+	budgets := make([]CapabilityBudget, 0, len(route.Nodes))
+	for _, node := range route.Nodes {
+		budgets = append(budgets, h.budgetFor(node.CapabilityID))
+	}
+	return budgets
+}
+
+// routeReadCeiling is the largest source ceiling any node in the route asks for,
+// so one opened source handle serves every node while each node still runs under
+// its own deadline and its own output cap.
+func routeReadCeiling(budgets []CapabilityBudget, fallback int64) int64 {
+	ceiling := fallback
+	for _, budget := range budgets {
+		if budget.MaxSourceBytes > ceiling {
+			ceiling = budget.MaxSourceBytes
+		}
+	}
+	return ceiling
+}
+
+// routeDeadline is the sum of the per-node deadlines: a route may legitimately
+// run several stages, so the entry ceiling cannot be one stage's timeout.
+func routeDeadline(budgets []CapabilityBudget, fallback time.Duration) time.Duration {
+	total := time.Duration(0)
+	for _, budget := range budgets {
+		timeout := budget.StageTimeout
+		if timeout <= 0 {
+			timeout = fallback
+		}
+		total += timeout
+	}
+	if total <= 0 {
+		return fallback
+	}
+	return total
 }
 
 func processorAttemptKey(subject, route, stage, capability string) string {
@@ -487,13 +557,16 @@ func appendSubjectIssue(report *Report, issue SubjectIssue) {
 }
 
 func (h *Host) processEntry(ctx context.Context, workspaceID, snapshotRef string, entry sqlite.NamespaceEntry) (ResultStatus, []SubjectIssue, error) {
-	source, err := openSource(ctx, h.Repo, entry.ContentID, h.opts.MaxSourceBytes)
+	// Identification reads a bounded probe, so it opens the source under the host
+	// default. The route is only known after that probe, and a route that
+	// includes a media capability reopens the source under its own larger ceiling
+	// before any stage runs; a text-only route keeps today's behaviour exactly.
+	probeSource, err := openSource(ctx, h.Repo, entry.ContentID, h.opts.MaxSourceBytes)
 	if err != nil {
 		return StatusFailed, nil, err
 	}
-	defer source.Close()
-
-	probe, err := source.ReadAll(ctx)
+	probe, err := probeSource.ReadAll(ctx)
+	probeSource.Close()
 	if err != nil {
 		return StatusFailed, nil, err
 	}
@@ -506,10 +579,18 @@ func (h *Host) processEntry(ctx context.Context, workspaceID, snapshotRef string
 	if len(route.Nodes) == 0 {
 		return StatusInapplicable, nil, nil
 	}
+	budgets := h.routeBudgets(route)
+	readCeiling := routeReadCeiling(budgets, h.opts.MaxSourceBytes)
+	source, err := openSource(ctx, h.Repo, entry.ContentID, readCeiling)
+	if err != nil {
+		return StatusFailed, nil, err
+	}
+	defer source.Close()
 	last := StatusInapplicable
 	admitted := false
 	var issues []SubjectIssue
-	for _, node := range route.Nodes {
+	for nodeIndex, node := range route.Nodes {
+		nodeBudget := budgets[nodeIndex]
 		proc, ok := h.byCap[node.CapabilityID]
 		if !ok {
 			attemptID, attemptErr := sqlite.NewStableID(sqlite.IDPrefixAttempt)
@@ -523,7 +604,7 @@ func (h *Host) processEntry(ctx context.Context, workspaceID, snapshotRef string
 			}
 			continue
 		}
-		status, err := h.admitNode(ctx, workspaceID, snapshotRef, entry, source, classification, route, node, proc, attemptContext{fenceToken: 1})
+		status, err := h.admitNode(ctx, workspaceID, snapshotRef, entry, source, classification, route, node, proc, attemptContext{fenceToken: 1}, nodeBudget)
 		if err != nil && status == "" {
 			status = StatusFailed
 		}
@@ -552,7 +633,7 @@ func (h *Host) processEntry(ctx context.Context, workspaceID, snapshotRef string
 	return last, issues, nil
 }
 
-func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, entry sqlite.NamespaceEntry, source *SourceHandle, classification ClassificationRecord, route Route, node RouteNode, proc Processor, attemptCtx attemptContext) (status ResultStatus, err error) {
+func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, entry sqlite.NamespaceEntry, source *SourceHandle, classification ClassificationRecord, route Route, node RouteNode, proc Processor, attemptCtx attemptContext, budget CapabilityBudget) (status ResultStatus, err error) {
 	if attemptCtx.fenceToken < 1 {
 		return StatusFailed, errors.New("processor attempt fence token must be positive")
 	}
@@ -593,7 +674,11 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 	if stagingDir == "" {
 		stagingDir = filepath.Join(h.Repo.Root(), "staging")
 	}
-	staging, err := openStaging(stagingDir, attemptID, h.opts.MaxSourceBytes)
+	stagingCeiling := budget.MaxSourceBytes
+	if stagingCeiling <= 0 {
+		stagingCeiling = h.opts.MaxSourceBytes
+	}
+	staging, err := openStaging(stagingDir, attemptID, stagingCeiling)
 	if err != nil {
 		return StatusFailed, err
 	}
@@ -607,7 +692,7 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 		Classification: classification,
 		Source:         source,
 		Staging:        staging,
-		MaxOutputBytes: h.opts.MaxSourceBytes,
+		MaxOutputBytes: stagingCeiling,
 	})
 	if runErr != nil {
 		if result.Reason == "" {
@@ -806,7 +891,31 @@ func buildProcessingRoute(classification ClassificationRecord) Route {
 			},
 		}
 	}
+	if hasOCRImageEvidence(classification) {
+		// OCR is an optional operator-installed capability. The node is part of
+		// the declared image route so an uninstalled engine is reported as an
+		// unavailable/inapplicable capability instead of disappearing.
+		return Route{
+			Kind: RouteProcessing,
+			Nodes: []RouteNode{
+				{Stage: StageExtract, CapabilityID: CapabilityOCRImageText},
+			},
+		}
+	}
 	return Route{Kind: RouteProcessing}
+}
+
+func hasOCRImageEvidence(classification ClassificationRecord) bool {
+	for _, item := range classification.Evidence {
+		if strings.HasPrefix(strings.ToLower(item.Candidate.MIME), "image/") {
+			return true
+		}
+		switch item.Candidate.FormatID {
+		case "png", "jpeg", "gif":
+			return true
+		}
+	}
+	return false
 }
 
 func hasAudioEvidence(classification ClassificationRecord) bool {
@@ -849,6 +958,8 @@ func admittedSchema(schemaRef, mediaType string) bool {
 	case schemaRef == SchemaRefTextEmbedding() && mediaType == MediaTypeEmbeddingJSON:
 		return true
 	case schemaRef == SchemaRefClipEmbedding() && mediaType == MediaTypeEmbeddingJSON:
+		return true
+	case schemaRef == SchemaRefOCRText() && mediaType == MediaTypeOCRJSON:
 		return true
 	default:
 		return false

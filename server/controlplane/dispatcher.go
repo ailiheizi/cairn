@@ -34,6 +34,7 @@ type Dispatcher struct {
 	indexBinding                   search.IndexBinding
 	vectorPath                     string
 	semanticBinding                semanticIndexerBinding
+	imageBinding                   imageIndexerBinding
 	semanticBundle                 command.Capability
 	semanticBundleMu               sync.RWMutex
 	semanticBundleInstallMu        sync.Mutex
@@ -48,6 +49,13 @@ type Dispatcher struct {
 	access                         *access.Service
 	recoveryReader                 *recoveryReaderState
 	operatorConfig                 *operatorConfigState
+	// ocrBundleRoot is the single operator-installed OCR profile location
+	// below the resolved paths.models root. It is empty when no persisted
+	// profile was supplied; OCR then reports NOT_BUILT and never runs.
+	ocrBundleRoot string
+	// ocrProcessor is the registered OCR processor, kept so shutdown can
+	// release its native session.
+	ocrProcessor *processor.OCRImageText
 	// tagApplyStepFailure is a test-only seam on the documented
 	// add-then-tombstone boundary of annotation.tag_apply. It is nil in
 	// production; a test installs it to fail one named step exactly as a real
@@ -66,6 +74,21 @@ const modelBundleCapabilityKind = "model-bundle"
 type semanticIndexerBinding struct {
 	provider      search.SemanticEmbeddingProvider
 	zvec          search.ZvecGenerationDriver
+	libraryPath   string
+	libraryDigest string
+	manifest      search.EmbeddingGenerationManifest
+}
+
+// imageIndexerBinding is the host-owned runtime handoff for the separate image
+// embedding space. It is additive and optional: a missing binding keeps the
+// multimodal dimension NOT_BUILT (no artifact) or UNAVAILABLE (artifact present
+// but unrunnable), and never affects exact save, lexical search, or the text
+// semantic dimension. source is the host-owned admitted-bytes boundary; the
+// search package never opens a repository itself.
+type imageIndexerBinding struct {
+	provider      search.ImageEmbeddingProvider
+	zvec          search.ZvecGenerationDriver
+	source        search.ImageContentSource
 	libraryPath   string
 	libraryDigest string
 	manifest      search.EmbeddingGenerationManifest
@@ -114,6 +137,10 @@ func WithOperatorConfig(resolved rwconfig.ResolvedConfig) DispatcherOption {
 			return
 		}
 		d.operatorConfig = &operatorConfigState{path: resolved.ConfigPath, runningDigest: resolved.Digest}
+		// The OCR profile location follows the same persisted paths.models
+		// root and <profile>/<goos-goarch> convention as the pinned semantic
+		// bundle. No second config key and no second location are introduced.
+		d.ocrBundleRoot = processor.OCRBundleRoot(resolved.Config.Paths.Models)
 	}
 }
 
@@ -148,6 +175,21 @@ func WithSemanticIndexerBinding(provider search.SemanticEmbeddingProvider, zvec 
 	return func(d *Dispatcher) {
 		d.semanticBinding = semanticIndexerBinding{
 			provider: provider, zvec: zvec, libraryPath: strings.TrimSpace(libraryPath),
+			libraryDigest: strings.TrimSpace(libraryDigest), manifest: manifest,
+		}
+	}
+}
+
+// WithImageIndexerBinding installs an already-admitted image embedding
+// provider, its vector backend, its admitted-bytes source, and the immutable
+// generation manifest. The caller remains responsible for bundle admission,
+// native-library digest validation, and the provider's readiness probe before
+// invoking this option. A missing binding leaves the image dimension NOT_BUILT
+// and is never substituted by fixture vectors.
+func WithImageIndexerBinding(provider search.ImageEmbeddingProvider, zvec search.ZvecGenerationDriver, source search.ImageContentSource, libraryPath, libraryDigest string, manifest search.EmbeddingGenerationManifest) DispatcherOption {
+	return func(d *Dispatcher) {
+		d.imageBinding = imageIndexerBinding{
+			provider: provider, zvec: zvec, source: source, libraryPath: strings.TrimSpace(libraryPath),
 			libraryDigest: strings.TrimSpace(libraryDigest), manifest: manifest,
 		}
 	}
@@ -336,6 +378,16 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 				SemanticZvec:            dispatcher.semanticBinding.zvec,
 				SemanticLibraryPath:     dispatcher.semanticBinding.libraryPath,
 				SemanticLibraryDigest:   dispatcher.semanticBinding.libraryDigest,
+				ImageProvider:           dispatcher.imageBinding.provider,
+				ImageZvec:               dispatcher.imageBinding.zvec,
+				ImageSource:             dispatcher.imageBinding.source,
+				ImageLibraryPath:        dispatcher.imageBinding.libraryPath,
+				ImageLibraryDigest:      dispatcher.imageBinding.libraryDigest,
+			}
+			if dispatcher.imageBinding.manifest != (search.EmbeddingGenerationManifest{}) {
+				dispatcher.search.MultimodalManifest = dispatcher.imageBinding.manifest
+				dispatcher.search.MultimodalProfileDigest = dispatcher.imageBinding.manifest.CanonicalDigest()
+				dispatcher.search.MultimodalSemanticSpace = dispatcher.imageBinding.manifest.SemanticSpace
 			}
 		}
 		if dispatcher.search != nil && dispatcher.fixtureDimensions {
@@ -348,8 +400,19 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 			implemented[command.OpSearchRebuild] = true
 		}
 		if dispatcher.exact.Processor == nil && dispatcher.exact.Repo != nil {
+			// The bundled byte-deterministic pack is always enabled. The
+			// optional OCR capability is registered only when a persisted
+			// models root resolved an OCR bundle location, so a host without
+			// that profile keeps the existing CAPABILITY_NOT_CONFIGURED
+			// outcome instead of inventing one.
+			processors := processor.DefaultProcessors()
+			if strings.TrimSpace(dispatcher.ocrBundleRoot) != "" {
+				dispatcher.ocrProcessor = processor.NewOCRImageText(dispatcher.ocrBundleRoot)
+				processors = append(processors, dispatcher.ocrProcessor)
+			}
 			dispatcher.exact.Processor = processor.NewHost(store, dispatcher.exact.Repo, processor.Options{
 				StagingDir: filepath.Join(dispatcher.exact.Repo.Root(), "staging"),
+				Processors: processors,
 			})
 		}
 		if dispatcher.sessions == nil && dispatcher.exact.Repo != nil {
@@ -698,7 +761,56 @@ func (d *Dispatcher) handleCapabilityList(env command.Envelope, started time.Tim
 		Version: "1",
 		Notes:   brokerNotes,
 	})
+	capabilities = append(capabilities, d.ocrCapability())
 	return succeeded(env, started, command.CapabilityListData{Capabilities: capabilities})
+}
+
+// capabilityKindProcessor is the capability kind for an optional learned
+// processor. It is deliberately separate from index-dimension and model-bundle
+// so an installed OCR profile is never read as an index-readiness claim.
+const capabilityKindProcessor = "processor"
+
+// ocrCapability reports the honest OCR capability state. It re-inspects the
+// operator-installed bundle on every call: an uninstalled profile is NOT_BUILT
+// with the expected path, a present but unusable profile is UNAVAILABLE with
+// its reason, and only a verified bundle is READY. A missing bundle never
+// degrades exact preservation, and this state never claims recognition
+// coverage beyond the languages the installed models declare.
+func (d *Dispatcher) ocrCapability() command.Capability {
+	root := strings.TrimSpace(d.ocrBundleRoot)
+	state := processor.InspectOCRBundle(root)
+	notes := state.Reason
+	if root != "" {
+		notes += "; expected bundle root: " + root
+	}
+	capability := command.Capability{
+		Kind:  capabilityKindProcessor,
+		ID:    processor.CapabilityOCRImageText,
+		State: state.State,
+		Notes: notes,
+	}
+	if state.EngineID != "" {
+		capability.Source = state.EngineID
+	}
+	if state.ProfileDigest != "" {
+		capability.Version = state.ProfileDigest
+	}
+	if len(state.Languages) > 0 {
+		capability.Notes = notes + "; declared languages: " + strings.Join(state.Languages, ",")
+		if state.License != "" {
+			capability.Notes += "; license: " + state.License
+		}
+	}
+	return capability
+}
+
+// CloseOCRCapability releases the lazily created native OCR session. It is
+// called by a host that owns the dispatcher for a bounded lifetime.
+func (d *Dispatcher) CloseOCRCapability() error {
+	if d == nil || d.ocrProcessor == nil {
+		return nil
+	}
+	return d.ocrProcessor.Close()
 }
 
 // namespaceListInput is the namespace.list input. Workspace, root, and parent

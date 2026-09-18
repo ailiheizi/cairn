@@ -298,23 +298,64 @@ func validateSemanticReceiptLibrary(idx *Indexer, libraryDigest string) error {
 }
 
 func openCloseSemanticGeneration(ctx context.Context, backend ZvecGenerationDriver, spec ZvecGenerationSpec) error {
+	return openCloseZvecGeneration(ctx, backend, spec)
+}
+
+// isFixtureZvecSpec recognizes the qualification profiles that intentionally
+// have no reader object. Every real profile must return a real reader; a nil
+// reader is otherwise a hard failure, never a silent success. The admitted BGE
+// space and every real image-space fingerprint digest (sha256:...) are real
+// profiles and must fail closed; legacy synthetic harness labels remain
+// tolerated exactly as before.
+func isFixtureZvecSpec(spec ZvecGenerationSpec) bool {
+	space := spec.Manifest.SemanticSpace
+	switch space {
+	case "", SemanticFixtureProfileV1, MultimodalFixtureProfileV1:
+		return true
+	case SemanticBundleBGESemanticSpace:
+		return false
+	}
+	return !strings.HasPrefix(space, "sha256:")
+}
+
+// openCloseZvecGeneration proves a built generation is reopenable through the
+// same replaceable driver before it is published.
+func openCloseZvecGeneration(ctx context.Context, backend ZvecGenerationDriver, spec ZvecGenerationSpec) error {
 	opened, err := backend.Open(ctx, spec)
 	if err != nil {
-		return fmt.Errorf("open semantic generation: %v", err)
+		return fmt.Errorf("open generation: %v", err)
 	}
 	if opened == nil {
-		// The in-memory qualification drivers intentionally have no reader
-		// object. The pinned local BGE profile, by contrast, must return a real
-		// reader and therefore fails closed on nil.
-		if spec.Manifest.SemanticSpace != SemanticBundleBGESemanticSpace {
+		if isFixtureZvecSpec(spec) {
 			return nil
 		}
-		return errors.New("semantic backend returned a nil generation")
+		return errors.New("vector backend returned a nil generation")
 	}
 	if err := opened.Close(); err != nil {
-		return fmt.Errorf("close semantic generation: %v", err)
+		return fmt.Errorf("close generation: %v", err)
 	}
 	return nil
+}
+
+// verifyZvecGenerationCoverage compares the durable identity set against one
+// backend generation and requires the backend's own membership verification.
+func verifyZvecGenerationCoverage(ctx context.Context, backend ZvecGenerationDriver, spec ZvecGenerationSpec, expected []ZvecCoverageIdentity) ([]ZvecCoverageIdentity, error) {
+	actual, err := semanticCoveragePairs(ctx, backend, spec)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	comparison := compareSemanticCoverage(expected, actual)
+	if !comparison.Complete() {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, semanticCoverageError(comparison))
+	}
+	verifier, ok := backend.(ZvecGenerationMembershipVerifier)
+	if !ok {
+		return nil, fmt.Errorf("%w: vector backend does not provide generation membership verification", ErrUnavailable)
+	}
+	if err := verifier.VerifyMembership(ctx, spec, actual); err != nil {
+		return nil, fmt.Errorf("%w: generation membership: %v", ErrUnavailable, err)
+	}
+	return append([]ZvecCoverageIdentity(nil), actual...), nil
 }
 
 func (c semanticCoverageComparison) Complete() bool {
@@ -463,22 +504,7 @@ func semanticExpectedPairs(expected map[string]string) []ZvecCoverageIdentity {
 }
 
 func (idx *Indexer) verifySemanticGenerationCoverage(ctx context.Context, spec ZvecGenerationSpec, expected []ZvecCoverageIdentity) ([]ZvecCoverageIdentity, error) {
-	actual, err := semanticCoveragePairs(ctx, idx.SemanticZvec, spec)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
-	}
-	comparison := compareSemanticCoverage(expected, actual)
-	if !comparison.Complete() {
-		return nil, fmt.Errorf("%w: %v", ErrUnavailable, semanticCoverageError(comparison))
-	}
-	verifier, ok := idx.SemanticZvec.(ZvecGenerationMembershipVerifier)
-	if !ok {
-		return nil, fmt.Errorf("%w: semantic backend does not provide generation membership verification", ErrUnavailable)
-	}
-	if err := verifier.VerifyMembership(ctx, spec, actual); err != nil {
-		return nil, fmt.Errorf("%w: semantic generation membership: %v", ErrUnavailable, err)
-	}
-	return append([]ZvecCoverageIdentity(nil), actual...), nil
+	return verifyZvecGenerationCoverage(ctx, idx.SemanticZvec, spec, expected)
 }
 
 // ensureSemanticGenerationVerified validates a generation once per process

@@ -868,7 +868,11 @@ type SearchComponentData struct {
 	GenerationID   string `json:"index_generation_ref,omitempty"`
 	ScoreSemantics string `json:"score_semantics,omitempty"`
 	Status         string `json:"status"`
-	Hits           int    `json:"hits"`
+	// Reason is the stable machine-readable reason when Status is not
+	// SUCCEEDED. A component that contributes no hits is never reported as a
+	// successful empty result.
+	Reason string `json:"reason,omitempty"`
+	Hits   int    `json:"hits"`
 }
 
 type SearchQueryData struct {
@@ -895,6 +899,21 @@ type SearchRebuildData struct {
 	SemanticGenerationRef string             `json:"semantic_generation_ref,omitempty"`
 	SemanticState         string             `json:"semantic_state"`
 	SemanticFailure       string             `json:"semantic_failure,omitempty"`
+	// ImageState reports the separate image embedding dimension. It is
+	// NOT_BUILT when no model artifact or binding is installed, UNAVAILABLE
+	// when an installed artifact cannot run, and READY only after a verified
+	// image generation exists. Image vectors are never mixed with text-space
+	// vectors.
+	ImageState string `json:"image_state"`
+	// ImageReason is the stable reason code when ImageState is not READY.
+	ImageReason string `json:"image_reason,omitempty"`
+	// ImageSpaceFingerprint is the canonical digest of the image space the
+	// generation was built in. Vectors from another space are refused.
+	ImageSpaceFingerprint string         `json:"image_space_fingerprint,omitempty"`
+	ImageGenerationRef    string         `json:"image_generation_ref,omitempty"`
+	ImageIndexed          int            `json:"image_indexed,omitempty"`
+	ImageSkipped          int            `json:"image_skipped,omitempty"`
+	ImageSkipReasons      map[string]int `json:"image_skip_reasons,omitempty"`
 }
 
 // SemanticBundleInstallInput selects the explicit installation source for the

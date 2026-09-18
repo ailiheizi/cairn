@@ -93,6 +93,20 @@ func (d *Dispatcher) handleSearchRebuild(ctx context.Context, env command.Envelo
 		}
 		degradedReasons = append(degradedReasons, "semantic search unavailable; lexical search generation was rebuilt")
 	}
+	// The image space is reported separately and never folded into the text
+	// semantic state. NOT_BUILT, UNAVAILABLE, and READY are reported exactly as
+	// the indexer observes them, with the stable reason code.
+	imageState := d.search.ImageIndexState(ctx, input.WorkspaceID)
+	data.ImageState = imageState.State
+	data.ImageReason = imageState.Reason
+	data.ImageSpaceFingerprint = imageState.SpaceFingerprint
+	data.ImageGenerationRef = imageState.GenerationID
+	data.ImageIndexed = imageState.Indexed
+	data.ImageSkipped = imageState.Skipped
+	data.ImageSkipReasons = imageState.SkipReasons
+	if imageState.State != search.ImageProviderReady && search.IndexerReadiness(d.search).MultimodalInstalled {
+		degradedReasons = append(degradedReasons, "image search is not ready ("+imageState.Reason+"); lexical search generation was rebuilt")
+	}
 	if len(degradedReasons) > 0 {
 		return degradedResult(env, started, data, strings.Join(degradedReasons, "; "))
 	}

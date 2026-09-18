@@ -21,7 +21,13 @@ func (TextEmbedding) Stage() Stage         { return StageEnrich }
 type ClipEmbedding struct{}
 
 func (ClipEmbedding) CapabilityID() string { return CapabilityClipEmbedding }
-func (ClipEmbedding) Stage() Stage         { return StageEnrich }
+
+// ProcessingBudget: an image embedding reads a picture and runs the vision (and
+// query) towers, which the text-sized defaults would truncate and cancel.
+func (ClipEmbedding) ProcessingBudget() CapabilityBudget {
+	return CapabilityBudget{MaxSourceBytes: mediaMaxSourceBytes, StageTimeout: mediaStageTimeout}
+}
+func (ClipEmbedding) Stage() Stage { return StageEnrich }
 
 type featureEmbedding struct {
 	Space              string `json:"space"`

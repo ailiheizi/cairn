@@ -31,16 +31,21 @@ const (
 	ProviderSemanticFix   = "query.semantic.fixture.v1"
 	ProviderSemanticONNX  = "query.semantic.onnx-bge-zvec.v1"
 	ProviderMultimodalFix = "query.multimodal.fixture.v1"
-	ProviderBrokerFuse    = "query.broker.fuse.v1"
-	ProviderGraphCatalog  = "query.graph.catalog.v1"
-	ScoreLexicalRank      = "fts5-rank"
-	ScoreGraphExact       = "relation-exact"
-	ScoreAcousticExact    = "fixture-exact"
-	ScoreSemanticExact    = "fixture-exact"
-	ScoreSemanticCosine   = "cosine-similarity"
-	ScoreMultimodalExact  = "fixture-exact"
-	ScoreComponentUnion   = "component-union"
-	CapabilityKindBroker  = "query-broker"
+	// ProviderMultimodalONNX is the real local image-space query provider. Its
+	// text queries go through the image model's own text tower; they are never
+	// served by the text embedding provider.
+	ProviderMultimodalONNX = "query.multimodal.onnx-clip-zvec.v1"
+	ProviderBrokerFuse     = "query.broker.fuse.v1"
+	ProviderGraphCatalog   = "query.graph.catalog.v1"
+	ScoreLexicalRank       = "fts5-rank"
+	ScoreGraphExact        = "relation-exact"
+	ScoreAcousticExact     = "fixture-exact"
+	ScoreSemanticExact     = "fixture-exact"
+	ScoreSemanticCosine    = "cosine-similarity"
+	ScoreMultimodalExact   = "fixture-exact"
+	ScoreMultimodalCosine  = "cosine-similarity"
+	ScoreComponentUnion    = "component-union"
+	CapabilityKindBroker   = "query-broker"
 
 	AxisPath            = "path"
 	AxisName            = "name"
@@ -68,6 +73,12 @@ const (
 	AxisMtime = "mtime"
 )
 
+// ProviderSemanticOnline is the real egress-gated online embedding provider.
+// Its embedding space is the selected online profile's space fingerprint, and
+// its vectors are only produced after the egress gate admits one request.
+// --- online embedding provider (additive wiring) ---
+const ProviderSemanticOnline = "query.semantic.online-embeddings.v1"
+
 // LexicalConstructAxes are the rebuildable text fields of the bundled FTS5
 // generation. Size and mtime are numeric facets, not text axes: they are
 // searchable through typed structured filters, never through MATCH.
@@ -87,7 +98,11 @@ type Dimension struct {
 	Version        string
 	ScoreSemantics string
 	ConstructAxes  []string
-	Notes          string
+	// Reason is the stable machine-readable reason code for a dimension that
+	// is not AVAILABLE. It is empty for a ready dimension and for the physical
+	// dimensions whose absence has no separate code.
+	Reason string
+	Notes  string
 }
 
 // QueryRequest is one search.query dispatch against a named generation.
@@ -297,13 +312,35 @@ func (f FieldCoverage) Present(field string) bool {
 
 // ProviderReadiness says which QueryProviders this process has wired.
 // A ready acoustic provider can still degrade when no generation exists.
+// The multimodal fields describe the separate image space: Multimodal is the
+// qualification-only fixture projection, MultimodalInstalled says a real image
+// binding is configured, and MultimodalReal says a verified real image
+// generation is currently served.
 type ProviderReadiness struct {
-	Lexical      bool
-	Acoustic     bool
-	Semantic     bool
-	SemanticReal bool
-	Multimodal   bool
-	Graph        bool
+	Lexical             bool
+	Acoustic            bool
+	Semantic            bool
+	SemanticReal        bool
+	Multimodal          bool
+	MultimodalInstalled bool
+	MultimodalReal      bool
+	MultimodalState     string
+	MultimodalReason    string
+	Graph               bool
+	// --- online embedding provider (additive wiring) ---
+	// SemanticOnline marks that the real semantic provider is an online
+	// (remote, egress-gated) provider rather than the local ONNX/BGE worker,
+	// so the dimension notes never mislabel a remote space as local. A hybrid
+	// provider is reported as online because one of its components is remote.
+	SemanticOnline bool
+	// SemanticComponents carries the per-component status of a hybrid
+	// provider ("local"/"online"), empty for a single-component provider.
+	SemanticComponents []SemanticProviderComponentStatus
+	// SemanticFailure is the provider's latest payload-free failure summary
+	// (reason codes and batch positions only). It is reported in the semantic
+	// dimension notes so a refused or failed egress is visible without
+	// claiming the dimension is fine.
+	SemanticFailure string
 }
 
 // DeclaredDimensions returns every discovery dimension the contract names.
@@ -331,13 +368,67 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 			semanticProvider = ProviderSemanticONNX
 			semanticScore = ScoreSemanticCosine
 			semanticNotes = "host-owned local ONNX/BGE embedding plus in-process zvec generation over durable semantic segments; disposable index, not recovery authority"
+			// --- online embedding provider (additive wiring) ---
+			// A remote embedding space is never described as the local BGE
+			// worker, and its per-component status is named with its reason.
+			if ready.SemanticOnline {
+				semanticProvider = ProviderSemanticOnline
+				semanticNotes = "host-owned online embedding provider over durable semantic segments, disclosed only through the egress gate (confirmation, credential, protection, and append-only receipt); disposable index, not recovery authority"
+				for _, component := range ready.SemanticComponents {
+					if component.State == SemanticComponentReady {
+						continue
+					}
+					detail := strings.TrimSpace(component.Reason)
+					if detail == "" {
+						detail = strings.TrimSpace(component.Failure)
+					}
+					if detail == "" {
+						detail = SemanticIndexUnavailableReason
+					}
+					semanticNotes += "; " + component.Component + "=" + SemanticComponentUnavailable + "(" + detail + ")"
+				}
+				if failure := strings.TrimSpace(ready.SemanticFailure); failure != "" {
+					semanticNotes += "; last failure: " + failure
+				}
+			}
 		}
 	}
-	multimodalState := "UNAVAILABLE"
-	multimodalNotes := "real multimodal model and vector IndexProvider are not wired; fixture CLIP-class search requires explicit opt-in"
+	multimodalState := ImageProviderNotBuilt
+	multimodalProvider := ProviderMultimodalONNX
+	multimodalScore := ScoreMultimodalCosine
+	multimodalReason := MultimodalIndexNotBuiltReason
+	multimodalNotes := "no image model artifact or binding is installed (" + MultimodalIndexNotBuiltReason + "); the separate image space requires an operator-installed model and is never served by fixture vectors"
+	if ready.MultimodalInstalled {
+		// A real image binding exists. Its state is reported exactly as the
+		// provider reports it; absence of a built generation is NOT_BUILT and a
+		// broken artifact or backend is UNAVAILABLE, each with its reason.
+		multimodalProvider = ProviderMultimodalONNX
+		multimodalScore = ScoreMultimodalCosine
+		multimodalReason = strings.TrimSpace(ready.MultimodalReason)
+		switch ready.MultimodalState {
+		case ImageProviderReady:
+			multimodalState = "AVAILABLE"
+			multimodalNotes = "separate local image embedding space queried through the image model's own text tower, with its own generation, space fingerprint, and provider digest; never compared or fused with text-space vectors; disposable index, not recovery authority"
+		case ImageProviderNotBuilt:
+			multimodalState = ImageProviderNotBuilt
+			if multimodalReason == "" {
+				multimodalReason = MultimodalIndexNotBuiltReason
+			}
+			multimodalNotes = "image model provider is installed but no image generation is built for this workspace (" + multimodalReason + ")"
+		default:
+			multimodalState = "UNAVAILABLE"
+			if multimodalReason == "" {
+				multimodalReason = MultimodalIndexUnavailableReason
+			}
+			multimodalNotes = "image model artifact, provider, or vector backend is unavailable (" + multimodalReason + ")"
+		}
+	}
 	if ready.Multimodal {
 		multimodalState = "AVAILABLE"
-		multimodalNotes = "explicitly enabled fixture joint-space generation over audio-tag ENRICH artifacts; not CLIP weights, not SHA-256, not recovery authority"
+		multimodalProvider = ProviderMultimodalFix
+		multimodalScore = ScoreMultimodalExact
+		multimodalReason = ""
+		multimodalNotes = "explicitly enabled fixture joint-space generation over audio-tag ENRICH artifacts; not CLIP weights, not a real embedding model, not SHA-256, not recovery authority"
 	}
 	graphState := "UNAVAILABLE"
 	graphNotes := "catalog relation QueryProvider; unavailable until the exact lane wires a search indexer"
@@ -373,10 +464,11 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 		},
 		{
 			ID:             DimensionMultimodal,
-			Provider:       ProviderMultimodalFix,
+			Provider:       multimodalProvider,
 			State:          multimodalState,
 			Version:        "1",
-			ScoreSemantics: ScoreMultimodalExact,
+			ScoreSemantics: multimodalScore,
+			Reason:         multimodalReason,
 			Notes:          multimodalNotes,
 		},
 		{
@@ -465,7 +557,7 @@ func LexicalCoverageFields() []string {
 
 func IndexerReadiness(idx *Indexer) ProviderReadiness {
 	ready := idx != nil && idx.Store != nil && idx.Engine != nil
-	fixtures := ready && idx.EnableFixtureDimensions
+	fixtures := ready && idx.fixtureDimensionsActive()
 	providerReady := ready
 	if ready {
 		if health, ok := idx.SemanticProvider.(interface{ SemanticReady() bool }); ok {
@@ -484,7 +576,79 @@ func IndexerReadiness(idx *Indexer) ProviderReadiness {
 		strings.TrimSpace(idx.SemanticLibraryDigest) != "" && idx.semanticIndexReady.Load() && !idx.semanticUnavailable.Load()
 	fixtureSemantic := fixtures && (idx.SemanticManifest == (EmbeddingGenerationManifest{}) ||
 		idx.SemanticManifest.SemanticSpace == SemanticFixtureProfileV1)
-	return ProviderReadiness{Lexical: ready, Acoustic: fixtures, Semantic: fixtureSemantic || realSemantic, SemanticReal: realSemantic, Multimodal: fixtures, Graph: ready}
+	imageInstalled := ready && idx.imageBindingActive()
+	imageState := ""
+	imageReason := ""
+	imageReal := false
+	if imageInstalled {
+		report := idx.imageProviderReport()
+		switch {
+		case report.State != ImageProviderReady:
+			imageState = report.State
+			imageReason = strings.TrimSpace(report.Reason)
+			if imageReason == "" {
+				imageReason = MultimodalIndexUnavailableReason
+			}
+		case idx.ImageSource == nil:
+			imageState = ImageProviderUnavailable
+			imageReason = "image content source is not configured"
+		case idx.ImageZvec == nil || strings.TrimSpace(idx.ImageLibraryPath) == "" || strings.TrimSpace(idx.ImageLibraryDigest) == "" ||
+			idx.MultimodalManifest.Validate() != nil:
+			imageState = ImageProviderUnavailable
+			imageReason = MultimodalIndexUnavailableReason
+		case !idx.imageIndexReady.Load() || idx.ImageFailure() != "":
+			imageState = ImageProviderNotBuilt
+			imageReason = MultimodalIndexNotBuiltReason
+		default:
+			imageZvecReady := true
+			if health, ok := idx.ImageZvec.(ZvecGenerationReadiness); ok {
+				imageZvecReady = health.ZvecReady(idx.ImageLibraryPath, idx.ImageLibraryDigest, idx.MultimodalManifest)
+			}
+			if !imageZvecReady {
+				imageState = ImageProviderUnavailable
+				imageReason = MultimodalIndexUnavailableReason
+			} else {
+				imageState = ImageProviderReady
+				imageReal = true
+			}
+		}
+	}
+	semanticOnline, semanticComponents, semanticFailure := semanticProviderReport(idx, realSemantic)
+	return ProviderReadiness{
+		Lexical: ready, Acoustic: fixtures, Semantic: fixtureSemantic || realSemantic, SemanticReal: realSemantic,
+		Multimodal: fixtures, MultimodalInstalled: imageInstalled, MultimodalReal: imageReal,
+		MultimodalState: imageState, MultimodalReason: imageReason, Graph: ready,
+		SemanticOnline: semanticOnline, SemanticComponents: semanticComponents, SemanticFailure: semanticFailure,
+	}
+}
+
+// semanticProviderReport reports whether the real semantic provider is remote
+// (online or hybrid), its honest per-component status for a hybrid provider,
+// and its latest payload-free failure summary.
+// --- online embedding provider (additive wiring) ---
+func semanticProviderReport(idx *Indexer, real bool) (bool, []SemanticProviderComponentStatus, string) {
+	if !real || idx == nil || idx.SemanticProvider == nil {
+		return false, nil, ""
+	}
+	kind := ""
+	if provider, ok := idx.SemanticProvider.(interface{ SemanticProviderKind() string }); ok {
+		kind = provider.SemanticProviderKind()
+	}
+	online := kind == "online" || kind == "hybrid"
+	var components []SemanticProviderComponentStatus
+	if provider, ok := idx.SemanticProvider.(interface {
+		ComponentStatuses() []SemanticProviderComponentStatus
+	}); ok {
+		components = provider.ComponentStatuses()
+	}
+	failure := ""
+	if health, ok := idx.SemanticProvider.(interface{ SemanticFailure() string }); ok {
+		failure = strings.TrimSpace(health.SemanticFailure())
+	}
+	if !online {
+		failure = ""
+	}
+	return online, components, failure
 }
 
 // NormalizeFuse accepts two or more declared dimension IDs. Duplicates drop.

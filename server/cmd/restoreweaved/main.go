@@ -99,26 +99,51 @@ type daemonOptions struct {
 	apiToken               string
 }
 
+// semanticWorkerBinding is one admitted embedding provider together with the
+// vector backend and immutable generation binding it produces.
+type semanticWorkerBinding struct {
+	provider      search.SemanticEmbeddingProvider
+	zvec          search.ZvecGenerationDriver
+	libraryPath   string
+	libraryDigest string
+	manifest      search.EmbeddingGenerationManifest
+	release       func() error
+}
+
+// configureSemanticBinding admits the pinned local ONNX/BGE worker for
+// embedding_mode=local. The local path is unchanged: same profile checks,
+// same admission, same worker lease, same probe.
 func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
-	if strings.TrimSpace(bundleRoot) == "" {
+	binding, err := startLocalSemanticBinding(ctx, resolved, store, bundleRoot, operatorOverride)
+	if err != nil {
+		return nil, nil, err
+	}
+	if binding.provider == nil {
 		return nil, nil, nil
 	}
+	return controlplane.WithSemanticIndexerBinding(binding.provider, binding.zvec, binding.libraryPath, binding.libraryDigest, binding.manifest), binding.release, nil
+}
+
+func startLocalSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (semanticWorkerBinding, error) {
+	if strings.TrimSpace(bundleRoot) == "" {
+		return semanticWorkerBinding{}, nil
+	}
 	if strings.TrimSpace(resolved.Config.Semantic.EmbeddingMode) != "local" {
-		return nil, nil, fmt.Errorf("semantic.embedding_mode %q is not compatible with the admitted local bundle", resolved.Config.Semantic.EmbeddingMode)
+		return semanticWorkerBinding{}, fmt.Errorf("semantic.embedding_mode %q is not compatible with the admitted local bundle", resolved.Config.Semantic.EmbeddingMode)
 	}
 	if strings.TrimSpace(resolved.Config.Semantic.LocalProfile) != search.SemanticBundleBGEProfileID {
-		return nil, nil, fmt.Errorf("semantic.local_profile %q is not compatible with the admitted bundle profile %q", resolved.Config.Semantic.LocalProfile, search.SemanticBundleBGEProfileID)
+		return semanticWorkerBinding{}, fmt.Errorf("semantic.local_profile %q is not compatible with the admitted bundle profile %q", resolved.Config.Semantic.LocalProfile, search.SemanticBundleBGEProfileID)
 	}
 	if strings.TrimSpace(resolved.Config.Semantic.VectorBackend) != "zvec" {
-		return nil, nil, fmt.Errorf("semantic.vector_backend %q is not compatible with the admitted zvec bundle", resolved.Config.Semantic.VectorBackend)
+		return semanticWorkerBinding{}, fmt.Errorf("semantic.vector_backend %q is not compatible with the admitted zvec bundle", resolved.Config.Semantic.VectorBackend)
 	}
 	bundle, err := loadSemanticBundleAdmission(bundleRoot, operatorOverride)
 	if err != nil {
-		return nil, nil, err
+		return semanticWorkerBinding{}, err
 	}
 	manifest, err := bundle.EmbeddingGenerationManifest(resolved.Digest)
 	if err != nil {
-		return nil, nil, err
+		return semanticWorkerBinding{}, err
 	}
 	owner := fmt.Sprintf("restoreweave-semantic-%d", os.Getpid())
 	leaseToken := fmt.Sprintf("semantic:%d", time.Now().UnixNano())
@@ -127,7 +152,7 @@ func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCon
 	fencer := exact.NewPublicationFencer(store, time.Now)
 	fenceToken, err := fencer.Acquire(ctx, domain, owner, leaseToken, now, now.Add(exact.DefaultPublicationFenceTTL))
 	if err != nil {
-		return nil, nil, fmt.Errorf("acquire semantic worker lease: %w", err)
+		return semanticWorkerBinding{}, fmt.Errorf("acquire semantic worker lease: %w", err)
 	}
 	validateLease := func(checkCtx context.Context) error {
 		return renewAndValidateSemanticLease(checkCtx, fencer, domain, owner, leaseToken, fenceToken, time.Now())
@@ -138,7 +163,7 @@ func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCon
 	})
 	if err != nil {
 		_ = fencer.Release(context.Background(), domain, owner, leaseToken, fenceToken, time.Now())
-		return nil, nil, err
+		return semanticWorkerBinding{}, err
 	}
 	probeCtx, cancelProbe := context.WithTimeout(ctx, 45*time.Second)
 	_, err = factory.Embed(probeCtx, search.SemanticEmbeddingRequest{
@@ -154,7 +179,7 @@ func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCon
 	cancelProbe()
 	if err != nil {
 		_ = fencer.Release(context.Background(), domain, owner, leaseToken, fenceToken, time.Now())
-		return nil, nil, fmt.Errorf("probe semantic worker: %w", err)
+		return semanticWorkerBinding{}, fmt.Errorf("probe semantic worker: %w", err)
 	}
 	leaseCtx, stopLease := context.WithCancel(ctx)
 	leaseDone := make(chan struct{})
@@ -172,7 +197,115 @@ func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCon
 	}
 	libraryPath := filepath.Join(bundleRoot, filepath.FromSlash(bundle.Descriptor.Zvec.Path))
 	libraryDigest := "sha256:" + bundle.AssetDigests["zvec"]
-	return controlplane.WithSemanticIndexerBinding(factory, search.NewZvecGenerationDriver(libraryPath), libraryPath, libraryDigest, manifest), release, nil
+	return semanticWorkerBinding{
+		provider: factory, zvec: search.NewZvecGenerationDriver(libraryPath),
+		libraryPath: libraryPath, libraryDigest: libraryDigest, manifest: manifest, release: release,
+	}, nil
+}
+
+// configureSemanticBindingForMode dispatches on semantic.embedding_mode.
+//
+//   - local:  the pinned ONNX/BGE worker (unchanged default).
+//   - online: the egress-gated HTTP provider. The local model worker is not
+//     started; the admitted bundle supplies only the in-process zvec vector
+//     backend, which is a local projection and never sees content of its own.
+//   - hybrid: both components, each bound to its own immutable space, with
+//     the local component serving the daemon's default generation space.
+//
+// A mode that cannot admit its provider is reported as a degraded semantic
+// capability by the caller; it never falls back to another mode, provider, or
+// space.
+func configureSemanticBindingForMode(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+	switch strings.TrimSpace(resolved.Config.Semantic.EmbeddingMode) {
+	case "online":
+		return configureOnlineSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
+	case "hybrid":
+		return configureHybridSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
+	default:
+		// The local path is byte-for-byte the existing behavior, including
+		// its own compatibility errors.
+		return configureSemanticBinding(ctx, resolved, store, bundleRoot, operatorOverride)
+	}
+}
+
+// configureOnlineSemanticBinding admits the immutable online profile and its
+// one HTTP egress path. The vector backend comes from the admitted local
+// bundle's zvec asset: the current packaging ships the in-process vector
+// backend inside that bundle, and an online-only backend artifact is not
+// admitted yet. No local model artifact is used to produce vectors.
+func configureOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+	provider, zvec, libraryPath, libraryDigest, manifest, err := buildOnlineSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
+	if err != nil {
+		return nil, nil, err
+	}
+	return controlplane.WithSemanticIndexerBinding(provider, zvec, libraryPath, libraryDigest, manifest), nil, nil
+}
+
+// configureHybridSemanticBinding starts the local default worker and adds the
+// online component beside it. The daemon's bound generation space remains the
+// local one; the online component's state is reported per component and is
+// only used when a request names its space.
+func configureHybridSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+	local, err := startLocalSemanticBinding(ctx, resolved, store, bundleRoot, operatorOverride)
+	if err != nil {
+		return nil, nil, fmt.Errorf("hybrid local component: %w", err)
+	}
+	if local.provider == nil {
+		return nil, nil, errors.New("hybrid embedding requires the admitted local bundle; the local default is not silently dropped")
+	}
+	online, _, _, _, onlineManifest, err := buildOnlineSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
+	if err != nil {
+		if local.release != nil {
+			_ = local.release()
+		}
+		return nil, nil, fmt.Errorf("hybrid online component: %w", err)
+	}
+	hybrid, err := search.NewHybridSemanticProvider(
+		search.SemanticProviderComponent{Name: "local", Provider: local.provider, Manifest: local.manifest, Default: true},
+		search.SemanticProviderComponent{Name: "online", Provider: online, Manifest: onlineManifest},
+	)
+	if err != nil {
+		if local.release != nil {
+			_ = local.release()
+		}
+		return nil, nil, err
+	}
+	return controlplane.WithSemanticIndexerBinding(hybrid, local.zvec, local.libraryPath, local.libraryDigest, local.manifest), local.release, nil
+}
+
+func buildOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (*search.OnlineEmbeddingProvider, search.ZvecGenerationDriver, string, string, search.EmbeddingGenerationManifest, error) {
+	profile, err := search.LoadOnlineEmbeddingProfile(modelsRoot, resolved.Config.Semantic.OnlineProfile)
+	if err != nil {
+		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, err
+	}
+	manifest, err := profile.EmbeddingGenerationManifest(resolved.Digest)
+	if err != nil {
+		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, err
+	}
+	bundle, err := loadSemanticBundleAdmission(bundleRoot, operatorOverride)
+	if err != nil {
+		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, fmt.Errorf("online embedding vector backend: %w", err)
+	}
+	libraryPath := filepath.Join(bundleRoot, filepath.FromSlash(bundle.Descriptor.Zvec.Path))
+	libraryDigest := "sha256:" + bundle.AssetDigests["zvec"]
+	provider, err := search.NewOnlineEmbeddingProvider(search.OnlineEmbeddingProviderOptions{
+		Mode:                           strings.TrimSpace(resolved.Config.Semantic.EmbeddingMode),
+		Profile:                        profile,
+		Manifest:                       manifest,
+		CredentialRef:                  resolved.Config.Semantic.OnlineCredentialRef,
+		SendContentWithoutConfirmation: resolved.Config.Semantic.SendContentWithoutConfirmation,
+		AuditSink:                      controlplane.NewSemanticEgressAuditSink(store),
+		SubjectPolicy:                  controlplane.NewSemanticEgressSubjectPolicy(store),
+	})
+	if err != nil {
+		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, err
+	}
+	if readinessErr := provider.CheckEgressReadiness(ctx); readinessErr != nil {
+		// The provider stays bound so capability and status name the exact
+		// failed condition; the daemon starts degraded, not silently online.
+		log.Printf("online semantic egress not ready: %v", readinessErr)
+	}
+	return provider, search.NewZvecGenerationDriver(libraryPath), libraryPath, libraryDigest, manifest, nil
 }
 
 // loadSemanticBundleAdmission is the single daemon admission boundary for the
@@ -337,7 +470,8 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		bundleRoot = filepath.Join(resolved.Config.Paths.Models, search.SemanticBundleBGEProfileID, runtime.GOOS+"-"+runtime.GOARCH)
 	}
 	bundleCapability := semanticBundleCapability(bundleRoot, options.semanticBundleOverride)
-	semanticOption, semanticCleanup, semanticErr := configureSemanticBinding(runCtx, resolved, store, bundleRoot, options.semanticBundleOverride)
+	semanticOption, semanticCleanup, semanticErr := configureSemanticBindingForMode(
+		runCtx, resolved, store, resolved.Config.Paths.Models, bundleRoot, options.semanticBundleOverride)
 	if semanticErr != nil {
 		log.Printf("semantic capability unavailable: %v", semanticErr)
 	}

@@ -777,6 +777,9 @@ func validate(cfg Config, resolvedPaths bool) error {
 		if err := validateProfileName("semantic.online_profile", cfg.Semantic.OnlineProfile); err != nil {
 			return err
 		}
+		if err := validateOnlineCredentialRef("semantic.online_credential_ref", cfg.Semantic.OnlineCredentialRef); err != nil {
+			return err
+		}
 	case "hybrid":
 		if strings.TrimSpace(cfg.Semantic.LocalProfile) == "" || strings.TrimSpace(cfg.Semantic.OnlineProfile) == "" {
 			return errors.New("semantic.local_profile and semantic.online_profile are required for hybrid embeddings")
@@ -785,6 +788,9 @@ func validate(cfg Config, resolvedPaths bool) error {
 			return err
 		}
 		if err := validateProfileName("semantic.online_profile", cfg.Semantic.OnlineProfile); err != nil {
+			return err
+		}
+		if err := validateOnlineCredentialRef("semantic.online_credential_ref", cfg.Semantic.OnlineCredentialRef); err != nil {
 			return err
 		}
 	default:
@@ -874,6 +880,31 @@ func validateProfileName(name, value string) error {
 		return fmt.Errorf("%s must be a non-whitespace profile identifier", name)
 	}
 	return nil
+}
+
+// validateOnlineCredentialRef accepts only scheme-qualified host secret
+// references for the online embedding provider. An online or hybrid profile
+// needs a credential, so a missing or bare reference is rejected at
+// validation time instead of starting a daemon that can never egress. The
+// value is a reference; a plaintext secret remains rejected by
+// containsSecretValue.
+func validateOnlineCredentialRef(name, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("%s is required for online and hybrid embeddings (use env://NAME or keychain://service/account)", name)
+	}
+	if strings.TrimSpace(value) != value {
+		return fmt.Errorf("%s must not contain leading or trailing whitespace", name)
+	}
+	scheme, rest, found := strings.Cut(value, "://")
+	if !found || scheme == "" || strings.TrimSpace(rest) == "" {
+		return fmt.Errorf("%s must be a scheme-qualified host secret reference such as env://NAME or keychain://service/account", name)
+	}
+	switch scheme {
+	case "env", "keychain":
+		return nil
+	default:
+		return fmt.Errorf("%s scheme %q is not supported (want env or keychain)", name, scheme)
+	}
 }
 
 func validatePublicationDomain(value string) error {

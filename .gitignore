@@ -12,3 +12,6 @@ coverage/
 /models/
 *.test
 *.out
+# Ad-hoc builds must never land in the repository root.
+/restoreweaved
+/rw

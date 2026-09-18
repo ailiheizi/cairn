@@ -36,7 +36,7 @@ func TestRealBGEEmbeddingBuildsAndQueriesNativeZvec(t *testing.T) {
 		Command: workerBinary, BundleRoot: bundleRoot, ConfigDigest: admission.Manifest.ConfigDigest,
 		GenerationID: "zvec-supervised-generation", FenceToken: 11,
 		SandboxPolicyDigest: sandbox.PolicyDigest(),
-		FenceValidator: func(context.Context) error { return nil }, HandshakeTimeout: 25 * time.Second,
+		FenceValidator:      func(context.Context) error { return nil }, HandshakeTimeout: 25 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("start supervised worker: %v", err)

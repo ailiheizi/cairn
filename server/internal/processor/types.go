@@ -25,17 +25,20 @@ const (
 	CapabilityAudioFingerprint  = "fingerprint.audio.fixture.v1"
 	CapabilityTextEmbedding     = "embed.text.fixture.v1"
 	CapabilityClipEmbedding     = "embed.clip.fixture.v1"
+	CapabilityOCRImageText      = "ocr.image.text.v1"
 	SchemaExtractedTextV1       = "restoreweave.artifact.extracted-text.v1"
 	SchemaAudioTrackV1          = "restoreweave.domain.audio.track/v1"
 	SchemaBookWorkV1            = "restoreweave.domain.book.work/v1"
 	SchemaAcousticFingerprintV1 = "restoreweave.artifact.acoustic-fingerprint.v1"
 	SchemaTextEmbeddingV1       = "restoreweave.artifact.text-embedding.v1"
 	SchemaClipEmbeddingV1       = "restoreweave.artifact.clip-embedding.v1"
+	SchemaOCRTextV1             = "restoreweave.artifact.ocr-text.v1"
 	MediaTypeUTF8Text           = "text/plain; charset=utf-8"
 	MediaTypeAudioJSON          = "application/json"
 	MediaTypeBookJSON           = "application/json"
 	MediaTypeFingerprintJSON    = "application/json"
 	MediaTypeEmbeddingJSON      = "application/json"
+	MediaTypeOCRJSON            = "application/json"
 	FixtureFingerprintAlgorithm = "fixture-v1"
 	FixtureTextSpace            = "fixture-text-v1"
 	FixtureClipSpace            = "fixture-clip-v1"
@@ -47,7 +50,28 @@ const (
 	defaultMaxSourceBytes = 1 << 20
 	defaultStageTimeout   = 2 * time.Second
 	defaultMaxConcurrent  = 2
+
+	// A capability that reads media rather than text needs room for a real
+	// picture and time for more than one model stage: at the 1 MiB default a
+	// screenshot is truncated before the processor sees it, and at the 2s
+	// default a detection plus recognition run is cancelled mid-flight.
+	mediaMaxSourceBytes = int64(64 << 20)
+	mediaStageTimeout   = 60 * time.Second
 )
+
+// CapabilityBudget overrides the host defaults for one capability; a zero field
+// keeps the host default.
+type CapabilityBudget struct {
+	MaxSourceBytes int64
+	StageTimeout   time.Duration
+}
+
+// MediaBudget is implemented by processors whose work reads media instead of
+// text. The host asks the processor rather than hard-coding capability names, so
+// a new media processor declares its own budget where it is defined.
+type MediaBudget interface {
+	ProcessingBudget() CapabilityBudget
+}
 
 type Stage string
 
@@ -153,6 +177,14 @@ func SchemaRefTextEmbedding() string {
 
 func SchemaRefClipEmbedding() string {
 	sum := sha256.Sum256([]byte(SchemaClipEmbeddingV1))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// SchemaRefOCRText pins the operator-installed OCR extracted-text schema by
+// digest. The schema names the exact artifact body shape; it does not claim
+// that an OCR engine is installed.
+func SchemaRefOCRText() string {
+	sum := sha256.Sum256([]byte(SchemaOCRTextV1))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 

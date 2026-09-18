@@ -1485,3 +1485,47 @@ func waitForRecoveryReader(t *testing.T, socketPath string, readerErr <-chan err
 	t.Fatalf("recovery reader did not listen on %s", socketPath)
 	return nil
 }
+
+// TestConfigureSemanticBindingForModeSelectsTheConfiguredProvider pins the
+// daemon's mode dispatch: local keeps the existing local admission errors,
+// online admits the installed online profile + vector backend, and a mode
+// whose provider cannot be admitted fails visibly instead of falling back.
+func TestConfigureSemanticBindingForModeSelectsTheConfiguredProvider(t *testing.T) {
+	ctx := context.Background()
+	resolved := rwconfig.ResolvedConfig{Config: rwconfig.Default(), Digest: "sha256:" + strings.Repeat("a", 64)}
+	// The default profile is local and its mode dispatch must remain the
+	// local path (the existing compatibility error naming embedding_mode).
+	if resolved.Config.Semantic.EmbeddingMode != "local" {
+		t.Fatalf("default embedding mode = %q, want local", resolved.Config.Semantic.EmbeddingMode)
+	}
+	_, _, err := configureSemanticBindingForMode(ctx, resolved, nil, t.TempDir(), filepath.Join(t.TempDir(), "missing-bundle"), false)
+	if err == nil || !strings.Contains(err.Error(), "bundle") {
+		t.Fatalf("local mode error = %v, want the unchanged local bundle admission path", err)
+	}
+	localProfileMismatch := resolved
+	localProfileMismatch.Config.Semantic.LocalProfile = "other-profile"
+	if _, _, err := configureSemanticBindingForMode(ctx, localProfileMismatch, nil, t.TempDir(), filepath.Join(t.TempDir(), "missing-bundle"), false); err == nil ||
+		!strings.Contains(err.Error(), "local_profile") {
+		t.Fatalf("local profile mismatch error = %v, want local_profile", err)
+	}
+
+	// Online mode without an installed profile manifest is explicit.
+	online := resolved
+	online.Config.Semantic.EmbeddingMode = "online"
+	online.Config.Semantic.OnlineProfile = "operator-online-v1"
+	online.Config.Semantic.OnlineCredentialRef = "env://RW_TEST_KEY"
+	modelsRoot := t.TempDir()
+	_, _, err = configureSemanticBindingForMode(ctx, online, nil, modelsRoot, filepath.Join(t.TempDir(), "missing-bundle"), false)
+	if err == nil || !strings.Contains(err.Error(), "not installed") {
+		t.Fatalf("online mode without profile error = %v", err)
+	}
+
+	// Hybrid mode refuses to start without its admitted local component: the
+	// local default is never silently dropped.
+	hybrid := online
+	hybrid.Config.Semantic.EmbeddingMode = "hybrid"
+	_, _, err = configureSemanticBindingForMode(ctx, hybrid, nil, modelsRoot, filepath.Join(t.TempDir(), "missing-bundle"), false)
+	if err == nil || !strings.Contains(err.Error(), "local") {
+		t.Fatalf("hybrid mode without local bundle error = %v", err)
+	}
+}

@@ -360,7 +360,9 @@ func TestDispatcherCapabilityList(t *testing.T) {
 		t.Fatalf("model bundle = %q, want UNAVAILABLE without an admitted bundle", states["model-bundle:"+search.SemanticBundleBGEProfileID])
 	}
 	want := len(command.KnownOperations()) + 2 + len(search.DeclaredDimensions(search.ProviderReadiness{})) + 1
-	want++
+	// +1 for the optional OCR processor capability, which is reported even when
+	// no operator-installed OCR bundle is present.
+	want += 2
 	if len(data.Capabilities) != want {
 		t.Fatalf("capability count = %d, want %d", len(data.Capabilities), want)
 	}

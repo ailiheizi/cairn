@@ -2,6 +2,65 @@
 
 ## Unreleased
 
+- Image search is a real dimension with its own space instead of a fixture.
+  `multimodal-clip` declares an image space fingerprint (schema
+  `restoreweave.image-space.v1`) that binds every declared fact of the model,
+  the preprocessing, and the vector schema; it reports READY, NOT_BUILT, or
+  UNAVAILABLE with the reason, never serves fixture vectors from a production
+  path, and the fixture provider is quarantined as soon as a real binding
+  exists. Image queries embed through their own tower, and a result produced
+  under a different space fingerprint is refused rather than scored. Fusion
+  includes the dimension only when its generation is ready and keeps reporting
+  per-component status, and the lexical and text-semantic behaviour is unchanged
+  when no image model is installed — which is what a fresh install reports.
+- Derived processing now has per-capability budgets. A processor that reads media
+  declares its own budget, and the host resolves an explicit override first,
+  then that declaration, then the host defaults; the read ceiling for a route is
+  the largest ceiling among its nodes and the entry deadline is the sum of its
+  node deadlines, so a multi-stage route is not cut short. OCR and image
+  embedding declare 64 MiB and 60 seconds, because at the previous 1 MiB and 2
+  second defaults a screenshot was truncated before the processor saw it and a
+  detection plus recognition run was cancelled mid-flight. Text capabilities
+  keep the previous defaults exactly.
+- OCR is now an optional real capability rather than an assumption.
+  `ocr.image.text.v1` runs detection and recognition in-process through the
+  already-pinned ONNX Runtime when an operator has installed the digest-pinned
+  RapidOCR bundle under `paths.models`, and produces one durable extract
+  artifact carrying the recognized text, per-region boxes and confidences, the
+  source's exact content id and logical length, the engine, runtime, model and
+  dictionary digests, the declared language coverage, and a recognition digest
+  over the canonical payload; the host seals the body and records its own
+  SHA-256. The recognized text reaches the existing lexical and semantic
+  discovery feed like every other extraction — no second index, store, or
+  dimension — an image with no text yields an explicit empty result rather than
+  an error or a silent success, and a low-confidence or bound-truncated result
+  is marked partial with its reasons. Nothing is downloaded: the capability
+  reports READY, NOT_BUILT or UNAVAILABLE with the expected bundle path and the
+  reason, per-subject attempts carry the same reason, a missing engine leaves
+  exact preservation untouched, and no run can exceed its image, region, text,
+  timeout, or concurrency budget.
+- Online embedding is a real, gated provider instead of a configuration
+  placeholder. The mode admits one immutable operator-installed profile
+  manifest pinning endpoint, provider, model id and revision, dimension, input
+  type and instruction field, prefixes, normalization, distance, batching and
+  timeout, and its space fingerprint is recorded in the generation manifest, in
+  the semantic dimension and in every egress receipt — so the same vendor with a
+  different dimension, revision, prefix or normalization is a different space
+  and builds a new generation instead of reinterpreting old vectors. Content can
+  leave the process through exactly one egress path, and only when the profile
+  and its credential reference resolve, the send-without-confirmation switch is
+  satisfied by an explicit digest-bound confirmation, every document subject is
+  locally protected, and an append-only receipt ledger is attached; a refusal is
+  typed, names the failed condition, makes no network call, and never falls back
+  to a local model, a fixture vector, or another space. Each attempted egress
+  appends one audit event carrying the provider profile, space fingerprints,
+  model identity, per-item text digests, payload digest and byte counts, the
+  authorizing switch or confirmation, timestamps, the HTTP status and a vendor
+  error class — never the payload text and never the credential. Unreachable
+  endpoints, timeouts, rejected credentials, quota, provider errors, redirects,
+  malformed responses, dimension mismatches, a different model echoed by the
+  provider, and invalid vectors each report their own reason. The local BGE
+  profile stays the personal default and is unchanged.
 - The search field now reaches every filter `search.query` records: `suffix:EXT`
   writes the daemon's recorded suffix, `protection:MODE` writes the protection
   mode against the daemon's closed vocabulary, and `lang:CODE` writes the

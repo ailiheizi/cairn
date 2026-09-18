@@ -31,6 +31,18 @@ type Indexer struct {
 	SemanticLibraryPath   string
 	SemanticLibraryDigest string
 
+	// ImageProvider, ImageZvec, ImageSource, and the library binding are the
+	// optional real image-space binding. The image space is separate from the
+	// text space: its query vectors come from the image model's own text tower
+	// and are never compared with text-space vectors. A missing or unhealthy
+	// binding keeps the multimodal dimension NOT_BUILT or UNAVAILABLE with a
+	// reason, and never blocks exact save or any other dimension.
+	ImageProvider      ImageEmbeddingProvider
+	ImageZvec          ZvecGenerationDriver
+	ImageSource        ImageContentSource
+	ImageLibraryPath   string
+	ImageLibraryDigest string
+
 	// Binding fields are populated by the daemon from the resolved config.
 	// An empty binding is retained for low-level fixture harnesses; daemon
 	// wiring always supplies ConfigDigest and the relevant profile digest.
@@ -73,6 +85,17 @@ type Indexer struct {
 	semanticVerifiedMu sync.RWMutex
 	semanticVerified   map[string]semanticGenerationReceipt
 	semanticVerifyMu   sync.Mutex
+
+	// imageVerified and imageReport mirror the semantic cache and latest
+	// bounded build result for the separate image space. They are process-local
+	// and never durable authority.
+	imageVerifiedMu sync.RWMutex
+	imageVerified   map[string]semanticGenerationReceipt
+	imageVerifyMu   sync.Mutex
+	imageIndexReady atomic.Bool
+	imageFailure    atomic.Value
+	imageReportMu   sync.RWMutex
+	imageReport     ImageIndexReport
 
 	// EnableFixtureDimensions is test/qualification-only wiring for the
 	// deterministic acoustic and embedding fixtures. Production readiness must
@@ -146,6 +169,52 @@ func (idx *Indexer) revokeSemanticGeneration(generationID string) {
 	idx.semanticIndexReady.Store(false)
 }
 
+func (idx *Indexer) cachedImageGeneration(generation sqlite.IndexGeneration) (int, bool) {
+	if idx == nil || strings.TrimSpace(generation.ID) == "" {
+		return 0, false
+	}
+	idx.imageVerifiedMu.RLock()
+	receipt, ok := idx.imageVerified[generation.ID]
+	idx.imageVerifiedMu.RUnlock()
+	if !ok || receipt.DBPath != generation.DBPath || receipt.ConfigDigest != generation.ConfigDigest ||
+		receipt.ProfileDigest != generation.ProviderProfileDigest || receipt.SemanticSpace != generation.SemanticSpace ||
+		receipt.LibraryPath != idx.ImageLibraryPath || receipt.LibraryDigest != idx.ImageLibraryDigest {
+		return 0, false
+	}
+	identities, identityDigest, libraryDigest, err := readImageGenerationReceipt(generation)
+	if err != nil || len(identities) != receipt.IdentityCount || identityDigest != receipt.IdentityDigest || libraryDigest != idx.ImageLibraryDigest {
+		return 0, false
+	}
+	return receipt.IdentityCount, true
+}
+
+func (idx *Indexer) cacheImageGeneration(generation sqlite.IndexGeneration, identities []ZvecCoverageIdentity) {
+	if idx == nil || strings.TrimSpace(generation.ID) == "" {
+		return
+	}
+	idx.imageVerifiedMu.Lock()
+	if idx.imageVerified == nil {
+		idx.imageVerified = make(map[string]semanticGenerationReceipt)
+	}
+	idx.imageVerified[generation.ID] = semanticGenerationReceipt{
+		GenerationID: generation.ID, DBPath: generation.DBPath, ConfigDigest: generation.ConfigDigest,
+		ProfileDigest: generation.ProviderProfileDigest, SemanticSpace: generation.SemanticSpace,
+		LibraryPath: idx.ImageLibraryPath, LibraryDigest: idx.ImageLibraryDigest,
+		IdentityCount: len(identities), IdentityDigest: semanticCoverageDigest(identities),
+	}
+	idx.imageVerifiedMu.Unlock()
+}
+
+func (idx *Indexer) revokeImageGeneration(generationID string) {
+	if idx == nil || strings.TrimSpace(generationID) == "" {
+		return
+	}
+	idx.imageVerifiedMu.Lock()
+	delete(idx.imageVerified, generationID)
+	idx.imageVerifiedMu.Unlock()
+	idx.imageIndexReady.Store(false)
+}
+
 func (idx *Indexer) profileDigest(dimension string) string {
 	var digest string
 	switch dimension {
@@ -161,7 +230,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 		}
 	case DimensionAcoustic:
 		digest = idx.AcousticProfileDigest
-		if digest == "" && idx.ConfigDigest != "" && idx.EnableFixtureDimensions {
+		if digest == "" && idx.ConfigDigest != "" && idx.fixtureDimensionsActive() {
 			digest = ProfileDigest(dimension, AcousticFixtureProfileV1)
 		}
 	case DimensionSemantic:
@@ -170,7 +239,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 		} else {
 			digest = idx.SemanticProfileDigest
 		}
-		if digest == "" && idx.ConfigDigest != "" && idx.EnableFixtureDimensions {
+		if digest == "" && idx.ConfigDigest != "" && idx.fixtureDimensionsActive() {
 			digest = ProfileDigest(dimension, SemanticFixtureProfileV1)
 		}
 	case DimensionMultimodal:
@@ -179,7 +248,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 		} else {
 			digest = idx.MultimodalProfileDigest
 		}
-		if digest == "" && idx.ConfigDigest != "" && idx.EnableFixtureDimensions {
+		if digest == "" && idx.ConfigDigest != "" && idx.fixtureDimensionsActive() {
 			digest = ProfileDigest(dimension, MultimodalFixtureProfileV1)
 		}
 	}
@@ -664,7 +733,7 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		_ = idx.Engine.RemoveFile(dbPath)
 		return sqlite.IndexGeneration{}, err
 	}
-	if idx.EnableFixtureDimensions {
+	if idx.fixtureDimensionsActive() {
 		_, _ = idx.rebuildAcoustic(ctx, workspaceID, snapshotRef, namespaceRootID, byID, artifacts)
 		_, _ = idx.rebuildTokens(ctx, workspaceID, snapshotRef, namespaceRootID, byID, artifacts, DimensionSemantic, "ENRICH", "embed.text.fixture.v1")
 		_, _ = idx.rebuildTokens(ctx, workspaceID, snapshotRef, namespaceRootID, byID, artifacts, DimensionMultimodal, "ENRICH", "embed.clip.fixture.v1")
@@ -680,8 +749,71 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			idx.semanticFailure.Store("")
 		}
 	}
+	if idx.imageBindingActive() && idx.ImageSource != nil {
+		imageReport, imageErr := idx.rebuildImage(ctx, workspaceID, snapshotRef, namespaceRootID, rootIDs, byID)
+		if imageErr != nil {
+			// Image embedding is bounded derived work like the text semantic
+			// lane: a failure preserves the lexical generation and keeps exact
+			// save usable, and the dimension reports UNAVAILABLE with its reason.
+			idx.imageIndexReady.Store(false)
+			idx.setImageFailure(imageErr)
+			idx.setImageReport(imageReport)
+		} else {
+			idx.imageIndexReady.Store(true)
+			idx.imageFailure.Store("")
+			idx.setImageReport(imageReport)
+		}
+	}
 	_, _ = idx.rebuildGraph(ctx, workspaceID, snapshotRef, namespaceRootID, byID, annotations, artifacts)
 	return generation, nil
+}
+
+// fixtureDimensionsActive gates the deterministic fixture projections. Fixture
+// wiring alone is never enough: a real space binding on the same dimension
+// quarantines the fixture path so a fixture vector can never be served as if
+// it were a real model vector.
+func (idx *Indexer) fixtureDimensionsActive() bool {
+	if idx == nil || !idx.EnableFixtureDimensions {
+		return false
+	}
+	if idx.MultimodalManifest != (EmbeddingGenerationManifest{}) &&
+		idx.MultimodalManifest.SemanticSpace != MultimodalFixtureProfileV1 {
+		return false
+	}
+	if idx.SemanticManifest != (EmbeddingGenerationManifest{}) &&
+		idx.SemanticManifest.SemanticSpace != SemanticFixtureProfileV1 {
+		return false
+	}
+	return true
+}
+
+func (idx *Indexer) setImageReport(report ImageIndexReport) {
+	if idx == nil {
+		return
+	}
+	if report.SkipReasons == nil {
+		report.SkipReasons = map[string]int{}
+	}
+	idx.imageReportMu.Lock()
+	idx.imageReport = report
+	idx.imageReportMu.Unlock()
+}
+
+func (idx *Indexer) imageReportSnapshot() ImageIndexReport {
+	if idx == nil {
+		return ImageIndexReport{}
+	}
+	idx.imageReportMu.RLock()
+	report := idx.imageReport
+	idx.imageReportMu.RUnlock()
+	if report.SkipReasons != nil {
+		reasons := make(map[string]int, len(report.SkipReasons))
+		for reason, count := range report.SkipReasons {
+			reasons[reason] = count
+		}
+		report.SkipReasons = reasons
+	}
+	return report
 }
 
 func (idx *Indexer) setLexicalWorkspaceFailure(workspaceID, failure string) {
@@ -1678,6 +1810,19 @@ func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGe
 		return generation, nil, ErrUnavailable
 	}
 	if !generationBindingMatches(idx, generation, dimension) {
+		// The image space refuses a generation whose recorded space or provider
+		// binding differs from the configured one. That refusal carries its own
+		// stable reason so a caller can tell a cross-space query from a generic
+		// unavailable index; it is never scored against the recorded vectors.
+		if dimension == DimensionMultimodal {
+			reason := MultimodalIndexUnavailableReason
+			if recorded := strings.TrimSpace(generation.SemanticSpace); recorded != "" {
+				if configured := strings.TrimSpace(idx.semanticSpace(DimensionMultimodal)); configured != "" && recorded != configured {
+					reason = MultimodalSpaceMismatchReason
+				}
+			}
+			return generation, nil, fmt.Errorf("%w: %s", ErrUnavailable, reason)
+		}
 		return generation, nil, ErrUnavailable
 	}
 	if workspaceID := strings.TrimSpace(req.WorkspaceID); workspaceID != "" &&
@@ -1718,9 +1863,16 @@ func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGe
 	case DimensionMultimodal:
 		if idx.MultimodalManifest != (EmbeddingGenerationManifest{}) &&
 			idx.MultimodalManifest.SemanticSpace != MultimodalFixtureProfileV1 {
-			// A real multimodal binding cannot silently fall back to a legacy
-			// token projection when its provider or vector store is unavailable.
-			err = ErrUnavailable
+			// A real image binding never falls back to a legacy token
+			// projection. It either serves the real image space or fails closed
+			// with its reason; fixture vectors are never substituted.
+			if !idx.imageBindingActive() {
+				err = fmt.Errorf("%w: %s", ErrUnavailable, MultimodalIndexNotBuiltReason)
+				break
+			}
+			hits, err = idx.queryImage(ctx, generation, req.Text)
+		} else if !idx.fixtureDimensionsActive() {
+			err = fmt.Errorf("%w: %s", ErrUnavailable, MultimodalIndexNotBuiltReason)
 		} else {
 			hits, err = idx.Engine.QueryTokens(ctx, generation.DBPath, queryToken(dimension, req.Text))
 		}
