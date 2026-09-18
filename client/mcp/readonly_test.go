@@ -116,7 +116,12 @@ var frozenAdmitted = map[string]bool{
 	command.OpBooksList:          false,
 	// subject.facts.list is read-only, but this four-tool surface keeps one
 	// tool per projection; the browser reads subject facts directly.
-	command.OpSubjectFactsList:  false,
+	command.OpSubjectFactsList: false,
+	// similarity.scan writes durable hash artifacts; similarity.groups is a
+	// read-only review projection, but the browser owns both surfaces, so the
+	// four-tool read-only surface admits neither.
+	command.OpSimilarityScan:    false,
+	command.OpSimilarityGroups:  false,
 	command.OpDescriptionCreate: false,
 	command.OpViewSave:          false,
 	command.OpExportPlan:        false,

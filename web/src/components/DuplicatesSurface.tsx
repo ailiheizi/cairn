@@ -98,6 +98,39 @@ type RepresentationRow = {
 type RepresentationRead = { status: "LOADING" | "READY" | "FAILED"; rows: RepresentationRow[]; error: string };
 type ActionMessage = { state: "IDLE" | "RUNNING" | "DONE"; text: string };
 type CopyState = "COPIED" | "FAILED";
+type SimilarityKind = "image" | "audio";
+type SimilarityMember = {
+  subject_ref?: string;
+  name?: string;
+  content_id?: string;
+  hash?: string;
+  distance?: number;
+  exact_duplicate_with?: string[];
+  artist?: string;
+  title?: string;
+  duration_ms?: number;
+  duration_delta_ms?: number;
+};
+type SimilarityGroup = { representative: SimilarityMember; members: SimilarityMember[]; basis: string; contains_exact_duplicates?: boolean };
+type SimilarityGroupsData = {
+  kind?: string;
+  basis?: string;
+  algorithm?: string;
+  max_distance?: number;
+  not_content_identity?: boolean;
+  identity_basis?: string;
+  scanned_count?: number;
+  not_scanned_count?: number;
+  not_scanned?: Array<{ subject_ref?: string; name?: string; reason?: string }>;
+  not_grouped_count?: number;
+  groups: SimilarityGroup[];
+};
+type SimilarityRead = {
+  status: "IDLE" | "LOADING" | "READY" | "UNAVAILABLE";
+  reason: string;
+  data: SimilarityGroupsData | undefined;
+  scannedThisSession: boolean;
+};
 
 function messageOf(reason: unknown) {
   return reason instanceof Error ? reason.message : String(reason ?? "");
@@ -194,6 +227,11 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
   const [copyStates, setCopyStates] = useState<Record<string, CopyState>>({});
   const [rovingIndex, setRovingIndex] = useState(0);
   const [readAt, setReadAt] = useState(0);
+  const [similarity, setSimilarity] = useState<Record<SimilarityKind, SimilarityRead>>({
+    image: { status: "IDLE", reason: "", data: undefined, scannedThisSession: false },
+    audio: { status: "IDLE", reason: "", data: undefined, scannedThisSession: false },
+  });
+  const [similarityBusy, setSimilarityBusy] = useState<SimilarityKind | "">("");
   const loadTokenRef = useRef(0);
   const startedGroupsRef = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLUListElement | null>(null);
@@ -362,6 +400,34 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     });
   }
 
+  // The similarity review: images get one explicit bounded scan (it writes
+  // durable non-identity hash artifacts and nothing else), then both kinds
+  // read their candidate groups. Every failure lands in an honest unavailable
+  // state with the daemon's reason; no group ever offers delete or merge.
+  async function runSimilarity(kind: SimilarityKind) {
+    if (!workspaceID || similarityBusy) return;
+    setSimilarityBusy(kind);
+    setSimilarity((current) => ({ ...current, [kind]: { ...current[kind], status: "LOADING", reason: "" } }));
+    try {
+      if (kind === "image" && !similarity.image.scannedThisSession) {
+        await command(operations.similarity.scan, { workspace_id: workspaceID, kind: "image" });
+      }
+      const response = await command(operations.similarity.groups, { workspace_id: workspaceID, kind });
+      const data = response.data as SimilarityGroupsData | undefined;
+      setSimilarity((current) => ({
+        ...current,
+        [kind]: { status: "READY", reason: "", data, scannedThisSession: current[kind].scannedThisSession || kind === "image" },
+      }));
+    } catch (error) {
+      setSimilarity((current) => ({
+        ...current,
+        [kind]: { status: "UNAVAILABLE", reason: messageOf(error), data: undefined, scannedThisSession: current[kind].scannedThisSession },
+      }));
+    } finally {
+      setSimilarityBusy("");
+    }
+  }
+
   async function loadSurface() {
     const token = ++loadTokenRef.current;
     const isCurrent = () => loadTokenRef.current === token;
@@ -380,6 +446,10 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     setNoteActions({});
     setCopyStates({});
     setRovingIndex(0);
+    setSimilarity({
+      image: { status: "IDLE", reason: "", data: undefined, scannedThisSession: false },
+      audio: { status: "IDLE", reason: "", data: undefined, scannedThisSession: false },
+    });
     startedGroupsRef.current = new Set();
     const resolved = await resolveWorkspace();
     if (!isCurrent()) return;
@@ -604,8 +674,92 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
                 />)}
               </ul>
             </>}
+          <SimilarityReview
+            similarity={similarity}
+            busy={similarityBusy}
+            workspaceReady={Boolean(workspaceID) && surfaceState === "READY"}
+            t={t}
+            onRun={(kind) => void runSimilarity(kind)}
+          />
           <p className="duplicates-read-at" data-read-at={readAt || ""}>{readAt ? t("Listing read at {{time}} (this browser)", { time: new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("The workspace listing has not been read in this browser yet")}</p>
         </>}
+  </section>;
+}
+
+// SimilarityReview is the optional "similar candidates (not identity)"
+// section. Every group states its basis and the frozen rule: candidate
+// evidence only, no delete, no merge, no keep-one. A kind the daemon cannot
+// answer reads UNAVAILABLE with the daemon's own reason.
+function SimilarityReview({ similarity, busy, workspaceReady, t, onRun }: {
+  similarity: Record<SimilarityKind, SimilarityRead>;
+  busy: SimilarityKind | "";
+  workspaceReady: boolean;
+  t: Translator;
+  onRun: (kind: SimilarityKind) => void;
+}) {
+  const headings: Record<SimilarityKind, string> = {
+    image: t("Similar image candidates"),
+    audio: t("Similar track candidates (declared facts)"),
+  };
+  const descriptions: Record<SimilarityKind, string> = {
+    image: t("An explicit scan computes a 64-bit perceptual hash per image and groups candidates within a stated Hamming distance. The hash is review evidence and never content identity."),
+    audio: t("Candidate tracks are grouped only by the artist and title the files themselves declare, with durations within two seconds. This grouping is metadata-derived, never content-derived."),
+  };
+  const runLabels: Record<SimilarityKind, string> = {
+    image: t("Scan similar images"),
+    audio: t("Read declared-track candidates"),
+  };
+  const memberLabel = (member: SimilarityMember) => member.name?.trim() || member.subject_ref || "";
+  return <section className="duplicates-similarity" aria-label={t("Similar candidates (not identity)")} data-similarity="true">
+    <div className="workspace-heading"><div><p className="eyebrow">{t("REVIEW EVIDENCE")}</p><h2>{t("Similar candidates (not identity)")}</h2></div></div>
+    <p className="duplicates-note duplicates-contract">{t("Similarity never establishes exact identity and never authorizes deletion: exact whole-content SHA-256 deduplication stays the only identity grouping, and this section offers selection, tags, and review only — no delete, no move, no merge.")}</p>
+    {(["image", "audio"] as SimilarityKind[]).map((kind) => {
+      const read = similarity[kind];
+      const data = read.data;
+      return <div className="similarity-kind" data-kind={kind} key={kind}>
+        <div className="similarity-kind-head">
+          <div><h3>{headings[kind]}</h3><p className="muted">{descriptions[kind]}</p></div>
+          <button type="button" className="secondary-button compact" data-action={`similarity-run-${kind}`} disabled={!workspaceReady || busy !== ""} onClick={() => onRun(kind)}>{busy === kind ? t("Working…") : runLabels[kind]}</button>
+        </div>
+        {!workspaceReady && <p className="muted" role="status">{t("Read the workspace listing before running a similarity review.")}</p>}
+        {read.status === "LOADING" && <p className="muted" role="status">{t("Reading the candidate groups…")}</p>}
+        {read.status === "UNAVAILABLE" && <p className="muted" role="status" data-similarity-unavailable={kind}>{t("The similarity review is unavailable: {{reason}}", { reason: read.reason || t("reason not reported") })}</p>}
+        {read.status === "READY" && data && <>
+          {data.not_content_identity !== true && <p className="muted" data-similarity-contract-missing="true">{t("The daemon's answer did not carry the non-identity statement; treat this answer as unusable and re-read.")}</p>}
+          <p className="similarity-accounting" role="status">
+            {t("{{scanned}} scanned · {{unscanned}} not scanned · {{ungrouped}} without a candidate group", {
+              scanned: data.scanned_count ?? 0,
+              unscanned: data.not_scanned_count ?? 0,
+              ungrouped: data.not_grouped_count ?? 0,
+            })}
+            {kind === "image" && typeof data.max_distance === "number" ? ` · ${t("threshold {{distance}} of 64 bits", { distance: data.max_distance })}` : ""}
+          </p>
+          {(data.groups?.length ?? 0) === 0
+            ? <p className="muted" data-similarity-empty={kind}>{t("No candidate group over the scanned subjects.")}</p>
+            : <ul className="similarity-groups" aria-label={headings[kind]}>
+              {data.groups.map((group, groupIndex) => <li className="similarity-group" key={group.representative.subject_ref || groupIndex} data-basis={group.basis}>
+                <div className="similarity-group-head">
+                  <strong>{memberLabel(group.representative)}</strong>
+                  <small>{group.basis === "PERCEPTUAL_HASH" ? t("Perceptual-hash evidence") : t("Declared track facts")}</small>
+                </div>
+                <ul className="similarity-members">
+                  {group.members.map((member) => {
+                    const subjectRef = member.subject_ref?.trim() ?? "";
+                    return <li className="similarity-member" key={subjectRef || memberLabel(member)} data-subject-ref={subjectRef} data-distance={member.distance ?? ""}>
+                      <span className="similarity-member-name">{memberLabel(member)}</span>
+                      {kind === "image"
+                        ? <small>{t("distance {{distance}}", { distance: member.distance ?? 0 })}{member.hash ? ` · ${member.hash.slice(0, 8)}…` : ""}</small>
+                        : <small>{member.artist ? `${member.artist} — ` : ""}{member.title || ""}{member.duration_ms ? ` · ${t("{{ms}} ms", { ms: member.duration_ms })}` : ""}{typeof member.duration_delta_ms === "number" ? ` · Δ ${member.duration_delta_ms} ms` : ""}</small>}
+                      {(member.exact_duplicate_with?.length ?? 0) > 0 && <small className="similarity-exact-flag">{t("Also an exact duplicate of {{others}}", { others: member.exact_duplicate_with?.join(", ") ?? "" })}</small>}
+                    </li>;
+                  })}
+                </ul>
+              </li>)}
+            </ul>}
+          {(data.not_scanned?.length ?? 0) > 0 && <p className="muted similarity-unscanned">{t("Not scanned (never grouped): {{names}}", { names: data.not_scanned?.slice(0, 5).map((item) => item.name?.trim() || item.subject_ref || "").join(" · ") || "" })}{(data.not_scanned?.length ?? 0) > 5 ? " …" : ""}</p>}
+        </>}
+      </div>;
+    })}
   </section>;
 }
 

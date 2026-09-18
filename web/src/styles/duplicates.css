@@ -332,3 +332,24 @@
   .duplicates-blocked,
   .duplicates-partial { background: rgba(221, 169, 82, 0.1); }
 }
+/* Similar candidates (not identity): review evidence beside the exact
+   duplicate groups. The section has no destructive control by construction;
+   members show their evidence (distance, hash, declared facts) as text. */
+.duplicates-similarity { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); display: grid; gap: 14px; }
+.duplicates-similarity .workspace-heading h2 { font-size: 20px; }
+.similarity-kind { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--surface); }
+.similarity-kind-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.similarity-kind-head h3 { margin: 0 0 4px; font-size: 15px; }
+.similarity-kind-head .muted { margin: 0; font-size: 12px; line-height: 1.5; max-width: 62ch; }
+.similarity-accounting { margin: 0; color: var(--muted); font-size: 12px; }
+.similarity-groups { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.similarity-group { border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 12px; background: var(--card-fill-quiet); display: grid; gap: 8px; }
+.similarity-group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.similarity-group-head strong { font-size: 13px; overflow-wrap: anywhere; }
+.similarity-group-head small { color: var(--muted); font-size: 11px; }
+.similarity-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.similarity-member { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.similarity-member-name { font-weight: 600; overflow-wrap: anywhere; }
+.similarity-member small { color: var(--muted); overflow-wrap: anywhere; }
+.similarity-exact-flag { color: var(--gold); }
+.similarity-unscanned { overflow-wrap: anywhere; }

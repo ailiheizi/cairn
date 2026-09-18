@@ -104,6 +104,13 @@ export const operations = {
     grantList: "egress.grant.list",
     grantRevoke: "egress.grant.revoke",
   },
+  // Optional similarity review: an explicit scan computes non-identity
+  // perceptual hashes; groups are a review projection that never claims
+  // identity and never offers deletion or merging.
+  similarity: {
+    scan: "similarity.scan",
+    groups: "similarity.groups",
+  },
   config: {
     get: "config.get",
     update: "config.update",

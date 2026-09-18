@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -32,12 +34,33 @@ func (tx *Tx) InsertProcessorArtifact(ctx context.Context, record *ProcessorArti
 		"lifecycle class": record.LifecycleClass,
 		"media type":      record.MediaType,
 		"digest":          record.Digest,
-		"attempt id":      record.AttemptID,
 		"producer digest": record.ProducerDigest,
 	} {
 		if err := requireText(name, value); err != nil {
 			return err
 		}
+	}
+	// Migration 26 admits exactly one producer outside the attempt lineage:
+	// the host-owned similarity scan. Its perceptual-hash artifact carries no
+	// attempt id and must never claim one; every other artifact still requires
+	// the attempt that produced it. Keep this condition in step with the
+	// processor_artifacts_require_terminal_attempt trigger.
+	origin := ""
+	var envelopeProbe struct {
+		Origin string `json:"origin"`
+	}
+	if len(record.Envelope) > 0 && json.Unmarshal(record.Envelope, &envelopeProbe) == nil {
+		origin = strings.TrimSpace(envelopeProbe.Origin)
+	}
+	scanOwnedHash := record.CapabilityID == "fingerprint.image.perceptual.v1" &&
+		record.Stage == "FINGERPRINT" && record.State == ArtifactAdmitted &&
+		origin == "similarity.scan"
+	if scanOwnedHash {
+		if record.AttemptID != "" {
+			return errors.New("a similarity-scan artifact must not claim an attempt id")
+		}
+	} else if err := requireText("attempt id", record.AttemptID); err != nil {
+		return err
 	}
 	if record.State != ArtifactAdmitted && record.State != ArtifactRejected {
 		return fmt.Errorf("invalid processor artifact state %q", record.State)

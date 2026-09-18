@@ -1721,6 +1721,48 @@ END;
 PRAGMA user_version = 25;
 `,
 	},
+	{
+		version: 26,
+		name:    "similarity_scan_artifacts",
+		sql: `
+-- The similarity scan is the one admitted artifact producer outside the
+-- processor attempt lineage: it is an explicit host operation, never part of
+-- ingest or retry, and it must never enter the signed attempt chain. Its only
+-- admitted output is the image perceptual hash: a FINGERPRINT artifact bound
+-- to the snapshot it read, carrying the non-identity declaration and the
+-- pinned algorithm inside its digest-verified body. Every other artifact
+-- producer still requires its succeeded terminal attempt, unchanged.
+DROP TRIGGER processor_artifacts_require_terminal_attempt;
+CREATE TRIGGER processor_artifacts_require_terminal_attempt
+BEFORE INSERT ON processor_artifacts
+WHEN NOT EXISTS (
+    SELECT 1 FROM processor_attempts attempt
+    WHERE attempt.workspace_id = NEW.workspace_id
+      AND attempt.attempt_id = NEW.attempt_id
+      AND attempt.subject_ref = NEW.subject_ref
+      AND attempt.snapshot_ref = NEW.snapshot_ref
+      AND attempt.route_digest = NEW.route_digest
+      AND attempt.stage = NEW.stage
+      AND attempt.capability_id = NEW.capability_id
+      AND attempt.fence_token = NEW.fence_token
+      AND attempt.status = 'SUCCEEDED'
+)
+ AND NOT (
+      NEW.capability_id = 'fingerprint.image.perceptual.v1'
+      AND NEW.stage = 'FINGERPRINT'
+      AND NEW.state = 'POLICY_ADMITTED'
+      AND NEW.attempt_id = ''
+      AND COALESCE(json_extract(NEW.envelope_json, '$.origin'), '') = 'similarity.scan'
+      AND COALESCE(json_extract(NEW.body, '$.not_content_identity'), 0) = 1
+      AND COALESCE(json_extract(NEW.body, '$.algorithm'), '') = 'dhash-64-v1'
+ )
+BEGIN
+    SELECT RAISE(ABORT, 'processor artifact requires its succeeded terminal attempt');
+END;
+
+PRAGMA user_version = 26;
+`,
+	},
 }
 
 func (s *Store) migrate(ctx context.Context) error {

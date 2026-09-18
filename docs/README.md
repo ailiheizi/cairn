@@ -124,6 +124,7 @@ P2P and magnet retrieval remain non-core. Perceptual media substitution, neural 
 - [Decentralized Music Audit](references/decentralized-music-audit.md)
 - [Peer-to-Peer and Magnet Research](references/p2p-and-magnet-research.md)
 - [Naming Research](references/naming-research.md)
+- [Product Experience Backlog](technical/product-experience-backlog.md) records operator-requested product work with its constraint status; it adds no scope by itself
 
 ## Benchmark and qualification runs
 

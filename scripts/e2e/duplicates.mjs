@@ -36,7 +36,11 @@ const SURFACE_READ_OPERATIONS = ["content.list", "status.get", "annotation.list"
 const SURFACE_WRITE_OPERATIONS = ["annotation.upsert"];
 // The action set every rendered button must belong to. A surface that grows a
 // destructive control fails this list before the wording of any label matters.
-const SURFACE_ACTIONS = ["refresh", "toggle-group", "open-details", "close-details", "copy-path", "read-group-facts", "tag-selected", "add-note"];
+const SURFACE_ACTIONS = ["refresh", "toggle-group", "open-details", "close-details", "copy-path", "read-group-facts", "tag-selected", "add-note",
+  // The similarity review's controls are read-and-review only: a bounded scan
+  // (writes non-identity hash artifacts) and the groups reads. No destructive
+  // action is added to the surface by the section.
+  "similarity-run-image", "similarity-run-audio"];
 
 const EMPTY_HEADING = /No duplicate groups over \d+ loaded subjects|已加载 \d+ 个主题中没有重复分组/;
 const NOT_PROOF = /not proof that no duplicates exist catalog-wide|不能证明全目录不存在重复/;
@@ -444,4 +448,64 @@ export async function assertDuplicateReview(ctx) {
   await page.unroute("**/api/v1/command");
   await page.getByRole("button", { name: /^(Library|内容库)/ }).click();
   await page.locator(".result-list").or(page.locator(".empty-state")).first().waitFor({ state: "visible", timeout: 10000 });
+}
+
+// The similar-candidates review (not identity). The section must exist beside
+// the exact groups, must restate the non-identity rule, must render honest
+// accounting from the daemon's answer, and must never offer delete, move, or
+// merge — the only writes this whole surface may issue stay annotation.upsert.
+export async function assertSimilarityReview(ctx) {
+  const { page } = ctx;
+  // Module-local capture of this section's own traffic, identical in shape to
+  // the duplicate-review tracker above.
+  const similarityWrites = [];
+  page.on("request", (request) => {
+    if (request.method() !== "POST" || !request.url().endsWith("/api/v1/command")) return;
+    let payload;
+    try { payload = request.postDataJSON(); } catch { return; }
+    similarityWrites.push(String(payload?.operation ?? ""));
+  });
+  await page.getByRole("button", { name: /^(Duplicates|重复)/ }).click();
+  // The rail entry and the section share data-view; target the section only.
+  const surface = page.locator("section[data-view='duplicates']");
+  await surface.waitFor({ state: "visible", timeout: 10000 });
+  await surface.locator('[data-similarity="true"]').waitFor({ state: "visible", timeout: 10000 });
+  const section = surface.locator('[data-similarity="true"]');
+  const body = await section.innerText();
+  assert.match(body, /相似候选（非身份）|Similar candidates \(not identity\)/, `the section must be named honestly: ${body.slice(0, 200)}`);
+  assert.match(body, /绝不建立精确身份|never establishes exact identity/, `the frozen rule must be restated: ${body.slice(0, 300)}`);
+  for (const kind of ["image", "audio"]) {
+    await section.locator(`[data-kind="${kind}"]`).waitFor({ state: "visible", timeout: 10000 });
+  }
+  // Run the image review: the fixture images are scanned (or honestly
+  // skipped), then the groups answer renders its accounting. The traffic
+  // capture starts here, so the duplicate-review reads above are not counted.
+  similarityWrites.length = 0;
+  await section.locator('[data-action="similarity-run-image"]').click();
+  await page.waitForFunction(() => {
+    const kind = document.querySelector('[data-kind="image"]');
+    return Boolean(kind?.querySelector(".similarity-accounting") || kind?.querySelector("[data-similarity-unavailable]"));
+  }, null, { timeout: 20000 });
+  const imageBody = await section.locator('[data-kind="image"]').innerText();
+  if (/相似度审查不可用|similarity review is unavailable/.test(imageBody)) {
+    // A build without the operations must say so and must not render groups.
+    assert.doesNotMatch(imageBody, /距离 |distance /, `an unavailable review must not render groups: ${imageBody}`);
+  } else {
+    assert.match(imageBody, /已扫描 |scanned /, `the ready review must state its accounting: ${imageBody}`);
+    assert.doesNotMatch(imageBody, /删除|合并|delete|merge/i, `no group may offer a destructive action: ${imageBody}`);
+  }
+  // Audio reads declared facts directly; without audio fixtures the answer is
+  // an honest empty or unavailable state, never a fabricated group.
+  await section.locator('[data-action="similarity-run-audio"]').click();
+  await page.waitForFunction(() => {
+    const kind = document.querySelector('[data-kind="audio"]');
+    return Boolean(kind?.querySelector(".similarity-accounting") || kind?.querySelector("[data-similarity-unavailable]") || kind?.querySelector("[data-similarity-empty]"));
+  }, null, { timeout: 20000 });
+  const audioBody = await section.locator('[data-kind="audio"]').innerText();
+  assert.ok(audioBody.trim().length > 0, "the audio review must render some honest state");
+  // The only writes this section may issue are annotation.upsert and the
+  // scan/groups reads' own bookkeeping; any other operation is a violation.
+  assert.ok(similarityWrites.every((operation) =>
+    operation === "annotation.upsert" || operation === "similarity.scan" || operation === "similarity.groups" || operation === "content.list" || operation === "status.get" || operation === "annotation.list"),
+  `an unexpected operation left this section: ${JSON.stringify(similarityWrites)}`);
 }

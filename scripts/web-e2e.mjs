@@ -21,7 +21,7 @@ import { assertSearchResultSurface, assertSearchQueryReexecuted, assertSearchRec
 import { assertResponsiveLayout, assertNarrowDrawers, assertImageBundleInstallControl, assertOnlineProviderEgressControl } from "./e2e/settings.mjs";
 import { assertOfflinePhase, assertRecoveredPhase } from "./e2e/session.mjs";
 import { assertSearchOperators } from "./e2e/searchops.mjs";
-import { assertDuplicateReview } from "./e2e/duplicates.mjs";
+import { assertDuplicateReview, assertSimilarityReview } from "./e2e/duplicates.mjs";
 import { assertTagsSurface } from "./e2e/tags.mjs";
 import { assertSelectionReport } from "./e2e/report.mjs";
 import { assertStatusSurface } from "./e2e/status.mjs";
@@ -101,6 +101,7 @@ async function assertOnline(ctx) {
   await assertStatusSurface(ctx);
   await assertSearchOperators(ctx);
   await assertDuplicateReview(ctx);
+  await assertSimilarityReview(ctx);
   await assertTagsSurface(ctx);
   await assertSelectionReport(ctx);
   await assertExportSidecarPolicy(ctx);

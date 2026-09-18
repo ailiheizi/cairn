@@ -430,6 +430,10 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		implemented[command.OpContentOpen] = true
 		implemented[command.OpContentRead] = true
 		implemented[command.OpContentClose] = true
+		// similarity.scan/groups are wired only with the exact lane: the scan
+		// reads admitted bytes through the repository image content source and
+		// stores hash artifacts; see similarity_ops.go.
+		implemented[command.OpSimilarityScan], implemented[command.OpSimilarityGroups] = true, true
 		if dispatcher.search == nil && dispatcher.exact.Repo != nil {
 			dir := dispatcher.vectorPath
 			if dir == "" {
@@ -660,6 +664,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleAudioList(ctx, env, started)
 	case command.OpBooksList:
 		return d.handleBooksList(ctx, env, started)
+	case command.OpSimilarityScan, command.OpSimilarityGroups:
+		return d.handleSimilarity(ctx, env, started)
 	case command.OpSubjectFactsList:
 		return d.handleSubjectFactsList(ctx, env, started)
 	default:
