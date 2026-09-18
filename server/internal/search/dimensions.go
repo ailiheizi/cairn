@@ -127,6 +127,11 @@ type QueryRequest struct {
 	Axes         []string
 	Filters      Filters
 	Fuse         []string
+	// ImageQuery is the optional host-admitted query image for the separate
+	// image space (search by image). It is retrieval material only: a
+	// vision-tower vector never establishes identity and never authorizes any
+	// deletion. Exactly one of Text and ImageQuery may serve one dimension.
+	ImageQuery *ImageQueryInput
 }
 
 // IndexBinding identifies the host configuration and immutable provider

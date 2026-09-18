@@ -306,7 +306,7 @@ Display paths are for people. Machine clients SHOULD pass `path_ref`. A CLI conv
 | `export.apply` | Destination mutation | Materialize one exact export-manifest digest to an explicit destination. |
 | `export.verify` | Bounded read | Verify materialized output against its manifest and selected representations. |
 | `capability.list` | None | List configured capture, processor, repository, index, and query capabilities. |
-| `search.query` | None | Query one exact named index generation and return authorized subject candidates. |
+| `search.query` | None | Query one exact named index generation and return authorized subject candidates. Accepts an additive `image_subject_ref` (a host-admitted jpeg/png subject whose bytes are re-hashed, decode-checked, and embedded by the image model's vision tower); typed refusals name `SUBJECT_NOT_IMAGE`, `QUERY_IMAGE_TOO_LARGE`, and `QUERY_IMAGE_UNDECODABLE`, and an input error never revokes a verified generation. |
 
 `snapshot.verify` writes evidence but does not mutate the snapshot. `content.close` and bounded reconciliation are operational cleanup, not dataset mutation.
 

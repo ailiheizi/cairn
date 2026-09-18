@@ -2,6 +2,8 @@ package search
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -85,6 +87,42 @@ func ImageMediaTypeForName(name string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// ImageQueryInput is one host-admitted query image for the image dimension
+// (search by image). The host resolves the subject, reads the bytes through
+// its own identity-checking content source, and passes the admitted material
+// here; the search package never opens a repository or a source path. A query
+// image is retrieval material only: its vector never establishes identity and
+// never authorizes deletion.
+type ImageQueryInput struct {
+	// MediaType is one of the admitted image media types (jpeg or png).
+	MediaType string
+	// Digest is the content identity of Bytes: "sha256:" + hex(SHA-256).
+	Digest string
+	// Bytes are the complete admitted image bytes.
+	Bytes []byte
+}
+
+// Validate is the caller-input admission for one query image. Every failure is
+// an ErrInvalidQuery so a bad input can never revoke a verified generation.
+// The identity rule matches the ingest embedding contract exactly: the digest
+// must be the SHA-256 of the admitted bytes.
+func (q ImageQueryInput) Validate() error {
+	if err := validateImageMediaType(q.MediaType); err != nil {
+		return fmt.Errorf("%w: query image media type is not admitted: %v", ErrInvalidQuery, err)
+	}
+	if len(q.Bytes) == 0 {
+		return fmt.Errorf("%w: query image bytes are empty", ErrInvalidQuery)
+	}
+	if len(q.Bytes) > MaxImageEmbeddingInputBytes {
+		return fmt.Errorf("%w: query image exceeds the %d byte bound", ErrInvalidQuery, MaxImageEmbeddingInputBytes)
+	}
+	sum := sha256.Sum256(q.Bytes)
+	if got := "sha256:" + hex.EncodeToString(sum[:]); strings.TrimSpace(q.Digest) != got {
+		return fmt.Errorf("%w: query image digest does not match the admitted bytes", ErrInvalidQuery)
+	}
+	return nil
 }
 
 // imageBindingActive reports whether a real image provider binding is
@@ -421,10 +459,13 @@ func (idx *Indexer) ensureImageGenerationVerified(ctx context.Context, generatio
 	return nil
 }
 
-// queryImage embeds the query text with the image model's own text tower and
+// queryImage embeds the query material with the image model's own towers and
 // scores it only against a generation whose space fingerprint matches the
-// vector that was produced.
-func (idx *Indexer) queryImage(ctx context.Context, generation sqlite.IndexGeneration, text string) (result []Hit, err error) {
+// vector that was produced. A text query goes through the text tower; an image
+// query goes through the same vision tower and preprocessing profile that
+// built the generation, so the produced vectors are comparable by
+// construction. The two materials are never mixed into one hybrid vector.
+func (idx *Indexer) queryImage(ctx context.Context, generation sqlite.IndexGeneration, text string, imageQuery *ImageQueryInput) (result []Hit, err error) {
 	querySucceeded := false
 	var opened ZvecGeneration
 	defer func() {
@@ -441,7 +482,14 @@ func (idx *Indexer) queryImage(ctx context.Context, generation sqlite.IndexGener
 			idx.revokeImageGeneration(generation.ID)
 		}
 	}()
-	if strings.TrimSpace(text) == "" {
+	if imageQuery != nil {
+		if strings.TrimSpace(text) != "" {
+			return nil, fmt.Errorf("%w: a multimodal query carries either query text or a query image, not both", ErrInvalidQuery)
+		}
+		if err := imageQuery.Validate(); err != nil {
+			return nil, err
+		}
+	} else if strings.TrimSpace(text) == "" {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidQuery, QueryTextRequiredReason)
 	}
 	if !idx.imageBindingActive() {
@@ -471,9 +519,20 @@ func (idx *Indexer) queryImage(ctx context.Context, generation sqlite.IndexGener
 	if err := idx.ensureImageGenerationVerified(ctx, generation); err != nil {
 		return nil, err
 	}
-	request := ImageEmbeddingRequest{
-		Purpose: ImageEmbeddingText, GenerationID: generation.ID, Manifest: manifest,
-		Fingerprint: fingerprint, Inputs: []ImageEmbeddingInput{{SegmentID: "query", Language: "und", Text: text}},
+	request := ImageEmbeddingRequest{GenerationID: generation.ID, Manifest: manifest, Fingerprint: fingerprint}
+	if imageQuery != nil {
+		// The query image is embedded by the identical vision tower and
+		// preprocessing profile that embedded the stored content, validated by
+		// the same request contract. "query" is a request-local carrier, never
+		// a subject claim.
+		request.Purpose = ImageEmbeddingImage
+		request.Inputs = []ImageEmbeddingInput{{
+			SubjectID: "query", SegmentID: "query", MediaType: imageQuery.MediaType,
+			ImageDigest: imageQuery.Digest, ImageBytes: imageQuery.Bytes,
+		}}
+	} else {
+		request.Purpose = ImageEmbeddingText
+		request.Inputs = []ImageEmbeddingInput{{SegmentID: "query", Language: "und", Text: text}}
 	}
 	if err := ValidateImageEmbeddingRequest(request); err != nil {
 		return nil, err

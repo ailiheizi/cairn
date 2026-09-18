@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Check, Download as DownloadIcon, FileText, LoaderCircle, Tag, X } from "lucide-react";
+import { Check, Download as DownloadIcon, FileText, Image as ImageIcon, LoaderCircle, Tag, X } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
@@ -49,6 +49,22 @@ const PROTECTION_OUTCOMES = [
 
 /** The lexical component of a fused search answer reports whether it answered. */
 const LEXICAL_DIMENSION = "lexical-metadata-fts";
+/** The filename suffixes the daemon's image dimension admits, mirroring search.ImageMediaTypeForName. */
+const IMAGE_QUERY_SUFFIXES = [".jpg", ".jpeg", ".png"] as const;
+
+/**
+ * The single selected subject the "search by this image" action may use: the
+ * daemon admits jpeg/png images by recorded suffix only, and the action is
+ * offered for exactly one selected file. Suffix evidence names the action, not
+ * the bytes; the daemon re-checks identity and decodability itself.
+ */
+function imageSearchSubject(subjects: SearchHit[]): string {
+  if (subjects.length !== 1) return "";
+  const only = subjects[0];
+  const name = only.name?.trim().toLowerCase() ?? "";
+  if (!only.subject_ref?.trim() || !IMAGE_QUERY_SUFFIXES.some((suffix) => name.endsWith(suffix))) return "";
+  return only.subject_ref.trim();
+}
 
 /** How many selected subjects one report reads stored facts for. */
 export const REPORT_SUBJECT_CAP = 200;
@@ -98,7 +114,7 @@ function downloadMarkdown(filename: string, text: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, query, tagDraft, busy, t, onSelectAll, onExport, onTagDraft, onApplyTag, onClear }: {
+export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, query, tagDraft, busy, t, onSelectAll, onExport, onTagDraft, onApplyTag, onClear, onImageSearch }: {
   count: number;
   subjects: SearchHit[];
   workspaceID: string;
@@ -113,10 +129,14 @@ export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, q
   onTagDraft: (value: string) => void;
   onApplyTag: () => void;
   onClear: () => void;
+  /** Offered when exactly one selected item is a daemon-admitted image: runs the image-dimension query. */
+  onImageSearch?: (subjectRef: string) => void;
 }) {
   const [reportState, setReportState] = useState<{ state: "IDLE" | "RUNNING" | "DONE" | "FAILED"; text: string }>({ state: "IDLE", text: "" });
   const reportToken = useRef(0);
   const reportBusy = reportState.state === "RUNNING";
+  // The one selected admitted image, when the parent offers the action at all.
+  const imageSubject = onImageSearch ? imageSearchSubject(subjects) : "";
 
   async function readAnnotations(workspace: string, subjectRef: string, issued: Set<string>): Promise<AnnotationRead> {
     issued.add("annotation.list");
@@ -348,6 +368,7 @@ export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, q
     <button type="button" className="secondary-button compact selection-all" onClick={onSelectAll}><Check size={14} />{t("Select all visible")}</button>
     <button type="button" className="secondary-button compact selection-export" onClick={(event) => onExport(event.currentTarget)} disabled={busy}><DownloadIcon size={14} />{t("Export selected")}</button>
     <button type="button" className="secondary-button compact selection-report" data-action="selection-report" aria-busy={reportBusy} title={t("Download this selection as Markdown")} aria-label={t("Download this selection as Markdown")} onClick={() => void downloadSelectionReport()} disabled={busy || reportBusy}>{reportBusy ? <LoaderCircle className="spin" size={14} /> : <FileText size={14} />}{t("Download Markdown")}</button>
+    {imageSubject && <button type="button" className="secondary-button compact selection-image-search" data-action="selection-image-search" title={t("Search the library for images that look like this one")} aria-label={t("Search the library for images that look like this one")} onClick={() => onImageSearch?.(imageSubject)} disabled={busy}><ImageIcon size={14} />{t("Search by this image")}</button>}
     <p className="selection-report-note">{t("Reads the selected subjects' tags, notes, representations, and protection outcomes from this daemon with bounded concurrency, then downloads one Markdown file in this browser. Nothing is uploaded and nothing is stored.")}</p>
     {reportState.state !== "IDLE" && <p className="selection-report-state" role="status" data-report-state={reportState.state}>{reportState.text}</p>}
     <form className="selection-tag" onSubmit={(event) => { event.preventDefault(); onApplyTag(); }}><input list="restoreweave-tag-vocabulary" aria-label={t("Tag for selected items")} value={tagDraft} onChange={(event) => onTagDraft(event.target.value)} placeholder={t("Add or reuse a tag")} disabled={busy} /><button type="submit" className="primary-button compact" disabled={busy || !tagDraft.trim()}><Tag size={14} />{t("Add tag")}</button></form>

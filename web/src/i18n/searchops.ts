@@ -11,6 +11,12 @@
 // fallback.
 
 export const searchops: Record<string, string> = {
+  // The selection bar's image query action: it submits search.query with the
+  // selected image's stable subject as the image dimension's query material.
+  "Search by this image": "以这张图搜索",
+  "Search the library for images that look like this one": "在资料库中搜索与这张图相似的图片",
+  "Image search results": "以图搜索结果",
+
   // The predicate row and the operator autocomplete.
   "Search predicates": "搜索谓词",
   "Predicates": "谓词",

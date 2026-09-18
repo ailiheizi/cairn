@@ -523,6 +523,7 @@ function App() {
         onLibraryKeyDown={selection.handleLibraryKeyDown}
         onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
         onClearNotice={() => setNotice(undefined)}
+        onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
         libraryListRef={libraryListRef}
       />}
       {selected && <DetailsPanel

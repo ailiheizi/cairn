@@ -48,6 +48,13 @@ type searchQueryInput struct {
 	Axes         []string        `json:"construct_axes,omitempty"`
 	Fuse         []string        `json:"fuse,omitempty"`
 	Filters      search.Filters  `json:"filters,omitempty"`
+	// ImageSubjectRef is the optional stable subject of one admitted image
+	// file used as the query material of the image dimension (search by
+	// image). It is resolved once here into admitted bytes through the
+	// repository image content source; the search package never resolves
+	// subjects or opens a repository. It is retrieval material only and never
+	// establishes exact identity.
+	ImageSubjectRef string `json:"image_subject_ref,omitempty"`
 	// EgressConfirmation is the optional typed per-request authorization for
 	// remote embedding. When semantic.send_content_without_confirmation is
 	// false and the semantic component would egress, a missing confirmation is
@@ -452,7 +459,21 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		ctx = search.WithSemanticEgressConfirmation(ctx, *confirmation)
 	}
 	queryText, dimensionID, requestedAxes, fuseIDs, filters := parseSearchRequest(input)
-	if queryText == "" && !filters.Has() {
+	if input.ImageSubjectRef != "" {
+		if err := requireStableID("image_subject_ref", input.ImageSubjectRef); err != nil {
+			return invalidInputResult(env, started, err)
+		}
+		if strings.TrimSpace(queryText) != "" {
+			return invalidInputResult(env, started, errString("image_subject_ref and query text cannot be set together"))
+		}
+		if strings.TrimSpace(input.WorkspaceID) == "" {
+			// The query image resolves to a subject of one workspace; a
+			// cross-workspace default would silently answer about the wrong
+			// subject.
+			return invalidInputResult(env, started, errString("workspace_id is required with image_subject_ref"))
+		}
+	}
+	if queryText == "" && !filters.Has() && input.ImageSubjectRef == "" {
 		return invalidInputResult(env, started, errString("query or filters are required"))
 	}
 	filters, err = search.NormalizeFilters(filters)
@@ -464,7 +485,45 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 			return invalidInputResult(env, started, err)
 		}
 	}
+	// The query image is resolved exactly once, before any dimension runs: the
+	// subject must be a published regular file with an admitted image suffix
+	// and bound content identity, and the bytes are read through the
+	// repository image content source, which re-hashes them against that
+	// identity. Every caller-input refusal here is typed and stable, and none
+	// of them touches a verified generation.
+	var imageQuery *search.ImageQueryInput
+	if input.ImageSubjectRef != "" {
+		resolved, resolveErr := d.resolveImageQueryInput(ctx, input.WorkspaceID, input.ImageSubjectRef)
+		if resolveErr != nil {
+			if containsNotFound(resolveErr) {
+				return notFoundResult(env, started, resolveErr.Error())
+			}
+			if errors.Is(resolveErr, errImageQueryInput) {
+				return invalidInputResult(env, started, resolveErr)
+			}
+			return catalogErrorResult(env, started, resolveErr)
+		}
+		imageQuery = &resolved
+	}
 	defaultBroker := strings.TrimSpace(dimensionID) == "" && len(fuseIDs) == 0 && input.GenerationID == ""
+	if imageQuery != nil && !defaultBroker {
+		// A caller-pinned dimension or fuse list must actually use the image:
+		// silently ignoring the resolved query image would answer a different
+		// question than the one that was asked.
+		if strings.TrimSpace(dimensionID) != "" && dimensionID != search.DimensionMultimodal {
+			return invalidInputResult(env, started, errString("image_subject_ref requires the multimodal dimension"))
+		}
+		usesImage := false
+		for _, id := range fuseIDs {
+			if id == search.DimensionMultimodal {
+				usesImage = true
+				break
+			}
+		}
+		if len(fuseIDs) > 0 && !usesImage {
+			return invalidInputResult(env, started, errString("image_subject_ref requires the multimodal dimension in fuse"))
+		}
+	}
 	if defaultBroker {
 		// The ordinary query path is host-owned fusion. Structured predicates
 		// remain enforced by the lexical projection while semantic contributes
@@ -480,7 +539,7 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		if input.GenerationID != "" {
 			return invalidInputResult(env, started, errString("fuse cannot pin one index_generation_ref"))
 		}
-		return d.handleFusedSearch(ctx, env, started, input.WorkspaceID, queryText, requestedAxes, fuseIDs, filters, defaultBroker)
+		return d.handleFusedSearch(ctx, env, started, input.WorkspaceID, queryText, requestedAxes, fuseIDs, filters, defaultBroker, imageQuery)
 	}
 	dimension, ok := search.LookupDimension(dimensionID, search.IndexerReadiness(d.search))
 	if !ok {
@@ -521,6 +580,7 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		Text:         queryText,
 		Axes:         axes,
 		Filters:      filters,
+		ImageQuery:   imageQuery,
 	})
 	if err != nil {
 		if errors.Is(err, search.ErrInvalidQuery) {
@@ -546,7 +606,7 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 	})
 }
 
-func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope, started time.Time, workspaceID, queryText string, requestedAxes, fuseIDs []string, filters search.Filters, defaultBroker bool) command.Result {
+func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope, started time.Time, workspaceID, queryText string, requestedAxes, fuseIDs []string, filters search.Filters, defaultBroker bool, imageQuery *search.ImageQueryInput) command.Result {
 	dims, err := search.NormalizeFuse(fuseIDs)
 	if err != nil {
 		return invalidInputResult(env, started, err)
@@ -570,6 +630,7 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 		Axes:        axes,
 		Fuse:        dims,
 		Filters:     filters,
+		ImageQuery:  imageQuery,
 	})
 	if err != nil {
 		return catalogErrorResult(env, started, err)

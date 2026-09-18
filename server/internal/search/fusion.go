@@ -31,18 +31,30 @@ const (
 	// queried because the request could not ask it anything. It is never a
 	// silent zero: Reason names why.
 	ComponentSkipped = "SKIPPED"
-	// QueryTextRequiredReason is the stable reason for a text-embedding
-	// dimension in a text-less (filter-only) query. A vector space has no
-	// vector to compare without query text, and a filter-only request is not a
-	// failure of that dimension.
+	// QueryTextRequiredReason is the stable reason for a vector dimension in a
+	// request that carries no material for it: a text-less (filter-only) query
+	// for a text-embedding space, or an image-only query for the text space. A
+	// vector space has no vector to compare without query material, and such a
+	// request is not a failure of that dimension.
 	QueryTextRequiredReason = "QUERY_TEXT_REQUIRED"
 )
 
-// dimensionNeedsQueryText reports whether one dimension is answered by
-// embedding the query text. The lexical and graph projections answer
-// filter-only requests; the vector spaces cannot.
-func dimensionNeedsQueryText(id string) bool {
-	return id == DimensionSemantic || id == DimensionMultimodal
+// dimensionHasQueryMaterial reports whether the request carries query
+// material for one dimension. The lexical and graph projections also answer
+// filter-only browse requests; the vector spaces need their own material: the
+// text space embeds query text, and the image space embeds query text through
+// its text tower or a host-admitted query image through its vision tower. A
+// request with no material for a dimension is skipped with its stable reason,
+// never scored as a silent zero.
+func dimensionHasQueryMaterial(req QueryRequest, id string) bool {
+	switch id {
+	case DimensionSemantic:
+		return strings.TrimSpace(req.Text) != ""
+	case DimensionMultimodal:
+		return strings.TrimSpace(req.Text) != "" || req.ImageQuery != nil
+	default:
+		return strings.TrimSpace(req.Text) != "" || req.Filters.Has()
+	}
 }
 
 // FuseResult unions typed component results without inventing a hybrid score.
@@ -109,9 +121,12 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 			result.Components = append(result.Components, component)
 			continue
 		}
-		if strings.TrimSpace(req.Text) == "" && dimensionNeedsQueryText(id) {
+		if !dimensionHasQueryMaterial(req, id) {
 			// A browse request (filters only) is not a failure of the vector
-			// space and must never be reported or remembered as one.
+			// spaces, and an image-only query is not a failure of the text
+			// space: each dimension that has no material for this request is
+			// skipped with its reason and must never be reported or remembered
+			// as a failure.
 			component.Status = ComponentSkipped
 			component.Reason = QueryTextRequiredReason
 			result.Components = append(result.Components, component)
@@ -123,6 +138,7 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 			Text:        req.Text,
 			Axes:        req.Axes,
 			Filters:     req.Filters,
+			ImageQuery:  req.ImageQuery,
 		})
 		component.GenerationID = generation.ID
 		if err != nil {

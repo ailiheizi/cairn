@@ -59,36 +59,57 @@ func mediaTypeForDecodedFormat(format string) (string, error) {
 	}
 }
 
-// PreprocessImageTensor decodes admitted image bytes and returns a normalized
-// CHW float32 tensor of size*size pixels. The declared mediaType must match the
-// actual decoded format.
-func PreprocessImageTensor(data []byte, mediaType string, size int) ([]float32, error) {
+// ValidateImageBytes admits image bytes for image-tower work: the bytes must
+// decode to an admitted standard-library format that matches the declared
+// media type and stay inside the bounded geometry. It is the shared admission
+// for ingest embeddings and for host-admitted query images; the query path
+// uses it so an undecodable query image is rejected as caller input before it
+// can reach a provider.
+func ValidateImageBytes(data []byte, mediaType string) error {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("%w: empty image bytes", ErrImagePreprocess)
-	}
-	if size <= 0 || size > 1024 {
-		return nil, fmt.Errorf("%w: image size %d is outside bounds", ErrImagePreprocess, size)
+		return fmt.Errorf("%w: empty image bytes", ErrImagePreprocess)
 	}
 	decoded, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("%w: decode: %v", ErrImagePreprocess, err)
+		return fmt.Errorf("%w: decode: %v", ErrImagePreprocess, err)
 	}
 	actual, err := mediaTypeForDecodedFormat(format)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if declared := strings.ToLower(strings.TrimSpace(mediaType)); declared != "" && declared != actual {
-		return nil, fmt.Errorf("%w: declared media type %q does not match decoded %q", ErrImagePreprocess, declared, actual)
+		return fmt.Errorf("%w: declared media type %q does not match decoded %q", ErrImagePreprocess, declared, actual)
 	}
 	bounds := decoded.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
 	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("%w: decoded image has no pixels", ErrImagePreprocess)
+		return fmt.Errorf("%w: decoded image has no pixels", ErrImagePreprocess)
 	}
 	if width > ImagePreprocessMaxDimension || height > ImagePreprocessMaxDimension ||
 		int64(width)*int64(height) > ImagePreprocessMaxPixels {
-		return nil, fmt.Errorf("%w: decoded image %dx%d exceeds the admitted bounds", ErrImagePreprocess, width, height)
+		return fmt.Errorf("%w: decoded image %dx%d exceeds the admitted bounds", ErrImagePreprocess, width, height)
 	}
+	return nil
+}
+
+// PreprocessImageTensor decodes admitted image bytes and returns a normalized
+// CHW float32 tensor of size*size pixels. The declared mediaType must match the
+// actual decoded format.
+func PreprocessImageTensor(data []byte, mediaType string, size int) ([]float32, error) {
+	if size <= 0 || size > 1024 {
+		return nil, fmt.Errorf("%w: image size %d is outside bounds", ErrImagePreprocess, size)
+	}
+	if err := ValidateImageBytes(data, mediaType); err != nil {
+		return nil, err
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		// ValidateImageBytes just admitted these bytes; a decode failure here
+		// would be a reader defect, not an input fact.
+		return nil, fmt.Errorf("%w: decode: %v", ErrImagePreprocess, err)
+	}
+	bounds := decoded.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
 	// Normalize the decoded color model once so the resample kernel sees a
 	// stable 8-bit RGBA layout regardless of the source format.
 	rgba := image.NewNRGBA(image.Rect(0, 0, width, height))

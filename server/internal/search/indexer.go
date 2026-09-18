@@ -1892,7 +1892,7 @@ func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGe
 				err = fmt.Errorf("%w: %s", ErrUnavailable, MultimodalIndexNotBuiltReason)
 				break
 			}
-			hits, err = idx.queryImage(ctx, generation, req.Text)
+			hits, err = idx.queryImage(ctx, generation, req.Text, req.ImageQuery)
 		} else if !idx.fixtureDimensionsActive() {
 			err = fmt.Errorf("%w: %s", ErrUnavailable, MultimodalIndexNotBuiltReason)
 		} else {

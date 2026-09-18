@@ -78,6 +78,8 @@ export type SearchFlow = {
   handleSearchFieldKeyDown: (event: ReactKeyboardEvent<HTMLFormElement>) => void;
   handleRecentsListKeyDown: (event: ReactKeyboardEvent<HTMLUListElement>) => void;
   runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<void>;
+  /** Submits search.query with one selected image as the query material (search by image). */
+  runImageSearch: (subjectRef: string) => Promise<void>;
   ops: SearchOpsFlow;
 };
 
@@ -468,6 +470,41 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     finally { setBusy(false); }
   }
 
+  // Search by image: the selection bar submits one selected image subject as
+  // the query material of the daemon's image dimension. It runs the same
+  // `search.query` operation and renders through the same fused pipeline; the
+  // image is retrieval material the daemon resolves itself, and this browser
+  // never reads or uploads the bytes.
+  async function runImageSearch(subjectRef: string) {
+    const imageSubjectRef = subjectRef.trim();
+    if (!imageSubjectRef) return;
+    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return; }
+    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return; }
+    if (!drafts.canLeaveDetailDrafts()) return;
+    setBusy(true); notify(undefined);
+    try {
+      // The typed dispatcher owns the default broker; the image-only request
+      // carries no text and no filters, so the daemon skips every dimension
+      // that has no material for it and reports each one's reason.
+      const response = await command(operations.search.query, { workspace_id: workspaceID, image_subject_ref: imageSubjectRef });
+      const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
+      const returned = (response.data?.hits ?? []) as SearchHit[];
+      drafts.discardDetailDrafts();
+      library.setHits(returned.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
+      // An image query has no field text: the results heading says so instead
+      // of echoing a query that was never run.
+      setLastExecutedQuery("");
+      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("search");
+      exportFlow.invalidateForSearch();
+      if (response.status === "DEGRADED") {
+        const reason = response.reasons?.map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.");
+        notify({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
+      }
+      markConnected();
+    } catch (error) { notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") }); }
+    finally { setBusy(false); }
+  }
+
   return {
     recentSearches: recents.recentSearches,
     searchFocused,
@@ -485,6 +522,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     handleSearchFieldKeyDown,
     handleRecentsListKeyDown,
     runSearch,
+    runImageSearch,
     ops,
   };
 }
