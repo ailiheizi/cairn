@@ -20,6 +20,8 @@ export type ExportFlow = {
   exportView: any;
   exportDestination: string;
   exportSidecars: string;
+  /** At least one field still holds the browser-local preset read on open. */
+  exportPresetApplied: boolean;
   changeExportSidecars: (value: string) => void;
   exportManifest: ExportManifestData | undefined;
   exportManifestSource: ExportManifestSource;
@@ -57,6 +59,45 @@ export type ExportFlow = {
 // truncating dynamic membership to a small default.
 const libraryPageSize = 200;
 
+// The export destination and sidecar choice this browser last used for one
+// workspace. This is a convenience for this browser only, following the
+// `restoreweave.*` recents prefix and its try/catch storage pattern: it is
+// never a plan, a frozen manifest, a durable default, or recovery evidence.
+// The manifest, the destination the daemon checks, and the written bytes stay
+// with the daemon catalog. The key is scoped per workspace so one workspace's
+// convenience never leaks into another's, and a missing or unreadable value
+// pre-fills nothing rather than inventing a default.
+const exportPresetPrefix = "restoreweave.export_preset.";
+type ExportPreset = { destination: string; sidecars: string };
+// The selector's closed vocabulary. The daemon implements exactly one policy
+// besides the empty default, so a stored value outside it is dropped instead of
+// being sent while the select cannot display it.
+const ADMITTED_SIDECAR_POLICIES = new Set(["", "handoff-v1:manifest-json"]);
+
+function readExportPreset(workspaceID: string): ExportPreset {
+  const empty: ExportPreset = { destination: "", sidecars: "" };
+  if (!workspaceID) return empty;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(`${exportPresetPrefix}${workspaceID}`) ?? "{}");
+    const sidecars = typeof parsed?.sidecars === "string" ? parsed.sidecars.trim() : "";
+    return {
+      destination: typeof parsed?.destination === "string" ? parsed.destination.trim() : "",
+      sidecars: ADMITTED_SIDECAR_POLICIES.has(sidecars) ? sidecars : "",
+    };
+  } catch { return empty; }
+}
+
+function writeExportPreset(workspaceID: string, preset: ExportPreset) {
+  if (!workspaceID) return;
+  try {
+    const key = `${exportPresetPrefix}${workspaceID}`;
+    const destination = preset.destination.trim();
+    const sidecars = ADMITTED_SIDECAR_POLICIES.has(preset.sidecars.trim()) ? preset.sidecars.trim() : "";
+    if (!destination && !sidecars) { window.localStorage.removeItem(key); return; }
+    window.localStorage.setItem(key, JSON.stringify({ destination, sidecars }));
+  } catch { /* a browser that refuses storage keeps no preset; the drawer still works */ }
+}
+
 export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode, selection, library, drafts, setBusy, notify, canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers, setExportOpen }: {
   t: Translator;
   workspaceID: string;
@@ -90,6 +131,10 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   // selector offers exactly that vocabulary; a daemon that moves ahead surfaces
   // its own invalid_input rather than a silent no-op.
   const [exportSidecars, setExportSidecars] = useState("");
+  // True while a pre-filled value still comes from the browser-local preset.
+  // The drawer's helper line states that the prefill is browser-local, and it
+  // stops being claimed as soon as the destination is edited.
+  const [exportPresetApplied, setExportPresetApplied] = useState(false);
   const [exportManifest, setExportManifest] = useState<ExportManifestData>();
   const [exportResult, setExportResult] = useState<any>();
   const [exportAction, setExportAction] = useState<ExportActionState>("IDLE");
@@ -123,10 +168,16 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     const nextMode: ExportMode = selectionForExport.length ? "selected" : "view";
     closeOtherDrawers();
     exportRequestRef.current += 1;
+    // The prefill is the last destination and sidecar choice this browser used
+    // in this workspace. It is a browser-local convenience, labelled as such in
+    // the drawer; a cleared or never-set value stays empty instead of inventing
+    // a default.
+    const preset = readExportPreset(workspaceID);
     setExportSelection(selectionForExport);
     setExportMode(nextMode); setExportView(undefined); setExportManifest(undefined); setExportResult(undefined);
     setExportManifestSource("planned");
-    setExportAction("IDLE"); setExportMessage(""); setExportDestination("");
+    setExportAction("IDLE"); setExportMessage(""); setExportDestination(preset.destination); setExportSidecars(preset.sidecars);
+    setExportPresetApplied(Boolean(preset.destination || preset.sidecars));
     setExportViewName(lastExecutedQuery.trim() ? `Search · ${lastExecutedQuery.trim().slice(0, 48)}` : "My saved search");
     setExportOpen(true); notify(undefined);
     // Recalling a saved view and re-verifying a frozen manifest are the
@@ -144,6 +195,9 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   }
   function changeExportDestination(value: string) {
     setExportDestination(value);
+    // Editing either field ends the preset claim, so the drawer never labels a
+    // value the operator has replaced as the stored browser default.
+    setExportPresetApplied(false);
     // A manifest recalled from history is already frozen: the destination is
     // only the place a later verify reads, so editing it must not discard the
     // frozen unit. A planned manifest still describes a write to one target.
@@ -152,6 +206,20 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     exportRequestRef.current += 1;
     setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
     setExportMessage(t("Destination changed. Preview a new frozen manifest."));
+  }
+  // The two fields form one preset and are remembered together, once a plan has
+  // actually used them. Only the selector's own vocabulary is ever stored, so a
+  // value the select cannot display is never sent back.
+  function changeExportSidecars(value: string) {
+    setExportSidecars(value);
+    if (value.trim() === "") setExportPresetApplied(false);
+  }
+  // Both values are remembered only after the daemon accepted a plan that used
+  // them: a partially typed path and an unsubmitted sidecar choice are not
+  // "last used" values, so they never overwrite the stored pair.
+  function rememberExportChoices() {
+    if (!exportDestination.trim()) return;
+    writeExportPreset(workspaceID, { destination: exportDestination, sidecars: exportSidecars });
   }
   async function saveViewForExport() {
     const name = exportViewName.trim();
@@ -200,6 +268,9 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       setExportManifest(response.data as ExportManifestData);
       setExportManifestSource("planned");
       setExportResult(undefined); setExportAction("IDLE");
+      // The daemon accepted this destination and sidecar pair, so it is the
+      // pair this browser offers next time in this workspace.
+      rememberExportChoices();
       setExportMessage(t("Export manifest frozen. Review the files before writing to the server directory."));
       void loadExportHistory();
     } catch (error) {
@@ -366,7 +437,8 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     exportView,
     exportDestination,
     exportSidecars,
-    changeExportSidecars: setExportSidecars,
+    exportPresetApplied,
+    changeExportSidecars,
     exportManifest,
     exportManifestSource,
     exportResult,

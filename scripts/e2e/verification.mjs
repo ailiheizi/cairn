@@ -100,6 +100,9 @@ export async function assertVerificationSurface(ctx) {
     assert.doesNotMatch(receiptBefore, /\d{4}|\d{1,2}:\d{2}/, `an UNRECORDED receipt must not render a time: ${receiptBefore}`);
     const lastVerification = newestRow.getByText(/Last verification|上次验证/).first();
     assert.equal((await lastVerification.innerText()).includes("UNKNOWN"), true, "an unrun service must not claim a verification time");
+    // An unrecorded receipt states no age either: the freshness line is about
+    // a recorded full-bytes pass, and no such record exists yet.
+    assert.equal(await report.locator(".verification-freshness").count(), 0, "no freshness statement may be rendered while no receipt is recorded");
     // The same rule holds for every unrecorded receipt on the page: no
     // fabricated time may appear next to an UNKNOWN state.
     for (const line of await report.locator('.verification-receipt[data-receipt-state="UNRECORDED"]').allInnerTexts()) {
@@ -168,6 +171,20 @@ export async function assertVerificationSurface(ctx) {
     assert.match(recordedText, /SUCCEEDED/, `the recorded receipt must state the daemon's outcome: ${recordedText}`);
     assert.match(recordedText, new RegExp(`${payload.passed_files}/${payload.attempted_files}`), `the recorded receipt must carry the daemon's counts: ${recordedText}`);
     assert.doesNotMatch(recordedText, /UNKNOWN/, `a recorded receipt must not render as UNKNOWN: ${recordedText}`);
+    // The receipt states its own age, computed from the daemon's recorded time:
+    // the run just happened, so the age the drawer reports must be under an
+    // hour and must come from a readable daemon time.
+    const ageAttribute = await recordedReceipt.getAttribute("data-age-minutes");
+    assert.match(String(ageAttribute), /^\d+$/, `a recorded receipt must carry the daemon's time as a readable age: ${ageAttribute}`);
+    assert.ok(Number(ageAttribute) < 60, `a just-recorded receipt must state a fresh age: ${ageAttribute}`);
+    assert.match(recordedText, /verified (just now|a minute ago|\d+ minutes ago)|(刚刚验证|1 分钟前验证|\d+ 分钟前验证)/, `a recorded pass must state how old its verification is: ${recordedText}`);
+    // The section states the last full read of repository bytes and its age,
+    // and a fresh pass raises no freshness suggestion.
+    const freshness = report.locator('[data-full-bytes-age-minutes]');
+    assert.equal(await freshness.count(), 1, "a recorded full-bytes pass must state when the full read last happened");
+    assert.ok(Number(await freshness.getAttribute("data-full-bytes-age-minutes")) < 60, "a just-recorded full-bytes pass must state a fresh age");
+    assert.match((await freshness.innerText()).trim(), /Last full-bytes verification|上次全量校验/, `the full-read line must name what it dates: ${await freshness.innerText()}`);
+    assert.equal(await report.locator('[data-full-bytes-stale="true"]').count(), 0, "a fresh full-bytes verification must not raise the freshness suggestion");
 
     // 8. An interrupted run records nothing: the outcome is UNKNOWN and the
     // earlier success claim must be gone from the session block.

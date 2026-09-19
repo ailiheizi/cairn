@@ -107,6 +107,11 @@ add-source, restore, and export drawers. */
 .export-view-saved svg { flex: 0 0 auto; margin-top: 1px; }
 .export-query-boundary { color: #9b8fba; font-size: 10px; line-height: 1.45; }
 .export-form { margin-top: 20px; }
+/* The browser-local preset label. It states where the pre-filled destination
+   and sidecar came from and carries no durable meaning: the daemon stores
+   nothing from the preset, and it is removed as soon as either field is
+   edited. */
+.export-preset-note { margin: 0; color: #84919a; font-size: 11px; line-height: 1.45; }
 .export-plan-card { margin-top: 18px; }
 .export-plan-card .plan-stats { align-items: flex-end; gap: 12px; }
 .export-plan-card .plan-stats span:last-child b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }

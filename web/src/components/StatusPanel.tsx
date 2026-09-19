@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
-import { formatBytes } from "../lib/format";
+import { formatBytes, lastFullBytesVerification, recordedAgeMinutes, verificationAgeLabel, verificationIsStale } from "../lib/format";
 import type { Translator } from "../i18n";
 import type { ExportManifestData, SnapshotSummary } from "../lib/types";
 
@@ -146,6 +146,13 @@ export function StatusPanel({ t, status, statusData, capabilities, onRefresh, on
 
   const facts = buildFacts({ t, status, statusData, capabilities, reads });
   const asOf = t("as of {{time}} (this browser)", { time: clockLabel(reads.readAt) });
+  // Verification freshness: the newest recorded passing full-bytes receipt
+  // dates the last complete read of repository bytes. Only a record older than
+  // the stated threshold yields the one-line suggestion; with no such record
+  // (or no readable receipt time) nothing is shown, so no age and no reminder
+  // is ever invented. It is a suggestion, never an alarm and never a health
+  // claim, and it never drives the headline.
+  const fullBytesStale = verificationIsStale(recordedAgeMinutes(lastFullBytesVerification(reads.snapshots)?.verified_at));
   // Only the protection and recovery facts may become the headline. A
   // discovery regression (an index dimension) and a "this build cannot source
   // this" row are facts too, but naming one as the top-line health claim would
@@ -161,6 +168,7 @@ export function StatusPanel({ t, status, statusData, capabilities, onRefresh, on
     <summary className="status-panel-summary" data-health={summaryState} data-weakest={weakest?.id ?? "none"} data-scope="protection-and-recovery"><span className="health-state" data-state={summaryState}>{summaryState}</span>{summaryState === "PROVEN" ? " · " : " — "}<span className="status-panel-summary-text">{summaryText}</span>{summaryState === "PROVEN" && <span className="status-panel-asof"> · {asOf}</span>}<ChevronRight className="status-panel-chevron" size={14} aria-hidden="true" /><span className="sr-only">{t("System readiness")}</span></summary>
     <div className="status-panel-body">
       <p className="status-panel-note">{t("Every health fact states what this browser can prove now. UNKNOWN names the missing source; it is never a zero or a healthy default.")}</p>
+      {fullBytesStale && <p className="status-panel-note status-panel-freshness">{t("The last full-bytes verification is more than 30 days old. Consider running it again when convenient.")}</p>}
       {FACT_GROUPS.map((group) => {
         const rows = facts.filter((fact) => fact.group === group.id);
         const groupWeakest = weakestFact(rows);
@@ -429,6 +437,13 @@ function schemaFact(t: Translator, catalog: any): FactValue {
   return ["UNKNOWN", t("this service reports no catalog schema state")];
 }
 
+// The verification row states the record and, when the daemon's own receipt
+// carries a readable time, how old that record is. The age is computed from
+// the receipt's `verified_at` and nothing else: an unrecorded receipt keeps
+// the UNKNOWN wording and gains no age, so no time is ever invented. The age
+// is a statement about the record, never a health claim or a pass, and a
+// FAILED or UNAVAILABLE receipt reports when it was recorded instead of
+// claiming a verification that did not happen.
 function verificationFact(t: Translator, latest: SnapshotSummary | undefined, reads: StatusReads): FactValue {
   if (reads.snapshotError) return ["UNKNOWN", t("snapshot.list did not answer in this browser session: {{message}}", { message: reads.snapshotError })];
   if (!latest) return ["UNKNOWN", t("no restore point is published yet")];
@@ -437,14 +452,23 @@ function verificationFact(t: Translator, latest: SnapshotSummary | undefined, re
     return ["UNKNOWN", t("no verification receipt is recorded (service reason: {{reason}})", { reason: verification?.reason || t("reason not reported") })];
   }
   const mode = verification.mode || "UNKNOWN";
-  if (verification.outcome === "FAILED") return ["FAILED", t("Verification failed: {{reason}}", { reason: verification.failure_reason || mode })];
-  if (verification.outcome === "UNAVAILABLE") return ["DEGRADED", t("Verification coverage is degraded: {{reason}}", { reason: verification.failure_reason || mode })];
-  return ["PROVEN", t("Last verification: {{time}} · {{mode}} · files {{passed}}/{{attempted}}", {
+  const minutes = recordedAgeMinutes(verification.verified_at);
+  const withAge = (line: string) => {
+    // Only a recorded pass may read "verified": every other recorded outcome
+    // states when it was recorded, so the age never upgrades a failure into a
+    // verification.
+    const passed = verification.outcome === "SUCCEEDED" || verification.ok === true;
+    const age = verificationAgeLabel(t, minutes, passed ? "verified" : "recorded");
+    return age ? `${line} · ${age}` : line;
+  };
+  if (verification.outcome === "FAILED") return ["FAILED", withAge(t("Verification failed: {{reason}}", { reason: verification.failure_reason || mode }))];
+  if (verification.outcome === "UNAVAILABLE") return ["DEGRADED", withAge(t("Verification coverage is degraded: {{reason}}", { reason: verification.failure_reason || mode }))];
+  return ["PROVEN", withAge(t("Last verification: {{time}} · {{mode}} · files {{passed}}/{{attempted}}", {
     time: daemonDateTime(verification.verified_at, t),
     mode,
     passed: Number(verification.passed_files ?? 0),
     attempted: Number(verification.attempted_files ?? 0),
-  })];
+  }))];
 }
 
 function protectionFact(t: Translator, latest: SnapshotSummary | undefined, reads: StatusReads): FactValue {

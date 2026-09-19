@@ -19,6 +19,10 @@
 .verification-section-copy { display: block; margin-top: 6px; color: var(--quiet); font-size: 10px; line-height: 1.5; }
 .verification-error { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 0; color: var(--coral); font-size: 11px; line-height: 1.45; }
 .verification-error svg { flex: 0 0 auto; margin-top: 1px; }
+/* The freshness suggestion. No state token, no alarm colour: it is stated only
+   when a recorded passing full-bytes receipt exists and is older than the
+   threshold, and the section shows no age at all otherwise. */
+.verification-freshness { margin: 8px 0 0; color: var(--quiet); font-size: 10px; line-height: 1.5; }
 
 /* --- levels and their cost ---------------------------------------------- */
 .verification-modes { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }

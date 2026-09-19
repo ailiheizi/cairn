@@ -1,5 +1,5 @@
 import type { Locale, Translator } from "../i18n";
-import type { BrowseRoot, SearchHit, SearchSegment, SortDirection, SortField } from "./types";
+import type { BrowseRoot, SearchHit, SearchSegment, SnapshotSummary, SnapshotVerificationData, SortDirection, SortField } from "./types";
 
 // Pure presentation and listing helpers.
 //
@@ -143,6 +143,66 @@ export function formatReachabilityMessage(value: string, t: Translator) {
 export function formatScanState(value: string | undefined, t: Translator) {
   const labels: Record<string, string> = { PLANNED: "Scan planned", RUNNING: "Scan in progress", COMPLETE: "Scan complete", INCOMPLETE: "Scan incomplete", FAILED: "Scan failed", CANCELLED: "Scan cancelled" };
   return t(labels[value ?? ""] ?? "No scan recorded");
+}
+
+// Verification freshness. The age of a recorded verification receipt is
+// computed from the daemon's own recorded time and from nothing else: a
+// timestamp this browser cannot parse yields no age at all, so a caller that
+// has no readable receipt time keeps its UNKNOWN wording instead of gaining an
+// invented one. The age is presentation only; it is never a health claim and
+// never a pass.
+export const STALE_VERIFICATION_DAYS = 30;
+
+export function recordedAgeMinutes(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const recorded = Date.parse(value);
+  if (Number.isNaN(recorded)) return undefined;
+  // A receipt the daemon stamped ahead of this browser's clock is still an
+  // age of zero, never a negative one.
+  return Math.max(0, Math.floor((Date.now() - recorded) / 60000));
+}
+
+// The one age fragment a receipt line may append. `verified` states the age of
+// a passing record; `recorded` is the neutral form for a failed or unavailable
+// outcome, whose record time is true but whose verification is not. A count of
+// one uses the singular phrasing so the sentence stays readable. Every catalog
+// key is handed to t() as a literal (never composed), so the i18n checker sees
+// the whole vocabulary this helper can render.
+export function verificationAgeLabel(t: Translator, minutes: number | undefined, verb: "verified" | "recorded"): string {
+  if (minutes === undefined) return "";
+  const verified = verb === "verified";
+  if (minutes < 1) return verified ? t("verified just now") : t("recorded just now");
+  if (minutes < 60) {
+    if (minutes === 1) return verified ? t("verified a minute ago") : t("recorded a minute ago");
+    return verified ? t("verified {{count}} minutes ago", { count: minutes }) : t("recorded {{count}} minutes ago", { count: minutes });
+  }
+  if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1) return verified ? t("verified an hour ago") : t("recorded an hour ago");
+    return verified ? t("verified {{count}} hours ago", { count: hours }) : t("recorded {{count}} hours ago", { count: hours });
+  }
+  const days = Math.floor(minutes / 1440);
+  if (days === 1) return verified ? t("verified a day ago") : t("recorded a day ago");
+  return verified ? t("verified {{count}} days ago", { count: days }) : t("recorded {{count}} days ago", { count: days });
+}
+
+export function verificationIsStale(minutes: number | undefined) {
+  return minutes !== undefined && minutes > STALE_VERIFICATION_DAYS * 24 * 60;
+}
+
+// The most recent recorded, passing full-bytes receipt among the restore
+// points a surface has read. Only that record dates the last full read of
+// repository bytes: another mode's receipt says nothing about it, and a
+// failed or unavailable outcome is not a verification. An empty result means
+// no full-bytes read is recorded, so no age and no reminder may be claimed.
+export function lastFullBytesVerification(snapshots: SnapshotSummary[]): SnapshotVerificationData | undefined {
+  const passing = snapshots
+    .map((summary) => summary.verification)
+    .filter((receipt): receipt is SnapshotVerificationData => receipt?.state === "RECORDED"
+      && (receipt.outcome === "SUCCEEDED" || receipt.ok === true)
+      && (receipt.mode ?? "") === "full-bytes"
+      && recordedAgeMinutes(receipt.verified_at) !== undefined);
+  return passing.sort((left, right) => Date.parse(right.verified_at ?? "") - Date.parse(left.verified_at ?? ""))[0];
 }
 
 // A path root is labelled by its name, and only duplicate names are

@@ -50,6 +50,10 @@
 }
 
 .status-panel-note { max-width: 76ch; margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+/* The freshness suggestion. It carries no state token and no colour that could
+   read as an alarm: it is one suggestion about a recorded time, and the panel
+   states no age at all when no recorded full-bytes receipt exists. */
+.status-panel-freshness { margin-bottom: 10px; color: var(--quiet); font-size: 11px; line-height: 1.45; }
 
 /* The body groups the facts instead of listing them flat: the protection and
    recovery facts (the summary's own set), the discovery facts, and the facts

@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, LoaderCircle, RefreshCw, ShieldAlert, Shield
 import { command } from "../app/command";
 import type { Result } from "../app/command";
 import { operations } from "../lib/operations";
-import { formatBytes } from "../lib/format";
+import { formatBytes, lastFullBytesVerification, recordedAgeMinutes, verificationAgeLabel, verificationIsStale } from "../lib/format";
 import type { Translator } from "../i18n";
 import type { SnapshotSummary, SnapshotVerificationData } from "../lib/types";
 
@@ -166,7 +166,12 @@ function runCost(mode: string) {
 
 // The one receipt line per restore point. An absent receipt keeps the daemon's
 // reason in the same element as the UNKNOWN token, so no caller can read a
-// state without its reason and no time is ever invented.
+// state without its reason and no time is ever invented. A recorded receipt
+// also states its age, computed from the daemon's own recorded `verified_at`
+// and nothing else: a pass reads "verified ...", a failure or unavailability
+// reads when it was "recorded", and a time the browser cannot parse adds no
+// age rather than an invented one. The age is a statement about the record,
+// never a health claim and never a pass.
 function receiptLine(t: Translator, receipt: SnapshotVerificationData | undefined) {
   const unrecordedReason = receipt?.reason || t("this service reports no verification receipt and no reason");
   if (!isRecorded(receipt)) {
@@ -175,27 +180,30 @@ function receiptLine(t: Translator, receipt: SnapshotVerificationData | undefine
   const mode = receipt.mode || t("mode not reported");
   const recorded = daemonDateTime(receipt.verified_at, t);
   const request = receipt.request_id || t("Not reported");
+  const passed = receipt.outcome === "SUCCEEDED" || receipt.ok === true;
+  const age = verificationAgeLabel(t, recordedAgeMinutes(receipt.verified_at), passed ? "verified" : "recorded");
+  const withAge = (line: string) => age ? `${line} · ${age}` : line;
   if (receipt.outcome === "FAILED") {
-    return t("Verification failed — {{reason}} · scope {{mode}} · recorded {{time}} · attempted {{attempted}} files · passed {{passed}} files · request {{request}}", {
+    return withAge(t("Verification failed — {{reason}} · scope {{mode}} · recorded {{time}} · attempted {{attempted}} files · passed {{passed}} files · request {{request}}", {
       reason: receipt.failure_reason || t("outcome not reported"),
       mode,
       time: recorded,
       attempted: Number(receipt.attempted_files ?? 0),
       passed: Number(receipt.passed_files ?? 0),
       request,
-    });
+    }));
   }
   if (receipt.outcome === "UNAVAILABLE") {
-    return t("Verification coverage unavailable — {{reason}} · scope {{mode}} · recorded {{time}} · attempted {{attempted}} files · passed {{passed}} files · request {{request}}", {
+    return withAge(t("Verification coverage unavailable — {{reason}} · scope {{mode}} · recorded {{time}} · attempted {{attempted}} files · passed {{passed}} files · request {{request}}", {
       reason: receipt.failure_reason || t("outcome not reported"),
       mode,
       time: recorded,
       attempted: Number(receipt.attempted_files ?? 0),
       passed: Number(receipt.passed_files ?? 0),
       request,
-    });
+    }));
   }
-  return t("Last verification: {{time}} · {{mode}} · {{outcome}} · ok {{ok}} · passed {{passed}}/{{attempted}} files · {{passedBytes}}/{{attemptedBytes}} bytes · restore verified {{restore}} · request {{request}}", {
+  return withAge(t("Last verification: {{time}} · {{mode}} · {{outcome}} · ok {{ok}} · passed {{passed}}/{{attempted}} files · {{passedBytes}}/{{attemptedBytes}} bytes · restore verified {{restore}} · request {{request}}", {
     time: recorded,
     mode,
     outcome: receipt.outcome || t("outcome not reported"),
@@ -206,7 +214,7 @@ function receiptLine(t: Translator, receipt: SnapshotVerificationData | undefine
     attemptedBytes: formatBytes(Number(receipt.attempted_bytes ?? 0)),
     restore: boolLabel(t, receipt.restore_verified),
     request,
-  });
+  }));
 }
 
 export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageReady, busy, workspaceID, subjectRef, onRefresh, onClose }: VerificationDrawerProps) {
@@ -319,6 +327,21 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
           : "";
   const canRun = !disabledReason && !running && (!destinationRequired || Boolean(destination.trim()));
   const recordsAsOf = t("record read at {{time}} (this browser)", { time: clockLabel(recordsReadAt) });
+  // Freshness. The age of the last full read of repository bytes comes from the
+  // newest recorded passing full-bytes receipt among the restore points this
+  // drawer read, and from nowhere else. No such receipt means no age line at
+  // all: the UNKNOWN receipt rows already say why, and nothing is invented to
+  // fill the gap. The reminder is stated only past the threshold and stays a
+  // suggestion, never an alarm and never a health claim.
+  const fullBytesReceipt = lastFullBytesVerification(snapshots);
+  const fullBytesAge = recordedAgeMinutes(fullBytesReceipt?.verified_at);
+  const fullBytesStale = verificationIsStale(fullBytesAge);
+  // The receipt only reaches this line with a readable time, so the age is
+  // always present; the guard keeps an unreadable time from rendering a
+  // half-finished sentence instead of no line.
+  const fullBytesFreshnessLine = fullBytesReceipt && fullBytesAge !== undefined
+    ? t("Last full-bytes verification: {{time}} · {{age}}", { time: daemonDateTime(fullBytesReceipt.verified_at, t), age: verificationAgeLabel(t, fullBytesAge, "verified") })
+    : "";
 
   async function runVerify(verifyMode: VerifyMode) {
     const ref = targetRef;
@@ -499,6 +522,8 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
             <button type="button" className="text-button verification-reload" onClick={() => void refreshRecord()} disabled={readState === "LOADING" || running}><RefreshCw className={readState === "LOADING" ? "spin" : ""} size={13} />{t("Refresh")}</button>
           </div>
           <small className="verification-section-copy">{t("Read from snapshot.list: the freeze facts and the newest verification receipt the catalog records for each restore point. A receipt that does not exist is UNKNOWN with the daemon's reason; it is never a time and never a pass.")}{readState === "READY" ? ` · ${recordsAsOf}` : ""}</small>
+          {fullBytesFreshnessLine && <p className="verification-freshness" data-full-bytes-age-minutes={fullBytesAge}>{fullBytesFreshnessLine}</p>}
+          {fullBytesStale && <p className="verification-freshness" data-full-bytes-stale="true">{t("The last full-bytes verification is more than 30 days old. Consider running it again when convenient.")}</p>}
           {readState === "LOADING" && <p className="muted" role="status">{t("Reading verification record…")}</p>}
           {readState === "ERROR" && <p className="verification-error" role="alert"><AlertCircle size={13} />{t("Reading the verification record failed: {{message}}", { message: readError })}</p>}
           {readState === "READY" && snapshots.length === 0 && <p className="muted">{t("No restore point is published yet, so there is no verification record to report.")}</p>}
@@ -515,7 +540,7 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
                 <span>{t("exact-protected {{protected}} · unprotected {{unprotected}}", { protected: Number(summary.protected_files ?? 0), unprotected: Number(summary.unprotected_files ?? 0) })}</span>
                 {outcomes ? <span className="mono">{t("recorded outcomes: {{outcomes}}", { outcomes })}</span> : <span>{t("no protection mix is recorded")}</span>}
               </p>
-              <p className="verification-receipt" data-receipt-state={isRecorded(receipt) ? "RECORDED" : "UNRECORDED"} data-outcome={isRecorded(receipt) ? String(receipt?.outcome ?? "") : "UNKNOWN"}>{receiptLine(t, receipt)}</p>
+              <p className="verification-receipt" data-receipt-state={isRecorded(receipt) ? "RECORDED" : "UNRECORDED"} data-outcome={isRecorded(receipt) ? String(receipt?.outcome ?? "") : "UNKNOWN"} data-age-minutes={isRecorded(receipt) ? recordedAgeMinutes(receipt.verified_at) ?? "" : ""}>{receiptLine(t, receipt)}</p>
             </li>;
           })}</ul>}
         </section>

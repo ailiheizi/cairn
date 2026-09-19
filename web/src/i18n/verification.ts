@@ -38,6 +38,10 @@ export const verification: Record<string, string> = {
   "exact-protected {{protected}} · unprotected {{unprotected}}": "精确保护 {{protected}} · 未保护 {{unprotected}}",
   "recorded outcomes: {{outcomes}}": "已记录结果：{{outcomes}}",
   "no protection mix is recorded": "未记录保护构成",
+  // The freshness line over the restore points this drawer read. The time and
+  // the age both come from the daemon's own recorded receipt; when no recorded
+  // passing full-bytes receipt exists this line is absent rather than empty.
+  "Last full-bytes verification: {{time}} · {{age}}": "上次全量校验：{{time}} · {{age}}",
 
   // --- the receipt line (RECORDED / UNRECORDED / FAILED / UNAVAILABLE) ---
   "Last verification: UNKNOWN — {{reason}}": "上次验证：UNKNOWN — {{reason}}",

@@ -329,3 +329,48 @@ export async function assertExportSidecarPolicy(ctx) {
   assert.equal(ctx.state.lastExportPlanInput?.sidecars, "handoff-v1:manifest-json", `the selected policy must reach the daemon: ${JSON.stringify(ctx.state.lastExportPlanInput)}`);
   await second.getByRole("button", { name: /关闭导出|Close export/ }).click();
 }
+
+// The export preset is browser-local convenience state, and this phase pins
+// both halves of that statement: the last plan's destination and sidecar choice
+// are pre-filled on the next open in the same workspace, and the drawer labels
+// the prefill as browser-local instead of letting it read as a durable daemon
+// default. The stored pair never changes the plan payload, which stays exactly
+// the fields the daemon accepts.
+export async function assertExportBrowserPreset(ctx) {
+  const { page, button } = ctx;
+  const workspaceID = String(await page.evaluate(() => localStorage.getItem("restoreweave.workspace_id") ?? "")).trim();
+  assert.ok(workspaceID, "the harness must have selected a workspace before the preset can be stored");
+  const presetKey = `restoreweave.export_preset.${workspaceID}`;
+  // The previous phase planned an export with this destination and the handoff
+  // sidecar, so both must now be remembered for this workspace.
+  const stored = JSON.parse(await page.evaluate((key) => localStorage.getItem(key) ?? "null", presetKey) ?? "null");
+  assert.ok(stored, `the last used export choices must be stored under ${presetKey}: ${JSON.stringify(stored)}`);
+  assert.equal(stored.sidecars, "handoff-v1:manifest-json", `the stored preset must keep the chosen sidecar: ${JSON.stringify(stored)}`);
+  assert.ok(String(stored.destination ?? "").length > 0, `the stored preset must keep the planned destination: ${JSON.stringify(stored)}`);
+
+  await button(/内容库|Library/).click();
+  await page.getByRole("main").getByRole("button", { name: /alpha\.txt/ }).first().click();
+  await button(/^(导出|Export)$/).click();
+  const drawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
+  await drawer.waitFor({ state: "visible", timeout: 10000 });
+  const destination = drawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ });
+  const selector = drawer.getByLabel(/随附文件策略|Sidecar policy/);
+  await destination.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await destination.inputValue(), stored.destination, "the drawer must pre-fill the last used destination");
+  assert.equal(await selector.inputValue(), "handoff-v1:manifest-json", "the drawer must pre-fill the last used sidecar choice");
+  const note = drawer.locator(".export-preset-note");
+  assert.equal(await note.count(), 1, "a pre-filled drawer must label the prefill");
+  assert.equal(await note.getAttribute("data-export-preset"), "browser-local", "the prefill label must state that it is browser-local");
+  await drawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+  // A cleared value stays empty: the preset is read on open, so removing it
+  // must leave both fields empty and withdraw the browser-local label instead
+  // of falling back to a default the operator never chose.
+  await page.evaluate((key) => localStorage.removeItem(key), presetKey);
+  await button(/^(导出|Export)$/).click();
+  const clearedDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
+  await clearedDrawer.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await clearedDrawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).inputValue(), "", "a cleared preset must leave the destination empty");
+  assert.equal(await clearedDrawer.getByLabel(/随附文件策略|Sidecar policy/).inputValue(), "", "a cleared preset must leave the sidecar choice empty");
+  assert.equal(await clearedDrawer.locator(".export-preset-note").count(), 0, "an empty preset must not be labelled");
+  await clearedDrawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+}
