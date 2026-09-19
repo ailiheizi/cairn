@@ -39,6 +39,10 @@ export async function createHarness({ url, executablePath, headless = true }) {
     // while an image tile may read bytes for its thumbnail.
     contentOpenEntryIDs: [],
     entryNames: new Map(),
+    // The latest content.list rows exactly as the daemon returned them, so a
+    // surface module can assert a browser-local projection (like the space
+    // report's byte total) against the real payload instead of a guess.
+    contentListItems: [],
     lastSearchHitNames: [],
     lastPlanSubjects: undefined,
     lastFrozenManifest: undefined,
@@ -68,6 +72,7 @@ export async function createHarness({ url, executablePath, headless = true }) {
     if (request?.operation !== "content.list") return;
     let body;
     try { body = await response.json(); } catch { return; }
+    state.contentListItems = body?.data?.items ?? [];
     for (const item of body?.data?.items ?? []) state.entryNames.set(String(item.entry_id ?? ""), String(item.name ?? ""));
   });
 

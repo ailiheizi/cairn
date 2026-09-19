@@ -1014,6 +1014,10 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 			EntryType:   string(entry.EntryType),
 			ContentID:   entry.ContentID,
 			LogicalSize: entry.LogicalSize,
+			// The modification time is the fact the scanner recorded at
+			// capture; a row whose metadata does not carry one simply omits
+			// the field, never zero-fills it.
+			ModifiedAt:  entryModifiedAt(entry),
 			IndexStatus: indexStatus[entry.SubjectRef],
 		})
 	}
@@ -1035,6 +1039,23 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 		Roots:       rootChoices,
 		Items:       items,
 	})
+}
+
+// entryModifiedAt reads the modification time the scanner recorded in the
+// entry's captured metadata. It is a captured fact, not a live stat: a row
+// with no recorded time carries no field.
+func entryModifiedAt(entry sqlite.NamespaceEntry) string {
+	var snapshot struct {
+		ModTime string `json:"mod_time"`
+	}
+	if len(entry.Metadata) == 0 || json.Unmarshal(entry.Metadata, &snapshot) != nil {
+		return ""
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(snapshot.ModTime))
+	if err != nil || parsed.IsZero() || parsed.Unix() <= 0 {
+		return ""
+	}
+	return parsed.UTC().Format(time.RFC3339)
 }
 
 // indexDimensionStates computes the lexical and semantic discovery state for

@@ -4,6 +4,7 @@ import { createTranslator, resolveInitialLocale } from "./i18n";
 import type { Locale } from "./i18n";
 import { command } from "./app/command";
 import { endpoints, operations } from "./lib/operations";
+import { parseHashView, writeHashView } from "./lib/hashView";
 import { isTextEntryTarget, useSearch } from "./app/useSearch";
 import { useSettings } from "./app/useSettings";
 import { useRecents } from "./app/useRecents";
@@ -244,6 +245,36 @@ function App() {
   const restore = useRestore({ t, snapshotRef, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, pushRecentDestination: recents.pushRecentDestination, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setExportOpen(false); setSettingsOpen(false); }, setRestoreOpen });
   const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode: view.setViewMode, selection, library, drafts, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
   const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
+
+  // The URL hash is a browser-local deep link over the library's projection
+  // state (view mode, the submitted search text, the active tag facets, the
+  // timeline month). It is read once on mount and restored after the daemon's
+  // first content listing arrived — restoring a search re-runs that query, so
+  // the restored view is always derived from the daemon, never from the hash.
+  // Every later change replaces the hash (replaceState, never pushState), so
+  // a refresh lands where the user was without spamming session history.
+  const pendingHashView = useRef(parseHashView(window.location.hash));
+  const [hashViewApplied, setHashViewApplied] = useState(false);
+  useEffect(() => {
+    if (hashViewApplied) return;
+    const pending = pendingHashView.current;
+    if (!pending.mode) { setHashViewApplied(true); return; }
+    if (!isConnected) return;
+    if ((pending.mode === "search" || pending.mode === "content" || pending.mode === "tag") && !library.libraryLoaded) return;
+    setHashViewApplied(true);
+    if (pending.mode === "search") {
+      const text = pending.q.trim();
+      if (!text) return;
+      setQuery(text);
+      void search.runSearch(undefined, text);
+      return;
+    }
+    if (pending.mode === "content" || pending.mode === "tag") { library.restoreLibraryHashView(pending.mode, pending.tags, pending.month); return; }
+    view.setViewMode(pending.mode);
+  }, [hashViewApplied, isConnected, library.libraryLoaded]);
+  useEffect(() => {
+    writeHashView({ mode: view.viewMode, q: lastExecutedQuery, tags: library.activeTags, month: library.activeTimelineMonth });
+  }, [lastExecutedQuery, library.activeTags, library.activeTimelineMonth, view.viewMode]);
 
   useEffect(() => { void refresh(); }, []);
   // The panel exists only below the compact boundary. A resize across it
@@ -524,6 +555,7 @@ function App() {
         onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
         onClearNotice={() => setNotice(undefined)}
         onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
+        onOpenHit={(hit) => void details.loadDetails(hit)}
         libraryListRef={libraryListRef}
       />}
       {selected && <DetailsPanel

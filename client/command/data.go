@@ -549,13 +549,17 @@ type ContentRootData struct {
 }
 
 type ContentItemData struct {
-	SubjectRef  string              `json:"subject_ref"`
-	EntryID     string              `json:"entry_id,omitempty"`
-	Name        string              `json:"name"`
-	Path        string              `json:"path"`
-	EntryType   string              `json:"entry_type"`
-	ContentID   string              `json:"content_id,omitempty"`
-	LogicalSize *int64              `json:"logical_size,omitempty"`
+	SubjectRef  string `json:"subject_ref"`
+	EntryID     string `json:"entry_id,omitempty"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	EntryType   string `json:"entry_type"`
+	ContentID   string `json:"content_id,omitempty"`
+	LogicalSize *int64 `json:"logical_size,omitempty"`
+	// ModifiedAt is the modification time the scanner recorded at capture
+	// (RFC 3339, UTC). It is absent for a row whose captured metadata carries
+	// no usable time.
+	ModifiedAt  string              `json:"modified_at,omitempty"`
 	IndexStatus *ContentIndexStatus `json:"index_status,omitempty"`
 }
 

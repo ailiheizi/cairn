@@ -182,3 +182,101 @@ export function shortManifestID(value: string | undefined) {
   if (!id) return "—";
   return id.length > 24 ? `${id.slice(0, 22)}…` : id;
 }
+
+// Timeline browse: a browser-local month projection over the loaded listing.
+// The daemon's `content.list` rows carry no modification time in this build
+// (see ContentItemData in client/command/data.go), so this reader yields
+// nothing for every row today and a strip over zero dated rows renders
+// absent, never zero-filled. When the daemon starts projecting a per-row
+// time, it is read here: epoch milliseconds (the unit of the daemon's own
+// mtime search axis) or an RFC 3339 string (the daemon's JSON timestamp
+// convention elsewhere).
+export function rowModificationTime(item: SearchHit): number | undefined {
+  const value = (item as { modified_at?: unknown }).modified_at;
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : undefined;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return undefined;
+}
+
+export function monthBucketKey(timeMs: number) {
+  const date = new Date(timeMs);
+  return Number.isNaN(date.getTime()) ? "" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function itemInMonth(item: SearchHit, month: string) {
+  const time = rowModificationTime(item);
+  return time !== undefined && monthBucketKey(time) === month;
+}
+
+// Ascending month buckets with a positive count; months with no loaded item
+// are absent rather than zero-filled.
+export function monthTimelineBuckets(items: SearchHit[]): Array<{ key: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const time = rowModificationTime(item);
+    if (time === undefined) continue;
+    const key = monthBucketKey(time);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts].map(([key, count]) => ({ key, count })).sort((left, right) => left.key.localeCompare(right.key));
+}
+
+// Space report: a browser-local byte projection over the loaded listing. The
+// total sums every row that carries a logical size; the largest entries are
+// files (directories are excluded); media classes count only rows whose name
+// suffix maps to a class, so unclassified rows are left out instead of being
+// guessed into a bucket.
+export type SpaceReportClass = "image" | "video" | "audio" | "document";
+const MEDIA_CLASS_SUFFIXES: Record<SpaceReportClass, string[]> = {
+  image: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif", "avif", "tif", "tiff", "ico"],
+  video: ["mp4", "mov", "mkv", "avi", "webm", "m4v", "mpg", "mpeg", "wmv", "flv", "ts", "3gp"],
+  audio: ["mp3", "flac", "wav", "m4a", "aac", "ogg", "oga", "opus", "wma", "aiff", "aif"],
+  document: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "rtf", "csv", "epub"],
+};
+export function mediaClassFromSuffix(suffix: string): SpaceReportClass | "" {
+  const normalized = suffix.trim().toLowerCase();
+  for (const [className, suffixes] of Object.entries(MEDIA_CLASS_SUFFIXES) as Array<[SpaceReportClass, string[]]>) {
+    if (suffixes.includes(normalized)) return className;
+  }
+  return "";
+}
+export type SpaceReport = {
+  totalBytes: number;
+  sizedItems: number;
+  top: Array<{ hit: SearchHit; size: number }>;
+  classes: Array<{ class: SpaceReportClass; label: string; bytes: number; count: number }>;
+};
+export function spaceReportProjection(items: SearchHit[]): SpaceReport {
+  let totalBytes = 0;
+  let sizedItems = 0;
+  const sized: Array<{ hit: SearchHit; size: number }> = [];
+  const classes = new Map<SpaceReportClass, { bytes: number; count: number }>();
+  for (const item of items) {
+    const size = sortableSize(item);
+    if (size === null) continue;
+    totalBytes += size;
+    sizedItems += 1;
+    if (item.entry_type !== "DIRECTORY") {
+      sized.push({ hit: item, size });
+      const className = mediaClassFromSuffix(formatFacetValue(item));
+      if (className) {
+        const entry = classes.get(className) ?? { bytes: 0, count: 0 };
+        entry.bytes += size;
+        entry.count += 1;
+        classes.set(className, entry);
+      }
+    }
+  }
+  const classLabels: Record<SpaceReportClass, string> = { image: "Images", video: "Videos", audio: "Audio", document: "Documents" };
+  const orderedClasses: SpaceReportClass[] = ["image", "video", "audio", "document"];
+  return {
+    totalBytes,
+    sizedItems,
+    top: sized.sort((left, right) => right.size - left.size || sortableName(left.hit).localeCompare(sortableName(right.hit))).slice(0, 3),
+    classes: orderedClasses.filter((className) => classes.has(className)).map((className) => ({ class: className, label: classLabels[className], bytes: classes.get(className)!.bytes, count: classes.get(className)!.count })),
+  };
+}

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { Locale, Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
-import { dedupFacetValue, exactIdentityKey, formatFacetValue, sortLibraryHits } from "../lib/format";
+import { dedupFacetValue, exactIdentityKey, formatFacetValue, itemInMonth, sortLibraryHits } from "../lib/format";
+import { isMonthBucketKey } from "../lib/hashView";
 import type { AnnotationRecord, BrowseCrumb, BrowseRoot, Notice, SearchHit, SortDirection, SortField, SystemFacetState, ViewMode } from "../lib/types";
 
 // The content library projection.
@@ -33,7 +34,14 @@ export type LibraryFlow = {
   tagVocabulary: string[];
   identityCounts: Map<string, number>;
   facetFilteredItems: SearchHit[];
+  /** The facet-filtered listing further narrowed by the active timeline month. */
+  monthFilteredItems: SearchHit[];
   filteredLibraryItems: SearchHit[];
+  activeTimelineMonth: string;
+  setActiveTimelineMonth: (value: string) => void;
+  toggleTimelineMonth: (month: string) => void;
+  libraryLoaded: boolean;
+  restoreLibraryHashView: (view: "content" | "tag", tags: string[], month: string) => boolean;
   tagFacets: Array<{ value: string; count: number }>;
   systemFacets: { types: Array<{ value: string; count: number }>; formats: Array<{ value: string; count: number }>; dedup: Array<{ value: string; count: number }>; tags: Array<{ value: string; count: number }>; index: Array<{ value: string; count: number }> };
   hasSystemFacets: boolean;
@@ -77,6 +85,11 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   const [browseRootID, setBrowseRootID] = useState("");
   const [browseRoots, setBrowseRoots] = useState<BrowseRoot[]>([]);
   const [browseCrumbs, setBrowseCrumbs] = useState<BrowseCrumb[]>([]);
+  // The timeline bucket is a browser-local filter over the loaded listing's
+  // month projection; it is only settable from the strip or the URL hash and
+  // never changes stored content or recovery meaning.
+  const [activeTimelineMonth, setActiveTimelineMonth] = useState("");
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
 
   const tagsBySubject = useMemo(() => {
     const result = new Map<string, string[]>();
@@ -107,15 +120,16 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     const indexNotReady = indexStates.length > 0 && indexStates.some((value) => value === "NOT_BUILT" || value === "UNAVAILABLE");
     return (!activeSystemFacets.type || item.entry_type === activeSystemFacets.type) && (!activeSystemFacets.format || format === activeSystemFacets.format) && (!activeSystemFacets.dedup || dedup === activeSystemFacets.dedup) && (!activeSystemFacets.tags || tagState === activeSystemFacets.tags) && (!activeSystemFacets.index || (activeSystemFacets.index === "NOT_READY" && indexNotReady));
   }), [activeSystemFacets, identityCounts, libraryItems]);
+  const monthFilteredItems = useMemo(() => activeTimelineMonth ? facetFilteredItems.filter((item) => itemInMonth(item, activeTimelineMonth)) : facetFilteredItems, [activeTimelineMonth, facetFilteredItems]);
   const tagFacets = useMemo(() => {
-    const visibleSubjects = new Set(facetFilteredItems.map((item) => item.subject_ref).filter((value): value is string => Boolean(value)));
+    const visibleSubjects = new Set(monthFilteredItems.map((item) => item.subject_ref).filter((value): value is string => Boolean(value)));
     const counts = new Map<string, number>();
     for (const [subject, values] of tagsBySubject) {
       if (!visibleSubjects.has(subject)) continue;
       for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
     }
     return [...counts].map(([value, count]) => ({ value, count })).sort((left, right) => left.value.localeCompare(right.value, locale));
-  }, [facetFilteredItems, locale, tagsBySubject]);
+  }, [locale, monthFilteredItems, tagsBySubject]);
   const systemFacets = useMemo(() => {
     const types = new Map<string, number>();
     const formats = new Map<string, number>();
@@ -138,16 +152,21 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
       }).length }].filter((facet) => facet.count > 0),
     };
   }, [identityCounts, libraryItems, locale]);
-  const filteredLibraryItems = useMemo(() => facetFilteredItems.filter((item) => {
+  const filteredLibraryItems = useMemo(() => monthFilteredItems.filter((item) => {
     const values = item.subject_ref ? tagsBySubject.get(item.subject_ref) ?? [] : [];
     return activeTags.every((tag) => values.includes(tag));
-  }), [activeTags, facetFilteredItems, tagsBySubject]);
+  }), [activeTags, monthFilteredItems, tagsBySubject]);
   const hasSystemFacets = Boolean(activeSystemFacets.type || activeSystemFacets.format || activeSystemFacets.dedup || activeSystemFacets.tags || activeSystemFacets.index);
-  const hasActiveFilters = activeTags.length > 0 || hasSystemFacets;
+  const hasActiveFilters = activeTags.length > 0 || hasSystemFacets || Boolean(activeTimelineMonth);
   const sortAvailable = viewMode !== "search";
-  const renderedHits = useMemo(() => sortAvailable && hits.length > 1
-    ? sortLibraryHits(hits, sortField, sortDirection, locale)
-    : hits, [hits, locale, sortAvailable, sortDirection, sortField]);
+  // When a filter is active the grid renders the reactive projection of the
+  // same facets, not the imperative hits state: the loader, the hash restore,
+  // and the facet toggles can then never race each other over hits. Search
+  // keeps its daemon-ordered hits.
+  const gridItems = viewMode !== "search" && hasActiveFilters ? filteredLibraryItems : hits;
+  const renderedHits = useMemo(() => sortAvailable && gridItems.length > 1
+    ? sortLibraryHits(gridItems, sortField, sortDirection, locale)
+    : gridItems, [gridItems, locale, sortAvailable, sortDirection, sortField]);
   const tagVocabulary = useMemo(() => [...new Set(workspaceTags.map((tag) => tag.body?.trim()).filter((value): value is string => Boolean(value)))].sort((left, right) => left.localeCompare(right, locale)), [locale, workspaceTags]);
 
   useEffect(() => {
@@ -178,7 +197,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
       logical_size: entry.logical_size,
       index_status: entry.index_status,
     })));
-    setSelected(undefined); setBrowseRootID(rootID); setBrowseCrumbs(crumbs); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("path");
+    setSelected(undefined); setBrowseRootID(rootID); setBrowseCrumbs(crumbs); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("path");
   }
   async function loadContentLibrary(activeWorkspaceID: string, refreshGeneration = refreshGenerationRef.current, guardDrafts = false) {
     if (guardDrafts && !canLeaveDetailDrafts()) return;
@@ -190,7 +209,8 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     setLibraryItems(items); setHits(items);
     const roots = (response.data?.roots ?? []) as BrowseRoot[];
     const rootID = response.data?.root_id || (roots.length === 1 ? roots[0].root_id : "");
-    setSelected(undefined); setBrowseRoots(roots); setBrowseRootID(rootID); setBrowseCrumbs([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("content");
+    setSelected(undefined); setBrowseRoots(roots); setBrowseRootID(rootID); setBrowseCrumbs([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
+    setLibraryLoaded(true);
   }
   async function loadTagVocabulary(activeWorkspaceID: string): Promise<AnnotationRecord[]> {
     try {
@@ -227,7 +247,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     discardDetailDrafts();
     const next = activeTags.includes(value) ? activeTags.filter((tag) => tag !== value) : [...activeTags, value];
     if (next.length === 0) {
-      setQuery(""); setLastExecutedQuery(""); setHits(facetFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
+      setQuery(""); setLastExecutedQuery(""); setHits(monthFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
       return;
     }
     setQuery(""); setLastExecutedQuery(""); setSelected(undefined); setActiveTags(next); setViewMode("tag");
@@ -241,12 +261,40 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   function clearLibraryFilters() {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
-    setQuery(""); setLastExecutedQuery(""); setHits(libraryItems); setSelected(undefined); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("content");
+    setQuery(""); setLastExecutedQuery(""); setHits(libraryItems); setSelected(undefined); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
   }
   function showFacetFilteredLibrary() {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
-    setQuery(""); setLastExecutedQuery(""); setHits(facetFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
+    setQuery(""); setLastExecutedQuery(""); setHits(monthFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
+  }
+  // Timeline browse: one month bucket filters the listing; clicking the active
+  // bucket again clears it. The strip lives in the content and tag views; the
+  // tag view re-derives its hits from the filtered projection, so only the
+  // content view needs the immediate hit set here.
+  function toggleTimelineMonth(month: string) {
+    if (!canLeaveDetailDrafts()) return;
+    discardDetailDrafts();
+    const next = activeTimelineMonth === month ? "" : month;
+    setActiveTimelineMonth(next);
+    setQuery(""); setLastExecutedQuery(""); setSelected(undefined);
+    if (viewMode === "content") setHits(libraryItems);
+  }
+  // Restores the browser-local filter view encoded in the URL hash. The hash
+  // is never durable state: an unknown tag or month yields the honest
+  // filtered-empty view, and nothing here touches stored content.
+  function restoreLibraryHashView(view: "content" | "tag", tags: string[], month: string) {
+    if (!canLeaveDetailDrafts()) return false;
+    const tagValues = [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
+    const monthValue = isMonthBucketKey(month) ? month : "";
+    if (view === "tag" && tagValues.length === 0 && !monthValue) return false;
+    if (view === "content" && !monthValue) return false;
+    discardDetailDrafts();
+    setQuery(""); setLastExecutedQuery(""); setSelected(undefined);
+    setActiveTags(view === "tag" ? tagValues : []);
+    setActiveTimelineMonth(monthValue);
+    setViewMode(view);
+    return true;
   }
   async function navigateLibrary(parentEntryID: string, crumbs: BrowseCrumb[], rootID = browseRootID) {
     if (!workspaceID || !rootID) return;
@@ -258,7 +306,8 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   function resetLibraryProjection() {
     setHits([]); setLibraryItems([]);
     setBrowseRootID(""); setBrowseRoots([]); setBrowseCrumbs([]);
-    setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("content");
+    setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
+    setLibraryLoaded(false);
   }
 
   return {
@@ -282,7 +331,13 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     tagVocabulary,
     identityCounts,
     facetFilteredItems,
+    monthFilteredItems,
     filteredLibraryItems,
+    activeTimelineMonth,
+    setActiveTimelineMonth,
+    toggleTimelineMonth,
+    libraryLoaded,
+    restoreLibraryHashView,
     tagFacets,
     systemFacets,
     hasSystemFacets,

@@ -460,7 +460,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setEditing(undefined);
       recents.pushRecentSearch(submittedQuery);
       exportFlow.invalidateForSearch();
-      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("search");
+      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       if (response.status === "DEGRADED") {
         const reason = response.reasons?.map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.");
         notify({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
@@ -494,7 +494,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // An image query has no field text: the results heading says so instead
       // of echoing a query that was never run.
       setLastExecutedQuery("");
-      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setViewMode("search");
+      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       exportFlow.invalidateForSearch();
       if (response.status === "DEGRADED") {
         const reason = response.reasons?.map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.");

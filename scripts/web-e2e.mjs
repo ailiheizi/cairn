@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import process from "node:process";
 import { createHarness } from "./e2e/harness.mjs";
-import { assertLibraryTiles, assertDetailsViewerNotesAndGuard, assertLibrarySortAndSelection } from "./e2e/library.mjs";
+import { assertLibraryTiles, assertDetailsViewerNotesAndGuard, assertLibrarySortAndSelection, assertLibraryQuickWins } from "./e2e/library.mjs";
 import { seedFixtureAndConnect, assertSourcePlanAndSave, assertSourcePreviewOnEnter, assertSourceSuggestionRecheck, assertSourcesView } from "./e2e/sources.mjs";
 import { assertExportSidecarPolicy, assertRestoreDrawer, assertRestoreFromRecentDestination, assertRestoreUnknownOutcome, assertSelectedExport, assertViewExportWithVerifyRetry, assertDurableSavedViewsAfterReload } from "./e2e/drawers.mjs";
 import { assertSearchResultSurface, assertSearchQueryReexecuted, assertSearchRecents } from "./e2e/search.mjs";
@@ -110,4 +110,8 @@ async function assertOnline(ctx) {
   await assertVerificationSurface(ctx);
   await assertActivitySurface(ctx);
   await assertDescriptionAction(ctx);
+
+  // The Phase-4 browser quick wins run last: they reload the page for the
+  // deep-link assertions, so no earlier surface's view state is disturbed.
+  await assertLibraryQuickWins(ctx);
 }

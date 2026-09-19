@@ -838,3 +838,58 @@ selection bar, and the details inspector column. */
 .media-section { margin-top: 18px; }
 .media-section .media-facts { margin-top: 10px; }
 .media-extract { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Timeline browse: a browser-local month projection over the loaded listing.
+   The strip renders only when the daemon's rows carry a usable time; with no
+   dated rows it is absent, never zero-filled. */
+.timeline-strip { display: grid; gap: 10px; margin: -2px 0 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 13px 0; }
+.timeline-heading { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+.timeline-heading svg { flex: 0 0 auto; color: var(--accent); }
+.timeline-heading > span { flex: 0 0 auto; font-size: 12px; font-weight: 780; }
+.timeline-heading small { min-width: 0; color: var(--muted); font-size: 11px; }
+.timeline-buckets { display: flex; align-items: flex-end; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.timeline-bucket { flex: 0 0 auto; display: grid; justify-items: center; gap: 3px; min-width: 52px; padding: 6px 8px 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--card-fill-quiet); color: var(--muted); cursor: pointer; }
+.timeline-bucket:hover { border-color: var(--accent); color: var(--ink); }
+.timeline-bucket.active { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+.timeline-bucket:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.timeline-bar { width: 26px; border-radius: 3px 3px 0 0; background: var(--accent); opacity: 0.62; }
+.timeline-bucket.active .timeline-bar { opacity: 1; }
+.timeline-month { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 700; }
+.timeline-count { font-size: 11px; }
+
+/* Space report: a collapsed browser-local byte summary over the loaded
+   listing; the header states the loaded scope instead of implying a query. */
+.space-report { margin: -2px 0 14px; border: 1px solid var(--line); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); }
+.space-report > summary { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-radius: var(--card-radius-sm); cursor: pointer; color: var(--ink); font-size: 12px; font-weight: 780; list-style: none; }
+.space-report > summary::-webkit-details-marker { display: none; }
+.space-report > summary > svg:first-child { flex: 0 0 auto; color: var(--accent); }
+.space-report > summary small { min-width: 0; color: var(--muted); font-size: 11px; font-weight: 500; }
+.space-report > summary > svg:last-child { flex: 0 0 auto; margin-left: auto; transition: transform 160ms ease; }
+.space-report[open] > summary > svg:last-child { transform: rotate(90deg); }
+.space-report-body { display: grid; gap: 10px; margin: 0 12px 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.space-report-total { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0; color: var(--muted); font-size: 12px; }
+.space-report-total b { color: var(--ink); font-size: 15px; }
+.space-report-top { display: flex; flex-wrap: wrap; gap: 6px; }
+.space-report-top button { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 250px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+.space-report-top button:hover { border-color: var(--accent); }
+.space-report-top button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.space-report-top button strong { overflow: hidden; max-width: 170px; text-overflow: ellipsis; white-space: nowrap; }
+.space-report-top button b { flex: 0 0 auto; color: var(--muted); font-weight: 600; }
+.space-report-classes { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; }
+.space-report-classes-label { flex-basis: 100%; font-size: 11px; }
+.space-report-class { display: inline-flex; align-items: baseline; gap: 5px; }
+.space-report-class b { color: var(--ink); }
+
+/* Empty-listing onboarding: three steps, rendered only when nothing filters
+   the listing; the heading names the loaded listing, never the catalog. */
+.onboarding-steps { max-width: 430px; display: grid; gap: 9px; margin: 4px 0 10px; padding: 0; list-style: none; text-align: left; counter-reset: onboarding-step; }
+.onboarding-steps li { position: relative; display: grid; gap: 3px; padding: 10px 12px 10px 42px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-fill-quiet); }
+.onboarding-steps li::before { content: counter(onboarding-step); counter-increment: onboarding-step; position: absolute; top: 12px; left: 12px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); font-size: 11px; font-weight: 800; }
+.onboarding-steps li b { color: var(--ink); font-size: 13px; }
+.onboarding-steps li span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.onboarding-steps li .primary-button { justify-self: start; margin-top: 4px; }
+
+@media (max-width: 640px) {
+  .timeline-heading small, .space-report > summary small { display: none; }
+  .space-report-top button { max-width: 200px; }
+}

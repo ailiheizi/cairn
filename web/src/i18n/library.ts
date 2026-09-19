@@ -218,6 +218,29 @@ export const library: Record<string, string> = {
   "This item has no stable subject reference.": "该项目没有稳定的主体引用。",
   "Library results": "内容库结果",
   "Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.": "使用方向键在项目之间移动，空格键选择当前项目，回车键打开详情，Escape 清除选择。",
+  // Timeline browse, space report, and the empty-listing onboarding guide are
+  // browser-local projections over the loaded listing; every label states that
+  // loaded scope instead of implying a server query.
+  "Browse by month": "按月浏览",
+  "Month counts over {{count}} loaded subjects": "按月统计，范围为已加载的 {{count}} 个项目",
+  "{{count}} items in {{month}}": "{{month}} 共 {{count}} 个项目",
+  "Remove month filter {{month}}": "移除月份筛选 {{month}}",
+  "Space report": "空间占用",
+  "Computed in this browser over {{count}} loaded items; not a server query.": "由本浏览器基于已加载的 {{count}} 个项目计算；不是服务器查询。",
+  "total logical size over {{count}} loaded items": "已加载 {{count}} 个项目的逻辑大小总计",
+  "Largest files": "最大的文件",
+  "Open {{name}}": "打开 {{name}}",
+  "Bytes by media class (suffix-derived)": "按媒体类别的字节占用（依据文件后缀推得）",
+  "Images": "图片",
+  "Videos": "视频",
+  "Audio": "音频",
+  "Documents": "文档",
+  "The loaded listing is empty": "当前加载的内容列表为空",
+  "Protect content": "保护内容",
+  "Search and organize": "搜索与整理",
+  "Point this browser at a source folder to inspect.": "让本浏览器指向一个来源目录以进行检查。",
+  "Review the plan, then confirm exact protection of the original bytes.": "检查计划，然后确认按原始字节进行完整保护。",
+  "Search, tag, and group the protected content.": "对已保护的内容进行搜索、标记和整理。",
   // Durable media facts: one label per admitted metadata_facts key. The
   // composed media.fact.<key> lookup is deliberate; every key the host
   // admits has an entry here so an undeclared key can never render.

@@ -326,3 +326,115 @@ export async function assertLibrarySortAndSelection(ctx) {
   await barButton(/清除选择|Clear selection/).click();
   await composer.fill("");
 }
+
+// The Phase-4 browser quick wins over the loaded listing: the space report, the
+// timeline strip, the URL-hash deep links, and the empty-listing onboarding
+// guide. Every projection here is browser-local over data the daemon already
+// returned, and the assertions hold regardless of the UI locale.
+//
+// Timeline note: the daemon's content.list rows carry no modification time in
+// this build, so the honest contract that is executable today is that the
+// strip renders absent (never zero-filled). Bucket filter/clear and the month
+// deep link need the daemon to project a per-row time first (reported to the
+// operator, not faked here).
+export async function assertLibraryQuickWins(ctx) {
+  const { page } = ctx;
+  await ctx.page.goto(ctx.url, { waitUntil: "networkidle" });
+  await page.getByRole("main").getByRole("button", { name: /alpha\.txt/ }).first().waitFor({ state: "visible", timeout: 20000 });
+  const tileNames = async () => (await page.locator(".result-list .result-open-copy strong").allInnerTexts()).map((value) => value.trim());
+  const search = page.getByRole("textbox", { name: /搜索内容库|Search content library/ });
+
+  // 1. Timeline strip: rendered from the captured modification times, with
+  //    the honest scope label; clicking the current-month bucket filters the
+  //    listing and clicking it again clears. A bucket count must equal the
+  //    number of loaded rows whose captured time falls in that month.
+  const strip = page.locator(".timeline-strip");
+  await strip.waitFor({ state: "visible", timeout: 10000 });
+  assert.match(await strip.innerText(), /范围为已加载的 \d+ 个|loaded subjects/, `the strip must state its loaded scope: ${await strip.innerText()}`);
+  const loadedItemsForTime = ctx.state.contentListItems ?? [];
+  const expectedMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  })();
+  const expectedInMonth = loadedItemsForTime.filter((item) => {
+    if (typeof item.modified_at !== "string" || !item.modified_at) return false;
+    return item.modified_at.slice(0, 7) === expectedMonth;
+  }).length;
+  assert.ok(expectedInMonth >= 1, `the fixture rows must carry captured times: ${JSON.stringify(loadedItemsForTime.slice(0, 2))}`);
+  const bucket = strip.locator(`[data-month="${expectedMonth}"]`);
+  assert.equal(Number(await bucket.getAttribute("data-count")), expectedInMonth, "the current-month bucket must count exactly the rows whose captured time falls in that month");
+  const before = await tileNames();
+  await bucket.click();
+  await page.waitForTimeout(250);
+  assert.equal(await tileNames().then((names) => names.length), expectedInMonth, "the month filter must narrow the listing to that month's rows");
+  assert.match(await page.evaluate(() => window.location.hash), new RegExp(`month=${expectedMonth}`), "the active month must be encoded in the URL hash");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("main").getByRole("button", { name: /alpha\.txt/ }).first().waitFor({ state: "visible", timeout: 20000 });
+  await page.waitForTimeout(400);
+  assert.match(await page.evaluate(() => window.location.hash), new RegExp(`month=${expectedMonth}`), "the month deep link must survive a reload");
+  assert.equal((await tileNames()).length, expectedInMonth, "the restored month filter must still narrow the listing");
+  await page.locator(".timeline-strip").locator(`[data-month="${expectedMonth}"]`).click();
+  await page.waitForTimeout(250);
+  assert.deepEqual(await tileNames(), before, "clicking the bucket again must clear the month filter");
+
+  // 2. Space report: the byte total equals the sum of the loaded rows'
+  //    logical_size exactly as the daemon returned them, and the largest-file
+  //    entries name rows from that same payload.
+  const spaceReport = page.locator(".space-report");
+  await spaceReport.waitFor({ state: "visible", timeout: 10000 });
+  const loadedItems = ctx.state.contentListItems ?? [];
+  assert.ok(loadedItems.length > 0, "the harness must have captured the content.list payload");
+  const expectedTotal = loadedItems.reduce((sum, item) => sum + (typeof item.logical_size === "number" && Number.isSafeInteger(item.logical_size) && item.logical_size >= 0 ? item.logical_size : 0), 0);
+  assert.equal(Number(await spaceReport.getAttribute("data-total-bytes")), expectedTotal, `the space report total must equal the sum of the loaded rows' logical_size (${expectedTotal})`);
+  await spaceReport.locator("summary").click();
+  const topNames = (await spaceReport.locator(".space-report-top button strong").allInnerTexts()).map((value) => value.trim());
+  const loadedNames = new Set(loadedItems.map((item) => String(item.name ?? "")));
+  assert.ok(topNames.length >= 1 && topNames.length <= 3, `the space report must list at most three largest files: ${JSON.stringify(topNames)}`);
+  for (const name of topNames) assert.ok(loadedNames.has(name), `the largest-file entry ${name} must come from the loaded rows`);
+  // A largest-file entry opens through the existing row-open path: the inspector.
+  await spaceReport.locator(".space-report-top button").first().click();
+  const openedName = topNames[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  await page.getByRole("main").getByRole("heading", { name: new RegExp(`^${openedName}$`) }).waitFor({ state: "visible", timeout: 10000 });
+  await spaceReport.locator("summary").click();
+
+  // 3. Deep links: the submitted search text and the active tag facet survive a
+  //    reload, and the restored views are re-derived from the daemon.
+  await search.fill("txt");
+  await search.press("Enter");
+  await page.getByRole("main").getByRole("heading", { name: /搜索结果|Results for "/i }).waitFor({ state: "visible", timeout: 15000 });
+  await page.waitForTimeout(200);
+  const searchHash = await page.evaluate(() => window.location.hash);
+  assert.match(searchHash, /[#&]?v=search/, `the search view must be encoded in the URL hash: ${searchHash}`);
+  assert.match(searchHash, /q=txt/, `the submitted search text must be encoded in the URL hash: ${searchHash}`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("main").getByRole("heading", { name: /搜索结果|Results for "/i }).waitFor({ state: "visible", timeout: 20000 });
+  await page.waitForTimeout(300);
+  assert.equal(await search.inputValue(), "txt", "the restored search view must show the submitted text in the field");
+  assert.deepEqual(await tileNames(), ctx.state.lastSearchHitNames, "the restored search view must re-run the same query through the daemon");
+  await page.getByRole("button", { name: /全部内容|All content/ }).click();
+  await page.getByRole("main").getByRole("heading", { name: /搜索结果|Results for "/i }).waitFor({ state: "hidden", timeout: 10000 });
+
+  const tagChip = page.locator(".tag-filter").filter({ hasText: "browser-e2e" }).first();
+  await tagChip.waitFor({ state: "visible", timeout: 10000 });
+  await tagChip.click();
+  await page.getByRole("main").getByRole("heading", { name: /标签：\s*browser-e2e|Content tagged browser-e2e/ }).waitFor({ state: "visible", timeout: 15000 });
+  const tagHash = await page.evaluate(() => window.location.hash);
+  assert.match(tagHash, /v=tag/, `the tag view must be encoded in the URL hash: ${tagHash}`);
+  assert.match(tagHash, /tag=browser-e2e/, `the active tag facet must be encoded in the URL hash: ${tagHash}`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("main").getByRole("heading", { name: /标签：\s*browser-e2e|Content tagged browser-e2e/ }).waitFor({ state: "visible", timeout: 20000 });
+  assert.deepEqual(await tileNames(), ["alpha.txt"], "the restored tag view must show exactly the tagged row the daemon reported");
+  // The restored view renders two Clear-filters controls (heading + summary);
+  // click the summary's explicitly.
+  await page.locator(".filter-summary-clear").click();
+  await page.getByRole("main").getByRole("heading", { name: /全部内容|All content/ }).waitFor({ state: "visible", timeout: 10000 });
+
+  // 4. Onboarding guide: never over a loaded listing, and a search-empty state
+  //    keeps the filtered-empty style instead of the guide. The guide never
+  //    claims the catalog is empty — only the loaded listing can be.
+  assert.equal(await page.locator(".onboarding-steps").count(), 0, "the onboarding guide must not render over a loaded listing");
+  await search.fill("no-such-browser-e2e-content");
+  await search.press("Enter");
+  await page.getByRole("main").getByRole("heading", { name: /没有找到匹配内容|No matches found/ }).waitFor({ state: "visible", timeout: 15000 });
+  assert.equal(await page.locator(".onboarding-steps").count(), 0, "a searched-empty state must keep the filtered-empty style, not the onboarding guide");
+}
