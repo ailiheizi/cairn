@@ -86,6 +86,19 @@ enrichment, not a new field. A smaller alternative is to emit only the first
 N bigrams per run, which bounds growth but makes matching position-dependent
 and is therefore harder to describe honestly.
 
+**Empirically verified token shapes** (probes run directly against the
+production tokenizer, `unicode61`, on 2026-09-19):
+
+| Feed shape | Queries that matched |
+| --- | --- |
+| raw run only | none of 杭州 / 西湖 / 备注 |
+| bigrams only (`杭州 州西 西湖 …`) | 杭州, 西湖, 备份, 州西 — but not the two-character pair formed by adjacent bigram boundaries in a query, and not a query the tokenizer merges differently |
+| **bigrams + per-character tokens** (`杭州 州西 … 杭 州 西 湖 …`) | 杭州, 西湖, 备份, 州西, and the space-separated pair 西 湖 |
+
+Conclusion: the working encoding is **bigrams plus per-character tokens**,
+space-separated, both derived from the same CJK run. That is the shape the
+implementation slice must emit; a bigram-only feed is insufficient.
+
 ## Browser-side quick wins (no daemon change, use existing facts)
 
 4. **Timeline browse**: month-bucketed capture/modified-time histogram over
