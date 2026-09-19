@@ -125,6 +125,7 @@ P2P and magnet retrieval remain non-core. Perceptual media substitution, neural 
 - [Peer-to-Peer and Magnet Research](references/p2p-and-magnet-research.md)
 - [Naming Research](references/naming-research.md)
 - [Product Experience Backlog](technical/product-experience-backlog.md) records operator-requested product work with its constraint status; it adds no scope by itself
+- [LinkGroup Design Review](technical/linkgroup-design-review.md) freezes the LinkGroup contract review, the design questions with their blocked candidates, and a proposed order for the Phase 6 slices; it adds no scope and authorizes no implementation
 
 ## Benchmark and qualification runs
 
