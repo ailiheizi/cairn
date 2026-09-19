@@ -21,13 +21,39 @@ phase/requirement/exit-test triple.
 ## Accepted, queued (operator-approved)
 
 1. **Upload / add-file channel.** The current add-source flow scans a host
-   directory; it has no good upload interface. Shape under consideration: a
-   bounded upload endpoint on the loopback `/api/v1` adapter that lands files
-   in a daemon-managed staging directory (size bounds, safe names, digest
-   echo), after which the existing `plan.ingest` review flow takes over — the
-   upload never bypasses plan review and adds no second state machine. Needs a
-   reviewed slice spec (security gates: unauthenticated loopback only, size
-   and count bounds, no path traversal, no silent ingest).
+   directory; it has no good upload interface. Slice spec (proposed, awaiting
+   operator confirmation):
+
+   - **Endpoint.** One bounded `POST /api/v1/upload` on the existing loopback
+     adapter, same token as every other call. It is file reception only: it
+     adds no policy, job, catalog, or recovery state machine.
+   - **Landing.** Files land in a daemon-managed staging directory under the
+     data root (`<data>/inbox/<date>-<random>/<safe-name>`), never inside a
+     configured source tree and never directly into the repository.
+   - **Bounds.** Per-file size cap (default 1 GiB, response states the cap),
+     per-request file count cap (e.g. 200), total in-flight cap; exceeded
+     bounds are typed refusals (`UPLOAD_TOO_LARGE`, `UPLOAD_TOO_MANY`,
+     `UPLOAD_QUOTA_EXCEEDED`), never silent truncation.
+   - **Safety.** Names are sanitized to a safe display name (path traversal,
+     control characters, and reserved names rejected or rewritten and echoed
+     back); the response carries the computed SHA-256 + length so the browser
+     can show the identity before anything is ingested; nothing is parsed or
+     processed at upload time.
+   - **Review.** The staged directory is offered back as a `plan.ingest`
+     source root; the ordinary review → digest-bound apply flow takes over.
+     The upload never bypasses plan review, and an un-ingested staging
+     directory is visible (and cleanable) in the sources surface.
+   - **Browser.** The add-source dialog gains an "upload files" mode using a
+     real file picker / drag-drop; it shows per-file identity and then offers
+     the protect plan for the staged batch.
+   - **Honesty.** The staged area is a plain host directory the daemon owns;
+     until a plan protects it, the bytes have no protection record, and the
+     UI says so in the same wording the link-only flow uses.
+
+   Decision needed from the operator: per-file size cap value and whether
+   uploads should be allowed without a token when the API runs tokenless on
+   loopback (proposed: allowed, since loopback-only is already the trust
+   boundary, but staged bytes stay unprotected-visible until reviewed).
 2. **Pinyin search.** Add pinyin (and initial) tokens to the lexical feed so
    `lvxing` finds `旅行`. Requires an embedded Hanzi→pinyin table (new static
    data dependency, generated from a public-domain source with recorded
