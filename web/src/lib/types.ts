@@ -51,7 +51,19 @@ export type SnapshotSummary = {
   verification?: SnapshotVerificationData;
 };
 export type SourceScan = { scan_ref?: string; generation?: number; state?: string; full_traversal?: boolean; started_at?: string; finished_at?: string; entries?: number; regular_files?: number; directories?: number; symlinks?: number; special_files?: number; bytes_hashed?: number; failed_entries?: number; unstable_entries?: number; detection_failures?: number };
-export type SourceSummary = { source_ref?: string; kind?: string; locator?: string; state?: string; reachability?: string; reachability_checked_at?: string; reachability_message?: string; latest_scan?: SourceScan; latest_snapshot_ref?: string; latest_namespace_root_id?: string };
+export type SourceSummary = { source_ref?: string; kind?: string; locator?: string; state?: string; reachability?: string; reachability_checked_at?: string; reachability_message?: string; latest_scan?: SourceScan; latest_snapshot_ref?: string; latest_namespace_root_id?: string; staging?: SourceStaging };
+// The daemon-owned upload inbox entry (`source.list`, kind STAGING_INBOX).
+// It is a projection over the staging directory, not a configured source: no
+// source_ref exists, and protection_record is always NONE until the operator
+// reviews and applies an ingest plan over the staged directory.
+export type SourceStaging = { path?: string; files?: number; bytes?: number; protection_record?: string; note?: string };
+// One per-file row of the upload endpoint's answer. A staged row carries the
+// stored identity the daemon computed while streaming; a refused row carries
+// skipped_reason (UPLOAD_TOO_LARGE / UPLOAD_NAME_REJECTED / UPLOAD_BUSY /
+// UPLOAD_IO_FAILED) and a plain message. The browser renders both shapes and
+// never derives an identity of its own.
+export type UploadFileRow = { original_name?: string; stored_name?: string; stored_path?: string; sha256?: string; length?: number; name_rewritten?: boolean; skipped_reason?: string; message?: string };
+export type UploadOutcome = { staging_dir?: string; files?: UploadFileRow[]; reason?: string; message?: string; error?: string };
 export type SourceProjection = { state: "READY" | "DEGRADED"; message?: string };
 
 // The path-level change the daemon classified between two restore points

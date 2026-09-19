@@ -15,6 +15,9 @@ export const status: Record<string, string> = {
   "Unavailable": "不可用",
   "Could not connect to RestoreWeave service. Start the service, then refresh.": "无法连接 RestoreWeave 服务。请启动服务后刷新。",
   "RestoreWeave returned an invalid response.": "RestoreWeave 服务返回了无效响应。",
+  // The upload transport (app/command.ts uploadFiles) shares the fail-closed
+  // messages above; this one covers its empty-selection guard.
+  "Choose at least one file to upload.": "请先选择要上传的文件。",
   "RestoreWeave service is unavailable": "RestoreWeave 服务不可用",
   "Start the service, then refresh this page. Saved content has not been changed.": "请启动服务后刷新页面。已保存的内容没有被修改。",
   "System readiness": "系统状态",

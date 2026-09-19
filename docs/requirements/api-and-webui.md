@@ -46,6 +46,7 @@ HTTP resources and status codes are transport concerns. The structured RestoreWe
 The current bounded implementation exposes:
 
 - `GET /api/v1/healthz` for a transport-only liveness check;
+- `POST /api/v1/upload` for the bounded upload channel: multipart `files`, 1 GiB per file, 200 files per request, a process-wide in-flight byte cap; lands into the daemon-managed inbox staging area and echoes per-file SHA-256 and length; staged bytes are unprotected until an ingest plan is reviewed and applied.
 - `POST /api/v1/command` with a strict `org.restoreweave.command.v1`
   envelope, returning the unchanged `org.restoreweave.result.v1` envelope;
 - optional `Authorization: Bearer <token>` validation when the host supplies

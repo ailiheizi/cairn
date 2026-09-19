@@ -8,6 +8,7 @@ const (
 	OpConfigUpdate            = "config.update"
 	OpSnapshotList            = "snapshot.list"
 	OpSourceList              = "source.list"
+	OpSourceStagingClean      = "source.staging_clean"
 	OpSnapshotDiff            = "snapshot.diff"
 	OpSnapshotVerify          = "snapshot.verify"
 	OpPlanIngest              = "plan.ingest"
@@ -76,6 +77,7 @@ func KnownOperations() []string {
 		OpConfigUpdate,
 		OpSnapshotList,
 		OpSourceList,
+		OpSourceStagingClean,
 		OpSnapshotDiff,
 		OpSnapshotVerify,
 		OpPlanIngest,

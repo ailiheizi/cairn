@@ -893,3 +893,10 @@ selection bar, and the details inspector column. */
   .timeline-heading small, .space-report > summary small { display: none; }
   .space-report-top button { max-width: 200px; }
 }
+
+/* Staging inbox card: the daemon-owned upload projection, clearly labelled as
+   daemon scratch with no protection record. */
+.source-card.staging-card { border-color: rgba(221, 169, 82, 0.28); }
+.source-health.staged { border-color: rgba(221, 169, 82, 0.23); color: #dfc38c; background: rgba(221, 169, 82, 0.07); }
+.source-health.staged > span { background: var(--gold); box-shadow: 0 0 0 2px rgba(221, 169, 82, 0.12); }
+.staging-path { overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

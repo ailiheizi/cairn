@@ -3,9 +3,9 @@ import type { FormEvent } from "react";
 import type { Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
-import { looksLikeRemoteLocator } from "../lib/format";
+import { formatBytes, looksLikeRemoteLocator } from "../lib/format";
 import type { LibraryFlow } from "./useLibrary";
-import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceChangeSummary, SourceProjection, SourceSummary, SnapshotDiffItem, SnapshotSummary } from "../lib/types";
+import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceChangeSummary, SourceProjection, SourceStaging, SourceSummary, SnapshotDiffItem, SnapshotSummary } from "../lib/types";
 
 // The configured sources surface and the add/recheck drawer.
 //
@@ -23,6 +23,8 @@ import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceCha
 export type SourcesFlow = {
   sources: SourceSummary[];
   setSources: (value: SourceSummary[]) => void;
+  staging: SourceStaging | undefined;
+  stagingBusy: boolean;
   sourceProjection: SourceProjection;
   setSourceProjection: (value: SourceProjection) => void;
   sourceChanges: Record<string, SourceChangeSummary>;
@@ -52,6 +54,8 @@ export type SourcesFlow = {
   viewSource: (sourceItem: SourceSummary) => Promise<void>;
   openAdd: (sourceItem?: SourceSummary, trigger?: EventTarget | null) => void;
   closeAdd: () => void;
+  ingestStaged: () => void;
+  cleanStaged: () => Promise<void>;
   resetSourceProjection: () => void;
 };
 
@@ -77,6 +81,8 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
   rememberWorkspace: (value: unknown) => void;
 }): SourcesFlow {
   const [sources, setSources] = useState<SourceSummary[]>([]);
+  const [staging, setStaging] = useState<SourceStaging | undefined>(undefined);
+  const [stagingBusy, setStagingBusy] = useState(false);
   const [sourceProjection, setSourceProjection] = useState<SourceProjection>({ state: "READY" });
   const [sourceChanges, setSourceChanges] = useState<Record<string, SourceChangeSummary>>({});
   const [source, setSource] = useState("");
@@ -108,7 +114,11 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       const response = await command(operations.source.list, { workspace_id: activeWorkspaceID });
       if (refreshGenerationRef.current !== refreshGeneration) return;
       const projected = (response.data?.sources ?? []) as SourceSummary[];
-      setSources(projected);
+      // The daemon-owned staging inbox arrives beside the configured sources
+      // as a clearly labelled projection (kind STAGING_INBOX) with no source
+      // ref. It is never counted as a configured source.
+      setSources(projected.filter((item) => item.kind !== "STAGING_INBOX"));
+      setStaging(projected.find((item) => item.kind === "STAGING_INBOX")?.staging);
       setSourceProjection({ state: "READY" });
       void loadSourceChanges(projected, restorePoints, refreshGeneration);
     } catch {
@@ -118,6 +128,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       // Drop the old cards so a failed refresh cannot leave actions bound to a
       // stale source projection.
       setSources([]);
+      setStaging(undefined);
       setSourceChanges({});
       setSourceProjection({ state: "DEGRADED" });
     }
@@ -320,9 +331,45 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     if (planAction === "INSPECTING" || planAction === "PROTECTING") { notify({ kind: "warning", text: t("This operation is still running. Keep this panel open until it finishes.") }); return; }
     setAddOpen(false); setRecheckSourceRef("");
   }
+  // The staging handoff: one action prefills the ordinary add-source drawer
+  // with the staging directory as the root and starts the same reviewable
+  // plan.ingest preview every other path uses. Nothing auto-ingests; only
+  // the operator's digest-bound confirm writes bytes.
+  function ingestStaged() {
+    const directory = staging?.path?.trim();
+    if (!directory || planAction !== "IDLE") return;
+    openAdd({ locator: directory });
+    void runIngestPlan(directory);
+  }
+  // The staged-file cleanup deletes ONLY regular files inside the daemon's
+  // own staging inbox, after an explicit window.confirm. The copy states the
+  // truth about what this is: staged files carry no protection record yet, so
+  // deleting never-ingested scratch is not destructive garbage collection of
+  // protected content — but if the bytes were never ingested, this removes
+  // the only copy. The daemon independently refuses anything outside its
+  // inbox root.
+  async function cleanStaged() {
+    const directory = staging?.path?.trim();
+    if (!directory || stagingBusy) return;
+    const count = Number(staging?.files ?? 0);
+    const bytes = formatBytes(Number(staging?.bytes ?? 0));
+    if (!window.confirm(t("Delete the {{count}} staged file(s) ({{bytes}})? Staged files have no protection record yet: if they were never saved to the library, this removes the only copy. Saved and protected content is never touched.", { count, bytes }))) return;
+    setStagingBusy(true);
+    try {
+      const response = await command(operations.source.stagingClean, { directory });
+      const data = response.data ?? {};
+      notify({ kind: response.status === "DEGRADED" ? "warning" : "success", text: t("Removed {{count}} staged file(s) ({{bytes}}) from the staging area.", { count: Number(data.removed_files ?? 0), bytes: formatBytes(Number(data.removed_bytes ?? 0)) }) });
+    } catch (error) {
+      notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not clean staged files.") });
+    } finally {
+      setStagingBusy(false);
+    }
+    try { await refresh(); } catch { /* the refresh reports its own projection failures */ }
+  }
   function resetSourceProjection() {
     setPlan(undefined);
     setSources([]);
+    setStaging(undefined);
     setSourceChanges({});
   }
 
@@ -366,6 +413,8 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
   return {
     sources,
     setSources,
+    staging,
+    stagingBusy,
     sourceProjection,
     setSourceProjection,
     sourceChanges,
@@ -395,6 +444,8 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     viewSource,
     openAdd,
     closeAdd,
+    ingestStaged,
+    cleanStaged,
     resetSourceProjection,
   };
 }

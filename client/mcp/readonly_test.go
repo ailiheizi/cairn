@@ -131,6 +131,11 @@ var frozenAdmitted = map[string]bool{
 	command.OpExportPlan:          false,
 	command.OpExportApply:         false,
 	command.OpExportVerify:        false,
+	// source.staging_clean deletes files inside the daemon-owned upload inbox
+	// after operator confirmation. It is a mutating scratch cleanup, never an
+	// admitted read-only operation, and never destructive garbage collection
+	// of protected content.
+	command.OpSourceStagingClean: false,
 }
 
 // TestReadOnlyAllowlistIsFrozenAndClassified proves the read-only property

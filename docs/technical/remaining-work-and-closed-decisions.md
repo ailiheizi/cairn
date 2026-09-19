@@ -73,6 +73,12 @@ model.
   the same signed processor plan.
 - Optional loopback API, focused browser client, maintenance/recovery CLI, and
   read-only local MCP.
+- Bounded upload channel into a daemon-owned staging inbox (loopback
+  `POST /api/v1/upload`, 1 GiB per file, 200 files per request, process-wide
+  in-flight byte ceiling). Staged bytes are daemon scratch with no protection
+  record: `source.list` projects the inbox honestly, and only the ordinary
+  plan.ingest -> review -> digest-bound plan.apply flow protects staged
+  content.
 
 This is a substantial core preview. It is not `RW-MVP-1` completion or release
 qualification.

@@ -15,6 +15,10 @@ export const API_BASE = "/api/v1";
 export const endpoints = {
   health: `${API_BASE}/healthz`,
   command: `${API_BASE}/command`,
+  // The bounded upload channel into the daemon-owned staging inbox. It sits
+  // behind the same token gate as /command; staging is daemon scratch until
+  // an ingest plan is reviewed and applied.
+  upload: `${API_BASE}/upload`,
 } as const;
 
 /**
@@ -39,6 +43,9 @@ export const operations = {
   },
   source: {
     list: "source.list",
+    // The reviewed staged-file cleanup: deletes only regular files inside the
+    // daemon-owned staging inbox after the operator's explicit confirmation.
+    stagingClean: "source.staging_clean",
   },
   content: {
     list: "content.list",

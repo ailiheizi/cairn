@@ -689,7 +689,10 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	var apiServer *http.Server
 	var apiListener net.Listener
 	if apiAddress != "" {
-		handler, handlerErr := api.HandlerWithStatic(dispatcher.Handle, api.Options{Token: options.apiToken}, options.webRoot)
+		handler, handlerErr := api.HandlerWithStatic(dispatcher.Handle, api.Options{
+			Token:  options.apiToken,
+			Upload: apiUploadStaging{dispatcher: dispatcher},
+		}, options.webRoot)
 		if handlerErr != nil {
 			return fmt.Errorf("load WebUI: %w", handlerErr)
 		}
@@ -782,6 +785,18 @@ func prepareAPIHTTPServer(address string, handler http.Handler) (*http.Server, n
 	}
 	server := &http.Server{Addr: address, Handler: handler}
 	return server, listener, nil
+}
+
+// apiUploadStaging adapts the dispatcher's upload staging sessions to the
+// loopback adapter's narrow interface. It owns nothing: bounds, naming, and
+// placement remain dispatcher decisions, so the adapter gains no second
+// policy or state machine.
+type apiUploadStaging struct {
+	dispatcher *controlplane.Dispatcher
+}
+
+func (s apiUploadStaging) BeginUploadSession() (api.UploadSession, error) {
+	return s.dispatcher.BeginUploadSession()
 }
 
 func runRecoveryReader(ctx context.Context, options daemonOptions) error {

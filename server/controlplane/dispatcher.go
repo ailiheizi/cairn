@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ailiheizi/restoreweave/client/command"
@@ -76,8 +77,19 @@ type Dispatcher struct {
 	// store failure would, so an interruption between the two steps can be
 	// proven to leave a subject carrying both names rather than neither.
 	tagApplyStepFailure func(subjectRef, action string) error
-	implemented         map[string]bool
-	unimplemented       []string
+	// inboxRoot is the daemon-owned upload staging inbox, derived from the
+	// configured catalog's parent directory. It is daemon scratch, never a
+	// durable store; an empty root keeps uploads disabled.
+	inboxRoot string
+	// uploadInFlight is the process-wide count of bytes currently being
+	// streamed into the staging inbox. It bounds concurrent upload traffic
+	// and is the only cross-request upload state in the process.
+	uploadInFlight atomic.Int64
+	// uploadLimits holds the operator-approved upload bounds; tests may
+	// shrink them without rewriting the constants.
+	uploadLimits  uploadLimits
+	implemented   map[string]bool
+	unimplemented []string
 }
 
 const modelBundleCapabilityKind = "model-bundle"
@@ -387,10 +399,12 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		command.OpDescriptionCreate:  true,
 	}
 	dispatcher := &Dispatcher{
-		store:       store,
-		catalogPath: catalogPath,
-		socketPath:  socketPath,
-		now:         time.Now,
+		store:        store,
+		catalogPath:  catalogPath,
+		socketPath:   socketPath,
+		now:          time.Now,
+		inboxRoot:    inboxRoot(catalogPath),
+		uploadLimits: defaultUploadLimits(),
 		semanticBundle: command.Capability{
 			Kind: modelBundleCapabilityKind, ID: search.SemanticBundleBGEProfileID,
 			State: command.CapabilityUnavailable, Version: "1",
@@ -429,6 +443,12 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 		implemented[command.OpEgressGrantCreate] = true
 		implemented[command.OpEgressGrantList] = true
 		implemented[command.OpEgressGrantRevoke] = true
+	}
+	// The staged-file cleanup is daemon-scratch work over the derived inbox;
+	// it needs no catalog or provider binding and is implemented whenever the
+	// daemon resolved an inbox root.
+	if dispatcher.inboxRoot != "" {
+		implemented[command.OpSourceStagingClean] = true
 	}
 	if dispatcher.exact != nil {
 		implemented[command.OpPlanIngest] = true
@@ -587,6 +607,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleNamespaceList(ctx, env, started)
 	case command.OpSourceList:
 		return d.handleSourceList(ctx, env, started)
+	case command.OpSourceStagingClean:
+		return d.handleSourceStagingClean(ctx, env, started)
 	case command.OpContentList:
 		return d.handleContentList(ctx, env, started)
 	case command.OpNamespaceResolve:

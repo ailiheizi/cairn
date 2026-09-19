@@ -725,7 +725,7 @@ These operations establish the catalog and command shape only. A description is 
 
 ## 10. Search and query operations
 
-`search.query` is a stable read-only projection operation using `DiscoveryQuery/v1`. The core remains recoverable when no provider is configured, but the `RW-MVP-1` reference distribution MUST configure bundled lexical, structured, and local semantic `IndexProvider` and `QueryProvider` implementations, validate their compatibility, and activate generation-pinned default fusion.
+`source.staging_clean` removes files the bounded upload channel staged under the daemon's resolved inbox root (and only that root); it is a dispatcher operation outside the read-only MCP surface. `search.query` is a stable read-only projection operation using `DiscoveryQuery/v1`. The core remains recoverable when no provider is configured, but the `RW-MVP-1` reference distribution MUST configure bundled lexical, structured, and local semantic `IndexProvider` and `QueryProvider` implementations, validate their compatibility, and activate generation-pinned default fusion.
 
 Example input:
 

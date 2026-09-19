@@ -244,6 +244,22 @@ type SourceSummaryData struct {
 	LatestScan            *SourceScanData `json:"latest_scan,omitempty"`
 	LatestSnapshotRef     string          `json:"latest_snapshot_ref,omitempty"`
 	LatestNamespaceRootID string          `json:"latest_namespace_root_id,omitempty"`
+	// Staging is present only on the daemon-owned upload-inbox entry. The
+	// inbox is daemon scratch, not a captured source: it has no source_ref
+	// and no catalog SourceRecord exists for it.
+	Staging *SourceStagingData `json:"staging,omitempty"`
+}
+
+// SourceStagingData is the honest projection of the daemon-owned upload
+// inbox. ProtectionRecord is always NONE until the operator reviews and
+// applies an ingest plan over the staged directory; the entry exists only
+// while the inbox holds files.
+type SourceStagingData struct {
+	Path             string `json:"path"`
+	Files            int    `json:"files"`
+	Bytes            int64  `json:"bytes"`
+	ProtectionRecord string `json:"protection_record"`
+	Note             string `json:"note,omitempty"`
 }
 
 type SourceScanData struct {

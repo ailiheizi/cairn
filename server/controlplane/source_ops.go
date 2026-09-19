@@ -97,6 +97,13 @@ func (d *Dispatcher) handleSourceList(ctx context.Context, env command.Envelope,
 		}
 		projected = append(projected, item)
 	}
+	// The daemon-owned upload inbox is projected beside the configured
+	// sources only while it holds staged bytes. It is clearly labelled
+	// daemon scratch with no protection record; no SourceRecord is created
+	// for it and it never participates in publication or recovery.
+	if staging := d.inboxProjection(checkedAt); staging != nil {
+		projected = append(projected, *staging)
+	}
 	return succeeded(env, started, command.SourceListData{WorkspaceID: input.WorkspaceID, Sources: projected})
 }
 

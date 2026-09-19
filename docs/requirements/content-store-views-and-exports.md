@@ -294,6 +294,7 @@ An installer MAY ask for one convenience `data_root`, but `restoreweave.config.v
 | `paths.catalog` | Operational SQLite subjects, plans, placements, annotations, descriptions, and projections | Target architecture is rebuildable from portable authoritative records, but the current checkout does not yet export every durable fact; do not treat it as disposable until the clean-import gate passes |
 | `paths.vectors` | zvec and other semantic generations | Disposable and rebuildable; exclude from recovery authority, but coordinate deletion through generation lifecycle |
 | implementation staging | Temporary placement, processor, export, and import objects | Not authoritative; collect only after leases/fences prove no active operation needs them |
+| upload inbox (implementation staging instance) | The bounded loopback upload channel lands operator files in `<data-root>/inbox/<session>/` before any plan exists | Staged bytes carry no protection record until an ingest plan is reviewed and applied; the inbox is a projection, never a captured source; cleaning never-ingested scratch is not destructive GC |
 | implementation locks | Single-writer, lease, and fencing state | Runtime coordination only; never use a stale lock file as publication proof |
 | source path | User-owned input observed through a capture profile | Outside the RestoreWeave data root; never inferred from any storage path |
 

@@ -21,6 +21,10 @@ type Options struct {
 	// Authorization: Bearer <token>. The token is injected by the host and is
 	// never read from a request body or persisted catalog.
 	Token string
+	// Upload, when set, enables POST /api/v1/upload on this listener behind
+	// the same token gate as every other call. The adapter owns multipart
+	// framing only; staging bounds and placement are the daemon's decisions.
+	Upload UploadStaging
 }
 
 func Handler(dispatch DispatchFunc, options Options) http.Handler {
@@ -40,6 +44,14 @@ func Handler(dispatch DispatchFunc, options Options) http.Handler {
 		}
 		if strings.TrimSpace(options.Token) != "" && r.Header.Get("Authorization") != "Bearer "+options.Token {
 			writeError(w, http.StatusUnauthorized, "authorization required")
+			return
+		}
+		if r.URL.Path == "/api/v1/upload" {
+			if options.Upload == nil {
+				writeUploadError(w, http.StatusServiceUnavailable, command.UploadReasonUnavailable, "upload staging is not enabled on this listener")
+				return
+			}
+			serveUpload(w, r, options.Upload)
 			return
 		}
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/command" {

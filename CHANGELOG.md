@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- The browser can finally hand files to the daemon: a bounded
+  `POST /api/v1/upload` streams files into a daemon-managed inbox staging
+  directory (1 GiB per file, 200 per request, a process-wide in-flight cap),
+  sanitizes names, echoes per-file SHA-256 and length while streaming at
+  constant memory, and never touches the repository, the catalog, or any
+  configured source. The sources surface shows the staging entry with its
+  counts, bytes, and an explicit "no protection record yet", one action
+  prefills the ordinary plan review with the staged directory, and a
+  confirm-guarded clean action removes never-ingested scratch files only
+  inside the daemon's own inbox root. Uploading never bypasses plan review.
 - Pinyin search joins the lexical dimension: the name and path axes carry
   provenance-recorded pinyin tokens (syllables, joined form, initials)
   generated from the public-domain Unihan database under lexical profile

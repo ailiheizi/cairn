@@ -1,7 +1,7 @@
-import { AlertCircle, ArchiveRestore, Folder, GitCompare, HardDrive, Plus, RefreshCw } from "lucide-react";
+import { AlertCircle, ArchiveRestore, Folder, GitCompare, HardDrive, Inbox, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { formatBytes, formatDateTime, formatReachability, formatReachabilityMessage, formatScanState, formatSourceKind, formatSourceState } from "../lib/format";
-import type { SnapshotDiffItem, SourceChangeSummary, SourceSummary } from "../lib/types";
+import type { SnapshotDiffItem, SourceChangeSummary, SourceStaging, SourceSummary } from "../lib/types";
 
 // The configured sources view.
 //
@@ -113,10 +113,35 @@ export function SourceCard({ source, locale, t, busy, coreStorageReady, change, 
   </article>;
 }
 
-export function SourcesSurface({ t, locale, sources, sourceProjection, sourceChanges, busy, coreStorageReady, isConnected, onViewSource, onRecheckSource, onOpenAdd }: {
+// The staging-inbox card. It renders the daemon's own projection of the
+// upload inbox: counts and bytes the daemon measured, and the daemon's own
+// statement that the staged bytes have no protection record yet. It is not a
+// configured source and offers exactly two actions: the prefill handoff into
+// the ordinary review → apply flow, and the confirm-gated cleanup that
+// deletes only files inside the daemon's staging directory.
+export function StagingCard({ staging, t, busy, coreStorageReady, onIngest, onClean }: { staging: SourceStaging; t: Translator; busy: boolean; coreStorageReady: boolean; onIngest: () => void; onClean: () => void }) {
+  const files = Number(staging.files ?? 0);
+  const path = staging.path?.trim() || "";
+  return <article className="source-card staging-card" data-kind="staging">
+    <header className="source-card-header"><span className="source-card-icon"><Inbox size={17} /></span><div className="source-card-title"><strong title={path}>{t("Staged uploads")}</strong><small>{t("Daemon staging area — not a captured source")}</small></div><span className="source-health staged"><span />{t("Unprotected")}</span></header>
+    <div className="source-card-state"><span>{t("Protection record")}</span><strong>{t("None yet")}</strong><small>{staging.note?.trim() || t("Staged bytes become protected only after you review and confirm a storage plan.")}</small></div>
+    <div className="source-card-stats">
+      <div><span>{t("Files")}</span><strong>{String(files)}</strong><small>{t("staged files")}</small></div>
+      <div><span>{t("Bytes hashed")}</span><strong>{formatBytes(Number(staging.bytes ?? 0))}</strong><small>{t("staged bytes")}</small></div>
+      <div><span>{t("Staging path")}</span><strong className="staging-path" title={path}>{path}</strong><small>{t("on the RestoreWeave host")}</small></div>
+      <div><span>{t("After saving")}</span><strong>{t("Stays until cleaned")}</strong><small>{t("Saving copies the bytes into the repository; it never deletes this staging area.")}</small></div>
+    </div>
+    <p className="muted">{t("Review the staged files, then confirm to save exact bytes. Until then they have no protection record.")}</p>
+    <footer className="source-card-actions"><button type="button" className="secondary-button compact" onClick={onIngest} disabled={busy || !coreStorageReady || files === 0}><Upload size={14} />{t("Review staged files")}</button><button type="button" className="secondary-button compact" onClick={onClean} disabled={busy || files === 0}><Trash2 size={14} />{t("Clean staged files")}</button></footer>
+  </article>;
+}
+
+export function SourcesSurface({ t, locale, sources, staging, stagingBusy, sourceProjection, sourceChanges, busy, coreStorageReady, isConnected, onViewSource, onRecheckSource, onOpenAdd, onIngestStaged, onCleanStaged }: {
   t: Translator;
   locale: Locale;
   sources: SourceSummary[];
+  staging?: SourceStaging;
+  stagingBusy: boolean;
   sourceProjection: { state: "READY" | "DEGRADED" };
   sourceChanges: Record<string, SourceChangeSummary>;
   busy: boolean;
@@ -125,9 +150,12 @@ export function SourcesSurface({ t, locale, sources, sourceProjection, sourceCha
   onViewSource: (sourceItem: SourceSummary) => void;
   onRecheckSource: (sourceItem: SourceSummary, trigger?: EventTarget | null) => void;
   onOpenAdd: (trigger?: EventTarget | null) => void;
+  onIngestStaged: () => void;
+  onCleanStaged: () => void;
 }) {
   return <section className="sources-surface" aria-label={t("Sources")}>
     {sourceProjection.state === "DEGRADED" && <div className="source-projection-warning" role="status"><AlertCircle size={14} /><span>{t("Source status could not be loaded. Saved content remains available; refresh to try again.")}</span></div>}
+    {staging && <StagingCard staging={staging} t={t} busy={busy || stagingBusy} coreStorageReady={coreStorageReady} onIngest={onIngestStaged} onClean={onCleanStaged} />}
     {sources.length > 0 ? <>
       <div className="sources-surface-actions"><button className="primary-button" onClick={(event) => onOpenAdd(event.currentTarget)} disabled={!isConnected || !coreStorageReady}><Plus size={16} />{t("Add source")}</button></div>
       <div className="source-card-list">{sources.map((sourceItem, index) => <SourceCard key={sourceItem.source_ref ?? sourceItem.locator ?? index} source={sourceItem} locale={locale} t={t} busy={busy} coreStorageReady={coreStorageReady} change={sourceItem.source_ref ? sourceChanges[sourceItem.source_ref] : undefined} onView={() => onViewSource(sourceItem)} onRecheck={(trigger) => onRecheckSource(sourceItem, trigger)} />)}</div>

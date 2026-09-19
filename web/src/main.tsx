@@ -625,6 +625,7 @@ function App() {
       coreStorageMessage={coreStorageMessage}
       notice={notice}
       repositoryPath={repositoryPath}
+      onStaged={() => void refresh()}
       onClose={sources.closeAdd}
       onDone={() => { sources.closeAdd(); reloadLibrary(); }}
     />}
