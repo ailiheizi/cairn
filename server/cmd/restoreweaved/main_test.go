@@ -712,7 +712,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if closeErr != nil {
 		t.Fatalf("close configured catalog: %v", closeErr)
 	}
-	wantLexicalProfile := search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV1)
+	wantLexicalProfile := search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV2)
 	if generation.ConfigDigest != effective.Digest || generation.ProviderProfileDigest != wantLexicalProfile {
 		t.Fatalf("real daemon lexical generation binding = %+v, want config=%s profile=%s",
 			generation, effective.Digest, wantLexicalProfile)

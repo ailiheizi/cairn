@@ -225,35 +225,49 @@ func Runs(text string) []Run {
 //
 // Text without covered characters yields empty results; non-CJK text is
 // never transformed, so callers can append these forms to a field without
-// disturbing its original content. Output size is linear in the input and
-// only a bounded number of builders are live at once, so long text is safe.
+// disturbing its original content. For scans the text once and allocates
+// only its output builders, so long text is safe at ingest time.
 func For(text string) (full []string, joined string, initials string) {
-	runs := Runs(text)
-	if len(runs) == 0 {
-		return nil, "", ""
+	ranges := loadTable()
+	var syllables, joinedOut, initialsOut strings.Builder
+	var entries []string
+	started := false // at least one run was seen; guards inter-run separators
+	inRun := false
+	flushRun := func() {
+		if inRun {
+			entries = append(entries, syllables.String())
+			syllables.Reset()
+			inRun = false
+		}
 	}
-	full = make([]string, 0, len(runs))
-	var joinedBuilder, initialsBuilder strings.Builder
-	for position, run := range runs {
-		var syllables strings.Builder
-		for index, readings := range run.Readings {
-			if index > 0 {
+	for offset := 0; offset < len(text); {
+		r, size := utf8.DecodeRuneInString(text[offset:])
+		if index := lookup(ranges, r); index >= 0 {
+			if !inRun {
+				if started {
+					joinedOut.WriteByte(' ')
+					initialsOut.WriteByte(' ')
+				}
+				started = true
+				inRun = true
+			}
+			primary := ranges[index].readings[0]
+			if syllables.Len() > 0 {
 				syllables.WriteByte(' ')
 			}
-			syllables.WriteString(readings[0])
+			syllables.WriteString(primary)
+			joinedOut.WriteString(primary)
+			initialsOut.WriteString(primary[:1])
+		} else {
+			flushRun()
 		}
-		full = append(full, syllables.String())
-		if position > 0 {
-			joinedBuilder.WriteByte(' ')
-			initialsBuilder.WriteByte(' ')
-		}
-		spaceFree := syllables.String()
-		joinedBuilder.WriteString(strings.ReplaceAll(spaceFree, " ", ""))
-		for _, readings := range run.Readings {
-			initialsBuilder.WriteString(readings[0][:1])
-		}
+		offset += size
 	}
-	return full, joinedBuilder.String(), initialsBuilder.String()
+	flushRun()
+	if len(entries) == 0 {
+		return nil, "", ""
+	}
+	return entries, joinedOut.String(), initialsOut.String()
 }
 
 // FieldAppendix renders the additional search tokens the lexical feed appends

@@ -15,3 +15,6 @@ coverage/
 # Ad-hoc builds must never land in the repository root.
 /restoreweaved
 /rw
+# Compiled scratch binaries from generator scripts (use `go run` instead).
+/generate-pinyin-table
+scripts/generate-pinyin-table/generate-pinyin-table

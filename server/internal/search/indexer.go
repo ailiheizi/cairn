@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
+	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
 	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
 )
 
@@ -221,7 +222,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 	case DimensionLexical:
 		digest = idx.LexicalProfileDigest
 		if digest == "" && idx.ConfigDigest != "" {
-			digest = ProfileDigest(dimension, LexicalProfileV1)
+			digest = ProfileDigest(dimension, LexicalProfileV2)
 		}
 	case DimensionGraph:
 		digest = idx.GraphProfileDigest
@@ -679,10 +680,17 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			}
 			segmentsJSON = string(encoded)
 		}
+		entryPath := displayPath(byID, entry)
 		doc := Document{
-			SubjectID:       entry.SubjectRef,
-			Path:            displayPath(byID, entry),
+			SubjectID: entry.SubjectRef,
+			Path:      entryPath,
+			// Pinyin token enrichment for the name/path axes only. The raw
+			// characters above stay in their fields untouched; the appendix
+			// adds queryable syllable tokens so a pinyin query reaches the
+			// same axis (profile: fts5-metadata-v2).
+			PathPinyin:      pinyin.FieldAppendix(entryPath),
 			Name:            entry.DisplayName,
+			NamePinyin:      pinyin.FieldAppendix(entry.DisplayName),
 			Suffix:          suffixOf(entry.DisplayName),
 			EntryType:       string(entry.EntryType),
 			ContentID:       entry.ContentID,

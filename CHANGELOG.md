@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Pinyin search joins the lexical dimension: the name and path axes carry
+  provenance-recorded pinyin tokens (syllables, joined form, initials)
+  generated from the public-domain Unihan database under lexical profile
+  `fts5-metadata-v2`, so `lvxing`, `lü xing`, or `lx` find 旅行计划.md while
+  the original characters keep matching. A rebuild under the new profile
+  creates a new generation; old generations stay bound to their recorded
+  digest and are never reinterpreted.
+- The library gains four browser-side ergonomics: a month-bucketed timeline
+  strip over the captured modification times (click to filter, click again to
+  clear), a collapsible space report whose byte total is asserted equal to the
+  daemon's own sizes, URL-hash deep links for the view/search/tags/month
+  (refresh re-derives everything from the daemon), and a three-step
+  empty-listing guide. `content.list` now projects `modified_at` — the
+  scanner-recorded capture time, omitted when absent — and the filtered grid
+  renders a reactive facet projection, removing the state race between the
+  loader, the hash restore, and the facet toggles.
 - The library answers "find me more like this one": `search.query` accepts an
   additive `image_subject_ref`, the daemon re-reads that subject's bytes
   through the identity-checking repository content source, admits them with

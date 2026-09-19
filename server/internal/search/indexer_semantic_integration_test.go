@@ -285,7 +285,7 @@ func TestIndexerRebuildLatestScopesSemanticNotesToPublishedRoot(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -429,7 +429,7 @@ func TestIndexerRebuildLatestRetainsPublishedSources(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -497,7 +497,7 @@ func TestIndexerPinnedSemanticGenerationRetainsOldRootAfterRepublish(t *testing.
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -607,7 +607,7 @@ func TestIndexerSemanticWarmAndQueryFailClosedForMissingGenerationMapping(t *tes
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -652,7 +652,7 @@ func TestIndexerSemanticRebuildRequiresMembershipVerifier(t *testing.T) {
 	manifest := testZvecManifest()
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: readinessZvecDriver{},
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -710,7 +710,7 @@ func TestIndexerSemanticRebuildQueryFuseAndProvenance(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()},
-		ConfigDigest: manifest.ConfigDigest, LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1),
+		ConfigDigest: manifest.ConfigDigest, LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2),
 		SemanticManifest: manifest, SemanticProvider: integrationSemanticProvider{},
 		SemanticZvec:        driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
@@ -861,7 +861,7 @@ func TestIndexerSemanticProfileSwitchPreservesOldGenerationAndDescriptions(t *te
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifestA.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV1), SemanticManifest: manifestA,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifestA,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}

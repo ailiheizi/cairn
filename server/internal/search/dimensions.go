@@ -245,7 +245,7 @@ func FixtureIndexBinding(configDigest string) IndexBinding {
 	multimodalManifest.ProviderDigest = ProfileDigest(DimensionMultimodal, MultimodalFixtureProfileV1)
 	return IndexBinding{
 		ConfigDigest:            strings.TrimSpace(configDigest),
-		LexicalProfileDigest:    ProfileDigest(DimensionLexical, LexicalProfileV1),
+		LexicalProfileDigest:    ProfileDigest(DimensionLexical, LexicalProfileV2),
 		SemanticProfileDigest:   semanticManifest.CanonicalDigest(),
 		MultimodalProfileDigest: multimodalManifest.CanonicalDigest(),
 		AcousticProfileDigest:   ProfileDigest(DimensionAcoustic, AcousticFixtureProfileV1),
@@ -267,7 +267,12 @@ func ProfileDigest(dimension, profile string) string {
 }
 
 const (
-	LexicalProfileV1           = "fts5-metadata-v1"
+	// LexicalProfileV2 is the lexical feed shape with pinyin token enrichment
+	// of the name/path axes and the dedicated name_pinyin/path_pinyin FTS5
+	// columns. It supersedes the "fts5-metadata-v1" profile: a generation
+	// built under the old profile records a different ProviderProfileDigest
+	// and is refused, never reinterpreted, by the current wiring.
+	LexicalProfileV2           = "fts5-metadata-v2"
 	GraphProfileV1             = "graph-catalog-v1"
 	AcousticFixtureProfileV1   = "acoustic-fixture-v1"
 	SemanticFixtureProfileV1   = "semantic-fixture-v1"

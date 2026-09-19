@@ -13,6 +13,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -23,8 +25,14 @@ var (
 )
 
 type Document struct {
-	SubjectID       string
-	Path            string
+	SubjectID string
+	Path      string
+	// NamePinyin and PathPinyin hold the pinyin token enrichment the feed
+	// appends for the name/path axes (see pinyin.FieldAppendix). They are
+	// searchable through the same axes, but never returned as display data:
+	// Hit.Name and Hit.Path stay the original raw values.
+	NamePinyin      string
+	PathPinyin      string
 	Name            string
 	Suffix          string
 	EntryType       string
@@ -97,7 +105,9 @@ func (engine *Engine) Build(ctx context.Context, generationID string, docs []Doc
 CREATE VIRTUAL TABLE documents USING fts5(
     subject_id UNINDEXED,
     path,
+    path_pinyin,
     name,
+    name_pinyin,
     suffix,
     entry_type,
     content_id,
@@ -128,18 +138,18 @@ CREATE VIRTUAL TABLE documents USING fts5(
 	defer tx.Rollback()
 	stmt, err := tx.PrepareContext(ctx, `
 INSERT INTO documents(
-    subject_id, path, name, suffix, entry_type, content_id, metadata,
+    subject_id, path, path_pinyin, name, name_pinyin, suffix, entry_type, content_id, metadata,
     duplicates, protection, locators, tags, notes, descriptions, extracted,
     detection, processing, representations, language, size_facet, mtime_facet,
     duplicate_group, segments
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return "", err
 	}
 	defer stmt.Close()
 	for _, doc := range docs {
-		if _, err := stmt.ExecContext(ctx, doc.SubjectID, doc.Path, doc.Name, doc.Suffix,
-			doc.EntryType, doc.ContentID, doc.Metadata, doc.Duplicates,
+		if _, err := stmt.ExecContext(ctx, doc.SubjectID, doc.Path, doc.PathPinyin, doc.Name, doc.NamePinyin,
+			doc.Suffix, doc.EntryType, doc.ContentID, doc.Metadata, doc.Duplicates,
 			doc.Protection, doc.Locators, doc.Tags, doc.Notes,
 			doc.Descriptions, doc.Extracted, doc.Detection, doc.Processing,
 			doc.Representations, doc.Language, nullableInt64Value(doc.LogicalSize),
@@ -391,7 +401,9 @@ func ftsQuery(text string, axes []string) string {
 	for _, token := range tokens {
 		alts := make([]string, 0, len(axes))
 		for _, axis := range axes {
-			alts = append(alts, ftsColumnForAxis(axis)+`:"`+token+`"*`)
+			for _, column := range ftsColumnsForAxis(axis) {
+				alts = append(alts, column+`:"`+token+`"*`)
+			}
 		}
 		if len(alts) == 1 {
 			groups = append(groups, alts[0])
@@ -402,14 +414,22 @@ func ftsQuery(text string, axes []string) string {
 	return strings.Join(groups, " AND ")
 }
 
-func ftsColumnForAxis(axis string) string {
+// ftsColumnsForAxis maps one lexical construct axis to the FTS5 columns that
+// carry it. The name and path axes span both the raw field and its pinyin
+// token enrichment, so a pinyin query reaches the same axis without ever
+// changing the raw display values.
+func ftsColumnsForAxis(axis string) []string {
 	switch axis {
 	case AxisType:
-		return "entry_type"
+		return []string{"entry_type"}
 	case AxisChecksum:
-		return "content_id"
+		return []string{"content_id"}
+	case AxisName:
+		return []string{"name", "name_pinyin"}
+	case AxisPath:
+		return []string{"path", "path_pinyin"}
 	default:
-		return axis
+		return []string{axis}
 	}
 }
 
@@ -448,31 +468,44 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 	fields := []struct {
 		axis string
 		text string
+		// enrichment is the additional pinyin token text indexed for this
+		// field's axis (name/path only). It is empty for fields without
+		// pinyin enrichment.
+		enrichment string
 	}{
-		{AxisPath, hit.Path},
-		{AxisName, hit.Name},
-		{AxisSuffix, suffix},
-		{AxisType, hit.EntryType},
-		{AxisChecksum, hit.ContentID},
-		{AxisMetadata, metadata},
-		{AxisDuplicates, duplicates},
-		{AxisDuplicateGroup, duplicateGroup},
-		{AxisProtection, protection},
-		{AxisLocators, locators},
-		{AxisTags, tags},
-		{AxisNotes, notes},
-		{AxisDescriptions, descriptions},
-		{AxisExtracted, extracted},
-		{AxisDetection, detection},
-		{AxisProcessing, processing},
-		{AxisRepresentations, representations},
-		{AxisLanguage, language},
+		{AxisPath, hit.Path, pinyin.FieldAppendix(hit.Path)},
+		{AxisName, hit.Name, pinyin.FieldAppendix(hit.Name)},
+		{AxisSuffix, suffix, ""},
+		{AxisType, hit.EntryType, ""},
+		{AxisChecksum, hit.ContentID, ""},
+		{AxisMetadata, metadata, ""},
+		{AxisDuplicates, duplicates, ""},
+		{AxisDuplicateGroup, duplicateGroup, ""},
+		{AxisProtection, protection, ""},
+		{AxisLocators, locators, ""},
+		{AxisTags, tags, ""},
+		{AxisNotes, notes, ""},
+		{AxisDescriptions, descriptions, ""},
+		{AxisExtracted, extracted, ""},
+		{AxisDetection, detection, ""},
+		{AxisProcessing, processing, ""},
+		{AxisRepresentations, representations, ""},
+		{AxisLanguage, language, ""},
 	}
 	var matched []string
 	for _, field := range fields {
 		lower := strings.ToLower(field.text)
+		enriched := ""
+		if field.enrichment != "" {
+			enriched = strings.ToLower(field.enrichment)
+		}
 		for _, token := range tokens {
-			if token != "" && strings.Contains(lower, strings.ToLower(token)) {
+			if token == "" {
+				continue
+			}
+			wanted := strings.ToLower(token)
+			if strings.Contains(lower, wanted) ||
+				(enriched != "" && strings.Contains(enriched, wanted)) {
 				matched = append(matched, field.axis)
 				break
 			}

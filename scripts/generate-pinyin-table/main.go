@@ -235,6 +235,9 @@ var toneStripped = strings.NewReplacer(
 	"ū", "u", "ú", "u", "ǔ", "u", "ù", "u",
 	"ǖ", "v", "ǘ", "v", "ǚ", "v", "ǜ", "v",
 	"ü", "v",
+	// The syllabic nasal interjections 嗯/呣 are recorded as bare toned
+	// nasals; their tone-free spellings are n, ng, and m.
+	"ň", "n", "ń", "n", "ǹ", "n", "ḿ", "m",
 )
 
 // normalizeSyllable strips tone marks and validates the ASCII result.
