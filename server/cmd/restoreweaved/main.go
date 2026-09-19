@@ -572,7 +572,7 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	}
 	indexBinding := search.IndexBinding{
 		ConfigDigest:         resolved.Digest,
-		LexicalProfileDigest: search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV2),
+		LexicalProfileDigest: search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV3),
 		GraphProfileDigest:   search.ProfileDigest(search.DimensionGraph, search.GraphProfileV1),
 	}
 	dispatcherOptions := []controlplane.DispatcherOption{

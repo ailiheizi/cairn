@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
 
@@ -27,32 +28,38 @@ var (
 type Document struct {
 	SubjectID string
 	Path      string
-	// NamePinyin and PathPinyin hold the pinyin token enrichment the feed
-	// appends for the name/path axes (see pinyin.FieldAppendix). They are
-	// searchable through the same axes, but never returned as display data:
-	// Hit.Name and Hit.Path stay the original raw values.
-	NamePinyin      string
-	PathPinyin      string
-	Name            string
-	Suffix          string
-	EntryType       string
-	ContentID       string
-	Metadata        string
-	Duplicates      string
-	DuplicateGroup  string
-	Protection      string
-	Locators        string
-	Tags            string
-	Notes           string
-	Descriptions    string
-	Extracted       string
-	Detection       string
-	Processing      string
-	Representations string
-	Language        string
-	LogicalSize     *int64
-	MtimeMillis     *int64
-	Segments        string
+	// NamePinyin, PathPinyin, NotesPinyin, DescriptionsPinyin, and
+	// ExtractedPinyin hold the pinyin token enrichment the feed appends for
+	// the name/path/notes/descriptions/extracted axes (see
+	// pinyin.FieldAppendix; the extracted axis is bounded, see
+	// extractedPinyinEnrichmentBound). They are searchable through the same
+	// axes, but never returned as display data: the Hit fields stay the
+	// original raw values.
+	NamePinyin         string
+	PathPinyin         string
+	NotesPinyin        string
+	DescriptionsPinyin string
+	ExtractedPinyin    string
+	Name               string
+	Suffix             string
+	EntryType          string
+	ContentID          string
+	Metadata           string
+	Duplicates         string
+	DuplicateGroup     string
+	Protection         string
+	Locators           string
+	Tags               string
+	Notes              string
+	Descriptions       string
+	Extracted          string
+	Detection          string
+	Processing         string
+	Representations    string
+	Language           string
+	LogicalSize        *int64
+	MtimeMillis        *int64
+	Segments           string
 }
 
 // SegmentRef is provenance for one durable text span inside a hit.
@@ -117,8 +124,11 @@ CREATE VIRTUAL TABLE documents USING fts5(
     locators,
     tags,
     notes,
+    notes_pinyin,
     descriptions,
+    descriptions_pinyin,
     extracted,
+    extracted_pinyin,
     detection,
     processing,
     representations,
@@ -139,10 +149,10 @@ CREATE VIRTUAL TABLE documents USING fts5(
 	stmt, err := tx.PrepareContext(ctx, `
 INSERT INTO documents(
     subject_id, path, path_pinyin, name, name_pinyin, suffix, entry_type, content_id, metadata,
-    duplicates, protection, locators, tags, notes, descriptions, extracted,
-    detection, processing, representations, language, size_facet, mtime_facet,
-    duplicate_group, segments
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    duplicates, protection, locators, tags, notes, notes_pinyin, descriptions, descriptions_pinyin,
+    extracted, extracted_pinyin, detection, processing, representations, language, size_facet,
+    mtime_facet, duplicate_group, segments
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return "", err
 	}
@@ -150,9 +160,10 @@ INSERT INTO documents(
 	for _, doc := range docs {
 		if _, err := stmt.ExecContext(ctx, doc.SubjectID, doc.Path, doc.PathPinyin, doc.Name, doc.NamePinyin,
 			doc.Suffix, doc.EntryType, doc.ContentID, doc.Metadata, doc.Duplicates,
-			doc.Protection, doc.Locators, doc.Tags, doc.Notes,
-			doc.Descriptions, doc.Extracted, doc.Detection, doc.Processing,
-			doc.Representations, doc.Language, nullableInt64Value(doc.LogicalSize),
+			doc.Protection, doc.Locators, doc.Tags, doc.Notes, doc.NotesPinyin,
+			doc.Descriptions, doc.DescriptionsPinyin, doc.Extracted, doc.ExtractedPinyin,
+			doc.Detection, doc.Processing, doc.Representations, doc.Language,
+			nullableInt64Value(doc.LogicalSize),
 			nullableInt64Value(doc.MtimeMillis), doc.DuplicateGroup, doc.Segments); err != nil {
 			return "", err
 		}
@@ -415,9 +426,9 @@ func ftsQuery(text string, axes []string) string {
 }
 
 // ftsColumnsForAxis maps one lexical construct axis to the FTS5 columns that
-// carry it. The name and path axes span both the raw field and its pinyin
-// token enrichment, so a pinyin query reaches the same axis without ever
-// changing the raw display values.
+// carry it. The name, path, notes, descriptions, and extracted axes span both
+// the raw field and its pinyin token enrichment, so a pinyin query reaches the
+// same axis without ever changing the raw display values.
 func ftsColumnsForAxis(axis string) []string {
 	switch axis {
 	case AxisType:
@@ -428,6 +439,12 @@ func ftsColumnsForAxis(axis string) []string {
 		return []string{"name", "name_pinyin"}
 	case AxisPath:
 		return []string{"path", "path_pinyin"}
+	case AxisNotes:
+		return []string{"notes", "notes_pinyin"}
+	case AxisDescriptions:
+		return []string{"descriptions", "descriptions_pinyin"}
+	case AxisExtracted:
+		return []string{"extracted", "extracted_pinyin"}
 	default:
 		return []string{axis}
 	}
@@ -468,50 +485,93 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 	fields := []struct {
 		axis string
 		text string
-		// enrichment is the additional pinyin token text indexed for this
-		// field's axis (name/path only). It is empty for fields without
-		// pinyin enrichment.
-		enrichment string
+		// enrichment returns the additional pinyin token text indexed for
+		// this field's axis (name/path/notes/descriptions/extracted). It is
+		// nil for fields without pinyin enrichment, and it is called lazily
+		// so a query already answered by the raw text never pays for the
+		// transliteration (the extracted axis can be large).
+		enrichment func(string) string
 	}{
-		{AxisPath, hit.Path, pinyin.FieldAppendix(hit.Path)},
-		{AxisName, hit.Name, pinyin.FieldAppendix(hit.Name)},
-		{AxisSuffix, suffix, ""},
-		{AxisType, hit.EntryType, ""},
-		{AxisChecksum, hit.ContentID, ""},
-		{AxisMetadata, metadata, ""},
-		{AxisDuplicates, duplicates, ""},
-		{AxisDuplicateGroup, duplicateGroup, ""},
-		{AxisProtection, protection, ""},
-		{AxisLocators, locators, ""},
-		{AxisTags, tags, ""},
-		{AxisNotes, notes, ""},
-		{AxisDescriptions, descriptions, ""},
-		{AxisExtracted, extracted, ""},
-		{AxisDetection, detection, ""},
-		{AxisProcessing, processing, ""},
-		{AxisRepresentations, representations, ""},
-		{AxisLanguage, language, ""},
+		{AxisPath, hit.Path, pinyin.FieldAppendix},
+		{AxisName, hit.Name, pinyin.FieldAppendix},
+		{AxisSuffix, suffix, nil},
+		{AxisType, hit.EntryType, nil},
+		{AxisChecksum, hit.ContentID, nil},
+		{AxisMetadata, metadata, nil},
+		{AxisDuplicates, duplicates, nil},
+		{AxisDuplicateGroup, duplicateGroup, nil},
+		{AxisProtection, protection, nil},
+		{AxisLocators, locators, nil},
+		{AxisTags, tags, nil},
+		{AxisNotes, notes, pinyin.FieldAppendix},
+		{AxisDescriptions, descriptions, pinyin.FieldAppendix},
+		{AxisExtracted, extracted, boundedPinyinEnrichment},
+		{AxisDetection, detection, nil},
+		{AxisProcessing, processing, nil},
+		{AxisRepresentations, representations, nil},
+		{AxisLanguage, language, nil},
 	}
 	var matched []string
 	for _, field := range fields {
 		lower := strings.ToLower(field.text)
 		enriched := ""
-		if field.enrichment != "" {
-			enriched = strings.ToLower(field.enrichment)
-		}
+		enrichedComputed := false
 		for _, token := range tokens {
 			if token == "" {
 				continue
 			}
 			wanted := strings.ToLower(token)
-			if strings.Contains(lower, wanted) ||
-				(enriched != "" && strings.Contains(enriched, wanted)) {
+			if strings.Contains(lower, wanted) {
+				matched = append(matched, field.axis)
+				break
+			}
+			if field.enrichment == nil {
+				continue
+			}
+			if !enrichedComputed {
+				enriched = strings.ToLower(field.enrichment(field.text))
+				enrichedComputed = true
+			}
+			if enriched != "" && strings.Contains(enriched, wanted) {
 				matched = append(matched, field.axis)
 				break
 			}
 		}
 	}
 	return matched
+}
+
+// extractedPinyinEnrichmentBound bounds the pinyin token enrichment of the
+// extracted axis to the first 256 KiB of the joined extracted-field text,
+// measured in bytes and always cut at a UTF-8 rune boundary. Extracted
+// document text can be arbitrarily large while the appendix adds roughly one
+// ASCII syllable per Han character, so the bound keeps feed growth
+// proportional for huge documents. This is an honest feed shape, not silent
+// truncation: the raw extracted text stays whole in its own field, so
+// raw-character queries over the full body still match; only the pinyin
+// token appendix stops at the bound (profile: fts5-metadata-v3).
+const extractedPinyinEnrichmentBound = 256 << 10
+
+// boundedPinyinEnrichment is the extracted-axis pinyin enrichment: the same
+// FieldAppendix the other text axes use, applied to the declared bounded
+// prefix of the field text.
+func boundedPinyinEnrichment(text string) string {
+	return pinyin.FieldAppendix(boundForPinyinEnrichment(text))
+}
+
+// boundForPinyinEnrichment returns the prefix of text the pinyin enrichment
+// covers: the whole text when it fits, otherwise the first
+// extractedPinyinEnrichmentBound bytes backed up to a UTF-8 rune boundary so
+// the prefix never splits a character.
+func boundForPinyinEnrichment(text string) string {
+	if len(text) <= extractedPinyinEnrichmentBound {
+		return text
+	}
+	cut := extractedPinyinEnrichmentBound
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut]
 }
 
 // matchedDescriptionSegments returns provenance for description matches. The

@@ -83,7 +83,7 @@ func TestSemanticQueryCannotRestoreReadinessFromPartialHits(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -113,7 +113,7 @@ func TestSemanticQueryUsesFrozenGenerationCoverageCache(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -234,7 +234,7 @@ func TestIndexerFeedsDurableFactsProtectionAndDescriptions(t *testing.T) {
 	}
 
 	configDigest := "sha256:config-rebuild"
-	lexicalProfileDigest := ProfileDigest(DimensionLexical, LexicalProfileV2)
+	lexicalProfileDigest := ProfileDigest(DimensionLexical, LexicalProfileV3)
 	indexer := &Indexer{
 		Store:                store,
 		Engine:               &Engine{Dir: t.TempDir()},

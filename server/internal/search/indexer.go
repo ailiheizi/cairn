@@ -222,7 +222,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 	case DimensionLexical:
 		digest = idx.LexicalProfileDigest
 		if digest == "" && idx.ConfigDigest != "" {
-			digest = ProfileDigest(dimension, LexicalProfileV2)
+			digest = ProfileDigest(dimension, LexicalProfileV3)
 		}
 	case DimensionGraph:
 		digest = idx.GraphProfileDigest
@@ -681,33 +681,42 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			segmentsJSON = string(encoded)
 		}
 		entryPath := displayPath(byID, entry)
+		notes := strings.Join(notesBySubject[entry.SubjectRef], " ")
+		descriptions := strings.Join(descriptionsBySubject[entry.SubjectRef], " ")
+		extracted := strings.Join(extractedBySubject[entry.SubjectRef], " ")
 		doc := Document{
 			SubjectID: entry.SubjectRef,
 			Path:      entryPath,
-			// Pinyin token enrichment for the name/path axes only. The raw
-			// characters above stay in their fields untouched; the appendix
-			// adds queryable syllable tokens so a pinyin query reaches the
-			// same axis (profile: fts5-metadata-v2).
-			PathPinyin:      pinyin.FieldAppendix(entryPath),
-			Name:            entry.DisplayName,
-			NamePinyin:      pinyin.FieldAppendix(entry.DisplayName),
-			Suffix:          suffixOf(entry.DisplayName),
-			EntryType:       string(entry.EntryType),
-			ContentID:       entry.ContentID,
-			Metadata:        strings.Join(metadata, " "),
-			Duplicates:      duplicate,
-			DuplicateGroup:  duplicateGroupBySubject[entry.SubjectRef],
-			Protection:      strings.Join(append(append([]string{}, protectionBySubject[entry.SubjectRef]...), recoveryBySubject[entry.SubjectRef]...), " "),
-			Locators:        strings.Join(locatorsBySubject[entry.SubjectRef], " "),
-			Tags:            strings.Join(tagsBySubject[entry.SubjectRef], " "),
-			Notes:           strings.Join(notesBySubject[entry.SubjectRef], " "),
-			Descriptions:    strings.Join(descriptionsBySubject[entry.SubjectRef], " "),
-			Extracted:       strings.Join(extractedBySubject[entry.SubjectRef], " "),
-			Detection:       strings.Join(detectionBySubject[entry.SubjectRef], " "),
-			Processing:      strings.Join(processingBySubject[entry.SubjectRef], " "),
-			Representations: strings.Join(representationsByContent[entry.ContentID], " "),
-			Language:        subjectLanguage(descriptionsBySubject[entry.SubjectRef]),
-			Segments:        segmentsJSON,
+			// Pinyin token enrichment for the name/path/notes/descriptions/
+			// extracted axes. The raw characters stay in their own fields
+			// untouched; the appendix adds queryable syllable tokens so a
+			// pinyin query reaches the same axis. The extracted axis bounds
+			// the enrichment to its first 256 KiB (see
+			// extractedPinyinEnrichmentBound); the raw text above stays whole
+			// (profile: fts5-metadata-v3).
+			PathPinyin:         pinyin.FieldAppendix(entryPath),
+			Name:               entry.DisplayName,
+			NamePinyin:         pinyin.FieldAppendix(entry.DisplayName),
+			Notes:              notes,
+			NotesPinyin:        pinyin.FieldAppendix(notes),
+			Descriptions:       descriptions,
+			DescriptionsPinyin: pinyin.FieldAppendix(descriptions),
+			Extracted:          extracted,
+			ExtractedPinyin:    boundedPinyinEnrichment(extracted),
+			Suffix:             suffixOf(entry.DisplayName),
+			EntryType:          string(entry.EntryType),
+			ContentID:          entry.ContentID,
+			Metadata:           strings.Join(metadata, " "),
+			Duplicates:         duplicate,
+			DuplicateGroup:     duplicateGroupBySubject[entry.SubjectRef],
+			Protection:         strings.Join(append(append([]string{}, protectionBySubject[entry.SubjectRef]...), recoveryBySubject[entry.SubjectRef]...), " "),
+			Locators:           strings.Join(locatorsBySubject[entry.SubjectRef], " "),
+			Tags:               strings.Join(tagsBySubject[entry.SubjectRef], " "),
+			Detection:          strings.Join(detectionBySubject[entry.SubjectRef], " "),
+			Processing:         strings.Join(processingBySubject[entry.SubjectRef], " "),
+			Representations:    strings.Join(representationsByContent[entry.ContentID], " "),
+			Language:           subjectLanguage(descriptionsBySubject[entry.SubjectRef]),
+			Segments:           segmentsJSON,
 		}
 		if entry.LogicalSize != nil {
 			size := *entry.LogicalSize

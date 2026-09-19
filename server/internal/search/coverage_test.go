@@ -178,7 +178,7 @@ func TestRestartedSemanticGenerationRejectsDeletedSegment(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -216,7 +216,7 @@ func TestPinnedOldSemanticGenerationCannotSetLatestReadiness(t *testing.T) {
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -291,7 +291,7 @@ func TestSemanticQueryReturnsCloseErrorAndRevokesGeneration(t *testing.T) {
 	driver := &closeErrorSemanticDriver{base: &integrationSemanticGenerationDriver{}}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -323,7 +323,7 @@ func TestWarmAfterSemanticRebuildFailureRejectsStaleSemanticGeneration(t *testin
 	driver := &integrationSemanticGenerationDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
 		SemanticProvider: integrationSemanticProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
@@ -345,7 +345,7 @@ func TestWarmAfterSemanticRebuildFailureRejectsStaleSemanticGeneration(t *testin
 	if err := store.InsertIndexGeneration(ctx, &sqlite.IndexGeneration{
 		ID: lexicalID, WorkspaceID: seed.WorkspaceID, SnapshotRef: "snapshot:lexical-after-failure",
 		NamespaceRootID: seed.RootID, DBPath: lexicalPath, Dimension: DimensionLexical,
-		ConfigDigest: manifest.ConfigDigest, ProviderProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV2),
+		ConfigDigest: manifest.ConfigDigest, ProviderProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3),
 		CreatedAt: oldLexical.CreatedAt.Add(time.Nanosecond),
 	}); err != nil {
 		t.Fatalf("publish newer lexical generation: %v", err)

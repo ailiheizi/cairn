@@ -12,13 +12,17 @@
   prefills the ordinary plan review with the staged directory, and a
   confirm-guarded clean action removes never-ingested scratch files only
   inside the daemon's own inbox root. Uploading never bypasses plan review.
-- Pinyin search joins the lexical dimension: the name and path axes carry
-  provenance-recorded pinyin tokens (syllables, joined form, initials)
-  generated from the public-domain Unihan database under lexical profile
-  `fts5-metadata-v2`, so `lvxing`, `lü xing`, or `lx` find 旅行计划.md while
-  the original characters keep matching. A rebuild under the new profile
-  creates a new generation; old generations stay bound to their recorded
-  digest and are never reinterpreted.
+- Pinyin search joins the lexical dimension: the name, path, notes,
+  descriptions, and extracted axes carry provenance-recorded pinyin tokens
+  (syllables, joined form, initials) generated from the public-domain Unihan
+  database under lexical profile `fts5-metadata-v3`, so `lvxing`, `lü xing`,
+  or `lx` find 旅行计划.md by name and reach CJK notes, descriptions, and
+  extracted document text through the same axes while the original characters
+  keep matching. The extracted axis bounds its enrichment to the first 256 KiB
+  of the field text (an honest feed shape; the raw text stays whole in its own
+  field, so raw-character queries over the full body still match). A rebuild
+  under the new profile creates a new generation; old generations stay bound
+  to their recorded digest and are never reinterpreted.
 - The library gains four browser-side ergonomics: a month-bucketed timeline
   strip over the captured modification times (click to filter, click again to
   clear), a collapsible space report whose byte total is asserted equal to the

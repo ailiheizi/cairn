@@ -61,7 +61,7 @@ func readyImageAndSemanticQueryIndexer(t *testing.T, store *sqlite.Store, seed *
 	// the lexical/semantic generation bindings match exactly as daemon wiring
 	// produces them.
 	semanticManifest.ConfigDigest = indexer.ConfigDigest
-	indexer.LexicalProfileDigest = ProfileDigest(DimensionLexical, LexicalProfileV2)
+	indexer.LexicalProfileDigest = ProfileDigest(DimensionLexical, LexicalProfileV3)
 	indexer.SemanticManifest = semanticManifest
 	indexer.SemanticProvider = integrationSemanticProvider{}
 	indexer.SemanticZvec = &integrationSemanticGenerationDriver{}
