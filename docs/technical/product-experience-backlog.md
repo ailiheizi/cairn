@@ -65,6 +65,27 @@ phase/requirement/exit-test triple.
    plan so the schema/operation/browser flow spec is ready — no schema or API
    implementation before the gates.
 
+## Known lexical limitation, with a candidate fix
+
+**CJK mid-run matching.** The lexical feed's FTS5 tokenizer (`unicode61`)
+treats a contiguous CJK run as one token and queries match by prefix, so a
+query for a word in the middle or at the end of a run does not match. This is
+a pre-existing property of the raw feed — verified on the live daemon: a note
+containing 杭州西湖的备份方案备忘 answers `杭州` (prefix) but not `西湖` or
+`备注` — and the pinyin enrichment (V3) inherits it: `xihu` fails for the same
+reason `西湖` does, while `lvxing`/`lx` succeed because those queries are
+prefixes of the run's joined/syllable forms.
+
+Candidate fix (not scheduled; needs the operator's call because it changes
+the feed shape again): index CJK **bigrams** — emit every adjacent character
+pair of each CJK run as an additional token — which makes any two-character
+query match anywhere inside a run, for both raw characters and pinyin forms.
+Costs: a new lexical profile version (V4), a larger FTS generation, and a
+rebuild; the coverage vocabulary stays unchanged because this is token
+enrichment, not a new field. A smaller alternative is to emit only the first
+N bigrams per run, which bounds growth but makes matching position-dependent
+and is therefore harder to describe honestly.
+
 ## Browser-side quick wins (no daemon change, use existing facts)
 
 4. **Timeline browse**: month-bucketed capture/modified-time histogram over
