@@ -53,6 +53,36 @@ repair, no retention model, and no update or delete protocol.
    lexical profile V1→V2→V3→V4 chain and the fail-closed generation binding
    already implement.
 
+## What the embedded decoder is actually for (and what it is not)
+
+A clarification worth recording, because the mechanism is easy to over-read.
+
+F3 is a **columnar data format**. Its files encode each column with one of
+several encoding schemes (dictionary, bit-packing, run-length, and so on).
+The embedded WebAssembly module exists for **encoding evolution**, not for
+compression ratio and not for reading arbitrary files: when a reader meets an
+encoding ID it does not implement, or a native implementation that is no
+longer version-compatible, it runs the file's own fallback decoder in a
+sandbox. The effect is that an old reader can still open a file that uses a
+newer encoding, and a new reader can still open a file written with an older
+one.
+
+It is therefore **not** a universal decoder interface that makes any file
+interpretable, and it is **not** a byte-exact reproduction mechanism: the
+paper claims that future readers can *decode the data*, not that the original
+bytes are reproduced. That is the opposite of what RestoreWeave's
+`EXACT_REVERSIBLE` demands, where a pinned decoder closure must reproduce the
+original `ContentID` — SHA-256 over the complete logical byte stream plus its
+length.
+
+The resemblance to a neural-codec shape (a decoder that must travel with the
+data because the encoding may outlive its implementation) is real, but the
+two serve different goals: F3 uses it for format longevity, RestoreWeave uses
+a decoder closure for physical savings with byte-exact recovery. The
+placement difference follows from that: F3 ships executable code *inside* the
+payload, which the security contract forbids here, while RestoreWeave keeps
+decoders as admitted, digest-recorded capabilities outside the content.
+
 ## Where the two designs genuinely diverge
 
 - **Unit of authority.** F3: one file = data + metadata + code. RestoreWeave:
