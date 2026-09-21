@@ -99,6 +99,50 @@ Conclusion: the working encoding is **bigrams plus per-character tokens**,
 space-separated, both derived from the same CJK run. That is the shape the
 implementation slice must emit; a bigram-only feed is insufficient.
 
+## Reader closure: keeping an old encoding readable years later
+
+The operator asked whether RestoreWeave can follow F3's encoder/decoder idea so
+that an encoding retired years from now can still be read. The answer is that
+the shape is **already frozen** and the remaining work is narrower than it
+sounds:
+
+- An `EXACT_REVERSIBLE` representation already must carry a portable
+  `RecoveryRecipe` naming the codec/profile ID, implementation digest,
+  model/tokenizer/dictionary digests, coder profile, framing digest, encoded
+  payload placement, decoded length, and validator profile, with the proof
+  `encoded placement -> pinned decoder -> complete byte stream -> SHA-256 +
+  length == source ContentIdentity`
+  (`docs/requirements/content-store-views-and-exports.md:232-236`). That is the
+  encoder/decoder pair, with a byte-exactness requirement F3 does not make.
+- The signed portable fact closure and the recovery reference already carry
+  `RequiredReaderDependencies` (`server/internal/exact/recovery_closure.go:226`,
+  `recovery_reference.go:71`; populated from the repository capability profile,
+  e.g. `restoreweave.repository.local-zstd-v1` plus
+  `klauspost/compress/zstd@v1.18.7`), so a reader can state what it needs.
+- The retirement rule is frozen: "A repository driver, decoder, model,
+  tokenizer, or dictionary cannot be removed while any retained representation
+  or recovery recipe depends on it"
+  (`docs/requirements/driver-and-processor-interfaces.md:479`).
+
+What is still missing is the part that makes those declarations *sufficient*:
+
+1. **Retention or reproduciblity, proven per dependency.** The requirement is
+   "retained, reproducibly rebuildable from a complete retained closure, or
+   both" (`docs/requirements/restore-manifest.md:1520`). Today each dependency
+   is a name plus a version string; nothing records where the decoder bits
+   live, how to rebuild them, or how to verify a rebuild.
+2. **An explicit decoder fallback order** — native implementation with a
+   matching digest, then the retained pinned decoder, then refuse and fall
+   through to the next recovery reference — instead of leaving the order
+   implicit.
+3. **Conformance vectors** (accept and reject cases) per signed record family,
+   so "any independent reader" is an executable claim rather than an
+   aspiration. Both this and item 2 are already listed above as F3 takeaways.
+
+Constraint carried forward: restorable content never executes. Whatever is
+retained is an admitted, digest-recorded capability kept *outside* the payload;
+F3's embedded decoder — executable code inside the data file — stays rejected.
+
 ## Browser-side quick wins (no daemon change, use existing facts)
 
 4. **Timeline browse**: month-bucketed capture/modified-time histogram over
