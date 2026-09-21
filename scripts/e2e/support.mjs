@@ -55,6 +55,19 @@ export async function assertStickyBarInView(ctx, drawer, state, kind = "source")
   }, `${drawerClass} ${scrollClass}`);
 }
 
+// A mocked route can be removed by an unroute() while its request is still in
+// flight; fulfilling then fails with "Route is already handled!". That is a
+// harness race, not a product failure, so mocks use this helper and ignore
+// exactly that error while still re-throwing anything else.
+export async function fulfillOrIgnoreRace(route, options) {
+  try {
+    await route.fulfill(options);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!/Route is already handled/i.test(message)) throw error;
+  }
+}
+
 export async function assertNoHorizontalOverflow(ctx) {
   const { page } = ctx;
   await page.setViewportSize({ width: 390, height: 844 });

@@ -55,6 +55,11 @@ func NewRecoveryDispatcher(socketPath string, service *exact.Service) (*Dispatch
 		command.OpSnapshotDiff:   true,
 		command.OpSnapshotVerify: true,
 		command.OpRecoveryImport: true,
+		// capability.list is read-only and already part of the command ABI. A
+		// clean reader may report which codec it can decode and how that codec
+		// stays obtainable; it still exposes no catalog, signing, or
+		// repository-write operation.
+		command.OpCapabilityList: true,
 	}
 	d := &Dispatcher{
 		socketPath:  socketPath,

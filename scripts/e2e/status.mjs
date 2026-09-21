@@ -19,6 +19,7 @@
 //     must state the receipt once it has run.
 
 import assert from "node:assert/strict";
+import { fulfillOrIgnoreRace } from "./support.mjs";
 
 const FACT_STATE = /^(PROVEN|UNKNOWN|DEGRADED|FAILED)/;
 // PROVEN rows carry the browser read time in either locale; every other state
@@ -244,7 +245,7 @@ export async function assertStatusSurface(ctx) {
         delete body.data.repository.writable_reason;
         delete body.data.repository.writable_checked_at;
       }
-      await route.fulfill({ response, json: body });
+      await fulfillOrIgnoreRace(route, { status: response.status(), contentType: "application/json", body: JSON.stringify(body) });
       return;
     }
     if (payload?.operation === "capability.list") {
@@ -256,7 +257,7 @@ export async function assertStatusSurface(ctx) {
           capability.notes = "simulated unavailable semantic provider";
         }
       }
-      await route.fulfill({ response, json: body });
+      await fulfillOrIgnoreRace(route, { status: response.status(), contentType: "application/json", body: JSON.stringify(body) });
       return;
     }
     await route.fallback();

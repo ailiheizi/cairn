@@ -109,7 +109,7 @@ func (repo *Dir) DescribeCapabilities() CapabilityProfile {
 		RepositoryFormat:   RepositoryProfileDirectoryCASDev,
 		Consistency:        ConsistencySingleHost,
 		Reader:             ReaderCleanInstall,
-		ReaderDependencies: []string{"restoreweave.repository.directory-cas-dev-v1"},
+		ReaderDependencies: []string{ReaderDependencyDirectoryCASDev},
 		Encryption:         EncryptionNone,
 		Compression:        CompressionIdentity,
 		Chunking:           ChunkingWholeFile,
@@ -125,7 +125,7 @@ func (repo *ZstdDir) DescribeCapabilities() CapabilityProfile {
 		RepositoryFormat:   RepositoryProfileLocalZstdV1,
 		Consistency:        ConsistencySingleHost,
 		Reader:             ReaderCleanInstall,
-		ReaderDependencies: []string{"restoreweave.repository.local-zstd-v1", "klauspost/compress/zstd@v1.18.7"},
+		ReaderDependencies: []string{ReaderDependencyLocalZstdV1, ReaderDependencyPinnedZstd},
 		Encryption:         EncryptionNone,
 		Compression:        CompressionProfileZstdV1,
 		Chunking:           ChunkingWholeFile,
@@ -137,7 +137,12 @@ func (repo *ZstdDir) DescribeCapabilities() CapabilityProfile {
 		capability.Driver = "restoreweave.local-zstd-encrypted"
 		capability.RepositoryFormat = RepositoryProfileLocalZstdEncryptedV1
 		capability.Encryption = EncryptionAES256GCM
-		capability.ReaderDependencies = append(capability.ReaderDependencies, "host-key-provider:v1")
+		// The encrypted profile reads a distinct envelope, so it must not claim
+		// the plain profile's dependency name: a reader that only satisfied the
+		// plain dependency would still be unable to open an encrypted object.
+		capability.ReaderDependencies = []string{
+			ReaderDependencyLocalZstdEncryptedV1, ReaderDependencyPinnedZstd, ReaderDependencyHostKeyProviderV1,
+		}
 	}
 	return capability
 }

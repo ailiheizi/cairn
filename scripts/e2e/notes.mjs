@@ -372,7 +372,10 @@ export async function assertNotesSurface(ctx) {
   // 12. The restored answer is the daemon's again.
   await page.unroute("**/api/v1/command");
   await surface.locator('[data-action="refresh"]').click();
-  await page.waitForFunction(() => document.querySelector(".notes-surface")?.getAttribute("data-state") === "READY", null, { timeout: 20000 });
+  // Wait for the result of the fresh load, not a stale attribute: the surface
+  // keeps its previous data-state until the new answer lands, so waiting on
+  // READY alone can pass while the mocked "truncated" answer is still shown.
+  await page.waitForFunction(() => document.querySelector(".notes-surface")?.getAttribute("data-partial") === "false", null, { timeout: 20000 });
   await page.waitForFunction((id) => Boolean(document.querySelector(`.note-row[data-annotation-id="${id}"]`)), String(alphaNote.annotation_id), { timeout: 15000 });
   assert.equal(await surface.getAttribute("data-partial"), "false", "the restored description answer must not read as partial");
   assert.equal(await surface.locator(`.note-row[data-description-document-id="${successor.description_document_id}"]`).count(), 1, "the restored answer must render the daemon's current leaf again");

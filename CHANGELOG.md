@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- The reader closure is declared, resolved, and vector-proven. `capability.list`
+  now reports one `reader-closure` row per admitted dependency — its role,
+  retention class, ordered decoder artifacts with digests, rebuild and verify
+  procedure, and decoder support window, or a typed refusal naming the caller
+  action. A frozen decoder fallback order (native implementation with a
+  matching digest, then the retained pinned decoder, then refuse and fall
+  through to the next recovery reference) replaces the implicit resolution,
+  and committed conformance vectors cover 17 signed-record accept/reject cases
+  plus golden payload bytes for the identity and zstd codecs, each regenerable
+  byte-for-byte from the production signers. This closes the three gaps behind
+  "an old encoding must stay readable years later" without ever putting
+  executable code inside content.
+- A read-only global Notes view: one rail entry listing every live user note
+  and current description leaf across the workspace, with source labels, lazy
+  body loading, a substring filter, honest empty/partial/blocked states, and
+  row navigation into the subject — no new durable record and no editor.
 - The browser can finally hand files to the daemon: a bounded
   `POST /api/v1/upload` streams files into a daemon-managed inbox staging
   directory (1 GiB per file, 200 per request, a process-wide in-flight cap),

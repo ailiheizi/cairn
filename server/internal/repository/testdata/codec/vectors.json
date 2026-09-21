@@ -1,0 +1,26 @@
+{
+  "schema": "org.restoreweave.codec-vector.v1",
+  "vectors": [
+    {
+      "name": "identity-payload",
+      "repository_profile": "directory-cas-dev-v1",
+      "blob": "identity-payload.blob",
+      "content_id": "sha256:9c8e75ea2a3ab91dc0de0d475a5cb12602078e85aebaa196f42e550775316ae5",
+      "logical_length": 2240
+    },
+    {
+      "name": "zstd-frame",
+      "repository_profile": "local-zstd-v1",
+      "blob": "zstd-frame.blob",
+      "content_id": "sha256:747b598aacee704d441b9dd57ba888cd8699ffcb548854c01d7a4fdbe9ca5108",
+      "logical_length": 14336
+    },
+    {
+      "name": "zstd-frame-incompressible",
+      "repository_profile": "local-zstd-v1",
+      "blob": "zstd-frame-incompressible.blob",
+      "content_id": "sha256:c4b14c92d449978e5c56a8f893fee390c50418ce473eebe5a886217227eddfac",
+      "logical_length": 4096
+    }
+  ]
+}

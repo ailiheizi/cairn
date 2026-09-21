@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ailiheizi/restoreweave/server/internal/repository"
@@ -311,5 +312,48 @@ func TestPortableFactReaderDependencySurvivesRelocation(t *testing.T) {
 	}
 	if !sameStrings(closures[0].Closure.RequiredReaderDependencies, portableFactReaderDependencies(reader.Repo)) {
 		t.Fatalf("relocated reader dependencies changed: %v", closures[0].Closure.RequiredReaderDependencies)
+	}
+}
+
+// TestSignedReaderDependencyTuplesAreAdmittedByThisBuild proves that every
+// dependency name a signed portable-fact record can carry is answered by a
+// reader-closure declaration this build admits, in both schema generations and
+// for every repository profile tuple the records can name. A reader of an old
+// record is therefore told how that decoder stays obtainable, and a name this
+// build cannot decode is refused with a typed reason instead of being guessed.
+func TestSignedReaderDependencyTuplesAreAdmittedByThisBuild(t *testing.T) {
+	repo, err := repository.OpenDir(filepath.Join(t.TempDir(), "repository"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := func(dependency, basis string) {
+		t.Helper()
+		if _, err := repository.AdmitReaderDependency(dependency); err != nil {
+			t.Fatalf("signed reader dependency %q (%s) is not admitted: %v", dependency, basis, err)
+		}
+	}
+	for _, closureSchema := range []string{PortableFactClosureSchemaV1, PortableFactClosureSchemaV2} {
+		for _, dependency := range portableFactReaderDependenciesForSchema(repo, closureSchema) {
+			declared(dependency, closureSchema)
+		}
+	}
+	for _, binding := range []RecoveryRepositoryBinding{
+		{Profile: repository.RepositoryProfileDirectoryCASDev, Compression: repository.CompressionProfileIdentity},
+		{Profile: repository.RepositoryProfileLocalZstdV1, Compression: repository.CompressionProfileZstdV1},
+		{Profile: repository.RepositoryProfileLocalZstdEncryptedV1, Compression: repository.CompressionProfileZstdV1},
+	} {
+		for _, closureSchema := range []string{PortableFactClosureSchemaV1, PortableFactClosureSchemaV2} {
+			for _, dependency := range portableFactReaderDependenciesForReference(binding, closureSchema) {
+				declared(dependency, binding.Profile+" "+closureSchema)
+			}
+		}
+	}
+	if _, err := repository.AdmitReaderDependency("restoreweave-reader:semantic-semantics-v1"); err == nil {
+		t.Fatal("an undeclared reader dependency was admitted")
+	}
+	// A reader must not assume the record's own listing is trustworthy: an
+	// unknown name has to fail closed even when it looks like a known scheme.
+	if _, err := repository.AdmitReaderDependency("repository:directory-cas-dev-v1/identity-v2"); err == nil {
+		t.Fatal("an undeclared payload tuple variant was admitted")
 	}
 }

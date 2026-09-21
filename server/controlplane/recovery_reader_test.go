@@ -71,6 +71,10 @@ func TestNewRecoveryDispatcherRequiresCatalogFreeSignedReader(t *testing.T) {
 		command.OpSnapshotVerify: true,
 		command.OpPlanRestore:    true,
 		command.OpPlanApply:      true,
+		// The clean reader reports its own reader closure through the existing
+		// read-only capability.list operation; it gains no catalog, signing, or
+		// repository-write surface.
+		command.OpCapabilityList: true,
 	}
 	if !reflect.DeepEqual(reader.implemented, want) {
 		t.Fatalf("reader operations = %v, want exactly %v", reader.implemented, want)

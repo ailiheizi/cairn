@@ -43,6 +43,7 @@ const executablePath = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH?.trim
 
 const ctx = await createHarness({ url, executablePath });
 try {
+  console.error(`[phase] ${phase} starting`);
   if (phase === "offline") {
     await ctx.page.route("**/api/v1/**", (route) => route.abort());
   }

@@ -890,7 +890,11 @@ func (d *Dispatcher) handleCapabilityList(env command.Envelope, started time.Tim
 	d.semanticBundleMu.RLock()
 	semanticBundle := d.semanticBundle
 	d.semanticBundleMu.RUnlock()
-	capabilities = append(capabilities, semanticBundle)
+	if strings.TrimSpace(semanticBundle.Kind) != "" {
+		// A reader-only dispatcher carries no semantic bundle: reporting a
+		// zero-valued row would invent a capability nobody installed.
+		capabilities = append(capabilities, semanticBundle)
+	}
 	for _, dimension := range search.DeclaredDimensions(search.IndexerReadiness(d.search)) {
 		if dimension.ID == search.DimensionSemantic && dimension.State == command.CapabilityUnavailable && d.search != nil {
 			if failure := strings.TrimSpace(d.search.SemanticFailure()); failure != "" {
@@ -920,7 +924,77 @@ func (d *Dispatcher) handleCapabilityList(env command.Envelope, started time.Tim
 		Notes:   brokerNotes,
 	})
 	capabilities = append(capabilities, d.ocrCapability())
+	capabilities = append(capabilities, d.readerClosureCapabilities()...)
 	return succeeded(env, started, command.CapabilityListData{Capabilities: capabilities})
+}
+
+// capabilityKindReaderClosure is the capability kind for a reader-closure
+// dependency: the codec, canonicalization, signature, or key dependency a
+// reader must satisfy before it can decode one of this repository's records.
+// It is separate from index-dimension and processor so "this build can still
+// read that encoding" is never confused with a processing capability.
+const capabilityKindReaderClosure = "reader-closure"
+
+// readerClosureCapabilities projects the reader closure of the wired
+// repository. It emits rows only when a repository is wired, so the operation
+// reports a declaration only for a codec this process actually opened, and an
+// unreadable dependency stays UNAVAILABLE with its typed refusal reason.
+func (d *Dispatcher) readerClosureCapabilities() []command.Capability {
+	if d.exact == nil || d.exact.Repo == nil {
+		return nil
+	}
+	closure, err := repository.ReaderClosureForRepository(d.exact.Repo)
+	if err != nil {
+		return []command.Capability{{
+			Kind: capabilityKindReaderClosure, ID: "repository-reader-closure",
+			State: command.CapabilityUnavailable, Notes: err.Error(),
+		}}
+	}
+	readable := "codec " + closure.Codec + " reader closure is satisfiable by this build"
+	if !closure.Readable {
+		readable = "codec " + closure.Codec + " reader closure is incomplete: " + closure.Reason
+	}
+	rows := make([]command.Capability, 0, len(closure.Declarations)+1)
+	for _, declaration := range closure.Declarations {
+		resolution, resolveErr := repository.AdmitReaderDependency(declaration.Dependency)
+		version, digestErr := declaration.ReaderClosureDigest()
+		if digestErr != nil {
+			version = ""
+		}
+		notes := declaration.Role + "; retention " + declaration.Retention + "; " + declaration.DecoderSupportWindow
+		if declaration.Rebuild != "" {
+			notes += "; rebuild: " + declaration.Rebuild
+		}
+		notes += "; verify: " + declaration.Verify
+		row := command.Capability{
+			Kind: capabilityKindReaderClosure, ID: declaration.Dependency,
+			Version: version, Notes: notes, State: command.CapabilityUnavailable,
+		}
+		if resolveErr == nil {
+			row.State = command.CapabilityAvailable
+			row.Source = resolution.Stage + ":" + resolution.DecoderID
+			rows = append(rows, row)
+			continue
+		}
+		var refusal *repository.ReaderDecoderRefusal
+		if errors.As(resolveErr, &refusal) {
+			row.Notes = refusal.Reason + "; " + refusal.Detail + "; " + refusal.CallerAction + "; " + notes
+		} else {
+			row.Notes = resolveErr.Error() + "; " + notes
+		}
+		rows = append(rows, row)
+	}
+	return append([]command.Capability{{
+		Kind: capabilityKindReaderClosure, ID: "repository-reader-closure",
+		State: readerClosureState(closure), Notes: readable,
+	}}, rows...)
+}
+
+func readerClosureState(closure repository.ReaderCodecClosure) string {
+	if closure.Readable {
+		return command.CapabilityAvailable
+	}
+	return command.CapabilityUnavailable
 }
 
 // capabilityKindProcessor is the capability kind for an optional learned

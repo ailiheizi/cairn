@@ -26,6 +26,7 @@
 // surface's state.
 
 import assert from "node:assert/strict";
+import { fulfillOrIgnoreRace } from "./support.mjs";
 
 const COMMAND_PATH = "/api/v1/command";
 const isCommandRequest = (request) => request.method() === "POST" && request.url().endsWith(COMMAND_PATH);
@@ -254,7 +255,7 @@ export async function assertVerificationSurface(ctx) {
         created_at: new Date().toISOString(),
         verification: { state: "UNRECORDED", reason: "no snapshot.verify receipt has been recorded for this restore point" },
       }];
-      await route.fulfill({ response, json: body });
+      await fulfillOrIgnoreRace(route, { status: response.status(), contentType: "application/json", body: JSON.stringify(body) });
     });
     await report.getByRole("button", { name: /Close verification report|关闭验证报告/ }).click();
     await panel.getByRole("button", { name: /刷新事实|Refresh facts/ }).click();
@@ -305,7 +306,7 @@ export async function assertVerificationSurface(ctx) {
       const response = await route.fetch();
       const body = await response.json();
       body.data.snapshots = [...(body?.data?.snapshots ?? []).filter((snapshot) => snapshot.snapshot_ref !== unavailableRow.snapshot_ref), unavailableRow];
-      await route.fulfill({ response, json: body });
+      await fulfillOrIgnoreRace(route, { status: response.status(), contentType: "application/json", body: JSON.stringify(body) });
     });
     await reopened.getByRole("button", { name: /Refresh$|刷新/ }).first().click();
     await page.waitForFunction(() => document.querySelector('.verification-receipt[data-outcome="UNAVAILABLE"]') !== null, null, { timeout: 15000 });

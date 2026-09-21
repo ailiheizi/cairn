@@ -124,7 +124,21 @@ sounds:
   or recovery recipe depends on it"
   (`docs/requirements/driver-and-processor-interfaces.md:479`).
 
-What is still missing is the part that makes those declarations *sufficient*:
+**Status: the three missing pieces are implemented and tested** (see the
+commit that carries this note). `reader.closure` declarations now ride the
+existing read-only `capability.list` as a `reader-closure` row kind — one row
+per admitted dependency stating its role, retention class, ordered decoder
+artifacts with digests, rebuild and verify procedure, and decoder support
+window, or a typed refusal with the caller action. A frozen decoder fallback
+resolver implements the order below and refuses with typed reasons that
+direct the caller to the next `RecoveryReference` rather than a weaker
+fidelity class. Conformance vectors are committed as golden files: 17 signed
+record vectors (accept plus reject per family, including a validly signed
+closure naming an unadmitted dependency) and golden payload bytes for the
+identity and zstd codecs, all regenerable byte-for-byte from the production
+signers.
+
+What was missing before those landed was:
 
 1. **Retention or reproduciblity, proven per dependency.** The requirement is
    "retained, reproducibly rebuildable from a complete retained closure, or

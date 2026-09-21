@@ -131,9 +131,12 @@ export async function assertMobileWorkspacePanel(ctx) {
 
   // Every rail entry is the desktop entry, inside the panel.
   const entries = panel.locator("button.workspace-nav-item");
-  assert.equal(await entries.count(), 5, "the panel must hold the five workspace views");
+  // The names are checked below; the count only has to cover them, so adding a
+  // view does not require editing this number.
+  const expectedEntryLabels = [/内容库|Library/, /来源|Sources/, /重复|Duplicates/, /备注|笔记|Notes/, /标签|Tags/, /活动|Activity/];
+  assert.ok(await entries.count() >= expectedEntryLabels.length, `the panel must hold every workspace view: ${await entries.count()} < ${expectedEntryLabels.length}`);
   const entryText = (await entries.allInnerTexts()).join("\n");
-  for (const label of [/内容库|Library/, /来源|Sources/, /重复|Duplicates/, /标签|Tags/, /活动|Activity/]) {
+  for (const label of expectedEntryLabels) {
     assert.match(entryText, label, `the panel must offer the ${label} view: ${entryText}`);
   }
   assert.equal(await entries.nth(0).isEnabled(), true, "every panel entry must be interactive");

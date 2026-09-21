@@ -234,6 +234,10 @@ export async function assertViewExportWithVerifyRetry(ctx) {
   await exportDrawer.getByRole("button", { name: /再次校验|Verify again/ }).click();
   await exportDrawer.getByText(/已根据冻结清单通过导出校验|Export verification passed/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
   await exportDrawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+  // The injection above must not outlive this check: a handler left registered
+  // here keeps intercepting every later module's traffic and can collide with
+  // a route another module registers on top of it.
+  await page.unroute("**/api/v1/command");
 }
 
 // Saved views and frozen manifests are durable daemon records: a full page
