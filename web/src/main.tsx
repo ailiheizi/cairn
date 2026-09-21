@@ -24,6 +24,7 @@ import { LibrarySurface } from "./components/LibrarySurface";
 import { ActivitySurface } from "./components/ActivitySurface";
 import { DuplicatesSurface } from "./components/DuplicatesSurface";
 import { TagsSurface } from "./components/TagsSurface";
+import { NotesSurface } from "./components/NotesSurface";
 import { DetailsPanel } from "./components/DetailsPanel";
 import { SourceDrawer } from "./components/SourceDrawer";
 import { RestoreDrawer } from "./components/RestoreDrawer";
@@ -86,6 +87,7 @@ function App() {
   // The activity view hands focus back to the rail entry it was opened from.
   const duplicatesRailRef = useRef<HTMLButtonElement | null>(null);
   const tagsRailRef = useRef<HTMLButtonElement | null>(null);
+  const notesRailRef = useRef<HTMLButtonElement | null>(null);
   const activityRailRef = useRef<HTMLButtonElement | null>(null);
   const t = useMemo(() => createTranslator(locale), [locale]);
 
@@ -472,9 +474,11 @@ function App() {
     onActivity={selectRailView(openActivity)}
     onDuplicates={selectRailView(() => view.setViewMode("duplicates"))}
     onTags={selectRailView(() => view.setViewMode("tags"))}
+    onNotes={selectRailView(() => view.setViewMode("notes"))}
     activityRef={activityRailRef}
     duplicatesRef={duplicatesRailRef}
     tagsRef={tagsRailRef}
+    notesRef={notesRailRef}
   />;
   // The panel hosts that same rail element and the same trusted status
   // disclosure; it adds the dialog shell only.
@@ -517,7 +521,12 @@ function App() {
     />
     <main className={`workspace ${selected ? "detail-active" : ""} ${showFirstSource ? "empty-library" : ""}`}>
       {compactLayout ? undefined : rail}
-      {view.viewMode === "duplicates" ? <DuplicatesSurface t={t} /> : view.viewMode === "tags" ? <TagsSurface t={t} /> : view.viewMode === "activity" ? <ActivitySurface
+      {view.viewMode === "duplicates" ? <DuplicatesSurface t={t} /> : view.viewMode === "tags" ? <TagsSurface t={t} /> : view.viewMode === "notes" ? <NotesSurface
+        t={t}
+        locale={locale}
+        workspaceID={workspaceID}
+        onOpenSubject={(hit) => void details.loadDetails(hit)}
+      /> : view.viewMode === "activity" ? <ActivitySurface
         t={t}
         locale={locale}
         workspaceID={workspaceID}

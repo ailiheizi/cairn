@@ -1,4 +1,4 @@
-import { Activity, Copy, HardDrive, Home, Tags, X } from "lucide-react";
+import { Activity, Copy, HardDrive, Home, StickyNote, Tags, X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import type { Translator } from "../i18n";
 
@@ -16,7 +16,7 @@ import type { Translator } from "../i18n";
 // every entry and the status disclosure inside it are the shared components,
 // so the two presentations cannot drift apart.
 
-export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sourceCount, onLibrary, onSources, onActivity, onDuplicates, onTags, activityRef, duplicatesRef, tagsRef }: {
+export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sourceCount, onLibrary, onSources, onActivity, onDuplicates, onTags, onNotes, activityRef, duplicatesRef, tagsRef, notesRef }: {
   t: Translator;
   viewMode: string;
   hasActiveFilters: boolean;
@@ -27,9 +27,11 @@ export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sou
   onActivity: () => void;
   onDuplicates: () => void;
   onTags: () => void;
+  onNotes: () => void;
   activityRef?: RefObject<HTMLButtonElement | null>;
   duplicatesRef?: RefObject<HTMLButtonElement | null>;
   tagsRef?: RefObject<HTMLButtonElement | null>;
+  notesRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return <aside className="workspace-sidebar" aria-label={t("Workspace navigation")}>
     <div className="workspace-sidebar-group">
@@ -38,6 +40,7 @@ export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sou
       <button type="button" className={`workspace-nav-item ${viewMode === "sources" ? "active" : ""}`} onClick={onSources}><HardDrive size={16} /><span>{t("Sources")}</span><small>{sourceCount}</small></button>
       <button type="button" ref={duplicatesRef} data-view="duplicates" className={`workspace-nav-item ${viewMode === "duplicates" ? "active" : ""}`} onClick={onDuplicates}><Copy size={16} /><span>{t("Duplicates")}</span></button>
       <button type="button" ref={tagsRef} data-view="tags" className={`workspace-nav-item ${viewMode === "tags" ? "active" : ""}`} onClick={onTags}><Tags size={16} /><span>{t("Tags")}</span></button>
+      <button type="button" ref={notesRef} data-view="notes" className={`workspace-nav-item ${viewMode === "notes" ? "active" : ""}`} onClick={onNotes}><StickyNote size={16} /><span>{t("Notes")}</span></button>
       <button type="button" ref={activityRef} data-view="activity" className={`workspace-nav-item ${viewMode === "activity" ? "active" : ""}`} onClick={onActivity}><Activity size={16} /><span>{t("Activity")}</span></button>
     </div>
   </aside>;

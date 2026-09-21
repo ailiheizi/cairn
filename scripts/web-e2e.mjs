@@ -28,6 +28,7 @@ import { assertStatusSurface } from "./e2e/status.mjs";
 import { assertVerificationSurface } from "./e2e/verification.mjs";
 import { assertActivitySurface } from "./e2e/activity.mjs";
 import { assertDescriptionAction } from "./e2e/description.mjs";
+import { assertNotesSurface } from "./e2e/notes.mjs";
 
 const phase = process.argv[2] ?? "online";
 const url = process.env.RESTOREWEAVE_WEB_E2E_URL ?? "http://127.0.0.1:5174/";
@@ -111,6 +112,9 @@ async function assertOnline(ctx) {
   await assertVerificationSurface(ctx);
   await assertActivitySurface(ctx);
   await assertDescriptionAction(ctx);
+  // The read-oriented global Notes view runs after the inspector's own notes
+  // assertions, because it reads the same records across subjects.
+  await assertNotesSurface(ctx);
 
   // The Phase-4 browser quick wins run last: they reload the page for the
   // deep-link assertions, so no earlier surface's view state is disturbed.

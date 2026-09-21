@@ -900,3 +900,118 @@ selection bar, and the details inspector column. */
 .source-health.staged { border-color: rgba(221, 169, 82, 0.23); color: #dfc38c; background: rgba(221, 169, 82, 0.07); }
 .source-health.staged > span { background: var(--gold); box-shadow: 0 0 0 2px rgba(221, 169, 82, 0.12); }
 .staging-path { overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* The read-oriented global Notes view (components/NotesSurface.tsx).
+ *
+ * Owner: the notes surface. The rule mirrors the tags surface: what the daemon
+ * returned, stated as such. A row shows the daemon's own subject name, source
+ * label and meta line, and the body only when the daemon returned one; a body
+ * that is not loaded yet, or unavailable, says so in place instead of the row
+ * disappearing. Nothing here is an affordance to write: the only controls are
+ * the filter, the refresh, and a description row's body toggle.
+ *
+ * Every rule is scoped to `.notes-surface`: the details inspector owns the
+ * `.note-row` class for its own subject-scoped list (see the notes-section
+ * rules above), and this surface must not restyle it. */
+.notes-surface { min-width: 0; }
+
+.notes-surface .notes-note,
+.notes-surface .notes-partial,
+.notes-surface .notes-warning,
+.notes-surface .notes-loading,
+.notes-surface .notes-filter-note,
+.notes-surface .notes-filter-empty,
+.notes-surface .notes-read-at,
+.notes-surface .note-row-unavailable {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.notes-surface .notes-contract { color: var(--ink); }
+.notes-surface .notes-partial { color: var(--gold); }
+.notes-surface .notes-read-at { margin: 12px 0 0; }
+.notes-surface .notes-loading { margin: 18px 0 0; font-size: 12px; }
+.notes-surface .notes-empty { margin-top: 12px; }
+
+.notes-surface .result-count.notes-scope {
+  max-width: min(520px, 46vw);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.notes-surface .notes-blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid rgba(221, 169, 82, 0.28);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--gold);
+  background: rgba(61, 45, 20, 0.3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.notes-surface .notes-blocked svg { flex: 0 0 auto; margin-top: 1px; }
+.notes-surface .notes-blocked > div { min-width: 0; display: grid; gap: 3px; }
+.notes-surface .notes-blocked strong { color: var(--ink); font-size: 12px; }
+.notes-surface .notes-blocked small { overflow-wrap: anywhere; font-size: 11px; }
+
+.notes-surface .notes-body { display: grid; gap: 8px; min-width: 0; }
+
+.notes-surface .notes-filter { display: grid; gap: 5px; margin-bottom: 0; font-size: 11px; color: var(--muted); }
+.notes-surface .notes-filter input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--ink);
+  background: var(--surface-container-low);
+  font: inherit;
+  font-size: 12px;
+}
+
+.notes-surface .notes-filter input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.notes-surface .notes-filter-note,
+.notes-surface .notes-filter-empty { margin: 0; }
+
+.notes-surface .notes-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.notes-surface .note-row { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card-fill-quiet); padding: 10px 12px; }
+.notes-surface .note-row-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+
+.notes-surface .note-row-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notes-surface .note-row-open:disabled { cursor: default; }
+.notes-surface .note-row-open:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.notes-surface .note-row-subject { font-size: 12px; font-weight: 780; overflow-wrap: anywhere; }
+.notes-surface .note-row-label { color: var(--accent); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+.notes-surface .note-row-meta,
+.notes-surface .note-row-path { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.notes-surface .note-row-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.notes-surface .note-row-body { color: var(--ink); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notes-surface .note-row-expand { flex: 0 0 auto; }
+.notes-surface .note-row-unavailable { margin: 8px 0 0; color: var(--gold); }
+
+@media (max-width: 640px) {
+  .notes-surface .note-row-head { flex-wrap: wrap; }
+  .notes-surface .note-row-expand { margin-left: 0; }
+}

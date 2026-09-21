@@ -121,8 +121,9 @@ export type SettingsSection = "storage" | "search" | "descriptions" | "recovery"
 
 // `sources` and `activity` are real workspace views like the library filters:
 // the configured sources and the durable job rows are each one surface, not a
-// second disclosure bar inside the library.
-export type ViewMode = "content" | "tag" | "path" | "search" | "sources" | "activity" | "duplicates" | "tags";
+// second disclosure bar inside the library. `notes` is the read-oriented
+// cross-subject Notes view (the same one Notes surface, seen across subjects).
+export type ViewMode = "content" | "tag" | "path" | "search" | "sources" | "activity" | "duplicates" | "tags" | "notes";
 export type ExportMode = "selected" | "view";
 
 // A frozen manifest reaches the drawer either from export.plan (the live
