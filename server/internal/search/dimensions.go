@@ -245,7 +245,7 @@ func FixtureIndexBinding(configDigest string) IndexBinding {
 	multimodalManifest.ProviderDigest = ProfileDigest(DimensionMultimodal, MultimodalFixtureProfileV1)
 	return IndexBinding{
 		ConfigDigest:            strings.TrimSpace(configDigest),
-		LexicalProfileDigest:    ProfileDigest(DimensionLexical, LexicalProfileV3),
+		LexicalProfileDigest:    ProfileDigest(DimensionLexical, LexicalProfileV4),
 		SemanticProfileDigest:   semanticManifest.CanonicalDigest(),
 		MultimodalProfileDigest: multimodalManifest.CanonicalDigest(),
 		AcousticProfileDigest:   ProfileDigest(DimensionAcoustic, AcousticFixtureProfileV1),
@@ -267,14 +267,20 @@ func ProfileDigest(dimension, profile string) string {
 }
 
 const (
-	// LexicalProfileV3 is the lexical feed shape with pinyin token enrichment
-	// of the name/path/notes/descriptions/extracted axes (the extracted axis
-	// bounded to its first 256 KiB, see extractedPinyinEnrichmentBound) and
-	// the dedicated *_pinyin FTS5 columns. It supersedes the
-	// "fts5-metadata-v2" profile: a generation built under the old profile
-	// records a different ProviderProfileDigest and is refused, never
-	// reinterpreted, by the current wiring.
-	LexicalProfileV3           = "fts5-metadata-v3"
+	// LexicalProfileV4 is the lexical feed shape that adds the derived CJK
+	// adjacency tokens — every adjacent character bigram plus every single
+	// character of each CJK run, and the adjacent pinyin syllable pairs — on
+	// top of the V3 pinyin token enrichment (name/path/notes/descriptions/
+	// extracted axes, the extracted axis bounded to its first 256 KiB, see
+	// extractedPinyinEnrichmentBound, in the dedicated *_pinyin FTS5 columns).
+	// The raw feed's unicode61 tokenizer treats one contiguous CJK run as a
+	// single prefix-matchable token, so V3 answered only a query at the start
+	// of a run; the adjacency tokens make any two-character query match
+	// anywhere inside the run, in characters and in pinyin, without a new
+	// field. It supersedes the "fts5-metadata-v3" profile: a generation built
+	// under an older profile records a different ProviderProfileDigest and is
+	// refused, never reinterpreted, by the current wiring.
+	LexicalProfileV4           = "fts5-metadata-v4"
 	GraphProfileV1             = "graph-catalog-v1"
 	AcousticFixtureProfileV1   = "acoustic-fixture-v1"
 	SemanticFixtureProfileV1   = "semantic-fixture-v1"

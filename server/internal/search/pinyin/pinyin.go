@@ -287,6 +287,46 @@ func FieldAppendix(text string) string {
 	return strings.Join(parts, " ")
 }
 
+// EnrichmentAppendix renders the complete additional search token text the
+// lexical feed appends to a CJK-bearing field. It is the superset of
+// FieldAppendix: for every maximal run of characters with recorded readings it
+// emits the CJK adjacency tokens — every adjacent character bigram and every
+// single character — followed by the pinyin appendix of FieldAppendix plus the
+// adjacent pinyin syllable pairs, so a two-character query matches anywhere
+// inside a run in characters and in pinyin, not only at the run's start.
+//
+// The feed's tokenizer (unicode61) treats one contiguous CJK run as a single
+// token matched by prefix, which is why the raw field alone answers only a
+// query at the start of a run; these tokens are the declared derived feed
+// shape, never display content. Adjacent means adjacent inside one run: no
+// token ever bridges the text between two runs. Text without covered
+// characters yields "" and the caller must not append a separator.
+func EnrichmentAppendix(text string) string {
+	runs := Runs(text)
+	if len(runs) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, run := range runs {
+		characters := []rune(run.Text)
+		for index := 0; index+1 < len(characters); index++ {
+			parts = append(parts, string(characters[index:index+2]))
+		}
+		for _, character := range characters {
+			parts = append(parts, string(character))
+		}
+		// Primary readings only, exactly like For; Runs records one reading
+		// set per character of the run, so the pairs align with the characters.
+		for index := 0; index+1 < len(run.Readings); index++ {
+			parts = append(parts, run.Readings[index][0]+run.Readings[index+1][0])
+		}
+	}
+	if appendix := FieldAppendix(text); appendix != "" {
+		parts = append(parts, appendix)
+	}
+	return strings.Join(parts, " ")
+}
+
 // UmlautForm rewrites the ASCII 'v' umlaut spelling to 'ü'. Only table
 // syllables feed this mapping and pinyin never uses the letter 'v', so no
 // legitimate spelling is affected.

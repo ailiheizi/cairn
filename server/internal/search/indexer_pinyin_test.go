@@ -48,10 +48,16 @@ func seedCJKFile(t *testing.T, store *sqlite.Store, seed *testutil.NamespaceSeed
 // seedCJKNote adds one CJK user note to the given subject.
 func seedCJKNote(t *testing.T, store *sqlite.Store, seed *testutil.NamespaceSeed, subjectRef string) {
 	t.Helper()
+	seedNoteBody(t, store, seed, subjectRef, cjkNoteBody)
+}
+
+// seedNoteBody adds one user note carrying body to the given subject.
+func seedNoteBody(t *testing.T, store *sqlite.Store, seed *testutil.NamespaceSeed, subjectRef, body string) {
+	t.Helper()
 	if err := store.Update(context.Background(), func(tx *sqlite.Tx) error {
 		return tx.InsertAnnotation(context.Background(), &sqlite.Annotation{
 			ID: mustSearchID(t, sqlite.IDPrefixAnnotation), WorkspaceID: seed.WorkspaceID,
-			SubjectRef: subjectRef, Kind: sqlite.AnnotationNote, Body: cjkNoteBody, Revision: 1,
+			SubjectRef: subjectRef, Kind: sqlite.AnnotationNote, Body: body, Revision: 1,
 		})
 	}); err != nil {
 		t.Fatalf("insert CJK note: %v", err)
@@ -122,7 +128,7 @@ func TestLexicalFeedAppendsPinyinTokensForNamePathNotesDescriptionsAndExtracted(
 	}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config-pinyin",
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3),
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
 	}
 	generation, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-feed", seed.RootID)
 	if err != nil {
@@ -234,7 +240,7 @@ func TestPinyinQueriesFindCJKContentThroughEveryEnrichedAxis(t *testing.T) {
 	seedExtractedText(t, store, seed, planID, cjkExtractedBody)
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config-pinyin",
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3),
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
 	}
 	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-query", seed.RootID); err != nil {
 		t.Fatalf("rebuild: %v", err)
@@ -306,9 +312,10 @@ func TestPinyinQueriesFindCJKContentThroughEveryEnrichedAxis(t *testing.T) {
 }
 
 // TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly pins the
-// extracted-axis feed shape: the pinyin appendix covers only the declared
-// 256 KiB prefix while the raw extracted field carries the whole text, so
-// raw-character queries over the unenriched tail still find the subject.
+// extracted-axis feed shape: the derived token appendix (CJK adjacency tokens
+// and pinyin forms) covers only the declared 256 KiB prefix while the raw
+// extracted field carries the whole text, so raw-character queries over the
+// unenriched tail still find the subject.
 func TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly(t *testing.T) {
 	ctx := context.Background()
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
@@ -326,7 +333,7 @@ func TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly(t *testing.T
 	seedExtractedText(t, store, seed, planID, body)
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config-pinyin",
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3),
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
 	}
 	generation, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-bound", seed.RootID)
 	if err != nil {
@@ -350,19 +357,24 @@ func TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly(t *testing.T
 	if !strings.HasSuffix(extracted, tail) {
 		t.Fatalf("raw extracted field lost the tail: %q", tail)
 	}
-	for _, form := range []string{"lv xing kai shi yu hang zhou xi hu", "lvxingkaishiyuhangzhouxihu", "lxksyhzxh"} {
+	for _, form := range []string{"lv xing kai shi yu hang zhou xi hu", "lvxingkaishiyuhangzhouxihu", "lxksyhzxh",
+		"西湖", "州西", "xihu", "zhouxi"} {
 		if !strings.Contains(extractedPinyin, form) {
 			t.Errorf("extracted pinyin %q misses the in-bound form %q", extractedPinyin, form)
 		}
 	}
-	for _, absent := range []string{"sha mo de jin tou shi dun huang", "shamodejintoushidunhuang", "smdjtsdh"} {
+	for _, absent := range []string{"sha mo de jin tou shi dun huang", "shamodejintoushidunhuang", "smdjtsdh",
+		"漠的", "mode", "dunhuang"} {
 		if strings.Contains(extractedPinyin, absent) {
 			t.Errorf("extracted pinyin %q contains beyond-bound form %q", extractedPinyin, absent)
 		}
 	}
 
 	// The prefix enrichment is searchable; the unenriched tail is reachable
-	// only through its raw characters, never through pinyin.
+	// only through its raw characters, never through pinyin or an adjacency
+	// token. The adjacency tokens follow the same declared bound as the rest
+	// of the appendix: an in-bound mid-run pair matches, and a pair inside the
+	// beyond-bound tail does not exist.
 	for _, probe := range []struct {
 		text string
 		axes []string
@@ -370,9 +382,13 @@ func TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly(t *testing.T
 	}{
 		{text: "lvxing", axes: []string{AxisExtracted}, want: 1},
 		{text: "hang zhou", axes: []string{AxisExtracted}, want: 1},
+		{text: "西湖", axes: []string{AxisExtracted}, want: 1},
+		{text: "xihu", axes: []string{AxisExtracted}, want: 1},
 		// 沙漠 starts the beyond-bound CJK run, so the raw-character query
-		// still finds the whole-text field.
+		// still finds the whole-text field; its adjacency tokens do not exist.
 		{text: "沙漠", axes: []string{AxisExtracted}, want: 1},
+		{text: "漠的", axes: []string{AxisExtracted}, want: 0},
+		{text: "mode", axes: []string{AxisExtracted}, want: 0},
 		{text: "dunhuang", axes: []string{AxisExtracted}, want: 0},
 		{text: "shamo", axes: []string{AxisExtracted}, want: 0},
 		{text: "dunhuang", axes: nil, want: 0},
@@ -390,6 +406,179 @@ func TestExtractedAxisPinyinEnrichmentCoversDeclaredBoundPrefixOnly(t *testing.T
 	}
 }
 
+// cjkMidRunNote is the V4 exit-test note. Every two-character word in it sits
+// mid-run or at the end of the run, where the bare unicode61 tokenizer can
+// only prefix-match: 杭州 opens the run, 西湖, 备份, and 备注 are interior or
+// trailing. The note is a second note body so the fixture note above keeps its
+// cross-axis place names.
+const cjkMidRunNote = "杭州西湖的备份方案备注"
+
+// TestLexicalProfileV4AnswersTheExitTestQueries pins the V4 feed shape end to
+// end through Rebuild and Query: a note containing 杭州西湖的备份方案备注 answers
+// 西湖, 备份, and 备注 mid-run and 杭州 at the run start, answers the pinyin
+// pairs xihu and beifen, keeps answering the raw full-run query, and never
+// answers an unrelated bigram.
+func TestLexicalProfileV4AnswersTheExitTestQueries(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	planID := seedCJKFile(t, store, seed)
+	seedNoteBody(t, store, seed, planID, cjkMidRunNote)
+	indexer := &Indexer{
+		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config-pinyin-v4",
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
+	}
+	generation, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-v4", seed.RootID)
+	if err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if generation.ProviderProfileDigest != ProfileDigest(DimensionLexical, LexicalProfileV4) {
+		t.Fatalf("generation profile digest = %q, want V4", generation.ProviderProfileDigest)
+	}
+
+	for _, probe := range []struct {
+		text  string
+		axes  []string
+		axis  string
+		want  int
+		notes string
+	}{
+		// The four exit-test words: 杭州 opens the run, 西湖/备份/备注 do not.
+		{text: "杭州", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "run start"},
+		{text: "西湖", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "mid-run"},
+		{text: "备份", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "mid-run"},
+		{text: "备注", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "run end"},
+		{text: "州西", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "adjacent interior pair"},
+		// The pinyin pairs for the same words, which V3 could not answer.
+		{text: "xihu", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "mid-run pinyin pair"},
+		{text: "beifen", axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "mid-run pinyin pair"},
+		// The raw full run still matches, with and without an axis restriction.
+		{text: cjkMidRunNote, axes: []string{AxisNotes}, axis: AxisNotes, want: 1, notes: "raw full run"},
+		{text: cjkMidRunNote, axes: nil, want: 1, notes: "raw full run, all axes"},
+		// Negative probes: a non-adjacent character pair, a non-adjacent
+		// pinyin pair, and an unrelated two-character word find nothing.
+		{text: "杭西", axes: nil, want: 0, notes: "non-adjacent characters"},
+		{text: "zhoubei", axes: nil, want: 0, notes: "non-adjacent syllables"},
+		{text: "春晓", axes: nil, want: 0, notes: "unrelated bigram"},
+		{text: "chunxiao", axes: nil, want: 0, notes: "unrelated pinyin pair"},
+	} {
+		_, hits, err := indexer.Query(ctx, QueryRequest{
+			WorkspaceID: seed.WorkspaceID, Dimension: DimensionLexical,
+			Text: probe.text, Axes: probe.axes,
+		})
+		if err != nil {
+			t.Fatalf("query %q (%s): %v", probe.text, probe.notes, err)
+		}
+		if len(hits) != probe.want {
+			t.Fatalf("query %q (%s) hits = %+v, want %d", probe.text, probe.notes, hits, probe.want)
+		}
+		if probe.want == 0 {
+			continue
+		}
+		if hits[0].SubjectID != planID {
+			t.Fatalf("query %q (%s) hit subject = %q, want the CJK file", probe.text, probe.notes, hits[0].SubjectID)
+		}
+		// A match on the note must be attributed to the notes axis and must
+		// still display the untouched raw note text.
+		if probe.axis != "" && !axisReported(hits[0].ConstructAxes, probe.axis) {
+			t.Errorf("query %q construct axes = %v, want %q", probe.text, hits[0].ConstructAxes, probe.axis)
+		}
+		if !containsWord(hits[0].Name, "旅行计划.md") {
+			t.Errorf("query %q hit name = %q, want the raw display name", probe.text, hits[0].Name)
+		}
+	}
+
+	// The coverage vocabulary is unchanged: the adjacency tokens are token
+	// enrichment inside the existing axes, not a new field.
+	coverage, err := indexer.Coverage(ctx, seed.WorkspaceID)
+	if err != nil {
+		t.Fatalf("coverage: %v", err)
+	}
+	if len(LexicalCoverageFields()) == 0 {
+		t.Fatal("coverage vocabulary is empty")
+	}
+	for _, invented := range []string{"name_pinyin", "path_pinyin", "notes_pinyin", "descriptions_pinyin",
+		"extracted_pinyin", "pinyin", "bigram", "bigrams", "cjk", "adjacency"} {
+		if _, ok := coverage.Fields[invented]; ok {
+			t.Errorf("coverage invented a %q field", invented)
+		}
+	}
+	if !coverage.Fields[AxisNotes] || !coverage.Fields[AxisName] {
+		t.Errorf("coverage fields = %+v, want notes and name present", coverage.Fields)
+	}
+}
+
+// TestCJKAdjacencyTokensMatchAtRunStartMiddleAndEnd proves the adjacency
+// tokens of one field reach every position of a run — start, middle, and end —
+// for the raw characters and the pinyin pair, and that a pair never bridges
+// the separators between runs.
+func TestCJKAdjacencyTokensMatchAtRunStartMiddleAndEnd(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	entryID := mustSearchID(t, sqlite.IDPrefixNamespaceEntry)
+	name := cjkMidRunNote + ".md"
+	if err := store.Update(ctx, func(tx *sqlite.Tx) error {
+		return tx.InsertNamespaceEntry(ctx, &sqlite.NamespaceEntry{
+			ID: entryID, WorkspaceID: seed.WorkspaceID, RootID: seed.RootID,
+			ParentID: seed.DirEntryID, RawName: []byte(name), DisplayName: name,
+			FullPathKey: []byte("Music\x00" + name), EntryType: sqlite.EntryFile,
+			Metadata: []byte(`{}`),
+		})
+	}); err != nil {
+		t.Fatalf("insert mid-run file entry: %v", err)
+	}
+	// A second subject whose note carries two separate runs: no adjacency
+	// token may bridge the ASCII text between them.
+	seedNoteBody(t, store, seed, entryID, "杭州abc西湖")
+	indexer := &Indexer{
+		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: "sha256:config-pinyin-v4",
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
+	}
+	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-positions", seed.RootID); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+
+	for _, probe := range []struct {
+		text string
+		axis string
+		want int
+	}{
+		// Name field: start, middle, and end of its run.
+		{text: "杭州", axis: AxisName, want: 1},
+		{text: "西湖", axis: AxisName, want: 1},
+		{text: "备份", axis: AxisName, want: 1},
+		{text: "备注", axis: AxisName, want: 1},
+		{text: "xihu", axis: AxisName, want: 1},
+		{text: "beizhu", axis: AxisName, want: 1},
+		{text: name, axis: AxisName, want: 1},
+		// Path field carries the same run.
+		{text: "备注", axis: AxisPath, want: 1},
+		{text: "beifen", axis: AxisPath, want: 1},
+		// The two-run note: an intra-run pair matches, a pair spanning the
+		// ASCII between the runs does not.
+		{text: "西湖", axis: AxisNotes, want: 1},
+		{text: "xihu", axis: AxisNotes, want: 1},
+		{text: "杭西", axis: AxisNotes, want: 0},
+		{text: "hangxi", axis: AxisNotes, want: 0},
+	} {
+		_, hits, err := indexer.Query(ctx, QueryRequest{
+			WorkspaceID: seed.WorkspaceID, Dimension: DimensionLexical,
+			Text: probe.text, Axes: []string{probe.axis},
+		})
+		if err != nil {
+			t.Fatalf("query %q on %s: %v", probe.text, probe.axis, err)
+		}
+		if len(hits) != probe.want {
+			t.Fatalf("query %q on %s hits = %+v, want %d", probe.text, probe.axis, hits, probe.want)
+		}
+		if probe.want == 1 && hits[0].SubjectID != entryID {
+			t.Fatalf("query %q on %s hit subject = %q, want the mid-run file", probe.text, probe.axis, hits[0].SubjectID)
+		}
+	}
+}
+
+// axisReported reports whether want appears in axes.
 func axisReported(axes []string, want string) bool {
 	for _, axis := range axes {
 		if axis == want {
@@ -399,11 +588,14 @@ func axisReported(axes []string, want string) bool {
 	return false
 }
 
-// TestLexicalProfileV3CreatesNewGenerationAndRefusesOldOnes pins the
+// TestLexicalProfileV4CreatesNewGenerationAndRefusesOldOnes pins the
 // fail-closed generation binding: changing the feed shape creates a new
 // generation, and a generation built under a different lexical profile is
-// refused, never reinterpreted.
-func TestLexicalProfileV3CreatesNewGenerationAndRefusesOldOnes(t *testing.T) {
+// refused, never reinterpreted. It follows the V1→V2→V3 precedent: an old
+// generation recorded under the superseded V3 profile stays addressable and
+// is refused by the V4 wiring, and the V4 generation is refused by the V3
+// wiring in the other direction.
+func TestLexicalProfileV4CreatesNewGenerationAndRefusesOldOnes(t *testing.T) {
 	ctx := context.Background()
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
 	seed := testutil.SeedNamespace(t, store)
@@ -411,12 +603,12 @@ func TestLexicalProfileV3CreatesNewGenerationAndRefusesOldOnes(t *testing.T) {
 	seedCJKNote(t, store, seed, planID)
 	configDigest := "sha256:config-pinyin-binding"
 
-	// An "old" generation: recorded under the superseded V2 profile digest.
+	// An "old" generation: recorded under the superseded V3 profile digest.
 	// The old profile string is quoted literally so the test documents the
 	// refused shape rather than deriving it from the current constant.
-	oldDigest := ProfileDigest(DimensionLexical, "fts5-metadata-v2")
-	if oldDigest == ProfileDigest(DimensionLexical, LexicalProfileV3) {
-		t.Fatal("v2 and v3 lexical profile digests collide")
+	oldDigest := ProfileDigest(DimensionLexical, "fts5-metadata-v3")
+	if oldDigest == ProfileDigest(DimensionLexical, LexicalProfileV4) {
+		t.Fatal("v3 and v4 lexical profile digests collide")
 	}
 	oldIndexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: configDigest,
@@ -430,46 +622,47 @@ func TestLexicalProfileV3CreatesNewGenerationAndRefusesOldOnes(t *testing.T) {
 		t.Fatalf("old generation profile digest = %q, want %q", oldGeneration.ProviderProfileDigest, oldDigest)
 	}
 
-	// The current wiring computes the V3 profile and must refuse the old
+	// The current wiring computes the V4 profile and must refuse the old
 	// generation instead of silently serving it.
 	newIndexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: configDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3),
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4),
 	}
 	if _, _, err := newIndexer.Query(ctx, QueryRequest{
 		WorkspaceID: seed.WorkspaceID, GenerationID: oldGeneration.ID, Dimension: DimensionLexical, Text: "track",
 	}); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("query of old-profile generation under V3 wiring = %v, want ErrUnavailable", err)
+		t.Fatalf("query of old-profile generation under V4 wiring = %v, want ErrUnavailable", err)
 	}
 
 	// A rebuild under the new feed shape creates a new generation; the old
 	// generation row stays addressable in the catalog.
 	newGeneration, err := newIndexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:pinyin-new", seed.RootID)
 	if err != nil {
-		t.Fatalf("V3 rebuild: %v", err)
+		t.Fatalf("V4 rebuild: %v", err)
 	}
 	if newGeneration.ID == oldGeneration.ID {
-		t.Fatal("V3 rebuild reused the old generation")
+		t.Fatal("V4 rebuild reused the old generation")
 	}
-	if newGeneration.ProviderProfileDigest != ProfileDigest(DimensionLexical, LexicalProfileV3) {
+	if newGeneration.ProviderProfileDigest != ProfileDigest(DimensionLexical, LexicalProfileV4) {
 		t.Fatalf("new generation profile digest = %q", newGeneration.ProviderProfileDigest)
 	}
 	if _, err := store.GetIndexGeneration(ctx, oldGeneration.ID); err != nil {
 		t.Fatalf("old generation row must remain readable: %v", err)
 	}
 
-	// The new generation serves pinyin queries through the newly enriched
-	// axes; the old wiring refuses the new generation in the other direction.
+	// The new generation serves pinyin and mid-run queries through the newly
+	// enriched axes; the old wiring refuses the new generation in the other
+	// direction.
 	if _, hits, err := newIndexer.Query(ctx, QueryRequest{
 		WorkspaceID: seed.WorkspaceID, GenerationID: newGeneration.ID, Dimension: DimensionLexical,
 		Text: "lvxing", Axes: []string{AxisNotes},
 	}); err != nil || len(hits) != 1 || hits[0].SubjectID != planID {
-		t.Fatalf("V3 generation notes-axis pinyin query = %+v err=%v", hits, err)
+		t.Fatalf("V4 generation notes-axis pinyin query = %+v err=%v", hits, err)
 	}
 	if _, _, err := oldIndexer.Query(ctx, QueryRequest{
 		WorkspaceID: seed.WorkspaceID, GenerationID: newGeneration.ID, Dimension: DimensionLexical, Text: "track",
 	}); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("query of V3 generation under old wiring = %v, want ErrUnavailable", err)
+		t.Fatalf("query of V4 generation under old wiring = %v, want ErrUnavailable", err)
 	}
 
 	// Without a pinned generation, the latest generation is only served when

@@ -222,7 +222,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 	case DimensionLexical:
 		digest = idx.LexicalProfileDigest
 		if digest == "" && idx.ConfigDigest != "" {
-			digest = ProfileDigest(dimension, LexicalProfileV3)
+			digest = ProfileDigest(dimension, LexicalProfileV4)
 		}
 	case DimensionGraph:
 		digest = idx.GraphProfileDigest
@@ -687,20 +687,23 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		doc := Document{
 			SubjectID: entry.SubjectRef,
 			Path:      entryPath,
-			// Pinyin token enrichment for the name/path/notes/descriptions/
-			// extracted axes. The raw characters stay in their own fields
-			// untouched; the appendix adds queryable syllable tokens so a
-			// pinyin query reaches the same axis. The extracted axis bounds
-			// the enrichment to its first 256 KiB (see
-			// extractedPinyinEnrichmentBound); the raw text above stays whole
-			// (profile: fts5-metadata-v3).
-			PathPinyin:         pinyin.FieldAppendix(entryPath),
+			// The declared derived CJK/pinyin token enrichment for the name/
+			// path/notes/descriptions/extracted axes. The raw characters stay
+			// in their own fields untouched; the appendix adds the raw CJK
+			// adjacency tokens (every adjacent character bigram plus every
+			// single character) and the pinyin tokens (syllables, adjacent
+			// syllable pairs, joined form, umlaut form, initials), so a
+			// mid-run query reaches the same axis in characters or in pinyin.
+			// The extracted axis bounds the enrichment to its first 256 KiB
+			// (see extractedPinyinEnrichmentBound); the raw text above stays
+			// whole (profile: fts5-metadata-v4).
+			PathPinyin:         pinyin.EnrichmentAppendix(entryPath),
 			Name:               entry.DisplayName,
-			NamePinyin:         pinyin.FieldAppendix(entry.DisplayName),
+			NamePinyin:         pinyin.EnrichmentAppendix(entry.DisplayName),
 			Notes:              notes,
-			NotesPinyin:        pinyin.FieldAppendix(notes),
+			NotesPinyin:        pinyin.EnrichmentAppendix(notes),
 			Descriptions:       descriptions,
-			DescriptionsPinyin: pinyin.FieldAppendix(descriptions),
+			DescriptionsPinyin: pinyin.EnrichmentAppendix(descriptions),
 			Extracted:          extracted,
 			ExtractedPinyin:    boundedPinyinEnrichment(extracted),
 			Suffix:             suffixOf(entry.DisplayName),

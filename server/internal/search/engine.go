@@ -29,9 +29,9 @@ type Document struct {
 	SubjectID string
 	Path      string
 	// NamePinyin, PathPinyin, NotesPinyin, DescriptionsPinyin, and
-	// ExtractedPinyin hold the pinyin token enrichment the feed appends for
-	// the name/path/notes/descriptions/extracted axes (see
-	// pinyin.FieldAppendix; the extracted axis is bounded, see
+	// ExtractedPinyin hold the derived CJK/pinyin token enrichment the feed
+	// appends for the name/path/notes/descriptions/extracted axes (see
+	// pinyin.EnrichmentAppendix; the extracted axis is bounded, see
 	// extractedPinyinEnrichmentBound). They are searchable through the same
 	// axes, but never returned as display data: the Hit fields stay the
 	// original raw values.
@@ -485,15 +485,16 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 	fields := []struct {
 		axis string
 		text string
-		// enrichment returns the additional pinyin token text indexed for
-		// this field's axis (name/path/notes/descriptions/extracted). It is
-		// nil for fields without pinyin enrichment, and it is called lazily
-		// so a query already answered by the raw text never pays for the
-		// transliteration (the extracted axis can be large).
+		// enrichment returns the additional derived token text indexed for
+		// this field's axis: the CJK adjacency tokens (bigrams plus single
+		// characters) and the pinyin tokens (see pinyin.EnrichmentAppendix).
+		// It is nil for fields without that enrichment, and it is called
+		// lazily so a query already answered by the raw text never pays for
+		// the transliteration (the extracted axis can be large).
 		enrichment func(string) string
 	}{
-		{AxisPath, hit.Path, pinyin.FieldAppendix},
-		{AxisName, hit.Name, pinyin.FieldAppendix},
+		{AxisPath, hit.Path, pinyin.EnrichmentAppendix},
+		{AxisName, hit.Name, pinyin.EnrichmentAppendix},
 		{AxisSuffix, suffix, nil},
 		{AxisType, hit.EntryType, nil},
 		{AxisChecksum, hit.ContentID, nil},
@@ -503,8 +504,8 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 		{AxisProtection, protection, nil},
 		{AxisLocators, locators, nil},
 		{AxisTags, tags, nil},
-		{AxisNotes, notes, pinyin.FieldAppendix},
-		{AxisDescriptions, descriptions, pinyin.FieldAppendix},
+		{AxisNotes, notes, pinyin.EnrichmentAppendix},
+		{AxisDescriptions, descriptions, pinyin.EnrichmentAppendix},
 		{AxisExtracted, extracted, boundedPinyinEnrichment},
 		{AxisDetection, detection, nil},
 		{AxisProcessing, processing, nil},
@@ -541,22 +542,24 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 	return matched
 }
 
-// extractedPinyinEnrichmentBound bounds the pinyin token enrichment of the
+// extractedPinyinEnrichmentBound bounds the derived token enrichment of the
 // extracted axis to the first 256 KiB of the joined extracted-field text,
 // measured in bytes and always cut at a UTF-8 rune boundary. Extracted
-// document text can be arbitrarily large while the appendix adds roughly one
-// ASCII syllable per Han character, so the bound keeps feed growth
-// proportional for huge documents. This is an honest feed shape, not silent
-// truncation: the raw extracted text stays whole in its own field, so
-// raw-character queries over the full body still match; only the pinyin
-// token appendix stops at the bound (profile: fts5-metadata-v3).
+// document text can be arbitrarily large while the appendix adds a bounded
+// number of tokens per Han character (adjacency bigrams, single characters,
+// and syllables), so the bound keeps feed growth proportional for huge
+// documents. This is an honest feed shape, not silent truncation: the raw
+// extracted text stays whole in its own field, so raw-character queries over
+// the full body still match (a contiguous raw run matches at its start even
+// beyond the bound); only the derived token appendix stops at the bound
+// (profile: fts5-metadata-v4).
 const extractedPinyinEnrichmentBound = 256 << 10
 
-// boundedPinyinEnrichment is the extracted-axis pinyin enrichment: the same
-// FieldAppendix the other text axes use, applied to the declared bounded
-// prefix of the field text.
+// boundedPinyinEnrichment is the extracted-axis token enrichment: the same
+// pinyin.EnrichmentAppendix the other text axes use, applied to the declared
+// bounded prefix of the field text.
 func boundedPinyinEnrichment(text string) string {
-	return pinyin.FieldAppendix(boundForPinyinEnrichment(text))
+	return pinyin.EnrichmentAppendix(boundForPinyinEnrichment(text))
 }
 
 // boundForPinyinEnrichment returns the prefix of text the pinyin enrichment

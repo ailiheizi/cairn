@@ -12,17 +12,15 @@
   prefills the ordinary plan review with the staged directory, and a
   confirm-guarded clean action removes never-ingested scratch files only
   inside the daemon's own inbox root. Uploading never bypasses plan review.
-- Pinyin search joins the lexical dimension: the name, path, notes,
-  descriptions, and extracted axes carry provenance-recorded pinyin tokens
-  (syllables, joined form, initials) generated from the public-domain Unihan
-  database under lexical profile `fts5-metadata-v3`, so `lvxing`, `lü xing`,
-  or `lx` find 旅行计划.md by name and reach CJK notes, descriptions, and
-  extracted document text through the same axes while the original characters
-  keep matching. The extracted axis bounds its enrichment to the first 256 KiB
-  of the field text (an honest feed shape; the raw text stays whole in its own
-  field, so raw-character queries over the full body still match). A rebuild
-  under the new profile creates a new generation; old generations stay bound
-  to their recorded digest and are never reinterpreted.
+- Chinese search matches mid-word now. The lexical feed (profile
+  `fts5-metadata-v4`) adds CJK adjacency tokens — every adjacent character
+  bigram plus every single character of a run, and the same for pinyin
+  syllables — alongside the existing raw text and pinyin forms. A note
+  containing 杭州西湖的备份 answers `西湖` and `xihu`, not only `杭州`; the
+  earlier feed could only match a run's prefix. The extracted-text axis keeps
+  its declared 256 KiB enrichment bound with the raw text whole, the coverage
+  vocabulary is unchanged, and a rebuild under V4 creates a new generation
+  while older generations stay bound to their recorded digests.
 - The library gains four browser-side ergonomics: a month-bucketed timeline
   strip over the captured modification times (click to filter, click again to
   clear), a collapsible space report whose byte total is asserted equal to the

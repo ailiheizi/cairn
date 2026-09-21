@@ -105,6 +105,49 @@ func TestRunsPreservesRunTextAndOffsets(t *testing.T) {
 	}
 }
 
+func TestEnrichmentAppendixEmitsAdjacencyTokensThenPinyinForms(t *testing.T) {
+	// Per run: every adjacent bigram first, then every single character, then
+	// the adjacent syllable pairs, then the unchanged FieldAppendix (the
+	// space-joined syllables, joined forms, and initials).
+	if got, want := EnrichmentAppendix("旅行计划"),
+		"旅行 行计 计划 旅 行 计 划 lvxing xingji jihua lv xing ji hua lvxingjihua lüxingjihua lxjh"; got != want {
+		t.Errorf("EnrichmentAppendix = %q, want %q", got, want)
+	}
+	// An ASCII-only field gains nothing.
+	if got := EnrichmentAppendix("track.flac"); got != "" {
+		t.Errorf("EnrichmentAppendix non-CJK = %q, want empty", got)
+	}
+	// Bigrams never bridge the characters between two runs, while the pinyin
+	// appendix still carries every run.
+	if got, want := EnrichmentAppendix("中文 abc 拼音"),
+		"中文 中 文 zhongwen 拼音 拼 音 pinyin zhong wen pin yin zhongwen pinyin zhongwen pinyin zw py"; got != want {
+		t.Errorf("EnrichmentAppendix multi-run = %q, want %q", got, want)
+	}
+	// A two-character run has exactly one bigram and two characters. The
+	// syllable pair and the joined umlaut form both spell the table's ASCII
+	// 'v': 女绿 reads nv lv, so the pair and the umlaut form are "nvlv" and
+	// "nülü".
+	if got, want := EnrichmentAppendix("女绿"),
+		"女绿 女 绿 nvlv nv lv nvlv nülü nl"; got != want {
+		t.Errorf("EnrichmentAppendix two-character = %q, want %q", got, want)
+	}
+	// The enrichment is a superset of FieldAppendix: every existing form stays
+	// byte-identical inside the new appendix.
+	for _, text := range []string{"旅行计划.md", "中文abc拼音", "万个", "女绿"} {
+		field := FieldAppendix(text)
+		enriched := EnrichmentAppendix(text)
+		if field == "" {
+			if enriched != "" {
+				t.Errorf("EnrichmentAppendix(%q) = %q, want empty like FieldAppendix", text, enriched)
+			}
+			continue
+		}
+		if !strings.Contains(enriched, field) {
+			t.Errorf("EnrichmentAppendix(%q) = %q, misses FieldAppendix %q", text, enriched, field)
+		}
+	}
+}
+
 func TestFieldAppendixComposesAllForms(t *testing.T) {
 	if got, want := FieldAppendix("旅行计划.md"), "lv xing ji hua lvxingjihua lüxingjihua lxjh"; got != want {
 		t.Errorf("FieldAppendix = %q, want %q", got, want)

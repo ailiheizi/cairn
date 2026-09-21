@@ -65,7 +65,7 @@ phase/requirement/exit-test triple.
    plan so the schema/operation/browser flow spec is ready — no schema or API
    implementation before the gates.
 
-## Known lexical limitation, with a candidate fix
+## Chinese mid-run matching — implemented (lexical profile V4, commit follows this note)
 
 **CJK mid-run matching.** The lexical feed's FTS5 tokenizer (`unicode61`)
 treats a contiguous CJK run as one token and queries match by prefix, so a

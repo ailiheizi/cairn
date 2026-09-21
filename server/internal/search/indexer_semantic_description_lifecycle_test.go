@@ -52,7 +52,7 @@ func TestSemanticFeedFiltersDescriptionHistoryButLexicalRetainsIt(t *testing.T) 
 	driver := &selectiveSourceFeedDriver{}
 	indexer := &Indexer{
 		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
-		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV3), SemanticManifest: manifest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4), SemanticManifest: manifest,
 		SemanticProvider: sourceFeedProvider{}, SemanticZvec: driver,
 		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
 	}
