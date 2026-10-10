@@ -992,7 +992,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   Consider repository-local workspace packages and locally trusted build-time
   additions before separately reviewing runtime iframe isolation or external
   processor packages. Do not adopt Cordis solely to manage the current small
-  compiled registry set. A proposed successor that keeps this ladder but extends
+  compiled registry set. An admitted successor that keeps this ladder but extends
   its first step is recorded in ADR-032 below.
 - **Music and queue boundary:** Artist and album browsing may use only real
   facts already returned by the existing `audio.list` projection; absent facts
@@ -1232,11 +1232,11 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 
 ### ADR-032: Presentation-plane extensions with a closed recovery plane
 
-- **Status:** Proposed 2026-10-10 as an informative architecture decision. It adds
-  no code, schema, phase credit or acceptance. Adopting it would narrow two
-  earlier statements (ADR-026's Cordis note and the Convergence Phase sentence in
-  `AGENTS.md`), so it waits for explicit operator sign-off and authorizes nothing
-  until then.
+- **Status:** Admitted 2026-10-10 by the operator as an informative architecture
+  decision, which also authorized the two guardrail edits below. It adds no code,
+  schema, phase credit or acceptance on its own: Stage 2 still has to earn its
+  exit. It narrows two earlier statements (ADR-026's Cordis note and the
+  Convergence Phase sentence in `AGENTS.md`), both of which are updated to match.
 - **Problem:** The operator wants interface appearance to be extensible, so that
   presentation work — a theme, a whole-shell arrangement, a new way to browse
   already-loaded content — can improve without waiting for a first-party release
@@ -1304,12 +1304,13 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   export. Community aesthetics become possible without anything entering the
   digest path. The client gains an admission step and a compatibility check that
   it does not have today.
-- **Required edits if this is approved:** ADR-026's "do not adopt Cordis" note
-  gains a pointer here, and the Convergence Phase sentence in `AGENTS.md` is
-  narrowed so that a runtime third-party marketplace stays out of scope while the
-  presentation-plane, locally trusted, declaratively composed case becomes
-  reviewable. That sentence is a guardrail; editing it needs the operator's
-  explicit sign-off and is deliberately not done by this ADR.
+- **Guardrail edits made on admission:** ADR-026's "do not adopt Cordis" note
+  carries a forward pointer here, and the Convergence Phase sentence in
+  `AGENTS.md` was narrowed to keep untrusted runtime third-party code, a general
+  extension ABI for the kernel and any plugin store out of scope while admitting
+  this presentation-plane case. That sentence is a guardrail, so it was edited
+  only after the operator's explicit approval; the rest of this ADR authorizes no
+  other guardrail change.
 
 ## 9. Open gates before the release binary
 

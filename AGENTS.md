@@ -45,11 +45,20 @@ Cairn is currently in a convergence phase: finish and polish the
 admitted core loop and the admitted first-party client surfaces before adding
 new scope. Prefer closing an existing gap (recovery, trust, a rough edge in an
 admitted UX surface) over starting a new surface or integration. A runtime
-third-party plugin marketplace — installable third-party extensions, a
-public extension ABI, or a plugin store — is explicitly out of scope, not
-merely deferred; see ADR-026/028 in
-`docs/technical/build-stack-and-architecture-selection.md`. Compiled
-first-party components registered in-repo remain the only extension model.
+third-party plugin marketplace — untrusted third-party code running inside the
+application, a public extension ABI for the kernel, or a plugin store — is
+explicitly out of scope, not merely deferred; see ADR-026/028 in
+`docs/technical/build-stack-and-architecture-selection.md`. Compiled first-party
+components registered in-repo remain the only extension model for the kernel and
+for anything that can affect identity, digests, processors, recovery records, or
+exports. ADR-032 admits one narrow exception on the presentation plane only: a
+versioned presentation package that declares an id, a supported host range, and
+the render slots or palettes it fills; is admitted whole or refused whole; and
+composes at build or install time so the running application executes no
+third-party code. It can never reach the recovery plane — ADR-032 states that
+exclusion as a hard boundary enforced structurally, not by review. Untrusted
+runtime third-party code, a general extension ABI for the kernel, and any plugin
+store remain out of scope.
 MCP/CLI/AI-harness integration is a real future direction but is deferred
 until after this convergence phase; do not start that work without a direct
 request.
