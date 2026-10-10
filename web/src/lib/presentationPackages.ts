@@ -19,9 +19,27 @@
 //     "tokens": { "--canvas": "#0b1020", "--ink": "#e6edf3" }
 //   }
 //
+// `tokens` is either that flat value set — one set applied under every
+// appearance, the declaration Stage 2a shipped — or one complete value set per
+// effective appearance, which is the capability a built-in palette already has:
+//
+//   "tokens": {
+//     "light": { "--canvas": "#f4f8ff", "--ink": "#0f2b46" },
+//     "dark":  { "--canvas": "#0b1020", "--ink": "#e6edf3" }
+//   }
+//
+// The two forms are exclusive, because a flat token name beside `light`/`dark`
+// would make one field mean two things, and both appearances must be declared:
+// a half-declared theme would keep claiming the theme id while leaving the other
+// appearance on the built-in palette. Every value set passes the identical
+// allowlist and forbidden-value rules through one code path, and the *effective*
+// appearance selects the set, so a stored preference of `system` behaves exactly
+// like the explicit appearance it resolves to.
+//
 // Every field is required. An unknown field is refused rather than ignored: a
 // document that declares `"css"`, `"script"` or `"components"` must be refused
-// whole, never admitted with the executable-looking part silently dropped.
+// whole, never admitted with the executable-looking part silently dropped. An
+// unknown key inside a value set is refused the same way, by name.
 //
 // WHERE PACKAGES COME FROM
 // The source of truth is the source tree, not the served output:
@@ -73,6 +91,7 @@
 // admission never reads `package.json` at runtime.
 
 import { BUILT_IN_THEME_IDS } from "./appearance";
+import type { PresentationTokens } from "./appearance";
 
 export const PRESENTATION_PACKAGE_SCHEMA = "cairn.presentation-package.v1";
 export const PRESENTATION_PACKAGE_INDEX_SCHEMA = "cairn.presentation-package-index.v1";
@@ -131,6 +150,11 @@ export const PRESENTATION_TOKEN_ALLOWLIST: readonly string[] = Object.freeze([
 
 const allowedTokenNames = new Set(PRESENTATION_TOKEN_ALLOWLIST);
 
+// The two appearance keys a per-appearance value-set declaration may name.
+// Every admitted design token starts with `--`, so neither name can collide
+// with one.
+const PRESENTATION_APPEARANCE_KEYS = ["light", "dark"] as const;
+
 /** A built-in palette id or a namespaced package id such as `community:aurora`. */
 const PACKAGE_ID_PATTERN = /^[a-z][a-z0-9-]*(?::[a-z0-9][a-z0-9._-]*)?$/;
 /** An index entry: a plain JSON file name in the index's own directory. */
@@ -155,7 +179,12 @@ export type PresentationPackage = {
   readonly name: string;
   readonly hostRange: string;
   readonly swatches: readonly string[];
-  readonly tokens: Readonly<Record<string, string>>;
+  /**
+   * Either one flat value set applied under every appearance (the original
+   * declaration, preserved exactly) or one value set per effective appearance.
+   * Both forms are the same admitted shape; only the host's apply step chooses.
+   */
+  readonly tokens: PresentationTokens;
   /** The index file name this package was read from, or "" for a direct call. */
   readonly source: string;
 };
@@ -245,6 +274,82 @@ export function forbiddenTokenValueFragment(value: string): string | undefined {
     if (lowered.includes(fragment)) return fragment;
   }
   return undefined;
+}
+
+type TokenValueSetAdmission =
+  | { readonly admitted: true; readonly values: Record<string, string> }
+  | { readonly admitted: false; readonly refusal: PresentationPackageRefusal };
+
+/**
+ * One value set, checked by the one rule: every key must be an admitted design
+ * token and every value must pass the forbidden-value rule. `where` names the
+ * appearance a set belongs to, so a refusal inside a per-appearance
+ * declaration says which set it came from. A flat set passes `""`.
+ */
+function admitTokenValueSet(
+  value: Record<string, unknown>,
+  source: string,
+  id: string,
+  where: string,
+): TokenValueSetAdmission {
+  const values: Record<string, string> = {};
+  const prefix = where === "" ? "" : `${where}: `;
+  for (const [name, tokenValue] of Object.entries(value)) {
+    if (!allowedTokenNames.has(name)) {
+      return { admitted: false, refusal: { code: "token-key", source, id, detail: truncateDetail(`${prefix}${name}`) } };
+    }
+    if (typeof tokenValue !== "string") {
+      return { admitted: false, refusal: { code: "token-value", source, id, detail: truncateDetail(`${prefix}${name}`) } };
+    }
+    const fragment = forbiddenTokenValueFragment(tokenValue);
+    if (fragment) {
+      return { admitted: false, refusal: { code: "token-value", source, id, detail: truncateDetail(`${prefix}${name}: ${fragment}`) } };
+    }
+    values[name] = tokenValue;
+  }
+  return { admitted: true, values };
+}
+
+type TokensAdmission =
+  | { readonly admitted: true; readonly tokens: PresentationTokens }
+  | { readonly admitted: false; readonly refusal: PresentationPackageRefusal };
+
+/**
+ * The `tokens` field in either admitted form. Presence of `light` or `dark`
+ * selects the per-appearance form; a flat value set is every other case, so a
+ * document that never heard of the new form is admitted exactly as before. The
+ * two forms never mix: a flat token name beside an appearance key would make one
+ * field mean two things and is refused whole. The per-appearance form requires
+ * both appearances, because a half-declared theme would keep claiming the theme
+ * id while leaving the other appearance to the built-in palette.
+ */
+function admitTokenDeclaration(value: Record<string, unknown>, source: string, id: string): TokensAdmission {
+  const declaredKeys = Object.keys(value);
+  const declaresAppearances = declaredKeys.some((key) => (PRESENTATION_APPEARANCE_KEYS as readonly string[]).includes(key));
+  if (!declaresAppearances) {
+    const flat = admitTokenValueSet(value, source, id, "");
+    if (!flat.admitted) return { admitted: false, refusal: flat.refusal };
+    return { admitted: true, tokens: flat.values };
+  }
+  for (const key of declaredKeys) {
+    if (!(PRESENTATION_APPEARANCE_KEYS as readonly string[]).includes(key)) {
+      return {
+        admitted: false,
+        refusal: { code: "manifest", source, id, detail: truncateDetail(`tokens mixes value sets: ${key}`) },
+      };
+    }
+  }
+  const sets: Partial<Record<(typeof PRESENTATION_APPEARANCE_KEYS)[number], Record<string, string>>> = {};
+  for (const appearance of PRESENTATION_APPEARANCE_KEYS) {
+    const declaredSet = value[appearance];
+    if (!isRecord(declaredSet) || Object.keys(declaredSet).length === 0) {
+      return { admitted: false, refusal: { code: "manifest", source, id, detail: truncateDetail(`tokens.${appearance}`) } };
+    }
+    const admittedSet = admitTokenValueSet(declaredSet, source, id, appearance);
+    if (!admittedSet.admitted) return { admitted: false, refusal: admittedSet.refusal };
+    sets[appearance] = admittedSet.values;
+  }
+  return { admitted: true, tokens: { light: sets.light as Record<string, string>, dark: sets.dark as Record<string, string> } };
 }
 
 function parseSemanticVersion(value: string): SemanticVersion | undefined {
@@ -352,14 +457,10 @@ export function admitPresentationPackage(value: unknown, options: PresentationAd
   if (!isRecord(value.tokens) || Object.keys(value.tokens).length === 0) {
     return refusal("manifest", source, value.id, "tokens");
   }
-  const tokens: Record<string, string> = {};
-  for (const [name, tokenValue] of Object.entries(value.tokens)) {
-    if (!allowedTokenNames.has(name)) return refusal("token-key", source, value.id, name);
-    if (typeof tokenValue !== "string") return refusal("token-value", source, value.id, name);
-    const fragment = forbiddenTokenValueFragment(tokenValue);
-    if (fragment) return refusal("token-value", source, value.id, `${name}: ${fragment}`);
-    tokens[name] = tokenValue;
-  }
+  // One code path decides both forms, so a per-appearance value set can never be
+  // validated more loosely than the flat declaration it extends.
+  const tokenDeclaration = admitTokenDeclaration(value.tokens, source, value.id);
+  if (!tokenDeclaration.admitted) return { admitted: false, refusal: tokenDeclaration.refusal };
   return {
     admitted: true,
     package: {
@@ -368,7 +469,7 @@ export function admitPresentationPackage(value: unknown, options: PresentationAd
       name: value.name,
       hostRange: value.hostRange,
       swatches,
-      tokens,
+      tokens: tokenDeclaration.tokens,
       source,
     },
   };

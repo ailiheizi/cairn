@@ -16,13 +16,37 @@ export type ThemeID = BuiltInThemeID | (string & {});
 export type InterfaceId = string;
 
 /**
+ * One complete set of design-token values, keyed by an admitted token name.
+ * Admission in `presentationPackages.ts` is the only thing that produces one.
+ */
+export type PresentationTokenValues = Readonly<Record<string, string>>;
+
+/**
+ * A per-appearance declaration: one value set per effective appearance. Both
+ * are required, so a package can never claim a theme id and then leave one
+ * appearance on the built-in palette.
+ */
+export type PresentationAppearanceTokens = {
+  readonly light: PresentationTokenValues;
+  readonly dark: PresentationTokenValues;
+};
+
+/**
+ * A package's declared values in either admitted form. The flat form is the
+ * original `cairn.presentation-package.v1` declaration: one value set applied
+ * under every appearance, preserved exactly. The per-appearance form is the
+ * newer one: the effective appearance selects which set is written.
+ */
+export type PresentationTokens = PresentationTokenValues | PresentationAppearanceTokens;
+
+/**
  * An admitted theme package's tokens. The host writes them as inline custom
  * properties on the root element, which is why a package can restate a design
  * token and cannot introduce a rule, a selector, or a resource.
  */
 export type InstalledThemeTokens = {
   id: string;
-  tokens: Readonly<Record<string, string>>;
+  tokens: PresentationTokens;
 };
 
 export type AppearancePreference = {
@@ -112,10 +136,23 @@ export function resetAppearancePreference(storage?: StorageLike): void {
 // Custom properties an installed package wrote on the last apply. A built-in
 // palette has none, so they are removed before the compiled `[data-theme]`
 // blocks take over again — otherwise a stale override would outlive the
-// selection of the package that declared it.
+// selection of the package that declared it. The list is the previous apply's
+// keys, so a key that exists in only one of a package's two value sets is
+// removed when the other set is written.
 let appliedInstalledTokens: string[] = [];
 
-function applyInstalledThemeTokens(root: RootElement, tokens?: Readonly<Record<string, string>>): void {
+/**
+ * Which declared value set the *effective* appearance selects. A flat
+ * declaration (the original form) is one set applied under every appearance. A
+ * per-appearance declaration is keyed by appearance, and only the effective one
+ * — never the stored preference, which may be `system` — is written.
+ */
+function valuesForAppearance(tokens: PresentationTokens, appearance: EffectiveAppearance): PresentationTokenValues {
+  const selected: unknown = (tokens as Readonly<Record<string, unknown>>)[appearance];
+  return isRecord(selected) ? (selected as PresentationTokenValues) : (tokens as PresentationTokenValues);
+}
+
+function applyInstalledThemeTokens(root: RootElement, tokens?: PresentationTokenValues): void {
   if (!root.style) return;
   for (const name of appliedInstalledTokens) root.style.removeProperty(name);
   appliedInstalledTokens = [];
@@ -139,7 +176,8 @@ export function applyAppearancePreference(
   root.setAttribute("data-theme", normalized.themeId);
   root.setAttribute("data-appearance", effective);
   root.setAttribute("data-interface", normalized.interfaceId);
-  applyInstalledThemeTokens(root, installedThemes.find((theme) => theme.id === normalized.themeId)?.tokens);
+  const installedTheme = installedThemes.find((theme) => theme.id === normalized.themeId);
+  applyInstalledThemeTokens(root, installedTheme && valuesForAppearance(installedTheme.tokens, effective));
   return effective;
 }
 

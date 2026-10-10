@@ -19,8 +19,9 @@ startup and admits what it finds there.
 
 - `index.json` — the index the client reads. It names the installed packages.
 - `inkstone-indigo.json` — one genuine, selectable example theme and the
-  reference to copy. Its `hostRange` admits this release, so it applies as soon
-  as you build or run the client.
+  reference to copy. It declares a light and a dark palette, so the Color mode
+  control changes it the way it changes a built-in palette. Its `hostRange`
+  admits this release, so it applies as soon as you build or run the client.
 
 ## Install your own package
 
@@ -47,13 +48,19 @@ never admitted with the executable-looking part silently dropped.
 ```json
 {
   "schema": "cairn.presentation-package.v1",
-  "id": "community:inkstone-indigo",
-  "name": "Inkstone Indigo",
+  "id": "community:aurora",
+  "name": "Aurora",
   "hostRange": ">=0.1.0-prealpha.1 <0.2.0",
-  "swatches": ["#12111c", "#c6bcff", "#7fe0b5"],
+  "swatches": ["#f4f8ff", "#2f5d8a", "#0f2b46"],
   "tokens": {
-    "--canvas": "#12111c",
-    "--ink": "#ecebff"
+    "light": {
+      "--canvas": "#f4f8ff",
+      "--ink": "#0f2b46"
+    },
+    "dark": {
+      "--canvas": "#0b1020",
+      "--ink": "#e6edf3"
+    }
   }
 }
 ```
@@ -65,7 +72,57 @@ never admitted with the executable-looking part silently dropped.
 | `name` | 1–80 characters. Shown in the palette picker. |
 | `hostRange` | A space- or comma-separated comparator list over the application version (`web/package.json`), e.g. `>=0.1.0-prealpha.1 <0.2.0`. Comparators are `>=`, `>`, `<=`, `<`, `=`; anything else is refused as unsupported syntax. |
 | `swatches` | 1–4 preview colours, each 1–40 characters, following the value rules below. |
-| `tokens` | At least one entry, every key from the token list below. |
+| `tokens` | One flat value set — at least one entry, every key from the token list below — **or** the two names `light` and `dark`, each holding one such value set. See below. |
+
+## `tokens`: one palette, or one per appearance
+
+`tokens` accepts exactly two shapes, and never a mixture of them.
+
+**A flat value set** is one palette of fixed values applied under every
+appearance. This is the original form and still works unchanged:
+
+```json
+"tokens": {
+  "--canvas": "#12111c",
+  "--ink": "#ecebff"
+}
+```
+
+**An appearance-keyed value set** declares one palette per effective
+appearance, so the System/Light/Dark control changes how your theme looks
+exactly as it does for a built-in palette. The host writes the set the
+*effective* appearance selects, so `system` behaves like the appearance it
+resolves to:
+
+```json
+"tokens": {
+  "light": {
+    "--canvas": "#f4f8ff",
+    "--ink": "#0f2b46",
+    "--primary": "#4a3f9d"
+  },
+  "dark": {
+    "--canvas": "#12111c",
+    "--ink": "#ecebff",
+    "--primary": "#c6bcff"
+  }
+}
+```
+
+Rules for this form:
+
+- Both `light` and `dark` are required. A package that declares only one would
+  keep claiming the theme id while leaving the other appearance on the built-in
+  palette, so it is refused whole.
+- A flat token name beside `light`/`dark` makes one field mean two things and is
+  refused whole.
+- Each set is checked by the same token allowlist and the same value rules as a
+  flat set; an unknown key inside a set is refused whole, by name, and names the
+  appearance it came from.
+- A set may declare fewer tokens than the other one. A token declared in only
+  one set is written for that appearance and **removed** for the other, so the
+  compiled value takes over there instead of leaking across.
+
 
 `index.json` has its own shape, and an entry is refused if it is not a plain
 `*.json` file name in this directory:
@@ -130,15 +187,23 @@ is assign it to a design token.
 
 ## Notes for a theme author
 
-- A package restates a **single** palette of fixed values. The application's
-  System/Light/Dark control still switches appearance, but the tokens a package
-  sets do not become a second light or dark variant — they are the same values
-  in both. Set the tokens as one coherent palette and check contrast yourself.
-  The shipped example is a dark theme, so it renders dark under every appearance
-  setting.
-- The example sets 40 of the 42 tokens and leaves `--page-gutter` and `--rail`
-  at their compiled responsive values; whatever a package does not set, the
-  built-in palette keeps.
+- A package may restate **one** palette of fixed values, or **one palette per
+  appearance**. Use the per-appearance form when you want the System/Light/Dark
+  control to change how your theme looks; use the flat form when the palette is
+  meant to be the same in both. Either way, check contrast yourself.
+- The shipped example, `inkstone-indigo.json`, declares a real light and dark
+  pair: an inkstone-paper light palette and the deep indigo dark palette, with
+  the same shape and the same radii, so selecting it and switching appearance
+  changes the rendered colours instead of doing nothing.
+- The example sets 40 of the 42 tokens in each appearance and leaves
+  `--page-gutter` and `--rail` at their compiled responsive values; whatever a
+  package does not set for the selected appearance, the built-in palette keeps.
+- `color-scheme` is not an admitted token, so a package never writes it, and it
+  does not need to. The client already derives it from the effective appearance
+  through a rule that is not scoped to a theme (`html[data-appearance="light"]`
+  in `web/src/styles/base.css`), so native form controls and scrollbars follow
+  light and dark correctly under an installed theme too. Measured: an installed
+  theme reports `color-scheme: light` under light and `dark` under dark.
 - Admission is pure: the same document is either admitted whole or refused
   whole, with one stable reason. If your package is refused, the reason is shown
   in the interface and, for this directory, named by the build.

@@ -21,6 +21,16 @@
 //                         whole and never shadows the built-in;
 //   scenario "shell"      a package declaring CSS/script-bearing fields is
 //                         refused whole rather than partially ignored;
+//   scenario "per-appearance" a package declaring one value set per appearance
+//                         renders two different sets of token values when the
+//                         Color mode control switches light to dark, a token
+//                         declared in only one set is removed for the other
+//                         appearance, and a package declaring only the original
+//                         flat map still applies the same values under both;
+//   scenario "per-appearance-refusals" a forbidden value inside one value set, an
+//                         unknown key inside one, a half-declared theme, and a
+//                         mixture of the flat and per-appearance forms are each
+//                         refused whole with no partial application;
 //   scenario "absent"     with no index at all nothing is installed, no refusal
 //                         is reported, and the built-in palettes stay in charge;
 //   scenario "shipped"    the example package shipped in the source tree
@@ -202,8 +212,12 @@ async function readAppearance(page) {
     return {
       theme: root.getAttribute("data-theme"),
       appearance: root.getAttribute("data-appearance"),
+      colorScheme: computed.colorScheme,
       canvas: computed.getPropertyValue("--canvas").trim(),
       ink: computed.getPropertyValue("--ink").trim(),
+      primary: computed.getPropertyValue("--primary").trim(),
+      gold: computed.getPropertyValue("--gold").trim(),
+      coral: computed.getPropertyValue("--coral").trim(),
       cardRadius: computed.getPropertyValue("--card-radius").trim(),
       paintedText: computed.color,
       paintedRadius: settingsPage ? getComputedStyle(settingsPage).borderTopLeftRadius : "",
@@ -222,6 +236,35 @@ async function readAppearance(page) {
       installNote: document.querySelector(".appearance-colors .appearance-storage-note")?.textContent?.trim() ?? "",
     };
   });
+}
+
+/** `#rrggbb` as the `rgb(r, g, b)` a computed style paints it with. */
+function rgbOf(value) {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
+  require(match, `cannot turn ${JSON.stringify(value)} into a painted rgb() colour`);
+  return `rgb(${parseInt(match[1], 16)}, ${parseInt(match[2], 16)}, ${parseInt(match[3], 16)})`;
+}
+
+/** A package's `tokens` is either one flat value set or one per appearance. */
+function declaresAppearances(tokens) {
+  return Boolean(tokens) && typeof tokens === "object"
+    && (Object.prototype.hasOwnProperty.call(tokens, "light") || Object.prototype.hasOwnProperty.call(tokens, "dark"));
+}
+
+/** The value set one appearance selects; a flat declaration applies under both. */
+function declaredValues(tokens, appearance) {
+  const selected = tokens && typeof tokens === "object" && !Array.isArray(tokens) ? tokens[appearance] : undefined;
+  return selected && typeof selected === "object" && !Array.isArray(selected) ? selected : tokens;
+}
+
+/** Switch the Color mode control and wait for the effective appearance to land. */
+async function setAppearanceMode(page, mode) {
+  await page.locator(`input[name="cairn-appearance-mode"][value=${JSON.stringify(mode)}]`).check();
+  await page.waitForFunction(
+    (value) => document.documentElement.getAttribute("data-appearance") === value,
+    mode,
+    { timeout: 8000 },
+  );
 }
 
 async function waitForPaletteOption(page, id) {
@@ -572,30 +615,261 @@ async function scenarioShippedExample(packagesDirectory) {
     await selectTheme(page, example.id);
     const read = await readAppearance(page);
     assert.equal(read.theme, example.id, `shipped: the example id becomes data-theme, observed ${JSON.stringify(read.theme)}`);
-    // The example declares one palette of fixed values, applied on top of
-    // whatever built-in appearance is in charge, so these are the declared
-    // values rather than a light variant of them.
-    assert.equal(read.canvas, example.tokens["--canvas"], `shipped: the declared --canvas reaches the document, observed ${JSON.stringify(read.canvas)}`);
-    assert.equal(read.ink, example.tokens["--ink"], `shipped: the declared --ink reaches the document, observed ${JSON.stringify(read.ink)}`);
-    assert.equal(read.cardRadius, example.tokens["--card-radius"], `shipped: the declared --card-radius reaches the document, observed ${JSON.stringify(read.cardRadius)}`);
+    // The fresh context asks for a light system, so the example is read under
+    // the effective light appearance: a per-appearance declaration selects its
+    // light set, and a flat declaration applies the same values everywhere.
+    const perAppearance = declaresAppearances(example.tokens);
+    const lightTokens = declaredValues(example.tokens, "light");
+    const darkTokens = declaredValues(example.tokens, "dark");
+    assert.equal(read.appearance, "light", `shipped: an untouched preference resolves to light in a light system, observed ${JSON.stringify(read.appearance)}`);
+    assert.equal(read.canvas, lightTokens["--canvas"], `shipped: the declared --canvas reaches the document, observed ${JSON.stringify(read.canvas)}`);
+    assert.equal(read.ink, lightTokens["--ink"], `shipped: the declared --ink reaches the document, observed ${JSON.stringify(read.ink)}`);
+    assert.equal(read.cardRadius, lightTokens["--card-radius"], `shipped: the declared --card-radius reaches the document, observed ${JSON.stringify(read.cardRadius)}`);
     // `.app-shell` paints `var(--surface)` and inherits `color` from `var(--ink)`,
     // so these two are the proof that the package is not merely stored: the
     // interface actually renders with the declared values.
-    assert.equal(read.paintedSurface, "rgb(27, 26, 41)", `shipped: the declared --surface is what the application shell actually paints, observed ${JSON.stringify(read.paintedSurface)}`);
-    assert.equal(read.paintedInk, "rgb(236, 235, 255)", `shipped: the declared --ink is what the shell paints text with, observed ${JSON.stringify(read.paintedInk)}`);
-    assert.equal(read.paintedRadius, example.tokens["--card-radius"], `shipped: the declared --card-radius is what the settings surface renders, observed ${JSON.stringify(read.paintedRadius)}`);
+    assert.equal(read.paintedSurface, rgbOf(lightTokens["--surface"]), `shipped: the declared --surface is what the application shell actually paints, observed ${JSON.stringify(read.paintedSurface)}`);
+    assert.equal(read.paintedInk, rgbOf(lightTokens["--ink"]), `shipped: the declared --ink is what the shell paints text with, observed ${JSON.stringify(read.paintedInk)}`);
+    assert.equal(read.paintedRadius, lightTokens["--card-radius"], `shipped: the declared --card-radius is what the settings surface renders, observed ${JSON.stringify(read.paintedRadius)}`);
     assert.equal(read.paintedThemeCardRadius, "10px", `shipped: a compiled component radius still renders beside it, observed ${JSON.stringify(read.paintedThemeCardRadius)}`);
+    const painted = { theme: read.theme, light: { canvas: read.canvas, paintedSurface: read.paintedSurface, paintedInk: read.paintedInk, cardRadius: read.cardRadius } };
+
+    if (perAppearance) {
+      // The shipped theme is the reference a self-hoster copies, so it must be
+      // visibly two palettes rather than one palette under two labels.
+      await setAppearanceMode(page, "dark");
+      const darkRead = await readAppearance(page);
+      assert.equal(darkRead.appearance, "dark", `shipped: the mode control reaches the effective appearance, observed ${JSON.stringify(darkRead.appearance)}`);
+      assert.equal(darkRead.canvas, darkTokens["--canvas"], `shipped: the same theme under dark applies its own --canvas, observed ${JSON.stringify(darkRead.canvas)}`);
+      assert.notEqual(darkRead.canvas, read.canvas, `shipped: the light and dark sets are different palettes, observed both as ${JSON.stringify(darkRead.canvas)}`);
+      assert.equal(darkRead.paintedInk, rgbOf(darkTokens["--ink"]), `shipped: the dark --ink is what the shell paints text with, observed ${JSON.stringify(darkRead.paintedInk)}`);
+      assert.equal(darkRead.paintedSurface, rgbOf(darkTokens["--surface"]), `shipped: the dark --surface is what the application shell actually paints, observed ${JSON.stringify(darkRead.paintedSurface)}`);
+      assert.equal(darkRead.cardRadius, darkTokens["--card-radius"], `shipped: the same radii in both sets, observed ${JSON.stringify(darkRead.cardRadius)}`);
+      painted.dark = { canvas: darkRead.canvas, paintedSurface: darkRead.paintedSurface, paintedInk: darkRead.paintedInk, cardRadius: darkRead.cardRadius };
+
+      await setAppearanceMode(page, "light");
+      const backRead = await readAppearance(page);
+      assert.equal(backRead.canvas, lightTokens["--canvas"], `shipped: switching back re-applies the light set, observed ${JSON.stringify(backRead.canvas)}`);
+    }
+
     observed.scenarios[`shipped:${exampleName}`] = {
       id: example.id,
       name: example.name,
       file: exampleFile,
       hostRange: example.hostRange,
-      declaredTokens: Object.keys(example.tokens).length,
-      painted: { theme: read.theme, canvas: read.canvas, paintedSurface: read.paintedSurface, paintedInk: read.paintedInk, cardRadius: read.cardRadius },
+      perAppearance,
+      declaredTokens: perAppearance
+        ? { light: Object.keys(lightTokens).length, dark: Object.keys(darkTokens).length }
+        : Object.keys(lightTokens).length,
+      painted,
     };
 
     await checkBuiltInPalettes(page, "shipped");
     assert.deepEqual(external, [], "shipped: serving and applying the example requests nothing outside the document origin");
+  } finally {
+    await context.close();
+  }
+}
+
+/** A package that declares one value set per appearance, next to one that
+ *  declares only the flat map. The effective appearance — not the stored
+ *  preference — must select the set, and a key present in only one set must be
+ *  removed when the other set is written. */
+async function scenarioPerAppearanceApplies(packagesDirectory, declaredVersion) {
+  const daynightID = "acceptance:daynight-shift";
+  const flatID = "acceptance:fixed-plate";
+  const lightTokens = {
+    "--canvas": "#fdf7ec",
+    "--ink": "#241d12",
+    "--primary": "#7a4f18",
+    "--card-radius": "6px",
+    "--gold": "#6b4a08",
+  };
+  const darkTokens = {
+    "--canvas": "#151109",
+    "--ink": "#f6ecd9",
+    "--primary": "#e6c48a",
+    "--card-radius": "11px",
+    "--coral": "#ff9a8f",
+  };
+  const flatTokens = { "--canvas": "#0d1b2a", "--ink": "#e0e6ed", "--card-radius": "5px" };
+  await writeFixture(packagesDirectory, {
+    schema: INDEX_SCHEMA,
+    packages: ["daynight.json", "fixed.json"],
+  }, {
+    "daynight.json": {
+      schema: PACKAGE_SCHEMA,
+      id: daynightID,
+      name: "Daynight Shift",
+      hostRange: `>=${declaredVersion} <9.0.0`,
+      swatches: ["#fdf7ec", "#151109"],
+      tokens: { light: lightTokens, dark: darkTokens },
+    },
+    "fixed.json": {
+      schema: PACKAGE_SCHEMA,
+      id: flatID,
+      name: "Fixed Plate",
+      hostRange: `>=${declaredVersion} <9.0.0`,
+      swatches: ["#0d1b2a"],
+      tokens: flatTokens,
+    },
+  });
+  const { context, page, external } = await openClient();
+  try {
+    await openAppearance(page);
+    await waitForPaletteOption(page, daynightID);
+    assert.deepEqual((await readAppearance(page)).refusals, [], "per-appearance: both forms are admitted");
+    await selectTheme(page, daynightID);
+
+    const lightRead = await readAppearance(page);
+    assert.equal(lightRead.appearance, "light", `per-appearance: a light system resolves the untouched preference to light, observed ${JSON.stringify(lightRead.appearance)}`);
+    // color-scheme is not an admitted token, so a package never writes it; the
+    // host derives it from the effective appearance through a rule that is not
+    // scoped to a theme. Asserting it here keeps that true for an installed
+    // theme, so native controls cannot silently regress to the wrong scheme.
+    assert.equal(lightRead.colorScheme, "light", `per-appearance: an installed theme still gets a light native color-scheme under light, observed ${JSON.stringify(lightRead.colorScheme)}`);
+    assert.equal(lightRead.canvas, lightTokens["--canvas"], `per-appearance: the light set's --canvas is applied under light, observed ${JSON.stringify(lightRead.canvas)}`);
+    assert.equal(lightRead.ink, lightTokens["--ink"], `per-appearance: the light set's --ink is applied under light, observed ${JSON.stringify(lightRead.ink)}`);
+    assert.equal(lightRead.paintedText, rgbOf(lightTokens["--ink"]), `per-appearance: the light --ink is what the page paints text with, observed ${JSON.stringify(lightRead.paintedText)}`);
+    assert.equal(lightRead.cardRadius, lightTokens["--card-radius"], `per-appearance: the light set's layout token is applied, observed ${JSON.stringify(lightRead.cardRadius)}`);
+    assert.equal(lightRead.gold, lightTokens["--gold"], `per-appearance: a token declared only in the light set is the light value under light, observed ${JSON.stringify(lightRead.gold)}`);
+    assert.equal(lightRead.coral, "#dc8278", `per-appearance: a token the light set omits keeps the compiled value, observed ${JSON.stringify(lightRead.coral)}`);
+
+    await setAppearanceMode(page, "dark");
+    const darkRead = await readAppearance(page);
+    assert.equal(darkRead.appearance, "dark", `per-appearance: the mode control reaches the effective appearance, observed ${JSON.stringify(darkRead.appearance)}`);
+    assert.equal(darkRead.colorScheme, "dark", `per-appearance: an installed theme still gets a dark native color-scheme under dark, observed ${JSON.stringify(darkRead.colorScheme)}`);
+    assert.equal(darkRead.canvas, darkTokens["--canvas"], `per-appearance: the dark set's --canvas is applied under dark, observed ${JSON.stringify(darkRead.canvas)}`);
+    assert.notEqual(darkRead.canvas, lightRead.canvas, `per-appearance: the same theme renders two different --canvas values across appearances, observed both as ${JSON.stringify(darkRead.canvas)}`);
+    assert.equal(darkRead.ink, darkTokens["--ink"], `per-appearance: the dark set's --ink is applied under dark, observed ${JSON.stringify(darkRead.ink)}`);
+    assert.notEqual(darkRead.paintedText, lightRead.paintedText, `per-appearance: the same theme paints two different text colours across appearances, observed both as ${JSON.stringify(darkRead.paintedText)}`);
+    assert.equal(darkRead.cardRadius, darkTokens["--card-radius"], `per-appearance: the dark set's layout token replaces the light one, observed ${JSON.stringify(darkRead.cardRadius)}`);
+    assert.notEqual(darkRead.cardRadius, lightRead.cardRadius, `per-appearance: a layout token differs between the two sets, observed both as ${JSON.stringify(darkRead.cardRadius)}`);
+    assert.equal(darkRead.coral, darkTokens["--coral"], `per-appearance: a token declared only in the dark set is the dark value under dark, observed ${JSON.stringify(darkRead.coral)}`);
+    assert.equal(darkRead.gold, "#d0a152", `per-appearance: a token declared only in the light set is removed under dark, observed ${JSON.stringify(darkRead.gold)}`);
+
+    await setAppearanceMode(page, "light");
+    const backRead = await readAppearance(page);
+    assert.equal(backRead.canvas, lightTokens["--canvas"], `per-appearance: switching back re-applies the light set, observed ${JSON.stringify(backRead.canvas)}`);
+    assert.equal(backRead.gold, lightTokens["--gold"], `per-appearance: switching back re-applies the light-only token, observed ${JSON.stringify(backRead.gold)}`);
+    assert.equal(backRead.coral, "#dc8278", `per-appearance: switching back removes the dark-only token again, observed ${JSON.stringify(backRead.coral)}`);
+
+    // The original declaration keeps working exactly as it did: one flat value
+    // set, applied under every appearance.
+    await selectTheme(page, flatID);
+    const flatLight = await readAppearance(page);
+    assert.equal(flatLight.canvas, flatTokens["--canvas"], `per-appearance: a flat package applies under light, observed ${JSON.stringify(flatLight.canvas)}`);
+    assert.equal(flatLight.cardRadius, flatTokens["--card-radius"], `per-appearance: a flat package applies its layout token under light, observed ${JSON.stringify(flatLight.cardRadius)}`);
+    await setAppearanceMode(page, "dark");
+    const flatDark = await readAppearance(page);
+    assert.equal(flatDark.appearance, "dark", `per-appearance: the flat package renders under dark too, observed ${JSON.stringify(flatDark.appearance)}`);
+    assert.equal(flatDark.canvas, flatTokens["--canvas"], `per-appearance: the flat map is not reinterpreted as an appearance key, observed ${JSON.stringify(flatDark.canvas)}`);
+    assert.equal(flatDark.ink, flatTokens["--ink"], `per-appearance: the flat package keeps applying under dark, observed ${JSON.stringify(flatDark.ink)}`);
+    assert.equal(flatDark.gold, "#d0a152", `per-appearance: the previous theme's light-only token is gone under the flat package, observed ${JSON.stringify(flatDark.gold)}`);
+
+    // The stored preference `system` must select the set as well: the host
+    // resolves the *effective* appearance at apply time, so a stored `system`
+    // follows the device rather than freezing one palette.
+    await page.locator('input[name="cairn-appearance-mode"][value="system"]').check();
+    await selectTheme(page, daynightID);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.waitForFunction(() => document.documentElement.getAttribute("data-appearance") === "dark", undefined, { timeout: 8000 });
+    const systemDark = await readAppearance(page);
+    assert.equal(systemDark.canvas, darkTokens["--canvas"], `per-appearance: a stored system preference resolves dark at apply time, observed ${JSON.stringify(systemDark.canvas)}`);
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.waitForFunction(() => document.documentElement.getAttribute("data-appearance") === "light", undefined, { timeout: 8000 });
+    const systemLight = await readAppearance(page);
+    assert.equal(systemLight.canvas, lightTokens["--canvas"], `per-appearance: the same stored system preference resolves light in a light device, observed ${JSON.stringify(systemLight.canvas)}`);
+    assert.equal(systemLight.gold, lightTokens["--gold"], `per-appearance: the light-only token returns with the light set, observed ${JSON.stringify(systemLight.gold)}`);
+
+    await setAppearanceMode(page, "light");
+    await checkBuiltInPalettes(page, "per-appearance");
+    assert.deepEqual(external, [], "per-appearance: switching a package's appearance fetches nothing off-origin");
+    observed.scenarios["per-appearance"] = {
+      id: daynightID,
+      declaredSets: { light: Object.keys(lightTokens).length, dark: Object.keys(darkTokens).length },
+      light: { appearance: lightRead.appearance, canvas: lightRead.canvas, paintedText: lightRead.paintedText, cardRadius: lightRead.cardRadius, gold: lightRead.gold, coral: lightRead.coral },
+      dark: { appearance: darkRead.appearance, canvas: darkRead.canvas, paintedText: darkRead.paintedText, cardRadius: darkRead.cardRadius, gold: darkRead.gold, coral: darkRead.coral },
+      system: { dark: systemDark.canvas, light: systemLight.canvas },
+      flat: { id: flatID, light: flatLight.canvas, dark: flatDark.canvas },
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+/** A per-appearance declaration is checked by the same allowlist and the same
+ *  forbidden-value rule as a flat one, and its shape is checked too: an unknown
+ *  key inside a value set, a missing appearance, and a mixture of the two forms
+ *  are each refused whole with nothing applied. */
+async function scenarioPerAppearanceRefused(packagesDirectory, declaredVersion) {
+  const escapeID = "acceptance:appearance-escape";
+  const unknownID = "acceptance:appearance-unknown";
+  const halfID = "acceptance:appearance-half";
+  const mixedID = "acceptance:appearance-mixed";
+  const clean = { "--canvas": "#101820", "--ink": "#eef4f8" };
+  await writeFixture(packagesDirectory, {
+    schema: INDEX_SCHEMA,
+    packages: ["escape.json", "unknown.json", "half.json", "mixed.json"],
+  }, {
+    "escape.json": {
+      schema: PACKAGE_SCHEMA,
+      id: escapeID,
+      name: "Appearance Escape",
+      hostRange: `>=${declaredVersion}`,
+      swatches: ["#101820"],
+      tokens: { light: clean, dark: { "--canvas": "#000000", "--ink": "#ffffff; position: fixed; inset: 0" } },
+    },
+    "unknown.json": {
+      schema: PACKAGE_SCHEMA,
+      id: unknownID,
+      name: "Appearance Unknown Key",
+      hostRange: `>=${declaredVersion}`,
+      swatches: ["#202020"],
+      tokens: { light: { ...clean, "--overlay-position": "fixed" }, dark: clean },
+    },
+    "half.json": {
+      schema: PACKAGE_SCHEMA,
+      id: halfID,
+      name: "Appearance Half",
+      hostRange: `>=${declaredVersion}`,
+      swatches: ["#303030"],
+      tokens: { light: clean },
+    },
+    "mixed.json": {
+      schema: PACKAGE_SCHEMA,
+      id: mixedID,
+      name: "Appearance Mixed",
+      hostRange: `>=${declaredVersion}`,
+      swatches: ["#404040"],
+      tokens: { "--canvas": "#111111", light: clean, dark: clean },
+    },
+  });
+  const { context, page } = await openClient();
+  try {
+    await openAppearance(page);
+    await page.waitForFunction(() => document.querySelectorAll(".appearance-package-refusals p").length === 4, undefined, { timeout: 10000 });
+    const read = await readAppearance(page);
+    assert.equal(read.refusals.length, 4, `per-appearance refusal: every broken declaration is refused, observed ${JSON.stringify(read.refusals)}`);
+    const reasonFor = (id) => read.refusals.find((line) => line.includes(id));
+    const escapeReason = reasonFor(escapeID);
+    const unknownReason = reasonFor(unknownID);
+    const halfReason = reasonFor(halfID);
+    const mixedReason = reasonFor(mixedID);
+    assert.ok(escapeReason && escapeReason.includes("dark:") && escapeReason.includes("--ink") && escapeReason.includes("escape a CSS declaration"), `per-appearance refusal: a forbidden value inside the dark set is refused by set and name, observed ${JSON.stringify(escapeReason)}`);
+    assert.ok(unknownReason && unknownReason.includes("light:") && unknownReason.includes("--overlay-position") && unknownReason.includes("not an admitted design token"), `per-appearance refusal: an unknown key inside a value set is refused by name, observed ${JSON.stringify(unknownReason)}`);
+    assert.ok(halfReason && halfReason.includes("tokens.dark"), `per-appearance refusal: a half-declared theme is refused whole, observed ${JSON.stringify(halfReason)}`);
+    assert.ok(mixedReason && mixedReason.includes("mixes value sets") && mixedReason.includes("--canvas"), `per-appearance refusal: a flat token name beside the appearance keys is refused whole, observed ${JSON.stringify(mixedReason)}`);
+    for (const id of [escapeID, unknownID, halfID, mixedID]) {
+      assert.ok(!read.palette.some((entry) => entry.id === id), `per-appearance refusal: ${id} is not offered, observed ${JSON.stringify(read.palette.map((entry) => entry.id))}`);
+    }
+    // No partial application: every one of these packages declared an admissible
+    // light set beside its broken part, and none of them reached the document.
+    assert.equal(read.canvas, "#edf1f3", `per-appearance refusal: no token of a refused package is applied, observed ${JSON.stringify(read.canvas)}`);
+    assert.equal(read.cardRadius, BUILT_IN_CARD_RADIUS, `per-appearance refusal: no layout token of a refused package is applied, observed ${JSON.stringify(read.cardRadius)}`);
+    observed.scenarios["per-appearance-refusals"] = { refusals: read.refusals, canvas: read.canvas, palette: read.palette.map((entry) => entry.id) };
+
+    await checkBuiltInPalettes(page, "per-appearance-refusal");
   } finally {
     await context.close();
   }
@@ -626,6 +900,8 @@ try {
   await scenarioTokenValueRefused(packagesDirectory, declaredVersion);
   await scenarioCollisionRefused(packagesDirectory, declaredVersion);
   await scenarioCodeFieldsRefused(packagesDirectory, declaredVersion);
+  await scenarioPerAppearanceApplies(packagesDirectory, declaredVersion);
+  await scenarioPerAppearanceRefused(packagesDirectory, declaredVersion);
   await scenarioShippedExample(packagesDirectory);
   await scenarioNothingInstalled(packagesDirectory);
 } catch (error) {
@@ -654,6 +930,6 @@ if (failure) {
   console.error(`FAIL: ${failure.message}`);
   process.exitCode = 1;
 } else {
-  console.log("PASS: a valid presentation package was admitted and its tokens reached the rendered document; a host-range mismatch, an unadmitted token, a declaration-escaping value, a built-in id collision and a code-bearing field were each refused whole with a visible reason and no partial application; the shipped source-tree example theme was admitted and visibly applied using its own bytes; the built client carries those source bytes unchanged; and the three built-in palettes kept working in every case.");
+  console.log("PASS: a valid presentation package was admitted and its tokens reached the rendered document; a host-range mismatch, an unadmitted token, a declaration-escaping value, a built-in id collision and a code-bearing field were each refused whole with a visible reason and no partial application; a package declaring one value set per appearance rendered two different sets of values as the Color mode control switched light to dark, removed a token declared in only one set for the other appearance, and a package declaring only the flat map still applied the same values under both; a forbidden value inside a value set, an unknown key inside one, a half-declared theme and a mixture of the two forms were each refused whole; the shipped source-tree example theme was admitted and visibly applied as two palettes using its own bytes; the built client carries those source bytes unchanged; and the three built-in palettes kept working in every case.");
   console.log("NOTE: build-time refusal (web/vite.config.ts rejecting a package in web/public/presentation-packages) is not run by this script because a nested build would rewrite web/dist while these scenarios read it. Verify it manually: add a broken package to the source directory, run `cd web && npm run build`, observe the nonzero exit and the named file and reason, then remove the file and rebuild.");
 }
