@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/exact"
 	"github.com/ailiheizi/cairn/server/internal/repository"
 	"github.com/ailiheizi/cairn/server/internal/search"
@@ -22,7 +22,7 @@ import (
 func TestCoreWorkflowThroughDispatcher(t *testing.T) {
 	ctx := context.Background()
 	configPath := filepath.Join(t.TempDir(), "cairn.toml")
-	resolved, err := rwconfig.Init(configPath)
+	resolved, err := cairnconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("initialize config: %v", err)
 	}

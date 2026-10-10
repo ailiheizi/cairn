@@ -311,7 +311,7 @@ evidence:
 ```sh
 bash scripts/package-offline.sh \
   --version v0.1.0-prealpha.1 --os linux --arch arm64 \
-  --rw /absolute/path/to/cairn \
+  --cairn /absolute/path/to/cairn \
   --daemon /absolute/path/to/cairnd \
   --web-dist /absolute/path/to/web/dist \
   --semantic-archive /absolute/path/to/semantic-bundle.tar.gz \

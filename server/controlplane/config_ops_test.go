@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "cairn.toml")
-	resolved, err := rwconfig.Init(configPath)
+	resolved, err := cairnconfig.Init(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 	if data.ConfigPath != configPath || data.ConfigDigest != resolved.Digest || data.RunningConfigDigest != resolved.Digest || data.RestartRequired {
 		t.Fatalf("config.get data = %+v", data)
 	}
-	var candidate rwconfig.Config
+	var candidate cairnconfig.Config
 	if err := json.Unmarshal(data.Config, &candidate); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 	if updatedData.ConfigDigest == data.ConfigDigest || !updatedData.RestartRequired || updatedData.RunningConfigDigest != resolved.Digest {
 		t.Fatalf("updated config data = %+v", updatedData)
 	}
-	persisted, err := rwconfig.LoadFile(configPath)
+	persisted, err := cairnconfig.LoadFile(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 
 func TestDispatcherConfigUpdateRejectsStaleAndInvalidProfiles(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "cairn.toml")
-	resolved, err := rwconfig.Init(configPath)
+	resolved, err := cairnconfig.Init(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestDispatcherConfigUpdateRejectsStaleAndInvalidProfiles(t *testing.T) {
 		t.Fatalf("stale config.update = %q: %+v", stale.Status, stale.Reasons)
 	}
 
-	var candidate rwconfig.Config
+	var candidate cairnconfig.Config
 	if err := json.Unmarshal(payload, &candidate); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestDispatcherConfigUpdateRejectsStaleAndInvalidProfiles(t *testing.T) {
 	if invalid.Status != command.StatusFailed || !hasReasonCode(invalid, ReasonCodeInvalidInput) {
 		t.Fatalf("invalid config.update = %q: %+v", invalid.Status, invalid.Reasons)
 	}
-	unchanged, err := rwconfig.LoadEffective(rwconfig.LoadOptions{Path: configPath, ResolveOptions: rwconfig.ResolveOptions{Environ: map[string]string{}}})
+	unchanged, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{Path: configPath, ResolveOptions: cairnconfig.ResolveOptions{Environ: map[string]string{}}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -178,7 +178,7 @@ except Exception as exc:
 PY
  )"
 [[ -d "$package_root" ]] || { echo "error: validated package root could not be resolved" >&2; exit 1; }
-rw="$package_root/bin/cairn"; daemon="$package_root/bin/cairnd"
+cairn="$package_root/bin/cairn"; daemon="$package_root/bin/cairnd"
 socket="$work/m.sock"; config="$work/config/cairn/config.toml"
 data_home="$work/data"; xdg_config="$work/config"; logs="$evidence/logs"
 mkdir -m 700 "$logs" "$work/source" "$work/recovered"
@@ -194,7 +194,7 @@ clean_env_args=(env -u CAIRN_CONFIG -u CAIRN_CATALOG -u CAIRN_REPOSITORY
 clean_env() {
   "${clean_env_args[@]}" "$@"
 }
-run_cli() { clean_env "$rw" --socket "$socket" "$@"; }
+run_cli() { clean_env "$cairn" --socket "$socket" "$@"; }
 start_daemon() {
   "${clean_env_args[@]}" "$daemon" --config "$config" --socket "$socket" \
     >"$logs/daemon.log" 2>&1 &
@@ -216,8 +216,8 @@ save_command() {
   run_cli --json "$@" >"$logs/$name.json"
 }
 
-clean_env "$rw" config init --path "$config" >"$logs/config-init.txt"
-clean_env "$rw" --json config show --path "$config" >"$logs/effective-config.json"
+clean_env "$cairn" config init --path "$config" >"$logs/config-init.txt"
+clean_env "$cairn" --json config show --path "$config" >"$logs/effective-config.json"
 jq -e --arg root "$work/" \
   '[.paths.catalog,.paths.repository,.paths.vectors,.paths.models,.paths.recovery_records] | all(.[]; type == "string" and startswith($root))' \
   "$logs/effective-config.json" >/dev/null || {
@@ -285,13 +285,13 @@ clean_env "$daemon" --recovery-reader --repository "$repo_root" \
   --trust-anchor "$work/portable/trust-anchor.json" --socket "$recovery_socket" \
   >"$logs/recovery-reader.log" 2>&1 &
 recovery_pid=$!
-recovery_rw() { clean_env "$rw" --socket "$recovery_socket" "$@"; }
+recovery_cairn() { clean_env "$cairn" --socket "$recovery_socket" "$@"; }
 for _ in $(seq 1 90); do
-  if recovery_rw snapshot list >/dev/null 2>&1; then break; fi
+  if recovery_cairn snapshot list >/dev/null 2>&1; then break; fi
   if ! kill -0 "$recovery_pid" 2>/dev/null; then echo "error: clean recovery reader exited during startup" >&2; exit 1; fi
   sleep 1
 done
-save_recovery_command() { local name="$1"; shift; recovery_rw --json "$@" >"$logs/$name.json"; }
+save_recovery_command() { local name="$1"; shift; recovery_cairn --json "$@" >"$logs/$name.json"; }
 save_recovery_command recovery-import recovery import "$work/portable/recovery-reference.json" "$work/portable/trust-anchor.json"
 jq -e '.status == "SUCCEEDED" and .data.files == 1 and .data.bytes == '"$expected_bytes"' and .data.catalog_created == false' "$logs/recovery-import.json" >/dev/null
 save_recovery_command restore-plan restore "$snapshot_ref" "$work/recovered"

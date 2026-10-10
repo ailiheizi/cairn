@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/access"
 	"github.com/ailiheizi/cairn/server/internal/exact"
 	"github.com/ailiheizi/cairn/server/internal/identify"
@@ -185,7 +185,7 @@ func WithConfigDigest(digest string) DispatcherOption {
 // WithOperatorConfig enables validated reads and atomic updates of the same
 // persisted profile selected at daemon startup. Updates never hot-swap live
 // services; callers receive an explicit restart-required state instead.
-func WithOperatorConfig(resolved rwconfig.ResolvedConfig) DispatcherOption {
+func WithOperatorConfig(resolved cairnconfig.ResolvedConfig) DispatcherOption {
 	return func(d *Dispatcher) {
 		if strings.TrimSpace(resolved.ConfigPath) == "" {
 			return

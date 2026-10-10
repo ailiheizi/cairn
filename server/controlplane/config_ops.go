@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 )
 
 type operatorConfigState struct {
@@ -63,16 +63,16 @@ func (d *Dispatcher) handleConfigUpdate(env command.Envelope, started time.Time)
 	if input.ExpectedConfigDigest != current.ConfigDigest {
 		return conflictResult(env, started, "persisted configuration changed; reload settings before saving")
 	}
-	candidate, err := rwconfig.DecodeJSON(bytes.NewReader(input.Config))
+	candidate, err := cairnconfig.DecodeJSON(bytes.NewReader(input.Config))
 	if err != nil {
 		return invalidInputResult(env, started, err)
 	}
-	if _, err := rwconfig.Resolve(candidate, rwconfig.ResolveOptions{
+	if _, err := cairnconfig.Resolve(candidate, cairnconfig.ResolveOptions{
 		BaseDir: filepath.Dir(state.path), Environ: map[string]string{},
 	}); err != nil {
 		return invalidInputResult(env, started, err)
 	}
-	if err := rwconfig.Save(state.path, candidate); err != nil {
+	if err := cairnconfig.Save(state.path, candidate); err != nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, err.Error()))
 	}
 	updated, err := state.load()
@@ -83,9 +83,9 @@ func (d *Dispatcher) handleConfigUpdate(env command.Envelope, started time.Time)
 }
 
 func (s *operatorConfigState) load() (command.ConfigData, error) {
-	resolved, err := rwconfig.LoadEffective(rwconfig.LoadOptions{
+	resolved, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{
 		Path: s.path,
-		ResolveOptions: rwconfig.ResolveOptions{
+		ResolveOptions: cairnconfig.ResolveOptions{
 			Environ: map[string]string{},
 		},
 	})

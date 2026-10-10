@@ -423,7 +423,7 @@ def typed_data(envelope: dict[str, Any], operation: str) -> dict[str, Any]:
 
 
 def extract_web_and_semantic_inputs(package_archive: Path, evidence_root: Path, semantic_archive: Path | None,
-                                   rw: Path, daemon: Path, use_packaged_semantic: bool = False) -> tuple[Path, Path | None]:
+                                   cairn: Path, daemon: Path, use_packaged_semantic: bool = False) -> tuple[Path, Path | None]:
     """Read a candidate tarball and retain its Web tree under new evidence."""
     if package_archive.is_symlink() or not package_archive.is_file():
         _fail("candidate package archive must be a regular non-symlink file")
@@ -432,7 +432,7 @@ def extract_web_and_semantic_inputs(package_archive: Path, evidence_root: Path, 
     web_root.mkdir(parents=True, mode=0o700)
     found: dict[str, str] = {}
     extracted_semantic: Path | None = None
-    expected_rw, expected_daemon = sha256_file(rw), sha256_file(daemon)
+    expected_cairn, expected_daemon = sha256_file(cairn), sha256_file(daemon)
     try:
         with tarfile.open(package_archive, "r:gz") as archive:
             for member in archive:
@@ -445,9 +445,9 @@ def extract_web_and_semantic_inputs(package_archive: Path, evidence_root: Path, 
                 if normalized.endswith("/bin/cairn") or normalized == "bin/cairn":
                     stream = archive.extractfile(member)
                     if stream is None:
-                        _fail("candidate package rw member is unreadable")
+                        _fail("candidate package cairn member is unreadable")
                     digest = hashlib.sha256(stream.read()).hexdigest()
-                    found["rw"] = digest
+                    found["cairn"] = digest
                 elif normalized.endswith("/bin/cairnd") or normalized == "bin/cairnd":
                     stream = archive.extractfile(member)
                     if stream is None:
@@ -487,7 +487,7 @@ def extract_web_and_semantic_inputs(package_archive: Path, evidence_root: Path, 
                         extracted_semantic = semantic_target
     except (OSError, tarfile.TarError) as exc:
         _fail(f"cannot read candidate package archive: {exc}")
-    if found.get("rw") != expected_rw or found.get("daemon") != expected_daemon:
+    if found.get("cairn") != expected_cairn or found.get("daemon") != expected_daemon:
         _fail("candidate package CLI/daemon digests do not match supplied binaries")
     if not any(web_root.iterdir()):
         _fail("candidate package archive contains no Web distribution")
@@ -526,7 +526,7 @@ def _extract_reason(output: str) -> Any:
 
 def create_owned_runtime_root() -> Path:
     """Create a short, private /tmp root and preserve it for audit/recovery."""
-    created = Path(tempfile.mkdtemp(prefix="rwm-", dir="/tmp"))
+    created = Path(tempfile.mkdtemp(prefix="cairn-", dir="/tmp"))
     os.chmod(created, 0o700)
     os.chown(created, os.getuid(), os.getgid())
     # macOS exposes /tmp as a symlink to /private/tmp. Persist only the
@@ -568,7 +568,7 @@ def start_owned_process(command: list[str], env: dict[str, str], output: Any,
         raise
 
 
-def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: dict[str, Any], evidence_root: Path,
+def run_profile(profile: str, cairn: Path, daemon: Path, corpus: Path, manifest: dict[str, Any], evidence_root: Path,
                 sample_ms: int, web_root: Path, semantic_archive: Path | None) -> dict[str, Any]:
     run_id = str(uuid.uuid4())
     evidence_profile = evidence_root / "runs" / profile
@@ -608,11 +608,11 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     def record_typed(item: dict[str, Any]) -> None:
         command_records.append(item)
         _write_json(records_path, command_records)
-    init = invoke([str(rw), "config", "init", "--path", str(config_path)], "cairn config init")
+    init = invoke([str(cairn), "config", "init", "--path", str(config_path)], "cairn config init")
     if init.returncode != 0:
         _fail(f"cairn config init failed: {init.stderr.strip() or init.stdout.strip()}")
     patch_storage_profile(config_path, profile)
-    config_result = invoke([str(rw), "--json", "config", "validate", "--path", str(config_path)], "cairn config validate")
+    config_result = invoke([str(cairn), "--json", "config", "validate", "--path", str(config_path)], "cairn config validate")
     effective = decode_cli_json(config_result, "cairn config validate")
     config_digest = effective.get("config_digest")
     paths = effective.get("paths")
@@ -656,7 +656,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     def start_daemon() -> subprocess.Popen[str]:
         command = [str(daemon), "--config", str(config_path), "--socket", str(socket_path), *api_args]
         def ready(_proc: subprocess.Popen[str]) -> bool:
-            status = invoke([str(rw), "--socket", str(socket_path), "--json", "status"], "cairn status", timeout=3)
+            status = invoke([str(cairn), "--socket", str(socket_path), "--json", "status"], "cairn status", timeout=3)
             return status.returncode == 0
         try:
             return start_owned_process(command, env, log_file, ready)
@@ -676,7 +676,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     try:
         daemon_process = start_daemon()
         if semantic_archive is not None:
-            install_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m",
+            install_result = invoke([str(cairn), "--socket", str(socket_path), "--json", "--timeout", "10m",
                                      "semantic", "bundle", "install", "--archive", str(semantic_archive)],
                                     "cairn semantic bundle install", timeout=600)
             semantic_install = result_data(decode_cli_json(install_result, "cairn semantic bundle install"), "cairn semantic bundle install")
@@ -688,7 +688,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         pre_ingest_all = measure_roots(sampled_roots)
         assert pre_ingest_all is not None
         verify_corpus(corpus, manifest)
-        planned_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "ingest", str(corpus), "--protection", "STORE_EXACT"], "cairn ingest plan", timeout=600)
+        planned_result = invoke([str(cairn), "--socket", str(socket_path), "--json", "--timeout", "10m", "ingest", str(corpus), "--protection", "STORE_EXACT"], "cairn ingest plan", timeout=600)
         planned = result_data(decode_cli_json(planned_result, "cairn ingest plan"), "cairn ingest plan")
         if planned.get("state") != "READY" or planned.get("executable") is not True or planned.get("protection_mode") != "STORE_EXACT":
             _fail("ingest inspection did not produce an executable STORE_EXACT plan")
@@ -712,14 +712,14 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         if any(item.get("mode") != "STORE_EXACT" or item.get("planned_outcome") not in ("EXACT_PROTECTED", "EXACT_FALLBACK") for item in decisions):
             _fail("ingest plan contains a non-exact or unresolved per-file protection outcome")
 
-        applied_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "plan", "apply", planned["plan_id"],
+        applied_result = invoke([str(cairn), "--socket", str(socket_path), "--json", "--timeout", "10m", "plan", "apply", planned["plan_id"],
                                  "--workspace", planned["workspace_id"], "--digest", planned["plan_digest"]], "cairn plan apply", timeout=600)
         applied = result_data(decode_cli_json(applied_result, "cairn plan apply"), "cairn plan apply")
         snapshot_ref = applied.get("snapshot_ref")
         if not snapshot_ref or applied.get("workspace_id") != planned.get("workspace_id"):
             _fail("publication reference is absent or belongs to a different workspace")
         verify_corpus(corpus, manifest)
-        verified_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "snapshot", "verify", snapshot_ref, "--mode", "full-bytes"], "cairn snapshot verify", timeout=600)
+        verified_result = invoke([str(cairn), "--socket", str(socket_path), "--json", "--timeout", "10m", "snapshot", "verify", snapshot_ref, "--mode", "full-bytes"], "cairn snapshot verify", timeout=600)
         verified = result_data(decode_cli_json(verified_result, "cairn snapshot verify"), "cairn snapshot verify")
         if verified.get("ok") is not True or verified.get("bytes") != logical_bytes or verified.get("files") != len(manifest["entries"]):
             _fail("full-byte verification did not match corpus file/byte totals")
@@ -733,7 +733,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         if semantic_archive is None and rebuild_data.get("semantic_state") not in ("UNAVAILABLE", "NOT_BUILT"):
             _fail("semantic provider state is unexpected without an installed bundle")
         query_text = Path(manifest["entries"][0]["path"]).stem or Path(manifest["entries"][0]["path"]).name
-        query_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "search", query_text,
+        query_result = invoke([str(cairn), "--socket", str(socket_path), "--json", "--timeout", "10m", "search", query_text,
                                "--workspace", planned["workspace_id"]], "cairn search", timeout=600)
         semantic_query = decode_cli_json(query_result, "cairn search", allow_degraded=semantic_archive is None)
         if semantic_archive is not None:
@@ -771,7 +771,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     repository_growth = growth["repository"]
     external_growth = steady_growth - repository_growth
     fixed_seen: set[tuple[int, int]] = set()
-    fixed_runtime = {"cli": measure_allocated(rw, seen_objects=fixed_seen),
+    fixed_runtime = {"cli": measure_allocated(cairn, seen_objects=fixed_seen),
                      "daemon": measure_allocated(daemon, seen_objects=fixed_seen),
                      "web": measure_allocated(web_root, seen_objects=fixed_seen)}
     accounting = savings_accounting(logical_bytes, pre_ingest, settled, pre_ingest_all["temporary"], settled_all["temporary"], fixed_runtime)
@@ -816,7 +816,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
                        "incremental_temporary_growth_bytes": accounting["settled_temporary_growth_bytes"],
                        "equations": {"incremental": "logical source bytes - (settled five configured roots + settled TMPDIR - pre-ingest five configured roots - pre-ingest TMPDIR)",
                                      "full": "logical source bytes - final catalog/repository/vectors/models/recovery bytes - final TMPDIR bytes - fixed CLI/daemon/Web bytes"}},
-        "candidate_binaries": {"rw_sha256": sha256_file(rw), "cairnd_sha256": sha256_file(daemon)},
+        "candidate_binaries": {"cairn_sha256": sha256_file(cairn), "cairnd_sha256": sha256_file(daemon)},
         "evidence": {"daemon_log": str(log_path), "command_records": str(records_path),
                      "config_path": str(config_path), "config_sha256": sha256_file(config_path),
                      "runtime_root_preserved": str(root), "plan_show": "CLI has no plan show subcommand; immutable ingest plan and profile/config binding are retained in CLI output records",
@@ -826,7 +826,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rw", required=True, type=Path, help="candidate rw CLI binary")
+    parser.add_argument("--cairn", required=True, type=Path, help="candidate cairn CLI binary")
     parser.add_argument("--daemon", required=True, type=Path, help="matching cairnd binary")
     parser.add_argument("--corpus", required=True, type=Path, help="read-only operator-reviewed corpus")
     parser.add_argument("--corpus-manifest", required=True, type=Path, help="cairn.corpus-manifest.v1 JSON")
@@ -837,14 +837,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sample-ms", type=int, default=50, help="allocated-byte sampling interval (10..1000 ms)")
     args = parser.parse_args(argv)
     try:
-        rw = _safe_absolute(args.rw, "rw binary")
+        cairn = _safe_absolute(args.cairn, "cairn binary")
         daemon = _safe_absolute(args.daemon, "daemon binary")
         corpus = _safe_absolute(args.corpus, "corpus")
         manifest_path = _safe_absolute(args.corpus_manifest, "corpus manifest")
         package_archive = _safe_absolute(args.package_archive, "package archive")
         semantic_archive = _safe_absolute(args.semantic_archive, "semantic archive") if args.semantic_archive is not None else None
-        if not rw.is_file() or rw.is_symlink() or not os.access(rw, os.X_OK):
-            _fail("rw must be an executable regular file")
+        if not cairn.is_file() or cairn.is_symlink() or not os.access(cairn, os.X_OK):
+            _fail("cairn must be an executable regular file")
         if not daemon.is_file() or daemon.is_symlink() or not os.access(daemon, os.X_OK):
             _fail("daemon must be an executable regular file")
         if not manifest_path.is_file():
@@ -864,12 +864,12 @@ def main(argv: list[str] | None = None) -> int:
         evidence_dir.mkdir(mode=0o700)
         _write_json(evidence_dir / "corpus.manifest.json", manifest)
         web_root, packaged_semantic = extract_web_and_semantic_inputs(package_archive, evidence_dir, semantic_archive,
-                                                                      rw, daemon, args.semantic_from_package)
+                                                                      cairn, daemon, args.semantic_from_package)
         semantic_archive = semantic_archive or packaged_semantic
         results = {}
         for profile in ("raw", "zstd"):
             verify_corpus(corpus, manifest)
-            result = run_profile(profile, rw, daemon, corpus, manifest, evidence_dir, args.sample_ms, web_root, semantic_archive)
+            result = run_profile(profile, cairn, daemon, corpus, manifest, evidence_dir, args.sample_ms, web_root, semantic_archive)
             results[profile] = result
             _write_json(evidence_dir / f"{profile}.candidate-measurement.json", result)
         if results["raw"]["corpus"] != results["zstd"]["corpus"]:

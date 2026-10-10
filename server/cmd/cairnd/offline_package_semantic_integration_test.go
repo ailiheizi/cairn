@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
@@ -74,7 +74,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	artifact := filepath.Join(root, "build", "cairn-candidate.tar.gz")
 	packageScript := exec.Command("bash", filepath.Join(workspaceRoot, "scripts", "package-offline.sh"),
 		"--version", "candidate-test", "--os", runtime.GOOS, "--arch", runtime.GOARCH,
-		"--rw", cairnBin, "--daemon", daemonBin, "--web-dist", webDist,
+		"--cairn", cairnBin, "--daemon", daemonBin, "--web-dist", webDist,
 		"--semantic-archive", semanticArchive, "--output", artifact)
 	packageScript.Dir = workspaceRoot
 	if output, err := packageScript.CombinedOutput(); err != nil {
@@ -144,7 +144,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if output, err := initConfig.CombinedOutput(); err != nil {
 		t.Fatalf("packaged cairn config init: %v\n%s", err, output)
 	}
-	config, err := rwconfig.LoadFile(configPath)
+	config, err := cairnconfig.LoadFile(configPath)
 	if err != nil {
 		t.Fatalf("load clean generated config: %v", err)
 	}

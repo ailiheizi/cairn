@@ -7,7 +7,7 @@ export TZ=UTC
 umask 077
 
 usage() {
-  echo "usage: $0 --version VERSION --os OS --arch ARCH --rw FILE --daemon FILE --web-dist DIR --semantic-archive FILE [--redistribution-evidence DIR] --output FILE" >&2
+  echo "usage: $0 --version VERSION --os OS --arch ARCH --cairn FILE --daemon FILE --web-dist DIR --semantic-archive FILE [--redistribution-evidence DIR] --output FILE" >&2
 }
 
 version=""; target_os=""; target_arch=""; cairn_bin=""; daemon_bin=""; web_dist=""; semantic_archive=""; redistribution_evidence=""; output=""
@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
     --version) version="${2:-}"; shift 2;;
     --os) target_os="${2:-}"; shift 2;;
     --arch) target_arch="${2:-}"; shift 2;;
-    --rw) cairn_bin="${2:-}"; shift 2;;
+    --cairn) cairn_bin="${2:-}"; shift 2;;
     --daemon) daemon_bin="${2:-}"; shift 2;;
     --web-dist) web_dist="${2:-}"; shift 2;;
     --semantic-archive) semantic_archive="${2:-}"; shift 2;;

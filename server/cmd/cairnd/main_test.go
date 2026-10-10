@@ -23,7 +23,7 @@ import (
 
 	"github.com/ailiheizi/cairn/client/command"
 	"github.com/ailiheizi/cairn/client/transport"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/exact"
 	"github.com/ailiheizi/cairn/server/internal/repository"
 	"github.com/ailiheizi/cairn/server/internal/search"
@@ -98,34 +98,34 @@ func TestKeepSemanticLeaseAliveInvalidatesOnRenewalFailure(t *testing.T) {
 func TestValidateRuntimeStorageProfileRejectsSilentlyIgnoredProfiles(t *testing.T) {
 	tests := []struct {
 		name   string
-		mutate func(*rwconfig.Config)
+		mutate func(*cairnconfig.Config)
 		want   string
 	}{
 		{
 			name: "repository",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Storage.RepositoryProfile = "local-qualified"
 			},
 			want: "repository profile",
 		},
 		{
 			name: "experimental encrypted repository",
-			mutate: func(cfg *rwconfig.Config) {
-				cfg.Storage.RepositoryProfile = rwconfig.RepositoryProfileLocalZstdEncryptedV1
-				cfg.Storage.CompressionProfile = rwconfig.CompressionProfileZstdV1
+			mutate: func(cfg *cairnconfig.Config) {
+				cfg.Storage.RepositoryProfile = cairnconfig.RepositoryProfileLocalZstdEncryptedV1
+				cfg.Storage.CompressionProfile = cairnconfig.CompressionProfileZstdV1
 			},
 			want: "experimental and is not admitted in this build",
 		},
 		{
 			name: "compression",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Storage.CompressionProfile = "lossless-default"
 			},
 			want: "compression profile",
 		},
 		{
 			name: "neural codec",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Storage.NeuralCodec = "rwkv-experimental"
 			},
 			want: "neural codec",
@@ -133,7 +133,7 @@ func TestValidateRuntimeStorageProfileRejectsSilentlyIgnoredProfiles(t *testing.
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := rwconfig.Default()
+			cfg := cairnconfig.Default()
 			test.mutate(&cfg)
 			if err := validateRuntimeStorageProfile(cfg); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("validate error = %v, want %q", err, test.want)
@@ -276,22 +276,22 @@ func TestNormalDaemonRequiresPersistedConfig(t *testing.T) {
 }
 
 func TestValidateRuntimeStorageProfileAcceptsCurrentDevelopmentProfile(t *testing.T) {
-	if err := validateRuntimeStorageProfile(rwconfig.Default()); err != nil {
+	if err := validateRuntimeStorageProfile(cairnconfig.Default()); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestValidateRuntimeStorageProfileAcceptsLocalZstdCandidate(t *testing.T) {
-	cfg := rwconfig.Default()
-	cfg.Storage.RepositoryProfile = rwconfig.RepositoryProfileLocalZstdV1
-	cfg.Storage.CompressionProfile = rwconfig.CompressionProfileZstdV1
+	cfg := cairnconfig.Default()
+	cfg.Storage.RepositoryProfile = cairnconfig.RepositoryProfileLocalZstdV1
+	cfg.Storage.CompressionProfile = cairnconfig.CompressionProfileZstdV1
 	if err := validateRuntimeStorageProfile(cfg); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestResolveAPIAddressKeepsCurrentAdapterOnLoopback(t *testing.T) {
-	configured := rwconfig.APIConfig{Enabled: true, Listen: "127.0.0.1:4534"}
+	configured := cairnconfig.APIConfig{Enabled: true, Listen: "127.0.0.1:4534"}
 	if got, err := resolveAPIAddress("", configured); err != nil || got != configured.Listen {
 		t.Fatalf("configured address = %q, %v", got, err)
 	}
@@ -301,7 +301,7 @@ func TestResolveAPIAddressKeepsCurrentAdapterOnLoopback(t *testing.T) {
 	if _, err := resolveAPIAddress("0.0.0.0:4534", configured); err == nil {
 		t.Fatal("non-loopback override unexpectedly accepted")
 	}
-	if got, err := resolveAPIAddress("", rwconfig.APIConfig{}); err != nil || got != "" {
+	if got, err := resolveAPIAddress("", cairnconfig.APIConfig{}); err != nil || got != "" {
 		t.Fatalf("disabled address = %q, %v", got, err)
 	}
 }
@@ -370,15 +370,15 @@ func TestRunWithOptionsAPIBindFailureLeavesUnixSocketUnavailable(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config", "config.toml")
-	cfg := rwconfig.Default()
-	cfg.Paths = rwconfig.Paths{
+	cfg := cairnconfig.Default()
+	cfg.Paths = cairnconfig.Paths{
 		Catalog:         filepath.Join(root, "catalog.sqlite"),
 		Repository:      filepath.Join(root, "repository"),
 		Vectors:         filepath.Join(root, "vectors"),
 		Models:          filepath.Join(root, "models"),
 		RecoveryRecords: filepath.Join(root, "recovery"),
 	}
-	if err := rwconfig.Save(configPath, cfg); err != nil {
+	if err := cairnconfig.Save(configPath, cfg); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 	socketPath := filepath.Join(root, "runtime", "cairnd.sock")
@@ -401,29 +401,29 @@ func TestRunWithOptionsAPIBindFailureLeavesUnixSocketUnavailable(t *testing.T) {
 }
 
 func TestConfigureSemanticBindingRequiresLocalZvecSelection(t *testing.T) {
-	resolved := rwconfig.ResolvedConfig{Config: rwconfig.Default(), Digest: "sha256:" + strings.Repeat("a", 64)}
+	resolved := cairnconfig.ResolvedConfig{Config: cairnconfig.Default(), Digest: "sha256:" + strings.Repeat("a", 64)}
 	for _, test := range []struct {
 		name   string
-		mutate func(*rwconfig.Config)
+		mutate func(*cairnconfig.Config)
 		want   string
 	}{
 		{
 			name: "online embedding",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Semantic.EmbeddingMode = "online"
 			},
 			want: "embedding_mode",
 		},
 		{
 			name: "wrong local profile",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Semantic.LocalProfile = "other-profile"
 			},
 			want: "local_profile",
 		},
 		{
 			name: "wrong vector backend",
-			mutate: func(cfg *rwconfig.Config) {
+			mutate: func(cfg *cairnconfig.Config) {
 				cfg.Semantic.VectorBackend = "qdrant"
 			},
 			want: "vector_backend",
@@ -476,21 +476,21 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if !strings.Contains(string(validateOutput), "config_digest") || !strings.Contains(string(validateOutput), dataHome) {
 		t.Fatalf("cairn config validate output = %s", validateOutput)
 	}
-	cfg, err := rwconfig.LoadFile(configPath)
+	cfg, err := cairnconfig.LoadFile(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.Storage.RepositoryProfile = rwconfig.RepositoryProfileLocalZstdV1
-	cfg.Storage.CompressionProfile = rwconfig.CompressionProfileZstdV1
-	if err := rwconfig.Save(configPath, cfg); err != nil {
+	cfg.Storage.RepositoryProfile = cairnconfig.RepositoryProfileLocalZstdV1
+	cfg.Storage.CompressionProfile = cairnconfig.CompressionProfileZstdV1
+	if err := cairnconfig.Save(configPath, cfg); err != nil {
 		t.Fatalf("save zstd candidate config: %v", err)
 	}
-	cfg, err = rwconfig.LoadFile(configPath)
+	cfg, err = cairnconfig.LoadFile(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Storage.RepositoryProfile != rwconfig.RepositoryProfileLocalZstdV1 ||
-		cfg.Storage.CompressionProfile != rwconfig.CompressionProfileZstdV1 {
+	if cfg.Storage.RepositoryProfile != cairnconfig.RepositoryProfileLocalZstdV1 ||
+		cfg.Storage.CompressionProfile != cairnconfig.CompressionProfileZstdV1 {
 		t.Fatalf("persisted storage tuple = %q/%q", cfg.Storage.RepositoryProfile, cfg.Storage.CompressionProfile)
 	}
 	validateZstdConfig := exec.Command(cairnBin, "--json", "config", "validate", "--path", configPath)
@@ -499,8 +499,8 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if err != nil {
 		t.Fatalf("cairn config validate zstd candidate: %v\n%s", err, validateZstdOutput)
 	}
-	if !strings.Contains(string(validateZstdOutput), rwconfig.RepositoryProfileLocalZstdV1) ||
-		!strings.Contains(string(validateZstdOutput), rwconfig.CompressionProfileZstdV1) {
+	if !strings.Contains(string(validateZstdOutput), cairnconfig.RepositoryProfileLocalZstdV1) ||
+		!strings.Contains(string(validateZstdOutput), cairnconfig.CompressionProfileZstdV1) {
 		t.Fatalf("cairn config validate zstd output = %s", validateZstdOutput)
 	}
 	for _, path := range []string{cfg.Paths.Catalog, cfg.Paths.Repository, cfg.Paths.Vectors, cfg.Paths.RecoveryRecords} {
@@ -676,7 +676,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if err != nil {
 		t.Fatalf("read configured repository profile marker: %v", err)
 	}
-	if strings.TrimSpace(string(profileMarker)) != rwconfig.RepositoryProfileLocalZstdV1 {
+	if strings.TrimSpace(string(profileMarker)) != cairnconfig.RepositoryProfileLocalZstdV1 {
 		t.Fatalf("configured repository profile marker = %q", strings.TrimSpace(string(profileMarker)))
 	}
 	if !repositoryHasZstdPayload(t, cfg.Paths.Repository) {
@@ -709,9 +709,9 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	case <-time.After(5 * time.Second):
 		t.Fatalf("configured daemon did not stop\n%s", daemonLog.String())
 	}
-	effective, err := rwconfig.LoadEffective(rwconfig.LoadOptions{
+	effective, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{
 		Path: configPath,
-		ResolveOptions: rwconfig.ResolveOptions{
+		ResolveOptions: cairnconfig.ResolveOptions{
 			Environ: map[string]string{"XDG_DATA_HOME": dataHome},
 		},
 	})
@@ -823,8 +823,8 @@ func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 	cairnBin := buildTestBinary(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"))
 
 	root := t.TempDir()
-	cfg := rwconfig.Default()
-	cfg.Paths = rwconfig.Paths{
+	cfg := cairnconfig.Default()
+	cfg.Paths = cairnconfig.Paths{
 		Catalog:         filepath.Join(root, "catalog.sqlite"),
 		Repository:      filepath.Join(root, "repository"),
 		Vectors:         filepath.Join(root, "vectors"),
@@ -832,7 +832,7 @@ func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 	}
 	cfg.Recovery.PublicationDomain = "workspace:daemon-fence-test"
 	configPath := filepath.Join(root, "config.yaml")
-	if err := rwconfig.Save(configPath, cfg); err != nil {
+	if err := cairnconfig.Save(configPath, cfg); err != nil {
 		t.Fatalf("save daemon fence config: %v", err)
 	}
 	if _, _, err := exact.OpenSigningMaterial(cfg.Paths.RecoveryRecords, cfg.Recovery.PublicationDomain, true); err != nil {
@@ -1510,7 +1510,7 @@ func waitForRecoveryReader(t *testing.T, socketPath string, readerErr <-chan err
 // whose provider cannot be admitted fails visibly instead of falling back.
 func TestConfigureSemanticBindingForModeSelectsTheConfiguredProvider(t *testing.T) {
 	ctx := context.Background()
-	resolved := rwconfig.ResolvedConfig{Config: rwconfig.Default(), Digest: "sha256:" + strings.Repeat("a", 64)}
+	resolved := cairnconfig.ResolvedConfig{Config: cairnconfig.Default(), Digest: "sha256:" + strings.Repeat("a", 64)}
 	// The default profile is local and its mode dispatch must remain the
 	// local path (the existing compatibility error naming embedding_mode).
 	if resolved.Config.Semantic.EmbeddingMode != "local" {

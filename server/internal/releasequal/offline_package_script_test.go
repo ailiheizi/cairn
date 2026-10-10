@@ -41,7 +41,7 @@ func TestOfflinePackageScriptSyntaxAndCandidateGates(t *testing.T) {
 func TestOfflinePackageScriptRejectsUnsafeInputs(t *testing.T) {
 	root := repositoryRoot(t)
 	script := filepath.Join(root, "scripts", "package-offline.sh")
-	for _, args := range [][]string{{"--version", "v1", "--os", "linux", "--arch", "arm64"}, {"--version", "v1", "--os", "linux", "--arch", "arm64", "--rw", "/missing", "--daemon", "/missing", "--web-dist", "/missing", "--semantic-archive", "/missing", "--output", filepath.Join(t.TempDir(), "x.tar")}} {
+	for _, args := range [][]string{{"--version", "v1", "--os", "linux", "--arch", "arm64"}, {"--version", "v1", "--os", "linux", "--arch", "arm64", "--cairn", "/missing", "--daemon", "/missing", "--web-dist", "/missing", "--semantic-archive", "/missing", "--output", filepath.Join(t.TempDir(), "x.tar")}} {
 		if output, err := exec.Command("bash", append([]string{script}, args...)...).CombinedOutput(); err == nil {
 			t.Fatalf("unsafe/missing inputs accepted: %s", output)
 		}
@@ -56,7 +56,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	script := filepath.Join(root, "scripts", "package-offline.sh")
 	input := t.TempDir()
 	targetOS, targetArch := runtime.GOOS, runtime.GOARCH
-	rw := buildCLIBinary(t, root, input, "cairn", targetOS, targetArch)
+	cairn := buildCLIBinary(t, root, input, "cairn", targetOS, targetArch)
 	daemon := buildDaemonBinary(t, root, input, "cairnd", "purego")
 	web := filepath.Join(input, "web")
 	if err := os.Mkdir(web, 0o755); err != nil {
@@ -95,7 +95,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := filepath.Join(input, tc.name+".tar.gz")
-			args := []string{script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", tc.cli, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", out}
+			args := []string{script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", tc.cli, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", out}
 			output, err := exec.Command("bash", args...).CombinedOutput()
 			if err == nil || !strings.Contains(string(output), tc.reason) {
 				t.Fatalf("invalid CLI must fail with %q: err=%v\n%s", tc.reason, err, output)
@@ -106,7 +106,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 		})
 	}
 	noTagsDaemon := buildDaemonBinary(t, root, input, "cairnd-no-tags")
-	baseArgs := []string{"--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", rw, "--daemon", noTagsDaemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "no-tags.tar.gz")}
+	baseArgs := []string{"--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", cairn, "--daemon", noTagsDaemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "no-tags.tar.gz")}
 	if output, err := exec.Command("bash", append([]string{script}, baseArgs...)...).CombinedOutput(); err == nil {
 		t.Fatalf("daemon without purego accepted: %s", output)
 	}
@@ -136,17 +136,17 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 		t.Fatalf("daemon with wrong zvec pin accepted: %s", output)
 	}
 	linkedRW := filepath.Join(input, "cairn-link")
-	if err := os.Symlink(rw, linkedRW); err != nil {
+	if err := os.Symlink(cairn, linkedRW); err != nil {
 		t.Fatal(err)
 	}
-	if output, err := exec.Command("bash", script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", linkedRW, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "symlink.tar.gz")).CombinedOutput(); err == nil {
+	if output, err := exec.Command("bash", script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", linkedRW, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "symlink.tar.gz")).CombinedOutput(); err == nil {
 		t.Fatalf("symlink binary accepted: %s", output)
 	}
 	newlineAsset := filepath.Join(web, "bad\nname.js")
 	if err := os.WriteFile(newlineAsset, []byte("bad"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if output, err := exec.Command("bash", script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", rw, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "newline.tar.gz")).CombinedOutput(); err == nil {
+	if output, err := exec.Command("bash", script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", cairn, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "newline.tar.gz")).CombinedOutput(); err == nil {
 		t.Fatalf("newline web asset accepted: %s", output)
 	}
 	if err := os.Remove(newlineAsset); err != nil {
@@ -154,7 +154,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	}
 	build := func(name string) string {
 		out := filepath.Join(input, name+".tar.gz")
-		args := []string{script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", rw, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", out}
+		args := []string{script, "--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", cairn, "--daemon", daemon, "--web-dist", web, "--semantic-archive", semantic, "--output", out}
 		if output, err := exec.Command("bash", args...).CombinedOutput(); err != nil {
 			t.Fatalf("package %s: %v\n%s", name, err, output)
 		}

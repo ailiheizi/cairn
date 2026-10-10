@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
@@ -569,18 +569,18 @@ func describeEgressConfirmationFromInput(raw json.RawMessage) (*search.SemanticE
 // request observes the operator's saved selection; the running services are
 // still those the daemon started with, which is exactly what the health gates
 // below compare against.
-func (s *operatorConfigState) resolvedDescriptions() rwconfig.DescriptionConfig {
+func (s *operatorConfigState) resolvedDescriptions() cairnconfig.DescriptionConfig {
 	if s == nil {
-		return rwconfig.DescriptionConfig{}
+		return cairnconfig.DescriptionConfig{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	resolved, err := rwconfig.LoadEffective(rwconfig.LoadOptions{
+	resolved, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{
 		Path:           s.path,
-		ResolveOptions: rwconfig.ResolveOptions{Environ: map[string]string{}},
+		ResolveOptions: cairnconfig.ResolveOptions{Environ: map[string]string{}},
 	})
 	if err != nil {
-		return rwconfig.DescriptionConfig{}
+		return cairnconfig.DescriptionConfig{}
 	}
 	return resolved.Config.Descriptions
 }

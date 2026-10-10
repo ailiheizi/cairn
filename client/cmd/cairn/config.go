@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 )
 
 // newConfigCommand owns the small, local configuration lifecycle.  It does
@@ -22,7 +22,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 	var path string
 	initCmd := newExitCommand(env, "init", "Create a default config.toml without overwriting an existing file",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
-			resolved, err := rwconfig.Init(strings.TrimSpace(path))
+			resolved, err := cairnconfig.Init(strings.TrimSpace(path))
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "config init: %v\n", err)
 				return 1
@@ -37,7 +37,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 	var validatePath string
 	validateCmd := newExitCommand(env, "validate", "Validate a persisted config and print its digest",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
-			resolved, err := rwconfig.LoadEffective(rwconfig.LoadOptions{Path: strings.TrimSpace(validatePath)})
+			resolved, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{Path: strings.TrimSpace(validatePath)})
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "config validate: %v\n", err)
 				return 1
@@ -67,7 +67,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 	var effective bool
 	showCmd := newExitCommand(env, "show", "Show the effective redacted configuration",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
-			resolved, err := rwconfig.LoadEffective(rwconfig.LoadOptions{Path: strings.TrimSpace(showPath)})
+			resolved, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{Path: strings.TrimSpace(showPath)})
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "config show: %v\n", err)
 				return 1
@@ -89,9 +89,9 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 			var payload []byte
 			var marshalErr error
 			if ext := strings.ToLower(filepath.Ext(resolved.ConfigPath)); ext == ".yaml" || ext == ".yml" {
-				payload, marshalErr = rwconfig.MarshalYAML(resolved.Config)
+				payload, marshalErr = cairnconfig.MarshalYAML(resolved.Config)
 			} else {
-				payload, marshalErr = rwconfig.MarshalTOML(resolved.Config)
+				payload, marshalErr = cairnconfig.MarshalTOML(resolved.Config)
 			}
 			if marshalErr != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "config show: %v\n", marshalErr)

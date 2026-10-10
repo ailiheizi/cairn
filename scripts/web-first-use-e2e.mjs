@@ -150,9 +150,9 @@ try {
   const cairnBin = await executableFrom(process.env.CAIRN_BIN || process.env.BIN, "BIN", "./client/cmd/cairn", join(tempRoot, "cairn"));
   const webDist = await buildWebDist();
   const webDigest = await hashDirectory(webDist);
-  const binaryDigests = { daemon: sha256(await readFile(daemonBin)), rw: sha256(await readFile(cairnBin)), web: webDigest };
+  const binaryDigests = { daemon: sha256(await readFile(daemonBin)), cairn: sha256(await readFile(cairnBin)), web: webDigest };
   console.log(`FIRST_USE_BUILD daemon=${daemonBin} sha256=${binaryDigests.daemon}`);
-  console.log(`FIRST_USE_BUILD rw=${cairnBin} sha256=${binaryDigests.rw}`);
+  console.log(`FIRST_USE_BUILD cairn=${cairnBin} sha256=${binaryDigests.cairn}`);
   console.log(`FIRST_USE_BUILD web_dist=${webDist} tree_sha256=${binaryDigests.web}`);
 
   const configPath = join(tempRoot, "config.toml");
@@ -374,7 +374,7 @@ try {
     status: "PASS",
     date: new Date().toISOString(),
     scope: "fresh empty browser profile using existing upload, plan/apply, query, annotation, and original-download operations",
-    build: { daemonPath: daemonBin, daemonSha256: binaryDigests.daemon, rwPath: cairnBin, rwSha256: binaryDigests.rw, webDistPath: webDist, webDistTreeSha256: binaryDigests.web },
+    build: { daemonPath: daemonBin, daemonSha256: binaryDigests.daemon, cairnPath: cairnBin, cairnSha256: binaryDigests.cairn, webDistPath: webDist, webDistTreeSha256: binaryDigests.web },
     isolatedRuntime: { config: configPath, catalog: join(dataRoot, "catalog.sqlite"), repository: join(dataRoot, "repository"), recovery: join(dataRoot, "recovery"), socket: socketPath, listener: baseURL, profileRoot: tempRoot },
     generatedFile: { name: fixtureName, logicalBytes: fixtureBytes.length, sha256: expectedDigest, stagingUnprotectedBeforeApply: true, noPublishedSnapshotBeforeConfirmation: true, reviewProtectionMode: "STORE_EXACT" },
     userJourney: { freshEmptyGuide: true, explicitReviewAndConfirm: true, foundByName: true, taggedAndNoteAdded: true, foundByTag: true, foundByNoteText: true, originalDownloadBytesMatch: true, originalDownloadSha256: expectedDigest },

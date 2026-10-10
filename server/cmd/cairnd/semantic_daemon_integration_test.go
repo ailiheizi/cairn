@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
@@ -80,7 +80,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	if output, err := initConfig.CombinedOutput(); err != nil {
 		t.Fatalf("cairn config init: %v\n%s", err, output)
 	}
-	config, err := rwconfig.LoadFile(configPath)
+	config, err := cairnconfig.LoadFile(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}

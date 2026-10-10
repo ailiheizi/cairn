@@ -671,7 +671,7 @@ async function startDisposableDaemon(root, webRoot) {
   assert.ok(isAbsolute(clientBinary), "CAIRN_BIN override must be absolute");
   const binaries = {
     daemon: { path: daemonBinary, sha256: createHash("sha256").update(await readFile(daemonBinary)).digest("hex") },
-    rw: { path: clientBinary, sha256: createHash("sha256").update(await readFile(clientBinary)).digest("hex") },
+    cairn: { path: clientBinary, sha256: createHash("sha256").update(await readFile(clientBinary)).digest("hex") },
   };
   assert.equal(spawnSync(clientBinary, ["config", "init", "--path", config], { cwd: repo, env: isolatedDaemonEnvironment(root), stdio: "ignore" }).status, 0, "initialize disposable daemon config");
   const port = await freeLoopbackPort();

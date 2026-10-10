@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/controlplane"
 	"github.com/ailiheizi/cairn/server/internal/api"
 	"github.com/ailiheizi/cairn/server/internal/exact"
@@ -117,7 +117,7 @@ type semanticWorkerBinding struct {
 // configureSemanticBinding admits the pinned local ONNX/BGE worker for
 // embedding_mode=local. The local path is unchanged: same profile checks,
 // same admission, same worker lease, same probe.
-func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+func configureSemanticBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
 	binding, err := startLocalSemanticBinding(ctx, resolved, store, bundleRoot, operatorOverride)
 	if err != nil {
 		return nil, nil, err
@@ -128,7 +128,7 @@ func configureSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCon
 	return controlplane.WithSemanticIndexerBinding(binding.provider, binding.zvec, binding.libraryPath, binding.libraryDigest, binding.manifest), binding.release, nil
 }
 
-func startLocalSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (semanticWorkerBinding, error) {
+func startLocalSemanticBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, bundleRoot string, operatorOverride bool) (semanticWorkerBinding, error) {
 	if strings.TrimSpace(bundleRoot) == "" {
 		return semanticWorkerBinding{}, nil
 	}
@@ -219,7 +219,7 @@ func startLocalSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCo
 // A mode that cannot admit its provider is reported as a degraded semantic
 // capability by the caller; it never falls back to another mode, provider, or
 // space.
-func configureSemanticBindingForMode(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+func configureSemanticBindingForMode(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
 	switch strings.TrimSpace(resolved.Config.Semantic.EmbeddingMode) {
 	case "online":
 		return configureOnlineSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
@@ -237,7 +237,7 @@ func configureSemanticBindingForMode(ctx context.Context, resolved rwconfig.Reso
 // bundle's zvec asset: the current packaging ships the in-process vector
 // backend inside that bundle, and an online-only backend artifact is not
 // admitted yet. No local model artifact is used to produce vectors.
-func configureOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+func configureOnlineSemanticBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
 	provider, zvec, libraryPath, libraryDigest, manifest, err := buildOnlineSemanticBinding(ctx, resolved, store, modelsRoot, bundleRoot, operatorOverride)
 	if err != nil {
 		return nil, nil, err
@@ -249,7 +249,7 @@ func configureOnlineSemanticBinding(ctx context.Context, resolved rwconfig.Resol
 // online component beside it. The daemon's bound generation space remains the
 // local one; the online component's state is reported per component and is
 // only used when a request names its space.
-func configureHybridSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
+func configureHybridSemanticBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (controlplane.DispatcherOption, func() error, error) {
 	local, err := startLocalSemanticBinding(ctx, resolved, store, bundleRoot, operatorOverride)
 	if err != nil {
 		return nil, nil, fmt.Errorf("hybrid local component: %w", err)
@@ -283,7 +283,7 @@ func configureHybridSemanticBinding(ctx context.Context, resolved rwconfig.Resol
 // search, and the text semantic dimension are unaffected. The vector backend is
 // the in-process zvec library the admitted text bundle already ships, because
 // the image bundle admits no vector library of its own.
-func configureImageBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, repo repository.Driver, textBundleRoot, imageBundleRoot string, textBundleOverride bool) (controlplane.DispatcherOption, error) {
+func configureImageBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, repo repository.Driver, textBundleRoot, imageBundleRoot string, textBundleOverride bool) (controlplane.DispatcherOption, error) {
 	if strings.TrimSpace(imageBundleRoot) == "" {
 		return nil, nil
 	}
@@ -311,7 +311,7 @@ func configureImageBinding(ctx context.Context, resolved rwconfig.ResolvedConfig
 	), nil
 }
 
-func buildOnlineSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (*search.OnlineEmbeddingProvider, search.ZvecGenerationDriver, string, string, search.EmbeddingGenerationManifest, error) {
+func buildOnlineSemanticBinding(ctx context.Context, resolved cairnconfig.ResolvedConfig, store *sqlite.Store, modelsRoot, bundleRoot string, operatorOverride bool) (*search.OnlineEmbeddingProvider, search.ZvecGenerationDriver, string, string, search.EmbeddingGenerationManifest, error) {
 	profile, err := search.LoadOnlineEmbeddingProfile(modelsRoot, resolved.Config.Semantic.OnlineProfile)
 	if err != nil {
 		return nil, nil, "", "", search.EmbeddingGenerationManifest{}, err
@@ -448,7 +448,7 @@ func renewAndValidateSemanticLease(ctx context.Context, fencer exact.Publication
 // disclosure: it requires a live durable grant and — unless the operator's
 // remote-egress safety switch says otherwise — an explicit per-request
 // confirmation naming that grant.
-func configureDescribeBinding(resolved rwconfig.ResolvedConfig, store *sqlite.Store) (controlplane.DispatcherOption, error) {
+func configureDescribeBinding(resolved cairnconfig.ResolvedConfig, store *sqlite.Store) (controlplane.DispatcherOption, error) {
 	descriptions := resolved.Config.Descriptions
 	profileID := strings.TrimSpace(descriptions.ProviderProfile)
 	if profileID == "" || strings.TrimSpace(descriptions.Generate) == "disabled" {
@@ -487,7 +487,7 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resolved, err := rwconfig.LoadEffective(rwconfig.LoadOptions{
+	resolved, err := cairnconfig.LoadEffective(cairnconfig.LoadOptions{
 		Path: options.configPath,
 		// Normal daemon mode must be anchored to an operator-created persisted
 		// profile.  Falling back to platform defaults here can create a new
@@ -496,8 +496,8 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 		// Recovery-reader mode intentionally returns above and remains
 		// catalog/config-free.
 		AllowMissing: false,
-		ResolveOptions: rwconfig.ResolveOptions{
-			Overrides: rwconfig.PathOverrides{Catalog: options.catalogPath, Repository: options.repositoryPath},
+		ResolveOptions: cairnconfig.ResolveOptions{
+			Overrides: cairnconfig.PathOverrides{Catalog: options.catalogPath, Repository: options.repositoryPath},
 		},
 	})
 	if err != nil {
@@ -762,7 +762,7 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	return nil
 }
 
-func resolveAPIAddress(override string, configured rwconfig.APIConfig) (string, error) {
+func resolveAPIAddress(override string, configured cairnconfig.APIConfig) (string, error) {
 	address := strings.TrimSpace(override)
 	if address == "" && configured.Enabled {
 		address = configured.Listen
@@ -770,7 +770,7 @@ func resolveAPIAddress(override string, configured rwconfig.APIConfig) (string, 
 	if address == "" {
 		return "", nil
 	}
-	if err := rwconfig.ValidateLoopbackAPIListen(address); err != nil {
+	if err := cairnconfig.ValidateLoopbackAPIListen(address); err != nil {
 		return "", fmt.Errorf("start local HTTP adapter: %w", err)
 	}
 	return address, nil
@@ -859,44 +859,44 @@ func runRecoveryReader(ctx context.Context, options daemonOptions) error {
 	return nil
 }
 
-func validateRuntimeStorageProfile(cfg rwconfig.Config) error {
-	if cfg.Recovery.PublicationSigning != rwconfig.PublicationSigningLocalEd25519 {
+func validateRuntimeStorageProfile(cfg cairnconfig.Config) error {
+	if cfg.Recovery.PublicationSigning != cairnconfig.PublicationSigningLocalEd25519 {
 		return fmt.Errorf(
 			"recovery publication signing profile %q is not available in this build (available: %s)",
-			cfg.Recovery.PublicationSigning, rwconfig.PublicationSigningLocalEd25519,
+			cfg.Recovery.PublicationSigning, cairnconfig.PublicationSigningLocalEd25519,
 		)
 	}
-	if cfg.Storage.RepositoryProfile == rwconfig.RepositoryProfileLocalZstdEncryptedV1 {
+	if cfg.Storage.RepositoryProfile == cairnconfig.RepositoryProfileLocalZstdEncryptedV1 {
 		return fmt.Errorf(
 			"storage repository profile %q is experimental and is not admitted in this build (no daemon/secret-provider wiring)",
-			rwconfig.RepositoryProfileLocalZstdEncryptedV1,
+			cairnconfig.RepositoryProfileLocalZstdEncryptedV1,
 		)
 	}
 	switch cfg.Storage.RepositoryProfile {
-	case rwconfig.RepositoryProfileDirectoryCASDev:
-		if cfg.Storage.CompressionProfile != rwconfig.CompressionProfileIdentity {
+	case cairnconfig.RepositoryProfileDirectoryCASDev:
+		if cfg.Storage.CompressionProfile != cairnconfig.CompressionProfileIdentity {
 			return fmt.Errorf(
 				"storage compression profile %q is not available with repository profile %q (required: %s)",
-				cfg.Storage.CompressionProfile, cfg.Storage.RepositoryProfile, rwconfig.CompressionProfileIdentity,
+				cfg.Storage.CompressionProfile, cfg.Storage.RepositoryProfile, cairnconfig.CompressionProfileIdentity,
 			)
 		}
-	case rwconfig.RepositoryProfileLocalZstdV1:
-		if cfg.Storage.CompressionProfile != rwconfig.CompressionProfileZstdV1 {
+	case cairnconfig.RepositoryProfileLocalZstdV1:
+		if cfg.Storage.CompressionProfile != cairnconfig.CompressionProfileZstdV1 {
 			return fmt.Errorf(
 				"storage compression profile %q is not available with repository profile %q (required: %s)",
-				cfg.Storage.CompressionProfile, cfg.Storage.RepositoryProfile, rwconfig.CompressionProfileZstdV1,
+				cfg.Storage.CompressionProfile, cfg.Storage.RepositoryProfile, cairnconfig.CompressionProfileZstdV1,
 			)
 		}
 	default:
 		return fmt.Errorf(
 			"storage repository profile %q is not available in this build (available: %s, %s)",
-			cfg.Storage.RepositoryProfile, rwconfig.RepositoryProfileDirectoryCASDev, rwconfig.RepositoryProfileLocalZstdV1,
+			cfg.Storage.RepositoryProfile, cairnconfig.RepositoryProfileDirectoryCASDev, cairnconfig.RepositoryProfileLocalZstdV1,
 		)
 	}
-	if cfg.Storage.NeuralCodec != rwconfig.NeuralCodecDisabled {
+	if cfg.Storage.NeuralCodec != cairnconfig.NeuralCodecDisabled {
 		return fmt.Errorf(
 			"storage neural codec %q is not available in this build (available: %s)",
-			cfg.Storage.NeuralCodec, rwconfig.NeuralCodecDisabled,
+			cfg.Storage.NeuralCodec, cairnconfig.NeuralCodecDisabled,
 		)
 	}
 	return nil

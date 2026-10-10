@@ -180,7 +180,7 @@ class DeploymentSavingsTests(unittest.TestCase):
 
     def test_runtime_root_returns_canonical_owned_path(self):
         with tempfile.TemporaryDirectory() as tmp:
-            created = Path(tmp) / "rwm-test"
+            created = Path(tmp) / "cairn-test"
             def make_root(*_args, **_kwargs):
                 created.mkdir(mode=0o700)
                 return str(created)
@@ -200,12 +200,12 @@ class DeploymentSavingsTests(unittest.TestCase):
     def test_candidate_archive_binds_supplied_binaries_and_extracts_web_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            rw, daemon = base / "cairn", base / "cairnd"
-            rw.write_bytes(b"cli candidate")
+            cairn, daemon = base / "cairn", base / "cairnd"
+            cairn.write_bytes(b"cli candidate")
             daemon.write_bytes(b"daemon candidate")
             package = base / "candidate.tar.gz"
             with tarfile.open(package, "w:gz") as archive:
-                for name, data in (("candidate/bin/cairn", rw.read_bytes()),
+                for name, data in (("candidate/bin/cairn", cairn.read_bytes()),
                                    ("candidate/bin/cairnd", daemon.read_bytes()),
                                    ("candidate/web/dist/index.html", b"<html></html>")):
                     info = tarfile.TarInfo(name)
@@ -214,12 +214,12 @@ class DeploymentSavingsTests(unittest.TestCase):
                     archive.addfile(info, io.BytesIO(data))
             evidence = base / "evidence"
             evidence.mkdir()
-            web, semantic = qualify.extract_web_and_semantic_inputs(package, evidence, None, rw, daemon)
+            web, semantic = qualify.extract_web_and_semantic_inputs(package, evidence, None, cairn, daemon)
             self.assertEqual((web / "index.html").read_bytes(), b"<html></html>")
             self.assertIsNone(semantic)
             (package).write_bytes(b"replaced package")
             with self.assertRaisesRegex(qualify.QualificationError, "cannot read|digest"):
-                qualify.extract_web_and_semantic_inputs(package, base / "second", None, rw, daemon)
+                qualify.extract_web_and_semantic_inputs(package, base / "second", None, cairn, daemon)
 
     def test_profile_patch_changes_only_the_generated_storage_tuple(self):
         with tempfile.TemporaryDirectory() as tmp:

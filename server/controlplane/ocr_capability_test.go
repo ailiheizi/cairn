@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/ailiheizi/cairn/client/command"
-	rwconfig "github.com/ailiheizi/cairn/config"
+	cairnconfig "github.com/ailiheizi/cairn/config"
 	"github.com/ailiheizi/cairn/server/internal/processor"
 	"github.com/ailiheizi/cairn/server/testutil"
 )
@@ -26,13 +26,13 @@ func ocrCapabilityFor(t *testing.T, data command.CapabilityListData) command.Cap
 	return command.Capability{}
 }
 
-func ocrTestDispatcher(t *testing.T) (*Dispatcher, command.CapabilityListData, rwconfig.ResolvedConfig) {
+func ocrTestDispatcher(t *testing.T) (*Dispatcher, command.CapabilityListData, cairnconfig.ResolvedConfig) {
 	t.Helper()
 	// The persisted profile resolves paths.models below XDG_DATA_HOME, so the
 	// test owns every directory the OCR capability inspects.
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	configPath := filepath.Join(t.TempDir(), "cairn.toml")
-	resolved, err := rwconfig.Init(configPath)
+	resolved, err := cairnconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("init config: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestOCRCapabilityReportsUnavailableForABrokenBundle(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	// Pre-create the exact bundle location with an unreadable manifest.
 	configPath := filepath.Join(t.TempDir(), "cairn.toml")
-	resolved, err := rwconfig.Init(configPath)
+	resolved, err := cairnconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("init config: %v", err)
 	}
