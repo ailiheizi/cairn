@@ -69,8 +69,8 @@ echo "1/6  ONNX toolchain"
 
 echo "2/6  pinned source export"
 base="https://huggingface.co/$SOURCE_REPO/resolve/$SOURCE_REVISION"
-curl -sSL "${curl_proxy[@]}" -o "$work/model.onnx" "$base/onnx/model_quantized.onnx"
-curl -sSL "${curl_proxy[@]}" -o "$bundle/tokenizer.json" "$base/tokenizer.json"
+curl -sSL ${curl_proxy[@]+"${curl_proxy[@]}"} -o "$work/model.onnx" "$base/onnx/model_quantized.onnx"
+curl -sSL ${curl_proxy[@]+"${curl_proxy[@]}"} -o "$bundle/tokenizer.json" "$base/tokenizer.json"
 # The license must be the upstream licence text. A missing or unrelated file is
 # a hard failure rather than a silent fallback, because a bundle whose licence
 # asset is not a licence is worse than no bundle at all.
@@ -82,7 +82,7 @@ if command -v gh >/dev/null 2>&1; then
 fi
 if [ "$license_fetched" != true ]; then
   for branch in main master; do
-    if curl -sSL "${curl_proxy[@]}" -o "$bundle/LICENSE" "https://raw.githubusercontent.com/$UPSTREAM_GITHUB_REPO/$branch/LICENSE"; then
+    if curl -sSL ${curl_proxy[@]+"${curl_proxy[@]}"} -o "$bundle/LICENSE" "https://raw.githubusercontent.com/$UPSTREAM_GITHUB_REPO/$branch/LICENSE"; then
       if ! head -c 40 "$bundle/LICENSE" | grep -q "404"; then
         license_fetched=true
         break
