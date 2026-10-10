@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 // ExportManifestSchemaV1 is the frozen export-manifest contract. A manifest
 // is the unit of plan, apply, verify, and reproduction; it never re-evaluates
 // the live view it was frozen from.
-const ExportManifestSchemaV1 = "org.restoreweave.export-manifest.v1"
+const ExportManifestSchemaV1 = "org.cairn.export-manifest.v1"
 
 // ExportItem is one frozen subject output in an ExportManifest. SubjectRef is
 // the stable catalog subject; OutputName is the destination-relative name and
@@ -144,7 +144,7 @@ func exportManifestDestinationBasis(destination string) (string, error) {
 		Path   string `json:"path"`
 		State  string `json:"state"`
 	}
-	value := basis{Schema: "org.restoreweave.export-destination-basis.v1", Path: destination}
+	value := basis{Schema: "org.cairn.export-destination-basis.v1", Path: destination}
 	info, err := os.Lstat(destination)
 	if errors.Is(err, os.ErrNotExist) {
 		value.State = "ABSENT"

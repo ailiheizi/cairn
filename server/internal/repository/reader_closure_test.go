@@ -331,7 +331,7 @@ func TestResolveReaderDecoderRefusesEachTypedCase(t *testing.T) {
 		{
 			name: "no retained decoder",
 			declaration: ReaderClosureDeclaration{
-				Dependency: "restoreweave.memory-test", Role: ReaderRoleRepositoryDriver, Retention: ReaderRetentionUnavailable,
+				Dependency: "cairn.memory-test", Role: ReaderRoleRepositoryDriver, Retention: ReaderRetentionUnavailable,
 			},
 			wantReason:  ReaderRefusalNotRetained,
 			wantOutcome: ReaderAttemptNotRetained,
@@ -339,7 +339,7 @@ func TestResolveReaderDecoderRefusesEachTypedCase(t *testing.T) {
 		{
 			name: "retained decoder never offered",
 			declaration: ReaderClosureDeclaration{
-				Dependency: "restoreweave.repository.local-zstd-v1", Role: ReaderRoleCompressionCodec, Retention: ReaderRetentionRetainedReproducible,
+				Dependency: "cairn.repository.local-zstd-v1", Role: ReaderRoleCompressionCodec, Retention: ReaderRetentionRetainedReproducible,
 				Artifacts: []ReaderRetainedArtifact{{Stage: ReaderDecoderStageRetainedPinned, Kind: ReaderArtifactPinnedModule, Ref: "module@v1", Digest: "h1:pinned"}},
 			},
 			wantReason:  ReaderRefusalRetainedUnavailable,
@@ -348,7 +348,7 @@ func TestResolveReaderDecoderRefusesEachTypedCase(t *testing.T) {
 		{
 			name: "retained decoder digest mismatch",
 			declaration: ReaderClosureDeclaration{
-				Dependency: "restoreweave.repository.local-zstd-v1", Role: ReaderRoleCompressionCodec, Retention: ReaderRetentionRetainedReproducible,
+				Dependency: "cairn.repository.local-zstd-v1", Role: ReaderRoleCompressionCodec, Retention: ReaderRetentionRetainedReproducible,
 				Artifacts: []ReaderRetainedArtifact{{Stage: ReaderDecoderStageRetainedPinned, Kind: ReaderArtifactPinnedModule, Ref: "module@v1", Digest: "h1:pinned"}},
 			},
 			attempts:    []ReaderDecoderAttempt{{Stage: ReaderDecoderStageRetainedPinned, ID: "module@v1", Digest: "h1:other", Available: true}},

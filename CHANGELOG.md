@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Renamed: the project and its identifiers are now Cairn. The Go module path
+  (`github.com/ailiheizi/cairn`), the `cairn.config.v1` and
+  `org.cairn.result.v1` schema strings, `CAIRN_*` environment variables, the
+  browser storage keys, the `cairn-export.json` sidecar, the `cairn-web`
+  package, `shell.cairn.*`/`page.cairn.*` slot ids, and internal symbols such
+  as `OwnershipCairnPacks` all moved together; the daemon command is now
+  `server/cmd/cairnd`, producing a `cairnd` binary. Behaviour is unchanged.
+  Pre-alpha local profiles, config documents, and browser storage written under
+  the old identifiers are intentionally not migrated and must be regenerated.
 - The reader closure is declared, resolved, and vector-proven. `capability.list`
   now reports one `reader-closure` row per admitted dependency — its role,
   retention class, ordered decoder artifacts with digests, rebuild and verify
@@ -77,7 +86,7 @@
   every attempt writes an append-only receipt carrying the destination,
   redacted credential reference, data classes, budget consumption, and input
   and output digests. The operations are `semantic.provider.install|list` and
-  `egress.grant.create|list|revoke`, reachable from `rw semantic`.
+  `egress.grant.create|list|revoke`, reachable from `cairn semantic`.
 - Files now declare their media facts durably. Image dimensions and format,
   video container/duration/dimensions/codecs (ISO-BMFF, Matroska/WebM,
   RIFF-AVI), and audio duration/sample rate/channels/codec (m4a, mp3 with
@@ -129,7 +138,7 @@
   absent field rather than an empty string, and the selected policy reaches the
   daemon unchanged.
 - The image bundle is installable and reproducible instead of hand-placed.
-  `rw image bundle install --archive PATH` admits one Chinese-CLIP bundle from a
+  `cairn image bundle install --archive PATH` admits one Chinese-CLIP bundle from a
   local archive: the archive is transport, every declared asset is re-hashed
   against the descriptor inside it, a file the descriptor does not declare makes
   the install fail, the declared profile facts must be the admitted image
@@ -147,7 +156,7 @@
   installer, so an override or test configuration stays honest.
 - Image search is a real dimension with its own space instead of a fixture.
   `multimodal-clip` declares an image space fingerprint (schema
-  `restoreweave.image-space.v1`) that binds every declared fact of the model,
+  `cairn.image-space.v1`) that binds every declared fact of the model,
   the preprocessing, and the vector schema; it reports READY, NOT_BUILT, or
   UNAVAILABLE with the reason, never serves fixture vectors from a production
   path, and the fixture provider is quarantined as soon as a real binding
@@ -271,7 +280,7 @@
   change is the same planned, confirmed operation. The tags view now shows the
   daemon's plan before any write and the daemon's per-subject outcomes after.
 - Added a bounded read-only MCP profile over the typed command ABI
-  (`rw mcp serve --stdio --read-only`). Four tools — `search`, `get_subject`,
+  (`cairn mcp serve --stdio --read-only`). Four tools — `search`, `get_subject`,
   `list_recent`, `read_text_extract` — can dispatch only an enumerated allowlist
   of read operations through one gateway, so no plan, apply, restore, verify,
   export, cancel, delete or configuration operation is reachable; a test
@@ -289,7 +298,7 @@
   vocabulary in the reason, and a frozen output name that collides with a
   derived sidecar name fails the same way. Applying with that policy writes the
   frozen subject files exactly as before plus one derived
-  `restoreweave-export.json` beside them that restates each item's output name,
+  `cairn-export.json` beside them that restates each item's output name,
   exact identity, logical size and exactness with the manifest id, digest and
   policy, and says in its own note that it is derived output rather than content
   identity. Its content is a function of the frozen manifest alone, so applying
@@ -576,7 +585,7 @@
   and the existing `All content` heading control stays the way back to the full
   library. A labelled local recents panel (at most eight entries, most recent
   first, de-duplicated case-insensitively, persisted under
-  `restoreweave.recent_searches`) appears while the field is focused and empty,
+  `cairn.recent_searches`) appears while the field is focused and empty,
   re-runs a submitted query, drops one entry, or clears the list; Escape closes
   the list first and empties the field only on the next press. The panel states
   that it is browser-only history rather than a saved view: `view.save` remains

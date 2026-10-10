@@ -55,12 +55,12 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
       <a className="brand" href="/" aria-label={t("Cairn home")} onClick={(event) => { if (!canLeaveSettings()) event.preventDefault(); }}><span className="brand-mark"><ShieldCheck size={19} /></span><span>Cairn</span></a>
       <form className="global-search" onSubmit={search.runSearch} onFocus={(event) => { search.handleSearchFieldFocus(event.target); }} onBlur={(event) => { search.handleSearchFieldBlur(event.currentTarget.contains(event.relatedTarget as Node | null)); }} onKeyDown={search.handleSearchFieldKeyDown}>
         <Search size={17} aria-hidden="true" />
-        <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="restoreweave-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
-        <span className="sr-only" id="restoreweave-search-hint">{t("Command or Control plus K focuses this field. Recent searches are kept in this browser only; saving a query as a view is the durable form.")}</span>
+        <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="cairn-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
+        <span className="sr-only" id="cairn-search-hint">{t("Command or Control plus K focuses this field. Recent searches are kept in this browser only; saving a query as a view is the durable form.")}</span>
         {Boolean(query.trim()) && <button type="button" className="search-clear" aria-label={t("Clear search text")} title={t("Clears the field only. Current results stay until you search again or return to All content.")} onClick={search.clearSearchText}><X size={14} aria-hidden="true" /></button>}
         <button type="submit" className="search-submit" disabled={busy || !query.trim() || !isConnected || !catalogHealthy}>{busy ? <LoaderCircle className="spin" size={16} /> : t("Search")}</button>
-        {suggestionsOpen && <div className="search-suggest" role="listbox" aria-label={t("Search operators and values")} aria-describedby="restoreweave-search-suggest-note">
-          <p className="search-suggest-note" id="restoreweave-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary, and protection modes from the daemon's closed protection vocabulary.")}</p>
+        {suggestionsOpen && <div className="search-suggest" role="listbox" aria-label={t("Search operators and values")} aria-describedby="cairn-search-suggest-note">
+          <p className="search-suggest-note" id="cairn-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary, and protection modes from the daemon's closed protection vocabulary.")}</p>
           {suggestions.map((suggestion, index) => <button key={suggestion.key} type="button" role="option" aria-selected={index === activeSuggestion} className={`search-suggest-entry ${index === activeSuggestion ? "active" : ""}`} onClick={() => ops.acceptSuggestion(index)}>
             {suggestion.kind === "operator"
               ? <><b>{suggestion.name}</b><span>{t(suggestion.description)}</span><code>{suggestion.valueHint}</code></>
@@ -69,9 +69,9 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
                 : <><b>{suggestion.value}</b><span>{t("Tag, {{count}} items", { count: suggestion.count })}</span><code>{suggestion.token}</code></>}
           </button>)}
         </div>}
-        {search.searchRecentsOpen && <div className="search-recents" role="group" aria-label={t("Local recent searches")} aria-describedby="restoreweave-search-recents-note">
+        {search.searchRecentsOpen && <div className="search-recents" role="group" aria-label={t("Local recent searches")} aria-describedby="cairn-search-recents-note">
           <div className="search-recents-head"><span><History size={13} aria-hidden="true" />{t("Local recent searches")}</span><button type="button" className="search-recents-clear" onClick={search.clearRecentSearches}>{t("Clear recent searches")}</button></div>
-          <p className="search-recents-note" id="restoreweave-search-recents-note">{t("Kept in this browser only. These are not saved views; saving a query as a view is the durable form.")}</p>
+          <p className="search-recents-note" id="cairn-search-recents-note">{t("Kept in this browser only. These are not saved views; saving a query as a view is the durable form.")}</p>
           <ul className="search-recents-list" onKeyDown={search.handleRecentsListKeyDown}>
             {search.recentSearches.map((value) => <li className="search-recent-item" key={value}>
               <button type="button" className="search-recent-entry" title={value} onClick={() => search.pickRecentSearch(value)}>{value}</button>

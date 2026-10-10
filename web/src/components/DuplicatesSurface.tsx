@@ -273,7 +273,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
   }, [annotationStatus, groupReads, representations]);
 
   async function resolveWorkspace(): Promise<{ workspaceID: string; error: string }> {
-    const stored = window.localStorage.getItem("restoreweave.workspace_id")?.trim() ?? "";
+    const stored = window.localStorage.getItem("cairn.workspace_id")?.trim() ?? "";
     if (stored) return { workspaceID: stored, error: "" };
     // The browser-local id is a convenience the shell records after an explicit
     // publication. When it is absent, the daemon's own status projection names
@@ -639,10 +639,10 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
               {selection.length > 0 && <section className="duplicates-selection" role="region" aria-label={t("Tag for the selected members")} data-selected-count={selection.length}>
                 <span className="duplicates-selection-count" role="status">{t("{{count}} selected", { count: selection.length })}</span>
                 <form className="duplicates-tag" onSubmit={(event) => { event.preventDefault(); void applyTag(); }}>
-                  <input list="restoreweave-duplicates-tag-vocabulary" aria-label={t("Tag for the selected members")} value={tagDraft} placeholder={t("Add tag")} onChange={(event) => setTagDraft(event.target.value)} disabled={tagAction.state === "RUNNING"} />
+                  <input list="cairn-duplicates-tag-vocabulary" aria-label={t("Tag for the selected members")} value={tagDraft} placeholder={t("Add tag")} onChange={(event) => setTagDraft(event.target.value)} disabled={tagAction.state === "RUNNING"} />
                   <button type="submit" className="primary-button compact" data-action="tag-selected" disabled={tagAction.state === "RUNNING" || !tagDraft.trim()}><TagIcon size={14} />{t("Add tag")}</button>
                 </form>
-                <datalist id="restoreweave-duplicates-tag-vocabulary">{tagVocabulary.map((value) => <option key={value} value={value} />)}</datalist>
+                <datalist id="cairn-duplicates-tag-vocabulary">{tagVocabulary.map((value) => <option key={value} value={value} />)}</datalist>
                 <span className="duplicates-selection-note">{t("Tagging applies to selected members only and changes no bytes.")}</span>
               </section>}
               {tagAction.text && <p className="duplicates-action" data-action-state={tagAction.state} role="status">{tagAction.text}</p>}

@@ -1494,7 +1494,7 @@ func validExtentKind(value ExtentKind) bool {
 
 func validOwnershipMode(value OwnershipMode) bool {
 	switch value {
-	case OwnershipRestoreWeavePacks, OwnershipEngineManaged, OwnershipInline:
+	case OwnershipCairnPacks, OwnershipEngineManaged, OwnershipInline:
 		return true
 	default:
 		return false

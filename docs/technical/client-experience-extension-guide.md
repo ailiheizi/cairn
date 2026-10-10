@@ -53,10 +53,10 @@ The existing Exhibition record is a real example of the current shape:
 
    ```ts
    {
-     id: "restoreweave:exhibition",
-     mode: "page:restoreweave:exhibition",
+     id: "cairn:exhibition",
+     mode: "page:cairn:exhibition",
      route: "exhibition",
-     slot: "page.restoreweave.exhibition",
+     slot: "page.cairn.exhibition",
      label: "Exhibition",
      context: "loaded-library",
      chrome: "immersive",

@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // TestRealDaemonSemanticEndToEnd proves the production daemon path after the
@@ -30,20 +30,20 @@ import (
 // the real provider, and deleting that disposable generation degrades until a
 // subsequent rebuild restores the same profile-bound search.
 func TestRealDaemonSemanticEndToEnd(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("RESTOREWEAVE_RUN_SUPERVISED_ONNX")) != "1" {
-		t.Skip("RESTOREWEAVE_RUN_SUPERVISED_ONNX=1 is required for daemon qualification")
+	if strings.TrimSpace(os.Getenv("CAIRN_RUN_SUPERVISED_ONNX")) != "1" {
+		t.Skip("CAIRN_RUN_SUPERVISED_ONNX=1 is required for daemon qualification")
 	}
-	runtimeSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_RUNTIME"))
-	modelSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL"))
-	tokenizerSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_TOKENIZER"))
-	zvecSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	runtimeSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_RUNTIME"))
+	modelSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_MODEL"))
+	tokenizerSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_TOKENIZER"))
+	zvecSource := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if runtimeSource == "" || modelSource == "" || tokenizerSource == "" || zvecSource == "" {
 		t.Skip("real BGE, ONNX runtime, and zvec asset paths are required")
 	}
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"), "purego")
-	rwBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/rw", filepath.Join(binDir, "rw"), "purego")
+	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "purego")
+	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "purego")
 
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "xdg-data")
@@ -55,7 +55,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve worker temp base: %v", err)
 	}
-	workerTemp, err := os.MkdirTemp(workerTempBase, "rw-")
+	workerTemp, err := os.MkdirTemp(workerTempBase, "cairn-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +75,10 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	}
 	configPath := filepath.Join(root, "config", "config.yaml")
 	env := append(os.Environ(), "XDG_DATA_HOME="+dataHome, "TMPDIR="+workerTemp)
-	initConfig := exec.Command(rwBin, "config", "init", "--path", configPath)
+	initConfig := exec.Command(cairnBin, "config", "init", "--path", configPath)
 	initConfig.Env = env
 	if output, err := initConfig.CombinedOutput(); err != nil {
-		t.Fatalf("rw config init: %v\n%s", err, output)
+		t.Fatalf("cairn config init: %v\n%s", err, output)
 	}
 	config, err := rwconfig.LoadFile(configPath)
 	if err != nil {
@@ -105,17 +105,17 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 
 	// macOS has a short Unix-domain socket path limit; keep this test endpoint
 	// independent from the long testing.TempDir path.
-	socketPath := filepath.Join(os.TempDir(), "restoreweave-semantic-test-"+strconv.Itoa(os.Getpid())+".sock")
+	socketPath := filepath.Join(os.TempDir(), "cairn-semantic-test-"+strconv.Itoa(os.Getpid())+".sock")
 	_ = os.Remove(socketPath)
 	defer os.Remove(socketPath)
 	daemon, daemonDone, daemonLog := startDaemonProcessWithEnv(t, env, daemonBin, socketPath, "--config", configPath)
 	defer stopDaemonProcess(t, daemon, daemonDone, daemonLog)
-	waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
+	waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
 
-	initialCaps := runRealRWProcess(t, rwBin, socketPath, "capability", "list")
+	initialCaps := runRealRWProcess(t, cairnBin, socketPath, "capability", "list")
 	assertSemanticCapability(t, initialCaps, command.CapabilityUnavailable)
 	assertModelBundleCapability(t, initialCaps, command.CapabilityUnavailable)
-	installedResult := runRealRWProcess(t, rwBin, socketPath, "semantic", "bundle", "install", "--archive", archivePath)
+	installedResult := runRealRWProcess(t, cairnBin, socketPath, "semantic", "bundle", "install", "--archive", archivePath)
 	var installedData command.SemanticBundleInstallData
 	decodeProcessResult(t, installedResult, &installedData)
 	if installedData.ProfileID != search.SemanticBundleBGEProfileID || installedData.ProfileDigest == "" || installedData.Destination == "" || !installedData.Changed || !installedData.RestartRequired {
@@ -131,23 +131,23 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 		t.Fatalf("daemon stop after install: %v\n%s", err, daemonLog.String())
 	}
 	daemon, daemonDone, daemonLog = startDaemonProcessWithEnv(t, env, daemonBin, socketPath, "--config", configPath)
-	waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
-	assertModelBundleCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
+	assertModelBundleCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
 
-	planned := runRealRWProcess(t, rwBin, socketPath, "ingest", source)
+	planned := runRealRWProcess(t, cairnBin, socketPath, "ingest", source)
 	var ingest command.PlanIngestData
 	decodeProcessResult(t, planned, &ingest)
-	applied := runRealRWProcess(t, rwBin, socketPath, "plan", "apply", ingest.PlanID, "--workspace", ingest.WorkspaceID, "--digest", ingest.PlanDigest)
+	applied := runRealRWProcess(t, cairnBin, socketPath, "plan", "apply", ingest.PlanID, "--workspace", ingest.WorkspaceID, "--digest", ingest.PlanDigest)
 	var appliedData command.PlanApplyData
 	decodeProcessResult(t, applied, &appliedData)
-	resolved := runRealRWProcess(t, rwBin, socketPath, "namespace", "resolve", "semantic.txt", "--workspace", appliedData.WorkspaceID, "--root", appliedData.RootID)
+	resolved := runRealRWProcess(t, cairnBin, socketPath, "namespace", "resolve", "semantic.txt", "--workspace", appliedData.WorkspaceID, "--root", appliedData.RootID)
 	var resolvedData command.NamespaceResolveData
 	decodeProcessResult(t, resolved, &resolvedData)
-	created := runRealRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "语义恢复", "--body", "洪水城市档案恢复说明", "--accepted")
+	created := runRealRWProcess(t, cairnBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "语义恢复", "--body", "洪水城市档案恢复说明", "--accepted")
 	var description command.DescriptionCreateData
 	decodeProcessResult(t, created, &description)
 
-	semanticQuery := runRealRWProcessWithDaemonLog(t, rwBin, socketPath, daemonLog, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	semanticQuery := runRealRWProcessWithDaemonLog(t, cairnBin, socketPath, daemonLog, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var semanticData command.SearchQueryData
 	decodeProcessResult(t, semanticQuery, &semanticData)
 	if semanticData.Dimension != search.DimensionSemantic || semanticData.Provider != search.ProviderSemanticONNX || len(semanticData.Hits) != 1 {
@@ -166,12 +166,12 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	if !descriptionMatched {
 		t.Fatalf("real daemon semantic description provenance = %+v", semanticData.Hits[0])
 	}
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
 
 	// The ordinary CLI path deliberately omits the internal workspace ID. The
 	// default fused broker must resolve the default workspace, retain both
 	// lexical and semantic components, and apply the typed structured filter.
-	defaultSearch := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--filter", "entry_type=REGULAR_FILE")
+	defaultSearch := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--filter", "entry_type=REGULAR_FILE")
 	var defaultData command.SearchQueryData
 	decodeProcessResult(t, defaultSearch, &defaultData)
 	if defaultData.Provider != search.ProviderBrokerFuse || defaultData.Dimension != "" || len(defaultData.FusedDimensions) != 2 ||
@@ -183,7 +183,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 		t.Fatalf("real daemon default broker query/filter = %+v", defaultData)
 	}
 
-	fused := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--fuse", search.DimensionLexical, "--fuse", search.DimensionSemantic)
+	fused := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--fuse", search.DimensionLexical, "--fuse", search.DimensionSemantic)
 	var fusedData command.SearchQueryData
 	decodeProcessResult(t, fused, &fusedData)
 	if len(fusedData.Hits) != 1 || len(fusedData.Components) != 2 {
@@ -207,11 +207,11 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 		t.Fatalf("daemon stop: %v\n%s", err, daemonLog.String())
 	}
 	daemon, daemonDone, daemonLog = startDaemonProcessWithEnv(t, env, daemonBin, socketPath, "--config", configPath)
-	waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
+	waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
 	// Startup warm-up must establish semantic readiness before the first
 	// reopened query; query execution is not allowed to self-authorize it.
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
-	reopened := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	reopened := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var reopenedData command.SearchQueryData
 	decodeProcessResult(t, reopened, &reopenedData)
 	if reopenedData.GenerationID != semanticGenerationID || reopenedData.Provider != search.ProviderSemanticONNX || len(reopenedData.Hits) != 1 {
@@ -242,17 +242,17 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 
 	daemon, daemonDone, daemonLog = startDaemonProcessWithEnv(t, env, daemonBin, socketPath, "--config", configPath)
 	defer stopDaemonProcess(t, daemon, daemonDone, daemonLog)
-	waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
-	degraded := runRWProcessAllowStatus(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
+	degraded := runRWProcessAllowStatus(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	if degraded.Status != command.StatusDegraded {
 		t.Fatalf("deleted semantic generation status = %s, reasons=%+v", degraded.Status, degraded.Reasons)
 	}
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), search.IndexStateNotBuilt)
-	createdAgain := runRealRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "语义恢复 2", "--body", "洪水城市档案恢复说明", "--accepted")
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), search.IndexStateNotBuilt)
+	createdAgain := runRealRWProcess(t, cairnBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "语义恢复 2", "--body", "洪水城市档案恢复说明", "--accepted")
 	if createdAgain.Status != command.StatusSucceeded {
 		t.Fatalf("semantic rebuild description status = %s, reasons=%+v", createdAgain.Status, createdAgain.Reasons)
 	}
-	rebuilt := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	rebuilt := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var rebuiltData command.SearchQueryData
 	decodeProcessResult(t, rebuilt, &rebuiltData)
 	if rebuiltData.GenerationID == semanticGenerationID || len(rebuiltData.Hits) == 0 {
@@ -263,7 +263,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 			t.Fatalf("rebuilt semantic hit escaped subject = %+v", hit)
 		}
 	}
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
 }
 
 func assertSemanticCapability(t *testing.T, result command.Result, want string) {
@@ -309,36 +309,36 @@ func assertModelBundleCapability(t *testing.T, result command.Result, want strin
 	t.Fatalf("model bundle capability was not declared")
 }
 
-func runRealRWProcess(t *testing.T, rwBin, socketPath string, args ...string) command.Result {
+func runRealRWProcess(t *testing.T, cairnBin, socketPath string, args ...string) command.Result {
 	t.Helper()
 	fullArgs := append([]string{"--socket", socketPath, "--timeout", "90s", "--json"}, args...)
-	output, err := exec.Command(rwBin, fullArgs...).CombinedOutput()
+	output, err := exec.Command(cairnBin, fullArgs...).CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw %s: %v\n%s", strings.Join(args, " "), err, output)
+		t.Fatalf("cairn %s: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	var result command.Result
 	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("decode rw %s result: %v\n%s", strings.Join(args, " "), err, output)
+		t.Fatalf("decode cairn %s result: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	if result.Status != command.StatusSucceeded {
-		t.Fatalf("rw %s status = %s, reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
+		t.Fatalf("cairn %s status = %s, reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
 	}
 	return result
 }
 
-func runRealRWProcessWithDaemonLog(t *testing.T, rwBin, socketPath string, daemonLog *bytes.Buffer, args ...string) command.Result {
+func runRealRWProcessWithDaemonLog(t *testing.T, cairnBin, socketPath string, daemonLog *bytes.Buffer, args ...string) command.Result {
 	t.Helper()
 	fullArgs := append([]string{"--socket", socketPath, "--timeout", "90s", "--json"}, args...)
-	output, err := exec.Command(rwBin, fullArgs...).CombinedOutput()
+	output, err := exec.Command(cairnBin, fullArgs...).CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw %s: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
+		t.Fatalf("cairn %s: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
 	}
 	var result command.Result
 	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("decode rw %s result: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
+		t.Fatalf("decode cairn %s result: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
 	}
 	if result.Status != command.StatusSucceeded {
-		t.Fatalf("rw %s status = %s, reasons=%+v\ndaemon log:\n%s", strings.Join(args, " "), result.Status, result.Reasons, daemonLog.String())
+		t.Fatalf("cairn %s status = %s, reasons=%+v\ndaemon log:\n%s", strings.Join(args, " "), result.Status, result.Reasons, daemonLog.String())
 	}
 	return result
 }
@@ -347,34 +347,34 @@ func runRealRWProcessWithDaemonLog(t *testing.T, rwBin, socketPath string, daemo
 // model admission to finish before probing the daemon socket. The ordinary
 // daemon helper intentionally has a short timeout for lightweight tests; a
 // real BGE startup can take longer while loading its pinned model.
-func waitForRealDaemonCLI(t *testing.T, rwBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer, args ...string) {
+func waitForRealDaemonCLI(t *testing.T, cairnBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer, args ...string) {
 	t.Helper()
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-daemonDone:
-			t.Fatalf("restoreweaved exited before real semantic readiness: %v\n%s", err, daemonLog.String())
+			t.Fatalf("cairnd exited before real semantic readiness: %v\n%s", err, daemonLog.String())
 		default:
 		}
 		commandArgs := append([]string{"--socket", socketPath, "--json"}, args...)
-		if err := exec.Command(rwBin, commandArgs...).Run(); err == nil {
+		if err := exec.Command(cairnBin, commandArgs...).Run(); err == nil {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatalf("restoreweaved real semantic readiness timed out\n%s", daemonLog.String())
+	t.Fatalf("cairnd real semantic readiness timed out\n%s", daemonLog.String())
 }
 
-func runRWProcessAllowStatus(t *testing.T, rwBin, socketPath string, args ...string) command.Result {
+func runRWProcessAllowStatus(t *testing.T, cairnBin, socketPath string, args ...string) command.Result {
 	t.Helper()
 	fullArgs := append([]string{"--socket", socketPath, "--json"}, args...)
-	output, processErr := exec.Command(rwBin, fullArgs...).CombinedOutput()
+	output, processErr := exec.Command(cairnBin, fullArgs...).CombinedOutput()
 	var result command.Result
 	if decodeErr := json.Unmarshal(output, &result); decodeErr != nil {
-		t.Fatalf("decode rw %s result: %v (process error %v)\n%s", strings.Join(args, " "), decodeErr, processErr, output)
+		t.Fatalf("decode cairn %s result: %v (process error %v)\n%s", strings.Join(args, " "), decodeErr, processErr, output)
 	}
 	if processErr != nil && result.Status != command.StatusDegraded {
-		t.Fatalf("rw %s: %v, status=%s, reasons=%+v", strings.Join(args, " "), processErr, result.Status, result.Reasons)
+		t.Fatalf("cairn %s: %v, status=%s, reasons=%+v", strings.Join(args, " "), processErr, result.Status, result.Reasons)
 	}
 	return result
 }
@@ -460,7 +460,7 @@ func writeRealSemanticBundle(t *testing.T, root, runtimeSource, modelSource, tok
 	// same converter, immutable zvec-go module/version/commit, and receipts as
 	// the offline installer.
 	profile := writeAsset("profile", "profile.json", []byte(`{"base_model":"BAAI/bge-small-zh-v1.5@7999e1d3359715c523056ef9478215996d62a620","model_export":"onnx-single-file;converter=Xenova","model_id":"BAAI/bge-small-zh-v1.5","onnx_converter_source":"Xenova/bge-small-zh-v1.5@75c43b069aac4d136ba6bc1122f995fedcfd2781","preprocessing_digest":"sha256:02c794b19d805eff54b90c4eb7d7f75b17c1a3e5103730af2147408d57a7ed0e","profile":"bge-small-zh-v1.5"}`))
-	license := writeAsset("license", "LICENSE", []byte("RestoreWeave semantic bundle license inventory\n\n"+
+	license := writeAsset("license", "LICENSE", []byte("Cairn semantic bundle license inventory\n\n"+
 		"BAAI/bge-small-zh-v1.5 and its Xenova ONNX conversion: MIT (base model).\n"+
 		"ONNX Runtime: MIT. github.com/microsoft/onnxruntime\n"+
 		"onnxruntime_go: MIT. github.com/yalue/onnxruntime_go\n"+
@@ -476,7 +476,7 @@ func writeRealSemanticBundle(t *testing.T, root, runtimeSource, modelSource, tok
 		t.Fatalf("no fixed archive facts for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	sbomPayload, err := json.Marshal(map[string]any{
-		"schema": "restoreweave.semantic-bundle.sbom.v1", "profile": "bge-small-zh-v1.5",
+		"schema": "cairn.semantic-bundle.sbom.v1", "profile": "bge-small-zh-v1.5",
 		"base_model":            "BAAI/bge-small-zh-v1.5@7999e1d3359715c523056ef9478215996d62a620",
 		"onnx_converter_source": "Xenova/bge-small-zh-v1.5@75c43b069aac4d136ba6bc1122f995fedcfd2781",
 		"assets": map[string]any{

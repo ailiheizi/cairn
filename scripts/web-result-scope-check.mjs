@@ -21,16 +21,16 @@ assert.equal(scope.projectResultScope(rows, "photos")[0], photo, "projection pre
 assert.deepEqual(scope.resultScopeSource("tag", rows, [other]), [other], "tag/library scopes derive from the loaded publication set");
 assert.deepEqual(scope.resultScopeSource("path", rows, [other]), rows, "namespace browsing keeps its current returned rows");
 for (const [hash, expected] of [
-  ["#v=search&q=stars&presentation=exhibition", { mode: "search", presentation: "page:restoreweave:exhibition", q: "stars" }],
+  ["#v=search&q=stars&presentation=exhibition", { mode: "search", presentation: "page:cairn:exhibition", q: "stars" }],
   ["#v=tag&tag=family&presentation=photos", { mode: "tag", presentation: "photos", tags: ["family"] }],
-  ["#v=exhibition", { mode: "content", presentation: "page:restoreweave:exhibition" }],
+  ["#v=exhibition", { mode: "content", presentation: "page:cairn:exhibition" }],
 ]) {
   const parsed = hashes.parseHashView(hash);
   for (const [key, value] of Object.entries(expected)) assert.deepEqual(parsed[key], value, `${hash} restores ${key}`);
 }
 let replaced = "";
 globalThis.window = { location: { pathname: "/", search: "" }, history: { replaceState: (_state, _title, url) => { replaced = String(url); } } };
-hashes.writeHashView({ mode: "search", presentation: "page:restoreweave:exhibition", q: "stars", tags: [], month: "" });
+hashes.writeHashView({ mode: "search", presentation: "page:cairn:exhibition", q: "stars", tags: [], month: "" });
 assert.equal(replaced, "/#v=search&q=stars&presentation=exhibition", "deep link adds presentation without changing search scope");
 hashes.writeHashView({ mode: "search", presentation: "photos", q: "stars", tags: ["family", "travel"], month: "2026-10" });
 const restoredSearch = hashes.parseHashView(replaced.slice(replaced.indexOf("#")));

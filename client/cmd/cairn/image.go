@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // newImageCommand exposes the image bundle installation operation through the

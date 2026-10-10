@@ -35,7 +35,7 @@ Bilibili reference is made.
 ## Artifact and environment
 
 `dist/page-presentation-composition-20261009/artifact-identities.json` records
-checkout `/Users/macos/Documents/other_project/restoreweave`, HEAD
+checkout `/Users/macos/Documents/other_project/cairn`, HEAD
 `5fae20ae1e00c11d774c1b5ffa6b5928abcbc47a`, the dirty state, unchanged daemon,
 config digest and final client digests. Unrelated worktree changes were preserved;
 no commit, release, backend endpoint or durable format was added.

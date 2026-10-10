@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 const (

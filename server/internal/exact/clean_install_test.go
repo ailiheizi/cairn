@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // cleanInstallFixture publishes a signed snapshot with a real catalog and
@@ -365,7 +365,7 @@ func TestCleanInstallImportCorruptAnchorFailsClosed(t *testing.T) {
 	reader := openCleanInstallReader(t, repoRoot, anchor)
 
 	corruptPath := filepath.Join(t.TempDir(), "corrupt-anchor.json")
-	if err := os.WriteFile(corruptPath, []byte(`{"schema":"org.restoreweave.trust-anchor.v1","public_key":"not-a-key"}`), 0o600); err != nil {
+	if err := os.WriteFile(corruptPath, []byte(`{"schema":"org.cairn.trust-anchor.v1","public_key":"not-a-key"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reader.ImportRecoveryBundle(ctx, bundlePath, corruptPath, testPublicationDomain); err == nil {

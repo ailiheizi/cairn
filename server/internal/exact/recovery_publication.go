@@ -11,16 +11,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
-	PayloadReceiptSchemaV1             = "org.restoreweave.payload-receipt.v1"
-	MetadataEvidenceSchemaV1           = "org.restoreweave.authenticated-metadata-evidence.v1"
-	MetadataEvidenceSchemaV2           = "org.restoreweave.authenticated-metadata-evidence.v2"
-	PreparedEnvelopeSchemaV1           = "org.restoreweave.prepared-envelope.v1"
-	PreparedEnvelopeSchemaV2           = "org.restoreweave.prepared-envelope.v2"
+	PayloadReceiptSchemaV1             = "org.cairn.payload-receipt.v1"
+	MetadataEvidenceSchemaV1           = "org.cairn.authenticated-metadata-evidence.v1"
+	MetadataEvidenceSchemaV2           = "org.cairn.authenticated-metadata-evidence.v2"
+	PreparedEnvelopeSchemaV1           = "org.cairn.prepared-envelope.v1"
+	PreparedEnvelopeSchemaV2           = "org.cairn.prepared-envelope.v2"
 	portableRecordReadLimit      int64 = 16 << 20
 	portableFactsCoveragePartial       = "PARTIAL"
 )

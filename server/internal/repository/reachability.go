@@ -17,7 +17,7 @@ import (
 // ReachabilityPlanSchemaV1 identifies the non-destructive root accounting
 // record. A plan is evidence for a later, separately qualified collector; it
 // never authorizes deletion by itself.
-const ReachabilityPlanSchemaV1 = "restoreweave.reachability-plan.v1"
+const ReachabilityPlanSchemaV1 = "cairn.reachability-plan.v1"
 
 // ReachabilityRootKind names an authority which can keep a placement alive.
 // The list is deliberately closed so a caller cannot silently invent a weaker

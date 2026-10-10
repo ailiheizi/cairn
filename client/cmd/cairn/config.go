@@ -8,15 +8,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	rwconfig "github.com/ailiheizi/restoreweave/config"
+	rwconfig "github.com/ailiheizi/cairn/config"
 )
 
 // newConfigCommand owns the small, local configuration lifecycle.  It does
-// not require restoreweaved: first-run setup must work before a daemon exists.
+// not require cairnd: first-run setup must work before a daemon exists.
 func newConfigCommand(env *clientEnv) *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "Create and inspect the persisted RestoreWeave profile",
+		Short: "Create and inspect the persisted Cairn profile",
 	}
 
 	var path string
@@ -31,7 +31,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 			fmt.Fprintf(cmd.OutOrStdout(), "digest:  %s\n", resolved.Digest)
 			return 0
 		})
-	initCmd.Flags().StringVar(&path, "path", "", "config file path (overrides RESTOREWEAVE_CONFIG)")
+	initCmd.Flags().StringVar(&path, "path", "", "config file path (overrides CAIRN_CONFIG)")
 	configCmd.AddCommand(initCmd.Command)
 
 	var validatePath string
@@ -60,7 +60,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 			fmt.Fprintf(cmd.OutOrStdout(), "digest:  %s\n", resolved.Digest)
 			return 0
 		})
-	validateCmd.Flags().StringVar(&validatePath, "path", "", "config file path (overrides RESTOREWEAVE_CONFIG)")
+	validateCmd.Flags().StringVar(&validatePath, "path", "", "config file path (overrides CAIRN_CONFIG)")
 	configCmd.AddCommand(validateCmd.Command)
 
 	var showPath string
@@ -100,7 +100,7 @@ func newConfigCommand(env *clientEnv) *cobra.Command {
 			fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(string(payload)))
 			return 0
 		})
-	showCmd.Flags().StringVar(&showPath, "path", "", "config file path (overrides RESTOREWEAVE_CONFIG)")
+	showCmd.Flags().StringVar(&showPath, "path", "", "config file path (overrides CAIRN_CONFIG)")
 	showCmd.Flags().BoolVar(&effective, "effective", true, "resolve environment overrides and absolute data paths")
 	configCmd.AddCommand(showCmd.Command)
 	return configCmd

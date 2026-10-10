@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // phase2Harness deliberately keeps the repository and catalog paths separate:
@@ -43,7 +43,7 @@ func newPhase2Harness(t *testing.T) phase2Harness {
 		t.Fatalf("write fixture: %v", err)
 	}
 	return phase2Harness{
-		dispatcher: NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+		dispatcher: NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 			Store: store,
 			Repo:  repo,
 		})),

@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func controlPlaneOnlineProfile(t *testing.T) search.OnlineEmbeddingProfile {
@@ -79,7 +79,7 @@ func writeControlPlaneProfileDocument(t *testing.T, dir string, profile search.O
 func newOnlineProviderDispatcher(t *testing.T, modelsRoot string) (*Dispatcher, *sqlite.Store) {
 	t.Helper()
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithOnlineProviderInstaller(modelsRoot, func(ctx context.Context, root, sourcePath, declaredDigest string) (OnlineProviderInstallReceipt, error) {
 			receipt, err := search.InstallOnlineEmbeddingProfile(ctx, root, sourcePath, declaredDigest)
 			if err != nil {
@@ -184,7 +184,7 @@ func TestSemanticProviderInstallAndListThroughTheDispatcher(t *testing.T) {
 
 func TestSemanticProviderOperationsAreUnavailableWithoutWiring(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	for _, operation := range []string{command.OpSemanticProviderInstall, command.OpSemanticProviderList} {
 		result := dispatcher.Handle(context.Background(), command.Envelope{Operation: operation, Input: []byte(`{}`)})
 		if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeUnimplemented) {
@@ -439,7 +439,7 @@ func TestSearchQueryRejectsMalformedEgressConfirmation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithExact(&exact.Service{Store: store, Repo: repo}))
 	result := dispatcher.Handle(context.Background(), command.Envelope{
 		Operation: command.OpSearchQuery,
@@ -477,7 +477,7 @@ func TestFusedDegradedMessageNamesEgressReasons(t *testing.T) {
 // capabilities.
 func TestEgressGrantOperationsAreImplementedForAnOpenCatalog(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	for _, operation := range []string{command.OpEgressGrantCreate, command.OpEgressGrantList, command.OpEgressGrantRevoke} {
 		result := dispatcher.Handle(context.Background(), command.Envelope{Operation: operation, Input: []byte(`{}`)})
 		if hasReasonCode(result, ReasonCodeUnimplemented) || hasReasonCode(result, ReasonCodeUnknownOperation) {

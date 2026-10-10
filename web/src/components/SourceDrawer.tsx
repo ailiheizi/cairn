@@ -23,7 +23,7 @@ import type { Notice, UploadFileRow } from "../lib/types";
 // ordinary plan.ingest → review → digest-bound plan.apply flow, which the
 // handoff below prefills.
 
-const sourceFormID = "restoreweave-source-form";
+const sourceFormID = "cairn-source-form";
 
 type UploadMode = "path" | "upload";
 

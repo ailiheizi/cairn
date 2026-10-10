@@ -548,7 +548,7 @@ mark and report
 Deletion authority is ownership-mode specific:
 
 - **ENGINE_MANAGED_OBJECTS:** Cairn computes snapshot- and representation-level retention intent, submits a fenced engine snapshot deletion or retention request, and audits the engine's repository check and receipt. Cairn never sweeps engine-private chunks or packs directly.
-- **RESTOREWEAVE_PACKS:** Cairn computes physical reachability from authenticated roots and applies the fenced object sweep itself through the applicable `RepositoryDriver` capability.
+- **CAIRN_PACKS:** Cairn computes physical reachability from authenticated roots and applies the fenced object sweep itself through the applicable `RepositoryDriver` capability.
 
 GC traverses typed `PAYLOAD_LIVENESS` and `AUTHENTICATION_EVIDENCE` edges. Retaining signed evidence does not automatically retain every historical payload location, and retiring a payload placement never makes its authentication history disappear.
 

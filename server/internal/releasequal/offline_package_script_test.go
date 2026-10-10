@@ -56,8 +56,8 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	script := filepath.Join(root, "scripts", "package-offline.sh")
 	input := t.TempDir()
 	targetOS, targetArch := runtime.GOOS, runtime.GOARCH
-	rw := buildCLIBinary(t, root, input, "rw", targetOS, targetArch)
-	daemon := buildDaemonBinary(t, root, input, "restoreweaved", "purego")
+	rw := buildCLIBinary(t, root, input, "cairn", targetOS, targetArch)
+	daemon := buildDaemonBinary(t, root, input, "cairnd", "purego")
 	web := filepath.Join(input, "web")
 	if err := os.Mkdir(web, 0o755); err != nil {
 		t.Fatal(err)
@@ -83,13 +83,13 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	}
 	// Inspect actual cross-compiled CLI metadata; do not execute it or infer
 	// support for another host from this packaging rejection test.
-	wrongArchCLI := buildCLIBinary(t, root, input, "rw-other-arch", targetOS, otherArch)
-	wrongOSCLI := buildCLIBinary(t, root, input, "rw-other-os", otherOS, targetArch)
+	wrongArchCLI := buildCLIBinary(t, root, input, "cairn-other-arch", targetOS, otherArch)
+	wrongOSCLI := buildCLIBinary(t, root, input, "cairn-other-os", otherOS, targetArch)
 	for _, tc := range []struct {
 		name, cli, reason string
 	}{
 		{"non-go-cli", fakeCLI, "CLI has no readable Go BuildInfo"},
-		{"wrong-program", daemon, "CLI BuildInfo main path is not rw"},
+		{"wrong-program", daemon, "CLI BuildInfo main path is not cairn"},
 		{"wrong-arch", wrongArchCLI, "CLI platform"},
 		{"wrong-os", wrongOSCLI, "CLI platform"},
 	} {
@@ -105,7 +105,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 			}
 		})
 	}
-	noTagsDaemon := buildDaemonBinary(t, root, input, "restoreweaved-no-tags")
+	noTagsDaemon := buildDaemonBinary(t, root, input, "cairnd-no-tags")
 	baseArgs := []string{"--version", "v-test", "--os", targetOS, "--arch", targetArch, "--rw", rw, "--daemon", noTagsDaemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "no-tags.tar.gz")}
 	if output, err := exec.Command("bash", append([]string{script}, baseArgs...)...).CombinedOutput(); err == nil {
 		t.Fatalf("daemon without purego accepted: %s", output)
@@ -124,7 +124,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 	fakeGo := filepath.Join(fakeGoDir, "go")
-	fakeBuildInfo := fmt.Sprintf("#!/bin/sh\ncat <<'EOF'\n/tmp/fake: go1.26.5\n\tpath\tgithub.com/ailiheizi/restoreweave/server/cmd/restoreweaved\n\tbuild\t-tags=purego\n\tbuild\tGOOS=%s\n\tbuild\tGOARCH=%s\n\tdep\tgithub.com/zvec-ai/zvec-go\tv0.6.0\th1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=\nEOF\n", targetOS, targetArch)
+	fakeBuildInfo := fmt.Sprintf("#!/bin/sh\ncat <<'EOF'\n/tmp/fake: go1.26.5\n\tpath\tgithub.com/ailiheizi/cairn/server/cmd/cairnd\n\tbuild\t-tags=purego\n\tbuild\tGOOS=%s\n\tbuild\tGOARCH=%s\n\tdep\tgithub.com/zvec-ai/zvec-go\tv0.6.0\th1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=\nEOF\n", targetOS, targetArch)
 	if err := os.WriteFile(fakeGo, []byte(fakeBuildInfo), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	if output, err := wrongPinCmd.CombinedOutput(); err == nil {
 		t.Fatalf("daemon with wrong zvec pin accepted: %s", output)
 	}
-	linkedRW := filepath.Join(input, "rw-link")
+	linkedRW := filepath.Join(input, "cairn-link")
 	if err := os.Symlink(rw, linkedRW); err != nil {
 		t.Fatal(err)
 	}
@@ -180,10 +180,10 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	if output, err := exec.Command("tar", "-xzf", first, "-C", extract).CombinedOutput(); err != nil {
 		t.Fatalf("extract: %v\n%s", err, output)
 	}
-	packageName := "restoreweave-v-test-" + targetOS + "-" + targetArch
+	packageName := "cairn-v-test-" + targetOS + "-" + targetArch
 	packageRoot := filepath.Join(extract, packageName)
 	checkOuterTarHeaders(t, first, packageRoot, packageName)
-	if output, err := exec.Command(filepath.Join(packageRoot, "bin", "rw"), "--help").CombinedOutput(); err != nil || !strings.Contains(string(output), "Usage:") {
+	if output, err := exec.Command(filepath.Join(packageRoot, "bin", "cairn"), "--help").CombinedOutput(); err != nil || !strings.Contains(string(output), "Usage:") {
 		t.Fatalf("packaged native CLI cannot show help: %v\n%s", err, output)
 	}
 	manifestBytes, err := os.ReadFile(filepath.Join(packageRoot, "manifest.json"))
@@ -223,13 +223,13 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
 		t.Fatalf("manifest JSON: %v", err)
 	}
-	if manifest.Schema != "restoreweave.candidate-offline-artifact.v1" || manifest.Status != "CANDIDATE_ONLY_NOT_SUPPORTED" || manifest.Version != "v-test" || manifest.Platform.OS != targetOS || manifest.Platform.Arch != targetArch {
+	if manifest.Schema != "cairn.candidate-offline-artifact.v1" || manifest.Status != "CANDIDATE_ONLY_NOT_SUPPORTED" || manifest.Version != "v-test" || manifest.Platform.OS != targetOS || manifest.Platform.Arch != targetArch {
 		t.Fatalf("manifest = %+v", manifest)
 	}
-	if manifest.DaemonBuild.MainPath != "github.com/ailiheizi/restoreweave/server/cmd/restoreweaved" || manifest.DaemonBuild.GOOS != targetOS || manifest.DaemonBuild.GOARCH != targetArch || manifest.DaemonBuild.GoVersion == "" || manifest.DaemonBuild.BuildTags != "purego" || manifest.DaemonBuild.ZvecGo.Module != "github.com/zvec-ai/zvec-go" || manifest.DaemonBuild.ZvecGo.Version != "v0.6.1-0.20260721023313-9199195b29da" || manifest.DaemonBuild.ZvecGo.Sum != "h1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=" || manifest.DaemonBuild.ZvecGo.Commit != "9199195b29da" {
+	if manifest.DaemonBuild.MainPath != "github.com/ailiheizi/cairn/server/cmd/cairnd" || manifest.DaemonBuild.GOOS != targetOS || manifest.DaemonBuild.GOARCH != targetArch || manifest.DaemonBuild.GoVersion == "" || manifest.DaemonBuild.BuildTags != "purego" || manifest.DaemonBuild.ZvecGo.Module != "github.com/zvec-ai/zvec-go" || manifest.DaemonBuild.ZvecGo.Version != "v0.6.1-0.20260721023313-9199195b29da" || manifest.DaemonBuild.ZvecGo.Sum != "h1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=" || manifest.DaemonBuild.ZvecGo.Commit != "9199195b29da" {
 		t.Fatalf("daemon build provenance = %+v", manifest.DaemonBuild)
 	}
-	if manifest.CLIBuild.MainPath != "github.com/ailiheizi/restoreweave/client/cmd/rw" || manifest.CLIBuild.GOOS != targetOS || manifest.CLIBuild.GOARCH != targetArch || manifest.CLIBuild.GoVersion == "" {
+	if manifest.CLIBuild.MainPath != "github.com/ailiheizi/cairn/client/cmd/cairn" || manifest.CLIBuild.GOOS != targetOS || manifest.CLIBuild.GOARCH != targetArch || manifest.CLIBuild.GoVersion == "" {
 		t.Fatalf("CLI build provenance = %+v", manifest.CLIBuild)
 	}
 	if manifest.CLIBuild.GOOS != manifest.DaemonBuild.GOOS || manifest.CLIBuild.GOARCH != manifest.DaemonBuild.GOARCH {
@@ -294,7 +294,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(packageRoot, "LICENSE")); string(got) != mustReadFile(t, filepath.Join(root, "LICENSE")) {
 		t.Fatal("project LICENSE was not preserved verbatim")
 	}
-	for _, path := range []string{"NOTICE", "SBOM.json", "licenses/semantic-bundle.LICENSE", "licenses/semantic-bundle.NOTICE", "licenses/semantic-bundle.sbom.json", "bin/rw", "bin/restoreweaved", "web/dist/index.html", "semantic/semantic-bundle.tar.gz"} {
+	for _, path := range []string{"NOTICE", "SBOM.json", "licenses/semantic-bundle.LICENSE", "licenses/semantic-bundle.NOTICE", "licenses/semantic-bundle.sbom.json", "bin/cairn", "bin/cairnd", "web/dist/index.html", "semantic/semantic-bundle.tar.gz"} {
 		if _, err := os.Stat(filepath.Join(packageRoot, filepath.FromSlash(path))); err != nil {
 			t.Fatalf("missing packaged path %s: %v", path, err)
 		}
@@ -303,7 +303,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 		Schema string `json:"schema"`
 		Status string `json:"status"`
 	}
-	if err := json.Unmarshal(mustReadBytes(t, filepath.Join(packageRoot, "SBOM.json")), &rootSBOM); err != nil || rootSBOM.Schema != "restoreweave.candidate-artifact-sbom.v1" || rootSBOM.Status != "INCOMPLETE_NOT_RELEASE_SBOM" {
+	if err := json.Unmarshal(mustReadBytes(t, filepath.Join(packageRoot, "SBOM.json")), &rootSBOM); err != nil || rootSBOM.Schema != "cairn.candidate-artifact-sbom.v1" || rootSBOM.Status != "INCOMPLETE_NOT_RELEASE_SBOM" {
 		t.Fatalf("root SBOM = %+v, err=%v", rootSBOM, err)
 	}
 	if err := json.Unmarshal(mustReadBytes(t, filepath.Join(packageRoot, "licenses/semantic-bundle.sbom.json")), &semanticSBOM); err != nil || semanticSBOM.Schema != "fixture.sbom.v1" {
@@ -323,7 +323,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 func buildCLIBinary(t *testing.T, root, dir, name, targetOS, targetArch string) string {
 	t.Helper()
 	output := filepath.Join(dir, name)
-	cmd := exec.Command("go", "build", "-o", output, "./client/cmd/rw")
+	cmd := exec.Command("go", "build", "-o", output, "./client/cmd/cairn")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOOS="+targetOS, "GOARCH="+targetArch, "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -339,7 +339,7 @@ func buildDaemonBinary(t *testing.T, root, dir, name string, tags ...string) str
 	if len(tags) > 0 {
 		args = append(args, "-tags="+strings.Join(tags, ","))
 	}
-	args = append(args, "-o", output, "./server/cmd/restoreweaved")
+	args = append(args, "-o", output, "./server/cmd/cairnd")
 	cmd := exec.Command("go", args...)
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {

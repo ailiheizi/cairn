@@ -11,13 +11,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // The similarity contract under test (Phase 4, content-store §6): similarity
@@ -36,7 +36,7 @@ func newSimilarityDispatcher(t *testing.T) (*sqlite.Store, *repository.Dir, *Dis
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -441,8 +441,8 @@ func TestExactDuplicateGroupsUnchangedAfterSimilarityScan(t *testing.T) {
 	dispatcher.search = &search.Indexer{Store: store, Engine: &search.Engine{Dir: filepath.Join(repo.Root(), "indexes")}}
 
 	root := t.TempDir()
-	writeFixture(t, filepath.Join(root, "alpha.txt"), []byte("RestoreWeave exact duplicate content"))
-	writeFixture(t, filepath.Join(root, "beta.txt"), []byte("RestoreWeave exact duplicate content"))
+	writeFixture(t, filepath.Join(root, "alpha.txt"), []byte("Cairn exact duplicate content"))
+	writeFixture(t, filepath.Join(root, "beta.txt"), []byte("Cairn exact duplicate content"))
 	writeFixture(t, filepath.Join(root, "photo.png"), gradientPNG(t, 64, 64))
 	ingest := mustAppliedIngest(t, ctx, dispatcher, map[string]any{"root": root})
 
@@ -515,7 +515,7 @@ func openPlainStore(t *testing.T) *sqlite.Store {
 
 func TestSimilarityOperationsRequireExactLane(t *testing.T) {
 	store := openPlainStore(t)
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	for _, operation := range []string{command.OpSimilarityScan, command.OpSimilarityGroups} {
 		result := dispatcher.Handle(context.Background(), mustEnvelope(t, operation, map[string]any{"workspace_id": "wsp_aaaaaaaaaaaaaaaaaaaaaaaaaaaa", "kind": "image"}))
 		if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeUnimplemented) {

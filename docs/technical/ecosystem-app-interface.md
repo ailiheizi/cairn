@@ -56,7 +56,7 @@ A domain record is an extension-owned interpretation, not a new source of byte t
 ~~~json
 {
   "record_ref": "domain-record:01K2...",
-  "schema_ref": "org.restoreweave.domain.audio.track/v1",
+  "schema_ref": "org.cairn.domain.audio.track/v1",
   "domain_pack_ref": "domain-pack:audio@1",
   "revision": 3,
   "subject_refs": ["subject:01K2..."],
@@ -203,16 +203,16 @@ A signed domain pack declares schemas and processing capabilities, not storage a
 
 ~~~json
 {
-  "schema": "org.restoreweave.domain-pack-manifest.v1",
-  "pack_id": "org.restoreweave.audio",
+  "schema": "org.cairn.domain-pack-manifest.v1",
+  "pack_id": "org.cairn.audio",
   "version": "1.0.0",
   "package_digest": "sha256:...",
   "publisher": "...",
   "schemas": [
-    "org.restoreweave.domain.audio.album/v1",
-    "org.restoreweave.domain.audio.track/v1"
+    "org.cairn.domain.audio.album/v1",
+    "org.cairn.domain.audio.track/v1"
   ],
-  "segment_schemas": ["org.restoreweave.segment.audio.track/v1"],
+  "segment_schemas": ["org.cairn.segment.audio.track/v1"],
   "processor_profile_refs": ["processor-profile:audio-parse@1"],
   "index_fields": ["audio.artist", "audio.album", "audio.duration_ms"],
   "representation_uses": ["PLAYBACK", "PREVIEW"],

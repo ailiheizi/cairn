@@ -323,18 +323,18 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     // reason remains available through the badge's title and accessible name.
     if (state.kind === "ready-image") {
       return <>
-        <img className="rw-content-preview__thumb-image" src={state.url} alt="" onLoad={(event) => {
+        <img className="cairn-content-preview__thumb-image" src={state.url} alt="" onLoad={(event) => {
           const image = event.currentTarget;
           const tiny = image.naturalWidth > 0 && (image.naturalWidth <= TINY_IMAGE_PX || image.naturalHeight <= TINY_IMAGE_PX);
-          image.classList.toggle("rw-content-preview__thumb-image--tiny", tiny);
+          image.classList.toggle("cairn-content-preview__thumb-image--tiny", tiny);
           setThumbNaturalSize(tiny ? { width: image.naturalWidth, height: image.naturalHeight } : undefined);
         }} onError={() => { releaseUrl(); setState({ kind: "error", message: t("The content could not be decoded safely.") }); }} />
-        {thumbNaturalSize && <span className="rw-content-preview__thumb-size" aria-hidden="true" title={`${t("Tiny image")} · ${thumbNaturalSize.width}x${thumbNaturalSize.height}`}>{thumbNaturalSize.width}x{thumbNaturalSize.height}</span>}
+        {thumbNaturalSize && <span className="cairn-content-preview__thumb-size" aria-hidden="true" title={`${t("Tiny image")} · ${thumbNaturalSize.width}x${thumbNaturalSize.height}`}>{thumbNaturalSize.width}x{thumbNaturalSize.height}</span>}
       </>;
     }
     if (state.kind === "unavailable" || state.kind === "error") {
       const unavailableLabel = t("Preview unavailable");
-      return <span className="rw-content-preview__thumb-note" role="img" aria-label={`${unavailableLabel}: ${state.message}`} title={`${unavailableLabel} · ${state.message}`}><AlertCircle size={11} aria-hidden="true" /><span>{t("No preview")}</span></span>;
+      return <span className="cairn-content-preview__thumb-note" role="img" aria-label={`${unavailableLabel}: ${state.message}`} title={`${unavailableLabel} · ${state.message}`}><AlertCircle size={11} aria-hidden="true" /><span>{t("No preview")}</span></span>;
     }
     return null;
   }
@@ -349,28 +349,28 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
   // an empty stage.
   const imageName = IMAGE_EXTENSIONS.test(name);
 
-  return <div className={`rw-content-preview ${className}`}>
-    {!open && <button type="button" className="rw-content-preview__trigger" onClick={() => { releaseUrl(); setState({ kind: "idle" }); setOpen(true); }} disabled={!workspaceId || (!entryId && !subjectRef)}>
+  return <div className={`cairn-content-preview ${className}`}>
+    {!open && <button type="button" className="cairn-content-preview__trigger" onClick={() => { releaseUrl(); setState({ kind: "idle" }); setOpen(true); }} disabled={!workspaceId || (!entryId && !subjectRef)}>
       <Eye size={16} aria-hidden="true" /> {t("Preview")}
     </button>}
-    {open && <section className="rw-content-preview__panel" aria-live="polite" aria-label={t("Preview")}>
-      <div className="rw-content-preview__header"><strong>{name}</strong><button type="button" className="rw-content-preview__close" onClick={closePreview} aria-label={t("Close preview")}><X size={18} aria-hidden="true" /></button></div>
-      {state.kind === "loading" && <div className="rw-content-preview__status"><LoaderCircle className="rw-content-preview__spin" size={18} aria-hidden="true" /> {t("Reading exact content...")}</div>}
-      {(state.kind === "unavailable" || state.kind === "error") && <div className={`rw-content-preview__status ${state.kind === "error" ? "rw-content-preview__status--error" : `rw-content-preview__status--unavailable ${state.reason === "original-unavailable" ? "rw-content-preview__status--unavailable-critical" : ""}`}`} data-state={state.kind} data-reason={state.kind === "unavailable" ? state.reason : undefined}><strong>{state.kind === "error" ? t("Preview failed") : state.reason === "size-limit" ? t("Preview size limit reached") : state.reason === "original-unavailable" ? t("Original content unavailable") : t("Preview not provided for this format")}</strong><span>{state.message}</span>{state.kind === "error" && <button type="button" className="rw-content-preview__retry" onClick={() => { closePreview(); setTimeout(() => setOpen(true), 0); }}>{t("Retry")}</button>}</div>}
-      {state.kind === "ready-text" && <pre className="rw-content-preview__text">{state.text}</pre>}
-      {state.kind === "ready-image" && <div className="rw-content-preview__image-wrap">
-        <button type="button" className="rw-content-preview__image-button" aria-label={t("View full size")} onClick={(event) => openViewer(event.currentTarget)}>
-          <img className="rw-content-preview__image" src={state.url} alt={t("Content preview")} onLoad={(event) => {
+    {open && <section className="cairn-content-preview__panel" aria-live="polite" aria-label={t("Preview")}>
+      <div className="cairn-content-preview__header"><strong>{name}</strong><button type="button" className="cairn-content-preview__close" onClick={closePreview} aria-label={t("Close preview")}><X size={18} aria-hidden="true" /></button></div>
+      {state.kind === "loading" && <div className="cairn-content-preview__status"><LoaderCircle className="cairn-content-preview__spin" size={18} aria-hidden="true" /> {t("Reading exact content...")}</div>}
+      {(state.kind === "unavailable" || state.kind === "error") && <div className={`cairn-content-preview__status ${state.kind === "error" ? "cairn-content-preview__status--error" : `cairn-content-preview__status--unavailable ${state.reason === "original-unavailable" ? "cairn-content-preview__status--unavailable-critical" : ""}`}`} data-state={state.kind} data-reason={state.kind === "unavailable" ? state.reason : undefined}><strong>{state.kind === "error" ? t("Preview failed") : state.reason === "size-limit" ? t("Preview size limit reached") : state.reason === "original-unavailable" ? t("Original content unavailable") : t("Preview not provided for this format")}</strong><span>{state.message}</span>{state.kind === "error" && <button type="button" className="cairn-content-preview__retry" onClick={() => { closePreview(); setTimeout(() => setOpen(true), 0); }}>{t("Retry")}</button>}</div>}
+      {state.kind === "ready-text" && <pre className="cairn-content-preview__text">{state.text}</pre>}
+      {state.kind === "ready-image" && <div className="cairn-content-preview__image-wrap">
+        <button type="button" className="cairn-content-preview__image-button" aria-label={t("View full size")} onClick={(event) => openViewer(event.currentTarget)}>
+          <img className="cairn-content-preview__image" src={state.url} alt={t("Content preview")} onLoad={(event) => {
             const image = event.currentTarget;
             if (image.naturalWidth > 0 && image.naturalHeight > 0) setNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
           }} onError={() => { releaseUrl(); setState({ kind: "error", message: t("The content could not be decoded safely.") }); }} />
         </button>
-        <button type="button" className="rw-content-preview__viewer-button" onClick={(event) => openViewer(event.currentTarget)}>
+        <button type="button" className="cairn-content-preview__viewer-button" onClick={(event) => openViewer(event.currentTarget)}>
           <Maximize2 size={15} aria-hidden="true" /> {t("View full size")}
         </button>
       </div>}
-      {imageName && (state.kind === "unavailable" || state.kind === "error") && <div className="rw-content-preview__image-wrap">
-        <button type="button" className="rw-content-preview__viewer-button" onClick={(event) => openViewer(event.currentTarget)}>
+      {imageName && (state.kind === "unavailable" || state.kind === "error") && <div className="cairn-content-preview__image-wrap">
+        <button type="button" className="cairn-content-preview__viewer-button" onClick={(event) => openViewer(event.currentTarget)}>
           <Maximize2 size={15} aria-hidden="true" /> {t("View full size")}
         </button>
       </div>}
@@ -516,7 +516,7 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
 
   return <div
     ref={dialogRef}
-    className="rw-image-viewer"
+    className="cairn-image-viewer"
     role="dialog"
     aria-modal="true"
     aria-label={`${t("Image viewer")}: ${name}`}
@@ -525,23 +525,23 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
     data-zoom-current={currentZoom}
     onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
   >
-    <div className="rw-image-viewer__chrome">
-      <div className="rw-image-viewer__identity">
-        <strong className="rw-image-viewer__name" title={name}>{name}</strong>
-        <small className="rw-image-viewer__size">{measured ? t("{{width}} × {{height}} px", { width: measured.width, height: measured.height }) : t("Natural size unavailable")}</small>
+    <div className="cairn-image-viewer__chrome">
+      <div className="cairn-image-viewer__identity">
+        <strong className="cairn-image-viewer__name" title={name}>{name}</strong>
+        <small className="cairn-image-viewer__size">{measured ? t("{{width}} × {{height}} px", { width: measured.width, height: measured.height }) : t("Natural size unavailable")}</small>
       </div>
-      <div className="rw-image-viewer__controls" role="group" aria-label={t("Image viewer")}>
-        <button type="button" className="rw-image-viewer__control" aria-label={t("Zoom out")} title={t("Zoom out")} onClick={() => stepZoom(1 / ZOOM_STEP)} disabled={!ready || currentZoom <= ZOOM_MIN}><Minus size={16} aria-hidden="true" /></button>
-        <span className="rw-image-viewer__zoom-value" role="status">{`${Math.round(currentZoom)}%`}</span>
-        <button type="button" className="rw-image-viewer__control" aria-label={t("Zoom in")} title={t("Zoom in")} onClick={() => stepZoom(ZOOM_STEP)} disabled={!ready || currentZoom >= ZOOM_MAX}><Plus size={16} aria-hidden="true" /></button>
-        <button type="button" className="rw-image-viewer__control wide" onClick={() => changeZoom(fitZoom())} disabled={!ready}>{t("Fit to window")}</button>
-        <button type="button" className="rw-image-viewer__control wide" onClick={() => changeZoom(100)} disabled={!ready}>{t("Actual size")}</button>
+      <div className="cairn-image-viewer__controls" role="group" aria-label={t("Image viewer")}>
+        <button type="button" className="cairn-image-viewer__control" aria-label={t("Zoom out")} title={t("Zoom out")} onClick={() => stepZoom(1 / ZOOM_STEP)} disabled={!ready || currentZoom <= ZOOM_MIN}><Minus size={16} aria-hidden="true" /></button>
+        <span className="cairn-image-viewer__zoom-value" role="status">{`${Math.round(currentZoom)}%`}</span>
+        <button type="button" className="cairn-image-viewer__control" aria-label={t("Zoom in")} title={t("Zoom in")} onClick={() => stepZoom(ZOOM_STEP)} disabled={!ready || currentZoom >= ZOOM_MAX}><Plus size={16} aria-hidden="true" /></button>
+        <button type="button" className="cairn-image-viewer__control wide" onClick={() => changeZoom(fitZoom())} disabled={!ready}>{t("Fit to window")}</button>
+        <button type="button" className="cairn-image-viewer__control wide" onClick={() => changeZoom(100)} disabled={!ready}>{t("Actual size")}</button>
       </div>
-      <button type="button" className="rw-image-viewer__close" aria-label={t("Close viewer")} title={t("Close viewer")} onClick={onClose}><X size={18} aria-hidden="true" /></button>
+      <button type="button" className="cairn-image-viewer__close" aria-label={t("Close viewer")} title={t("Close viewer")} onClick={onClose}><X size={18} aria-hidden="true" /></button>
     </div>
     {ready
       ? <div
-          className={`rw-image-viewer__stage ${offset.x || offset.y ? "is-panned" : ""}`}
+          className={`cairn-image-viewer__stage ${offset.x || offset.y ? "is-panned" : ""}`}
           ref={stageRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -549,7 +549,7 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
           onPointerCancel={handlePointerUp}
         >
           <img
-            className={`rw-image-viewer__image ${tiny ? "is-pixelated" : ""}`}
+            className={`cairn-image-viewer__image ${tiny ? "is-pixelated" : ""}`}
             src={url}
             alt={t("Content preview")}
             draggable={false}
@@ -563,7 +563,7 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
             onError={() => onFail(t("The content could not be decoded safely."))}
           />
         </div>
-      : <div className="rw-image-viewer__status" role="alert">
+      : <div className="cairn-image-viewer__status" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
           <div><strong>{t("Preview unavailable")}</strong><span>{failed || message || t("Preview could not be loaded.")}</span></div>
         </div>}

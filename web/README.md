@@ -15,8 +15,8 @@ enabled = true
 listen = "127.0.0.1:4534"
 ```
 
-2. Start `restoreweaved` and run `npm ci && npm run dev` in this
-directory. Set `RESTOREWEAVE_API_TOKEN` when the API is not confined to a
+2. Start `cairnd` and run `npm ci && npm run dev` in this
+directory. Set `CAIRN_API_TOKEN` when the API is not confined to a
 trusted local process.
 
 The browser is a convenience surface. It must not be required for exact

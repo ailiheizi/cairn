@@ -9,7 +9,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/readsvc"
+	"github.com/ailiheizi/cairn/server/internal/readsvc"
 )
 
 type memSource struct {

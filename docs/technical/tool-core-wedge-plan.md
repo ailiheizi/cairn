@@ -39,7 +39,7 @@ Siftline run `rw-wedge-2026-08-16` (GitHub + HN + Tavily). First “content-addr
 
 **Stars are not demand.** casync ~1.6k and DataLad ~0.6k only show the *tool* shape is a known category. The 12 000-notes thread and Immich “you still need a backup” are the costly signals.
 
-**Strongest counter-story:** operators only adopt a native suite. That is a failed attach, not a reason to grow the core. **Smallest reverse:** they refuse to ingest unless we also edit/play inside `restoreweaved` — that would be a different product.
+**Strongest counter-story:** operators only adopt a native suite. That is a failed attach, not a reason to grow the core. **Smallest reverse:** they refuse to ingest unless we also edit/play inside `cairnd` — that would be a different product.
 
 ## 3. Core that stays a tool
 
@@ -60,7 +60,7 @@ capability.list      honest sockets
 Public attach (already exist; do not add a fourth):
 
 ```text
-rw / read-only MCP     tool
+cairn / read-only MCP     tool
 Inbox JSON             mixed find / restore
 OPDS                   books when a reader attaches
 OpenSubsonic           music when a player attaches
@@ -88,7 +88,7 @@ Unknown `capability_id` already fails. Missing later dimensions already degrade.
 
 ## 5. Wedge — text first, then the same files grow
 
-Each step reuses the core. No new `rw` subcommand. No new public REST.
+Each step reuses the core. No new `cairn` subcommand. No new public REST.
 
 ### T0 — Minimal text (do this shape, no new code required)
 
@@ -101,13 +101,13 @@ inbox/
 ```
 
 ```text
-rw ingest inbox/                         # creates a READY plan; review it
-rw plan apply <ingest-plan-id> \
+cairn ingest inbox/                         # creates a READY plan; review it
+cairn plan apply <ingest-plan-id> \
   --workspace <workspace-id> --digest <plan-digest>
-rw search "那句只有自己记得的话"
-rw annotation tag <subject> memory
-rw restore <snapshot> /tmp/out            # creates a read-only restore plan
-rw plan apply <restore-plan-id> \
+cairn search "那句只有自己记得的话"
+cairn annotation tag <subject> memory
+cairn restore <snapshot> /tmp/out            # creates a read-only restore plan
+cairn plan apply <restore-plan-id> \
   --workspace <workspace-id> --digest <plan-digest>
 ```
 
@@ -166,7 +166,7 @@ Images / stickers follow T3: files in the Inbox, restore into Immich / a pack to
 ## 7. What this checkout does *not* start
 
 - No `extract.video`, EXIF, OCR, or quote schema.
-- No `rw quote` / `rw watch` / `rw sticker`.
+- No `cairn quote` / `cairn watch` / `cairn sticker`.
 - No fourth HTTP catalog.
 - No filling OpenSubsonic `getVideos` with a fake library.
 - No release repository selection or promotion in this plan.

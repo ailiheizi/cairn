@@ -264,7 +264,7 @@ export async function assertDuplicateReview(ctx) {
   const selection = surface.locator(".duplicates-selection");
   await selection.waitFor({ state: "visible", timeout: 10000 });
   assert.equal(Number(await selection.getAttribute("data-selected-count")), 2, "the selection must report its own count");
-  await selection.locator('input[list="restoreweave-duplicates-tag-vocabulary"]').fill(tagBody);
+  await selection.locator('input[list="cairn-duplicates-tag-vocabulary"]').fill(tagBody);
   const upsertsBeforeTag = daemon.annotationUpserts.length;
   await selection.locator('[data-action="tag-selected"]').click();
   await surface.locator(`.duplicates-action[data-action-state="DONE"]`).waitFor({ state: "visible", timeout: 15000 });

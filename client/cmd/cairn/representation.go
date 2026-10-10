@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func newRepresentationCommand(env *clientEnv) *cobra.Command {
@@ -25,7 +25,7 @@ func newRepresentationListCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "list <entry-id>", "List representations for one subject or file version",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw representation list <entry-id> [--workspace <id>] [--file-version <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn representation list <entry-id> [--workspace <id>] [--file-version <id>]\n")
 				return 1
 			}
 			input := map[string]any{

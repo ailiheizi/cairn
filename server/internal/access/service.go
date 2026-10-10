@@ -8,16 +8,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/decode"
-	"github.com/ailiheizi/restoreweave/server/internal/readsvc"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/decode"
+	"github.com/ailiheizi/cairn/server/internal/readsvc"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
 	localPrincipal   = "principal:local-operator"
 	localIdentity    = "identity:local-operator"
-	localAudience    = "restoreweave:local"
+	localAudience    = "cairn:local"
 	localPolicyEpoch = "policy:local-v1"
 	localPolicyRef   = "policy:local-v1"
 	defaultTTL       = 24 * time.Hour

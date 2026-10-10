@@ -1,4 +1,4 @@
-// Package controlplane implements the restoreweaved daemon control plane:
+// Package controlplane implements the cairnd daemon control plane:
 // a Unix-socket JSON-envelope dispatcher over the shared client/command
 // wire protocol. The socket transport is private plumbing; the envelope
 // vocabulary is the stable serialized contract.

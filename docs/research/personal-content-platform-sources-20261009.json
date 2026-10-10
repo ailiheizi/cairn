@@ -13,7 +13,7 @@
       ],
       "does_not_support": [
         "The documentation does not establish cross-product backup compatibility or guarantee background execution timing on mobile operating systems.",
-        "A checksum skip is not evidence of RestoreWeave's complete SHA-256 plus logical-length identity contract."
+        "A checksum skip is not evidence of Cairn's complete SHA-256 plus logical-length identity contract."
       ],
       "retrieval_state": "opened_document",
       "domain": "photo",
@@ -28,7 +28,7 @@
         "The current Search types table explicitly includes OCR (text in images), camera make/model/lens, time frame, descriptions and tags. Verified in the root full primary-document open, not inferred from an earlier search excerpt."
       ],
       "does_not_support": [
-        "Does not demonstrate that RestoreWeave's text BGE profile provides image-context search.",
+        "Does not demonstrate that Cairn's text BGE profile provides image-context search.",
         "Does not establish accuracy, demand, or usability for any particular household library."
       ],
       "retrieval_state": "opened_document",
@@ -58,7 +58,7 @@
         "Public links can share selected assets or albums and can have expiry, password, and action controls; public links can permit recipient uploads."
       ],
       "does_not_support": [
-        "Does not define RestoreWeave's authorization, link revocation, or export-manifest semantics."
+        "Does not define Cairn's authorization, link revocation, or export-manifest semantics."
       ],
       "retrieval_state": "official_search_excerpt_only",
       "domain": "photo"
@@ -122,7 +122,7 @@
         "Indexing creates thumbnails and optionally JSON/YAML metadata sidecars."
       ],
       "does_not_support": [
-        "Import's duplicate behavior does not establish the RestoreWeave exact identity or deletion policy."
+        "Import's duplicate behavior does not establish the Cairn exact identity or deletion policy."
       ],
       "retrieval_state": "official_search_excerpt_only",
       "domain": "photo"
@@ -148,7 +148,7 @@
         "Recognition waits until the library has been fully scanned and may cause high CPU load; the guide documents new clusters and correction behaviors."
       ],
       "does_not_support": [
-        "Does not establish acceptable error rates, privacy suitability, or performance for RestoreWeave target hardware."
+        "Does not establish acceptable error rates, privacy suitability, or performance for Cairn target hardware."
       ],
       "retrieval_state": "opened_document",
       "domain": "photo"
@@ -201,7 +201,7 @@
         "Auto-backup stability depends on OS background-data, battery optimization, charging, and focused-backup conditions."
       ],
       "does_not_support": [
-        "Requires Synology Photos on DSM 7.2+ per the page; it is not a portable client/server feature specification for RestoreWeave.",
+        "Requires Synology Photos on DSM 7.2+ per the page; it is not a portable client/server feature specification for Cairn.",
         "Does not establish that deleting backed-up phone items is safe without an independent verified-recovery gate."
       ],
       "retrieval_state": "official_search_excerpt_only",
@@ -232,7 +232,7 @@
       "does_not_support": [
         "Does not establish that every compatible client has the same queue, offline, artwork, or playback behavior.",
         "Does not constitute an evaluation of actual usability or evidence of demand among single-person NAS owners.",
-        "Does not support the claim that playback verifies exact source bytes or RestoreWeave recovery."
+        "Does not support the claim that playback verifies exact source bytes or Cairn recovery."
       ],
       "retrieval_state": "opened_document",
       "domain": "music",
@@ -308,7 +308,7 @@
         "The official search excerpt describes libraries as virtual collections that can use multiple paths and recommends dedicated media types over mixed libraries; full details were not verified in an opened document."
       ],
       "does_not_support": [
-        "Does not establish that the library abstraction should become RestoreWeave's physical storage or catalog model.",
+        "Does not establish that the library abstraction should become Cairn's physical storage or catalog model.",
         "Does not prove useability or demand for a mixed content view."
       ],
       "retrieval_state": "official_search_excerpt_only",
@@ -323,7 +323,7 @@
       "does_not_support": [
         "Marketing feature listing does not establish availability on every platform, detailed semantics, or hands-on quality.",
         "Does not establish that Plexamp is fully self-contained without Plex account/server or subscription prerequisites.",
-        "Does not provide demand evidence for these features among RestoreWeave's target users."
+        "Does not provide demand evidence for these features among Cairn's target users."
       ],
       "retrieval_state": "open_failed",
       "domain": "music"
@@ -348,7 +348,7 @@
         "The official support page search excerpt describes a mutable playback queue, its distinction from a permanent playlist, and different insertion behavior for Play Next and Add to Up Next; full details were not verified in an opened document."
       ],
       "does_not_support": [
-        "Does not establish equivalent semantics in Navidrome, Jellyfin clients, or RestoreWeave.",
+        "Does not establish equivalent semantics in Navidrome, Jellyfin clients, or Cairn.",
         "Does not make the transient queue equivalent to a LinkGroup or frozen export manifest."
       ],
       "retrieval_state": "open_failed",
@@ -363,7 +363,7 @@
         "The feature requires an active Plex Pass condition and may require the server owner to allow downloads."
       ],
       "does_not_support": [
-        "Does not establish universal client support, arbitrary file placement, download conflict handling, or RestoreWeave's recovery semantics.",
+        "Does not establish universal client support, arbitrary file placement, download conflict handling, or Cairn's recovery semantics.",
         "Does not prove downloaded/transcoded copies are byte-identical to protected originals."
       ],
       "retrieval_state": "opened_document",

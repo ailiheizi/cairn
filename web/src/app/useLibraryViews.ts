@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { allLibraryViewIds, type LibraryViewId } from "../lib/libraryViews";
 
-const storageKey = "restoreweave.library-view-preferences.v1";
+const storageKey = "cairn.library-view-preferences.v1";
 
 function readEnabledViewIds(): ReadonlySet<LibraryViewId> {
   if (typeof window === "undefined") return allLibraryViewIds;

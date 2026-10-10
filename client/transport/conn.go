@@ -9,14 +9,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // ErrServerClosed is returned when the daemon closes the connection before a
 // result frame arrives.
 var ErrServerClosed = errors.New("connection closed by server before a result was returned")
 
-// Conn is one Unix-socket connection to restoreweaved. It is single-use per
+// Conn is one Unix-socket connection to cairnd. It is single-use per
 // round trip: Do writes one envelope and reads exactly one result frame.
 type Conn struct {
 	conn net.Conn

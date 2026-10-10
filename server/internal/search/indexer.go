@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/search/pinyin"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // Indexer builds and queries disposable FTS5 generations from durable catalog

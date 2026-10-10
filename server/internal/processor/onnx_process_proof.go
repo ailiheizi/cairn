@@ -29,25 +29,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 const (
-	onnxWorkerSocketEnv     = "RESTOREWEAVE_ONNX_WORKER_SOCKET"
-	onnxWorkerProtocolEnv   = "RESTOREWEAVE_ONNX_WORKER_PROTOCOL"
-	onnxWorkerProfileEnv    = "RESTOREWEAVE_ONNX_WORKER_PROFILE"
-	onnxWorkerConfigEnv     = "RESTOREWEAVE_ONNX_WORKER_CONFIG"
-	onnxWorkerDigestEnv     = "RESTOREWEAVE_ONNX_WORKER_DIGEST"
-	onnxWorkerExecutableEnv = "RESTOREWEAVE_ONNX_WORKER_EXECUTABLE"
-	onnxWorkerGenerationEnv = "RESTOREWEAVE_ONNX_WORKER_GENERATION"
-	onnxWorkerFenceEnv      = "RESTOREWEAVE_ONNX_WORKER_FENCE"
-	onnxWorkerSandboxEnv    = "RESTOREWEAVE_ONNX_WORKER_SANDBOX"
-	onnxWorkerNoncePathEnv  = "RESTOREWEAVE_ONNX_WORKER_NONCE_PATH"
-	onnxWorkerNonceFDE      = "RESTOREWEAVE_ONNX_WORKER_NONCE_FD"
+	onnxWorkerSocketEnv     = "CAIRN_ONNX_WORKER_SOCKET"
+	onnxWorkerProtocolEnv   = "CAIRN_ONNX_WORKER_PROTOCOL"
+	onnxWorkerProfileEnv    = "CAIRN_ONNX_WORKER_PROFILE"
+	onnxWorkerConfigEnv     = "CAIRN_ONNX_WORKER_CONFIG"
+	onnxWorkerDigestEnv     = "CAIRN_ONNX_WORKER_DIGEST"
+	onnxWorkerExecutableEnv = "CAIRN_ONNX_WORKER_EXECUTABLE"
+	onnxWorkerGenerationEnv = "CAIRN_ONNX_WORKER_GENERATION"
+	onnxWorkerFenceEnv      = "CAIRN_ONNX_WORKER_FENCE"
+	onnxWorkerSandboxEnv    = "CAIRN_ONNX_WORKER_SANDBOX"
+	onnxWorkerNoncePathEnv  = "CAIRN_ONNX_WORKER_NONCE_PATH"
+	onnxWorkerNonceFDE      = "CAIRN_ONNX_WORKER_NONCE_FD"
 	// Alias retained for package-local launchers that use the clearer suffix.
 	onnxWorkerNonceFDEnv     = onnxWorkerNonceFDE
-	onnxWorkerHandshakeV1    = "restoreweave.onnx-worker-handshake.v1"
+	onnxWorkerHandshakeV1    = "cairn.onnx-worker-handshake.v1"
 	onnxWorkerHandshakeLimit = 16 << 10
 
 	onnxWorkerNonceBytes   = 32
@@ -318,7 +318,7 @@ func onnxWorkerProbeDigest(probe ONNXWorkerProbeResult) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sum := sha256.Sum256(append([]byte("restoreweave.onnx-worker-probe.v1\n"), payload...))
+	sum := sha256.Sum256(append([]byte("cairn.onnx-worker-probe.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
@@ -602,7 +602,7 @@ func removeONNXWorkerRoot(root string) error {
 		return nil
 	}
 	if !filepath.IsAbs(root) || filepath.Clean(root) != root ||
-		!strings.HasPrefix(filepath.Base(root), "restoreweave-onnx-worker-") {
+		!strings.HasPrefix(filepath.Base(root), "cairn-onnx-worker-") {
 		return fmt.Errorf("refuse to clean an unowned ONNX worker root")
 	}
 	info, err := os.Lstat(root)
@@ -665,7 +665,7 @@ func makeONNXWorkerDirectoriesRemovable(path string) error {
 // requires an exact uid/gid match, so normalize only this newly minted root and
 // fail closed if that cannot be done.
 func createONNXWorkerRoot() (string, error) {
-	root, err := os.MkdirTemp("", "restoreweave-onnx-worker-")
+	root, err := os.MkdirTemp("", "cairn-onnx-worker-")
 	if err != nil {
 		return "", err
 	}
@@ -828,7 +828,7 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 		noncePath := ""
 		preserveFDs := []int{3}
 		if !sandbox.PreserveFDSupported() {
-			noncePath = "/restoreweave-worker-nonce"
+			noncePath = "/cairn-worker-nonce"
 			preserveFDs = nil
 		}
 		if noncePath != "" {

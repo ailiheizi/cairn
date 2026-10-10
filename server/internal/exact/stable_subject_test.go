@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func TestIngestStableSubjectContinuityAndPathSeparation(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // IngestLocator is one operator-supplied external route for a regular file.
@@ -422,7 +422,7 @@ func protectionDecisionDigest(decisions []IngestProtectionDecision) (string, err
 	payload, err := json.Marshal(struct {
 		Schema    string                     `json:"schema"`
 		Decisions []IngestProtectionDecision `json:"decisions"`
-	}{Schema: "org.restoreweave.protection-decisions.v2", Decisions: decisions})
+	}{Schema: "org.cairn.protection-decisions.v2", Decisions: decisions})
 	if err != nil {
 		return "", err
 	}

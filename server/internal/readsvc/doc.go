@@ -1,4 +1,4 @@
-// Package readsvc defines RestoreWeave's storage-agnostic, read-only snapshot
+// Package readsvc defines Cairn's storage-agnostic, read-only snapshot
 // namespace and content-access seams.
 //
 // The package intentionally separates host policy from adapter mechanics.

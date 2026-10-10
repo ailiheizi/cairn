@@ -17,13 +17,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func TestONNXRuntimeAdapterExecutesPinnedBGEAssets(t *testing.T) {
-	runtimeSource := os.Getenv("RESTOREWEAVE_BGE_ONNX_RUNTIME")
-	modelSource := os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL")
-	tokenizerSource := os.Getenv("RESTOREWEAVE_BGE_TOKENIZER")
+	runtimeSource := os.Getenv("CAIRN_BGE_ONNX_RUNTIME")
+	modelSource := os.Getenv("CAIRN_BGE_ONNX_MODEL")
+	tokenizerSource := os.Getenv("CAIRN_BGE_TOKENIZER")
 	if runtimeSource == "" || modelSource == "" || tokenizerSource == "" {
 		t.Skip("real ONNX/BGE asset paths are not set")
 	}

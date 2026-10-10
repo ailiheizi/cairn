@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func TestBuildAdmittedSemanticBundleArchiveRejectsMissingSourceWithoutOutput(t *testing.T) {
@@ -22,9 +22,9 @@ func TestBuildAdmittedSemanticBundleArchiveRejectsMissingSourceWithoutOutput(t *
 }
 
 func TestBuildAdmittedSemanticBundleArchiveRealDarwinBundle(t *testing.T) {
-	sourceRoot := os.Getenv("RESTOREWEAVE_REAL_SEMANTIC_BUNDLE")
+	sourceRoot := os.Getenv("CAIRN_REAL_SEMANTIC_BUNDLE")
 	if sourceRoot == "" {
-		t.Skip("RESTOREWEAVE_REAL_SEMANTIC_BUNDLE is not set; no live model lookup or download is permitted")
+		t.Skip("CAIRN_REAL_SEMANTIC_BUNDLE is not set; no live model lookup or download is permitted")
 	}
 	admission, err := search.LoadSemanticBundle(sourceRoot)
 	if err != nil {

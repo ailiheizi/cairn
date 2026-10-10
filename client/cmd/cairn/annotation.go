@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func newSearchCommand(env *clientEnv) *cobra.Command {
@@ -18,7 +18,7 @@ func newSearchCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "search <query>", "Query the default lexical+structured+semantic broker",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw search <query> [--workspace <id>] [--filter key=value]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn search <query> [--workspace <id>] [--filter key=value]\n")
 				return 1
 			}
 			input := map[string]any{"query": args[0]}
@@ -192,7 +192,7 @@ func newAnnotationCommand(env *clientEnv) *cobra.Command {
 func newAnnotationSubjectListCommand(env *clientEnv, use, short, kind string) *cobra.Command {
 	commandNode := newExitCommand(env, use, short, func(cmd *cobra.Command, env *clientEnv, args []string) int {
 		if len(args) != 1 {
-			fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw %s [--workspace <id>]\n", use)
+			fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn %s [--workspace <id>]\n", use)
 			return 1
 		}
 		return env.request(cmd, command.OpAnnotationList, map[string]any{
@@ -211,7 +211,7 @@ func newTagAddCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "add <subject-ref> <tag>", "Add a durable tag",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw tag add <subject-ref> <tag> [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn tag add <subject-ref> <tag> [--workspace <id>]\n")
 				return 1
 			}
 			return env.request(cmd, command.OpAnnotationUpsert, map[string]any{
@@ -230,7 +230,7 @@ func newTagRemoveCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "remove <subject-ref> <tag>", "Tombstone a durable tag",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw tag remove <subject-ref> <tag> [--workspace <id>] [--expected-revision <n>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn tag remove <subject-ref> <tag> [--workspace <id>] [--expected-revision <n>]\n")
 				return 1
 			}
 			list, err := env.do(cmd.Context(), command.OpAnnotationList, map[string]any{
@@ -238,7 +238,7 @@ func newTagRemoveCommand(env *clientEnv) *cobra.Command {
 				"subject_ref":  args[0],
 			})
 			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach restoreweaved at %s: %v\n", env.socket, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach cairnd at %s: %v\n", env.socket, err)
 				return 1
 			}
 			if list.Status != command.StatusSucceeded {
@@ -288,7 +288,7 @@ func newNoteSetCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "set <subject-ref>", "Create or revise a note",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw note set <subject-ref> --body <text> [--workspace <id>] [--id <annotation-id>] [--expected-revision <n>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn note set <subject-ref> --body <text> [--workspace <id>] [--id <annotation-id>] [--expected-revision <n>]\n")
 				return 1
 			}
 			body := cmd.Flags().Lookup("body").Value.String()
@@ -327,7 +327,7 @@ func newNoteRemoveCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "remove <annotation-id>", "Tombstone a note",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw note remove <annotation-id> [--workspace <id>] --expected-revision <n>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn note remove <annotation-id> [--workspace <id>] --expected-revision <n>\n")
 				return 1
 			}
 			revision, err := cmd.Flags().GetInt64("expected-revision")

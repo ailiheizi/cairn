@@ -12,15 +12,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/access"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/identify"
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/access"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/identify"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // Dispatcher routes command envelopes to implemented operations and returns a
@@ -754,7 +754,7 @@ func (d *Dispatcher) handleStatusGet(ctx context.Context, env command.Envelope, 
 	catalog.SchemaReason = schema.Reason
 	catalog.SchemaBinaryVersion = schema.BinaryVersion
 	data := command.StatusData{
-		Controller:   "restoreweaved",
+		Controller:   "cairnd",
 		ConfigDigest: d.configDigest,
 		Catalog:      catalog,
 		Identify: command.IdentifyStatus{
@@ -859,10 +859,10 @@ func (d *Dispatcher) handleCapabilityList(env command.Envelope, started time.Tim
 	capabilities := make([]command.Capability, 0, len(command.KnownOperations())+2)
 	for _, operation := range command.KnownOperations() {
 		state := command.CapabilityUnavailable
-		notes := "not implemented by this restoreweaved build"
+		notes := "not implemented by this cairnd build"
 		if d.implemented[operation] {
 			state = command.CapabilityAvailable
-			notes = "implemented by restoreweaved"
+			notes = "implemented by cairnd"
 		}
 		capabilities = append(capabilities, command.Capability{
 			Kind:  "operation",

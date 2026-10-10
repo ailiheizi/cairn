@@ -27,7 +27,7 @@ func TestProtectionRecoveryAndExternalBindingRoundTrip(t *testing.T) {
 		WorkspaceID:     workspace.ID,
 		ContentID:       contentID,
 		DecodedLength:   12,
-		OwnershipMode:   OwnershipRestoreWeavePacks,
+		OwnershipMode:   OwnershipCairnPacks,
 		CodecProfileRef: "raw-v1",
 		AccessMode:      AccessWholeObjectOnly,
 		RecordDigest:    "sha256:representation-record",
@@ -147,13 +147,13 @@ func TestUpsertProtectionRecordRetainsIdentityAndAdvancesRevision(t *testing.T) 
 	firstRepresentation := &Representation{
 		ID: testID(t, IDPrefixRepresentation), WorkspaceID: workspace.ID,
 		ContentID: "sha256:first", DecodedLength: 5,
-		OwnershipMode: OwnershipRestoreWeavePacks, CodecProfileRef: "raw-v1",
+		OwnershipMode: OwnershipCairnPacks, CodecProfileRef: "raw-v1",
 		AccessMode: AccessWholeObjectOnly, RecordDigest: "sha256:rep-first",
 	}
 	secondRepresentation := &Representation{
 		ID: testID(t, IDPrefixRepresentation), WorkspaceID: workspace.ID,
 		ContentID: "sha256:second", DecodedLength: 6,
-		OwnershipMode: OwnershipRestoreWeavePacks, CodecProfileRef: "raw-v1",
+		OwnershipMode: OwnershipCairnPacks, CodecProfileRef: "raw-v1",
 		AccessMode: AccessWholeObjectOnly, RecordDigest: "sha256:rep-second",
 	}
 	if err := store.Update(ctx, func(tx *Tx) error {
@@ -249,7 +249,7 @@ func TestProtectionOutcomeModeMatrix(t *testing.T) {
 		WorkspaceID:     workspace.ID,
 		ContentID:       "sha256:matrix",
 		DecodedLength:   4,
-		OwnershipMode:   OwnershipRestoreWeavePacks,
+		OwnershipMode:   OwnershipCairnPacks,
 		CodecProfileRef: "raw-v1",
 		AccessMode:      AccessWholeObjectOnly,
 		RecordDigest:    "sha256:matrix-representation",

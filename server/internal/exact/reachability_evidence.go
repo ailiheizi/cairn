@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 // ReachabilityEvidenceSchemaV1 is a signed, non-destructive root-accounting
 // envelope. It is deliberately separate from portable recovery records and
 // never authorizes a repository mutation.
-const ReachabilityEvidenceSchemaV1 = "org.restoreweave.reachability-evidence.v1"
+const ReachabilityEvidenceSchemaV1 = "org.cairn.reachability-evidence.v1"
 
 const ReachabilityEvidenceKind = "REACHABILITY_EVIDENCE"
 

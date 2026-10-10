@@ -23,7 +23,7 @@ func DescriptionProducerProfileDigest(profile string) string {
 	if profile == "" {
 		profile = "unspecified"
 	}
-	return digestText("restoreweave.description-producer-profile.v1:" + profile)
+	return digestText("cairn.description-producer-profile.v1:" + profile)
 }
 
 func validDescriptionKind(value DescriptionKind) bool {

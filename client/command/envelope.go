@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	SchemaCommand    = "org.restoreweave.command.v1"
-	SchemaResult     = "org.restoreweave.result.v1"
+	SchemaCommand    = "org.cairn.command.v1"
+	SchemaResult     = "org.cairn.result.v1"
 	DefaultWorkspace = "workspace:default"
 )
 

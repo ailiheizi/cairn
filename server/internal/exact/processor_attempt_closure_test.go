@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func addClosureTestAttempt(t *testing.T, fixture signedPublicationFixture, result IngestResult) {
@@ -477,7 +477,7 @@ func TestProcessorAttemptClosureRejectsMismatchedAttemptBundleSchema(t *testing.
 	if err := os.Remove(recordRelocationPath(t, fixture.repo.Root(), repository.RecordProcessorAttemptClosure, digests[0])); err != nil {
 		t.Fatal(err)
 	}
-	envelope.Closure.AttemptBundleSchema = "restoreweave.processor-attempts/v2"
+	envelope.Closure.AttemptBundleSchema = "cairn.processor-attempts/v2"
 	envelope.Closure.Signature = nil
 	signed, err := SignProcessorAttemptClosure(*fixture.service.SigningIdentity, envelope.Closure)
 	if err != nil {

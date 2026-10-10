@@ -28,7 +28,7 @@ const (
 	// SchemaPerceptualHashV1 names the artifact body schema. Every body
 	// carries not_content_identity=true so a reader can never mistake the
 	// hash for a content identity.
-	SchemaPerceptualHashV1 = "restoreweave.artifact.perceptual-hash.v1"
+	SchemaPerceptualHashV1 = "cairn.artifact.perceptual-hash.v1"
 	// PerceptualHashAlgorithmDHash64 is the fixed algorithm profile: 64-bit
 	// difference hash over a fixed 9x8 grayscale preprocess.
 	PerceptualHashAlgorithmDHash64 = "dhash-64-v1"

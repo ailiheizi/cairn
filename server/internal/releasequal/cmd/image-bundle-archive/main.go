@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func main() {

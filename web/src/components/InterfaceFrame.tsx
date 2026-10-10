@@ -69,8 +69,8 @@ function ImmersiveFrame({ header, navigation, content, details, compact, detailA
 }
 
 const shellRenderers = new Map<string, (props: InterfaceFrameProps) => ReactNode>([
-  ["shell.restoreweave.workspace", WorkspaceFrame],
-  ["shell.restoreweave.showcase", ShowcaseFrame],
+  ["shell.cairn.workspace", WorkspaceFrame],
+  ["shell.cairn.showcase", ShowcaseFrame],
 ]);
 for (const definition of interfaceCatalog) {
   if (!shellRenderers.has(definition.renderSlot)) throw new Error(`Missing compiled interface renderer: ${definition.id}`);

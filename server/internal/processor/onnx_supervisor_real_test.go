@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // TestSupervisedONNXWorkerRealEmbedding proves the production process boundary
@@ -22,12 +22,12 @@ import (
 // platform-owned input, never a test fixture; Linux additionally exercises
 // bubblewrap while Darwin exercises the authenticated process-only path.
 func TestSupervisedONNXWorkerRealEmbedding(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("RESTOREWEAVE_RUN_SUPERVISED_ONNX")) != "1" {
-		t.Skip("RESTOREWEAVE_RUN_SUPERVISED_ONNX=1 is required for supervised qualification")
+	if strings.TrimSpace(os.Getenv("CAIRN_RUN_SUPERVISED_ONNX")) != "1" {
+		t.Skip("CAIRN_RUN_SUPERVISED_ONNX=1 is required for supervised qualification")
 	}
-	runtimeSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_RUNTIME"))
-	modelSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL"))
-	tokenizerSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_TOKENIZER"))
+	runtimeSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_RUNTIME"))
+	modelSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_MODEL"))
+	tokenizerSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_TOKENIZER"))
 	if runtimeSource == "" || modelSource == "" || tokenizerSource == "" {
 		t.Skip("real BGE asset paths are required for supervised qualification")
 	}
@@ -36,7 +36,7 @@ func TestSupervisedONNXWorkerRealEmbedding(t *testing.T) {
 	}
 
 	bundleRoot, admission := realONNXAdmission(t, runtimeSource, modelSource, tokenizerSource)
-	daemon := buildRestoreweavedForWorker(t)
+	daemon := buildCairndForWorker(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	worker, closeWorker, err := StartONNXWorker(ctx, ONNXWorkerSupervisorOptions{
@@ -105,12 +105,12 @@ func assertSupervisedVector(t *testing.T, vectors []search.SemanticVector, subje
 	}
 }
 
-func buildRestoreweavedForWorker(t *testing.T) string {
+func buildCairndForWorker(t *testing.T) string {
 	t.Helper()
-	if binary := strings.TrimSpace(os.Getenv("RESTOREWEAVE_WORKER_BINARY")); binary != "" {
+	if binary := strings.TrimSpace(os.Getenv("CAIRN_WORKER_BINARY")); binary != "" {
 		info, err := os.Stat(binary)
 		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-			t.Fatalf("RESTOREWEAVE_WORKER_BINARY is not executable: %q (%v)", binary, err)
+			t.Fatalf("CAIRN_WORKER_BINARY is not executable: %q (%v)", binary, err)
 		}
 		return binary
 	}
@@ -119,11 +119,11 @@ func buildRestoreweavedForWorker(t *testing.T) string {
 		t.Fatal("locate processor source root")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "..", "..", ".."))
-	output := filepath.Join(t.TempDir(), "restoreweaved")
-	cmd := exec.Command("go", "build", "-tags", "purego", "-o", output, "./server/cmd/restoreweaved")
+	output := filepath.Join(t.TempDir(), "cairnd")
+	cmd := exec.Command("go", "build", "-tags", "purego", "-o", output, "./server/cmd/cairnd")
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build restoreweaved worker binary: %v\n%s", err, out)
+		t.Fatalf("build cairnd worker binary: %v\n%s", err, out)
 	}
 	return output
 }

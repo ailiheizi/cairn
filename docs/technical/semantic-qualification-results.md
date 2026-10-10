@@ -33,12 +33,12 @@ concurrency four, and ranked every document vector for each query.
 
 The executable evidence is
 `TestSupervisedONNXSemanticQualification`. An explicit output path writes an
-atomic `restoreweave.semantic-qualification.v1` JSON report:
+atomic `cairn.semantic-qualification.v1` JSON report:
 
 ```sh
-RESTOREWEAVE_RUN_SUPERVISED_ONNX=1 \
-RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT=/absolute/path/to/bge-small-zh-v1.5/darwin-arm64 \
-RESTOREWEAVE_SEMANTIC_QUALIFICATION_REPORT=/absolute/path/to/report.json \
+CAIRN_RUN_SUPERVISED_ONNX=1 \
+CAIRN_SEMANTIC_BUNDLE_ROOT=/absolute/path/to/bge-small-zh-v1.5/darwin-arm64 \
+CAIRN_SEMANTIC_QUALIFICATION_REPORT=/absolute/path/to/report.json \
 go test -tags='purego supervised_integration' ./server/internal/processor \
   -run '^TestSupervisedONNXSemanticQualification$' -count=1 -v
 ```
@@ -56,8 +56,8 @@ This is a development-host install and a live retrieval check, **not** a
 qualification run: it measures no recall corpus, no latency, and no memory. The
 dated qualification entry above remains the qualification evidence.
 
-The pinned development installer (`rw semantic bundle install`) admitted the
-bundle into `<data>/restoreweave/models/bge-small-zh-v1.5/darwin-arm64` with
+The pinned development installer (`cairn semantic bundle install`) admitted the
+bundle into `<data>/cairn/models/bge-small-zh-v1.5/darwin-arm64` with
 profile digest `sha256:2c660a7dd5d062a75f495f3d5e9d41d2906a0391d3146fa063e41de5434d7892`
 — byte-identical to the profile digest recorded by the 2026-09-03 run.
 
@@ -175,7 +175,7 @@ installer. Regression coverage lives in
 `semantic_provider_installer_test.go`,
 `server/internal/store/sqlite/egress_grants_test.go`,
 `server/controlplane/egress_grant_ops_test.go`, and
-`client/cmd/rw/egress_test.go`. Loopback HTTP stubs prove the gate order; a
+`client/cmd/cairn/egress_test.go`. Loopback HTTP stubs prove the gate order; a
 real remote endpoint was not exercised and no online provider ships as a
 default.
 
@@ -246,7 +246,7 @@ digest covers the whole descriptor, so a bundle with different documentation is
 a different provider identity, and the image generation is rebuilt for it.
 
 Installing the script-built archive through the daemon
-(`rw image bundle install --archive …`) reports the admitted profile, destination
+(`cairn image bundle install --archive …`) reports the admitted profile, destination
 and asset count, marks a restart as required, then rebuilds to
 `image_state: READY`, with the same Chinese image queries still returning the
 described image first.
@@ -256,7 +256,7 @@ described image first.
 The final candidate-only artifact was assembled with archive digest
 `sha256:96746b0a4080f4396a86de10942d380176fce47521e69a435e028ec59a75f064`.
 Its manifest records main path
-`github.com/ailiheizi/restoreweave/server/cmd/restoreweaved`, `darwin/arm64`,
+`github.com/ailiheizi/cairn/server/cmd/cairnd`, `darwin/arm64`,
 the exact `purego` build tag, and pinned
 `github.com/zvec-ai/zvec-go` version
 `v0.6.1-0.20260721023313-9199195b29da` with module sum
@@ -290,11 +290,11 @@ boundary:
 
 ```sh
 bash scripts/linux-qualification.sh --artifacts /path/to/evidence \
-  --semantic-archive /path/to/restoreweave-semantic-bundle.tar.gz --offline
+  --semantic-archive /path/to/cairn-semantic-bundle.tar.gz --offline
 ```
 
 In this mode the script copies the archive into a clean temporary root, calls
-only `rw semantic bundle install --archive`, records the archive digest, and
+only `cairn semantic bundle install --archive`, records the archive digest, and
 removes the temporary archive before the daemon restart. The original archive
 is never modified. This proves the script-level offline input and retained
 installed bundle path; it is still a candidate harness, not proof of a
@@ -311,11 +311,11 @@ evidence:
 ```sh
 bash scripts/package-offline.sh \
   --version v0.1.0-prealpha.1 --os linux --arch arm64 \
-  --rw /absolute/path/to/rw \
-  --daemon /absolute/path/to/restoreweaved \
+  --rw /absolute/path/to/cairn \
+  --daemon /absolute/path/to/cairnd \
   --web-dist /absolute/path/to/web/dist \
   --semantic-archive /absolute/path/to/semantic-bundle.tar.gz \
-  --output /absolute/path/to/restoreweave-v0.1.0-prealpha.1-linux-arm64.tar.gz
+  --output /absolute/path/to/cairn-v0.1.0-prealpha.1-linux-arm64.tar.gz
 ```
 
 The fixture acceptance test builds the artifact twice, requires byte-identical

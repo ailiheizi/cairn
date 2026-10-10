@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // imageGenerationReceiptFile is the immutable, generation-local record of one
@@ -30,7 +30,7 @@ type imageGenerationReceiptFile struct {
 	Identities     []ZvecCoverageIdentity `json:"identities"`
 }
 
-const imageGenerationReceiptSchema = "restoreweave.image-generation-receipt.v1"
+const imageGenerationReceiptSchema = "cairn.image-generation-receipt.v1"
 
 // writeImageGenerationReceipt publishes the receipt with the same atomic
 // no-replace pattern as the semantic receipt.
@@ -59,7 +59,7 @@ func writeImageGenerationReceipt(generation sqlite.IndexGeneration, libraryDiges
 	}
 	finalPath := semanticGenerationReceiptPath(generation.DBPath)
 	parent := filepath.Dir(finalPath)
-	file, err := os.CreateTemp(parent, ".restoreweave-image-receipt-*")
+	file, err := os.CreateTemp(parent, ".cairn-image-receipt-*")
 	if err != nil {
 		return err
 	}

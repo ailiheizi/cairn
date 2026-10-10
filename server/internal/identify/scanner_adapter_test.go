@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 // memorySink records the scanner output so a test can inspect the entries a

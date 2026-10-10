@@ -68,7 +68,7 @@ navigation, an inset main header, a larger heading, and gallery cards with
 stable tile scale. Switching does not clear the tested search, selection,
 inspected subject, or Notes draft. The palette remains independently selectable.
 
-`interfaceId` is a guarded field in the existing `restoreweave.appearance`
+`interfaceId` is a guarded field in the existing `cairn.appearance`
 browser preference. Legacy preferences keep their palette/mode and select the
 workspace interface; unknown values fall back to workspace. This is a compiled
 first-party seam, not a public theme format or runtime plugin loader. Child

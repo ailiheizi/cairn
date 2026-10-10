@@ -27,10 +27,10 @@ var (
 const (
 	workerPath   = "/worker"
 	stagePath    = "/stage"
-	hostname     = "restoreweave-processor"
-	noncePath    = "/restoreweave-worker-nonce"
-	policyIDFD   = "restoreweave.processor.sandbox.v11:ro-bin:ro-stage:proc:ro-sys:tmpfs-tmp:unshare-net-pid-ipc-uts:preserve-fd-3"
-	policyIDFile = "restoreweave.processor.sandbox.v11:ro-bin:ro-stage:proc:ro-sys:tmpfs-tmp:unshare-net-pid-ipc-uts:file-from-fd-3"
+	hostname     = "cairn-processor"
+	noncePath    = "/cairn-worker-nonce"
+	policyIDFD   = "cairn.processor.sandbox.v11:ro-bin:ro-stage:proc:ro-sys:tmpfs-tmp:unshare-net-pid-ipc-uts:preserve-fd-3"
+	policyIDFile = "cairn.processor.sandbox.v11:ro-bin:ro-stage:proc:ro-sys:tmpfs-tmp:unshare-net-pid-ipc-uts:file-from-fd-3"
 )
 
 // PolicyDigest binds the exact argv policy to a worker handshake. It is a
@@ -72,20 +72,20 @@ type Bind struct {
 }
 
 var allowedEnv = map[string]struct{}{
-	"PATH":                                {},
-	"LANG":                                {},
-	"LC_ALL":                              {},
-	"TZ":                                  {},
-	"HOME":                                {},
-	"RESTOREWEAVE_ONNX_WORKER_SOCKET":     {},
-	"RESTOREWEAVE_ONNX_WORKER_PROTOCOL":   {},
-	"RESTOREWEAVE_ONNX_WORKER_PROFILE":    {},
-	"RESTOREWEAVE_ONNX_WORKER_CONFIG":     {},
-	"RESTOREWEAVE_ONNX_WORKER_DIGEST":     {},
-	"RESTOREWEAVE_ONNX_WORKER_EXECUTABLE": {},
-	"RESTOREWEAVE_ONNX_WORKER_GENERATION": {},
-	"RESTOREWEAVE_ONNX_WORKER_FENCE":      {},
-	"RESTOREWEAVE_ONNX_WORKER_SANDBOX":    {},
-	"RESTOREWEAVE_ONNX_WORKER_NONCE_FD":   {},
-	"RESTOREWEAVE_ONNX_WORKER_NONCE_PATH": {},
+	"PATH":                         {},
+	"LANG":                         {},
+	"LC_ALL":                       {},
+	"TZ":                           {},
+	"HOME":                         {},
+	"CAIRN_ONNX_WORKER_SOCKET":     {},
+	"CAIRN_ONNX_WORKER_PROTOCOL":   {},
+	"CAIRN_ONNX_WORKER_PROFILE":    {},
+	"CAIRN_ONNX_WORKER_CONFIG":     {},
+	"CAIRN_ONNX_WORKER_DIGEST":     {},
+	"CAIRN_ONNX_WORKER_EXECUTABLE": {},
+	"CAIRN_ONNX_WORKER_GENERATION": {},
+	"CAIRN_ONNX_WORKER_FENCE":      {},
+	"CAIRN_ONNX_WORKER_SANDBOX":    {},
+	"CAIRN_ONNX_WORKER_NONCE_FD":   {},
+	"CAIRN_ONNX_WORKER_NONCE_PATH": {},
 }

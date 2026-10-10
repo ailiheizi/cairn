@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 type warningPublicationProcessor struct{}
@@ -32,7 +32,7 @@ func TestPlanApplyReturnsDegradedButPersistsSuccessfulJob(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "payload.txt"), []byte("durable payload"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store:     store,
 		Repo:      repo,
 		Processor: warningPublicationProcessor{},

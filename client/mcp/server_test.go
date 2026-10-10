@@ -12,10 +12,10 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
-	"github.com/ailiheizi/restoreweave/server/controlplane"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
+	"github.com/ailiheizi/cairn/server/controlplane"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // startDaemon runs the real control-plane server for the duration of the test
@@ -86,7 +86,7 @@ func TestToolsRoundTripOverPipes(t *testing.T) {
 		t.Fatalf("status.get returned an error result")
 	}
 	text := contentText(t, statusResult)
-	if !strings.Contains(text, "controller: restoreweaved") || !strings.Contains(text, "catalog ok: true") {
+	if !strings.Contains(text, "controller: cairnd") || !strings.Contains(text, "catalog ok: true") {
 		t.Fatalf("status.get text = %q", text)
 	}
 

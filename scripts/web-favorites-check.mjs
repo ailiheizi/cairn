@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { build } from "../web/node_modules/esbuild/lib/main.js";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "rw-favorites-check-"));
+const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "cairn-favorites-check-"));
 const entry = path.join(root, "web/src/app/useFavorites.ts");
 const output = path.join(tempDir, "useFavorites.mjs");
 try {
@@ -20,12 +20,12 @@ try {
     plugins: [{
       name: "stub-unused-hook-runtime",
       setup(plugin) {
-        plugin.onResolve({ filter: /^react$/ }, () => ({ path: "react", namespace: "rw-test" }));
-        plugin.onLoad({ filter: /^react$/, namespace: "rw-test" }, () => ({ contents: "export const useCallback = (fn) => fn; export const useRef = (current) => ({ current }); export const useState = (current) => [current, () => {}];", loader: "js" }));
-        plugin.onResolve({ filter: /\/command$/ }, () => ({ path: "command", namespace: "rw-test" }));
-        plugin.onLoad({ filter: /^command$/, namespace: "rw-test" }, () => ({ contents: "export const command = async () => { throw new Error('hook runtime is not used by pure checks'); };", loader: "js" }));
-        plugin.onResolve({ filter: /\/lib\/operations$/ }, () => ({ path: "operations", namespace: "rw-test" }));
-        plugin.onLoad({ filter: /^operations$/, namespace: "rw-test" }, () => ({ contents: "export const operations = {};", loader: "js" }));
+        plugin.onResolve({ filter: /^react$/ }, () => ({ path: "react", namespace: "cairn-test" }));
+        plugin.onLoad({ filter: /^react$/, namespace: "cairn-test" }, () => ({ contents: "export const useCallback = (fn) => fn; export const useRef = (current) => ({ current }); export const useState = (current) => [current, () => {}];", loader: "js" }));
+        plugin.onResolve({ filter: /\/command$/ }, () => ({ path: "command", namespace: "cairn-test" }));
+        plugin.onLoad({ filter: /^command$/, namespace: "cairn-test" }, () => ({ contents: "export const command = async () => { throw new Error('hook runtime is not used by pure checks'); };", loader: "js" }));
+        plugin.onResolve({ filter: /\/lib\/operations$/ }, () => ({ path: "operations", namespace: "cairn-test" }));
+        plugin.onLoad({ filter: /^operations$/, namespace: "cairn-test" }, () => ({ contents: "export const operations = {};", loader: "js" }));
       },
     }],
   });

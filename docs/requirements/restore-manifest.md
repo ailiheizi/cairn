@@ -215,9 +215,9 @@ Every stored representation must declare exactly one ownership mode. The record 
 {
   "representation_id": "urn:uuid:...",
   "content_id": "urn:sha256:...",
-  "ownership_mode": "ENGINE_MANAGED_OBJECTS|RESTOREWEAVE_PACKS",
+  "ownership_mode": "ENGINE_MANAGED_OBJECTS|CAIRN_PACKS",
   "engine_managed_objects": null,
-  "restoreweave_packs": null,
+  "cairn_packs": null,
   "physical_placement_refs": []
 }
 ~~~
@@ -236,7 +236,7 @@ Engine-internal chunk, pack, or object IDs are optional diagnostic data and must
 
 Every engine restore point created from a captured source binds the exact `CaptureSetRecord` ID and canonical digest in the engine request, authenticated engine receipt, independent verification, and placement-ledger creation event. Multiple repository restore points may satisfy one `CRASH_CONSISTENT_VIEW` generation only when all of them bind the same capture-set digest.
 
-### 9.2 Deferred RESTOREWEAVE_PACKS
+### 9.2 Deferred CAIRN_PACKS
 
 RW-MVP-1 does not implement or qualify this ownership mode. The schema is retained for a possible later native-storage profile.
 
@@ -985,7 +985,7 @@ The append-only authenticated physical placement ledger maps immutable represent
 {
   "checkpoint_id": "urn:uuid:...",
   "ledger_id": "urn:uuid:...",
-  "schema_version": "restoreweave-placement-ledger/1",
+  "schema_version": "cairn-placement-ledger/1",
   "payload": {
     "ledger_generation": 42,
     "parent_checkpoint_digest": "sha256:...",
@@ -1014,7 +1014,7 @@ Each placement creation is an immutable ledger event covered by `entry_set_diges
 
 An `ENGINE_MANAGED_OBJECTS` placement creation contains engine, adapter, repository, account, engine snapshot or restore-point handle, exact CaptureSetRecord ID and digest when source capture applies, authenticated engine receipt and digest, receipt fencing token, initial engine verification, independent Cairn creation-time restore-verification reference, and reader Capsule Core ref. It does not require or promote engine-private object locators.
 
-A `RESTOREWEAVE_PACKS` placement creation contains `RepositoryDriver` profile and repository, account, region, immutable backend locator, pack-object ID, encoded length, encoded-object digest, authenticated-encryption and index/footer digests, storage receipt, and initial independent readback result.
+A `CAIRN_PACKS` placement creation contains `RepositoryDriver` profile and repository, account, region, immutable backend locator, pack-object ID, encoded length, encoded-object digest, authenticated-encryption and index/footer digests, storage receipt, and initial independent readback result.
 
 Verification, degradation, repair, draining, retention transitions, supersession, and retirement are new immutable events in later signed checkpoints. A closure event binds the placement ID, prior event digest, closing ledger generation, reason, approval and evidence references, final readback or loss evidence, and successor placement IDs. Effective `valid_through` and current state are derived from the signed event chain; no placement or earlier checkpoint is rewritten to close it.
 
@@ -1064,7 +1064,7 @@ Illustrative authenticated seed header:
 ~~~json
 {
   "seed_id": "urn:uuid:...",
-  "seed_schema_version": "restoreweave-bootstrap-seed/1",
+  "seed_schema_version": "cairn-bootstrap-seed/1",
   "publication_domain_id": "...",
   "publication_record_digest": "sha256:...",
   "seed_generation": 7,
@@ -1395,7 +1395,7 @@ A valid signed parent chain proves ancestry but does not prove that a repository
 ~~~json
 {
   "witness_id": "urn:uuid:...",
-  "witness_schema_version": "restoreweave-recovery-head/1",
+  "witness_schema_version": "cairn-recovery-head/1",
   "repository_id": "...",
   "publication_domain_id": "...",
   "witness_epoch": 3,

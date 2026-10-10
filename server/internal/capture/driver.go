@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 // Session is one live capture against a bound local directory. Close releases

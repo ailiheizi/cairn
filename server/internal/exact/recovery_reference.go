@@ -11,14 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // RecoveryReferenceSchemaV2 is an independently retainable selector and
 // validation envelope. It is deliberately separate from the legacy v1 export
 // bundle, whose shape contains only a commit and prepared closure.
-const RecoveryReferenceSchemaV2 = "org.restoreweave.recovery-reference.v2"
+const RecoveryReferenceSchemaV2 = "org.cairn.recovery-reference.v2"
 
 const (
 	RecoveryFactHealthComplete   = "COMPLETE"
@@ -621,7 +621,7 @@ func portableFactReaderDependenciesForReference(binding RecoveryRepositoryBindin
 	return []string{
 		"canonicalization:encoding/json-compact-v1",
 		"repository:" + binding.Profile + "/" + binding.Compression,
-		"restoreweave-reader:portable-fact-" + readerVersion,
+		"cairn-reader:portable-fact-" + readerVersion,
 		"signature:ed25519-v1",
 	}
 }

@@ -200,13 +200,13 @@ class DeploymentSavingsTests(unittest.TestCase):
     def test_candidate_archive_binds_supplied_binaries_and_extracts_web_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            rw, daemon = base / "rw", base / "restoreweaved"
+            rw, daemon = base / "cairn", base / "cairnd"
             rw.write_bytes(b"cli candidate")
             daemon.write_bytes(b"daemon candidate")
             package = base / "candidate.tar.gz"
             with tarfile.open(package, "w:gz") as archive:
-                for name, data in (("candidate/bin/rw", rw.read_bytes()),
-                                   ("candidate/bin/restoreweaved", daemon.read_bytes()),
+                for name, data in (("candidate/bin/cairn", rw.read_bytes()),
+                                   ("candidate/bin/cairnd", daemon.read_bytes()),
                                    ("candidate/web/dist/index.html", b"<html></html>")):
                     info = tarfile.TarInfo(name)
                     info.size = len(data)

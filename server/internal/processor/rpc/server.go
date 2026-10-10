@@ -8,7 +8,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/processor"
 )
 
 // Server accepts one Unix connection per RUN_STAGE, receives source and

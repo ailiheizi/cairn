@@ -50,11 +50,11 @@ command -v npm >/dev/null 2>&1 || { echo "error: npm is required" >&2; exit 1; }
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 mkdir -p "$data_dir/bin"
 config_path=$data_dir/config.toml
-socket_path=$data_dir/restoreweaved.sock
+socket_path=$data_dir/cairnd.sock
 
-echo "RestoreWeave: building daemon, CLI, and WebUI..."
-( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/restoreweaved" ./server/cmd/restoreweaved )
-( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/rw" ./client/cmd/rw )
+echo "Cairn: building daemon, CLI, and WebUI..."
+( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/cairnd" ./server/cmd/cairnd )
+( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/cairn" ./client/cmd/cairn )
 [ -d "$repo_root/web/node_modules" ] || npm --prefix "$repo_root/web" ci >/dev/null
 npm --prefix "$repo_root/web" run build >/dev/null
 
@@ -62,18 +62,18 @@ npm --prefix "$repo_root/web" run build >/dev/null
 # generated default path deterministic below --data-dir; an existing profile
 # is never rewritten and its persisted paths remain authoritative.
 if [ ! -e "$config_path" ]; then
-  ( cd "$repo_root" && XDG_DATA_HOME=$data_dir "$data_dir/bin/rw" config init --path "$config_path" )
+  ( cd "$repo_root" && XDG_DATA_HOME=$data_dir "$data_dir/bin/cairn" config init --path "$config_path" )
 fi
 
 web_root=$repo_root/web/dist
 [ -f "$web_root/index.html" ] || { echo "error: WebUI build did not produce $web_root/index.html" >&2; exit 1; }
-echo "RestoreWeave: serving WebUI and API at http://$listen/"
-echo "RestoreWeave: data root $data_dir"
-echo "RestoreWeave: running in foreground; press Ctrl-C to stop"
+echo "Cairn: serving WebUI and API at http://$listen/"
+echo "Cairn: data root $data_dir"
+echo "Cairn: running in foreground; press Ctrl-C to stop"
 
 # Do not let ambient one-shot path overrides silently redirect an existing
 # persisted profile. API token and proxy variables remain inherited naturally.
-exec env -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY \
-  -u RESTOREWEAVE_VECTORS -u RESTOREWEAVE_MODELS -u RESTOREWEAVE_RECOVERY_RECORDS \
-  "$data_dir/bin/restoreweaved" --config "$config_path" --socket "$socket_path" \
+exec env -u CAIRN_CATALOG -u CAIRN_REPOSITORY \
+  -u CAIRN_VECTORS -u CAIRN_MODELS -u CAIRN_RECOVERY_RECORDS \
+  "$data_dir/bin/cairnd" --config "$config_path" --socket "$socket_path" \
   --api-listen "$listen" --web-root "$web_root"

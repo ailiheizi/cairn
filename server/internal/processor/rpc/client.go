@@ -12,7 +12,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/processor"
 )
 
 // CallSpec is a host-owned RUN_STAGE invocation. Source and staging files

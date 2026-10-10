@@ -18,7 +18,7 @@ import (
 // part of the bundled byte-deterministic extract pack, so a missing engine
 // cannot block exact preservation.
 //
-// Artifact body (schema restoreweave.artifact.ocr-text.v1, application/json):
+// Artifact body (schema cairn.artifact.ocr-text.v1, application/json):
 // the recognized text, per-region boxes and confidences, the source image's
 // exact identity (content_id and the logical length of the bytes actually
 // read), the engine/runtime/model/dictionary digests, the declared language

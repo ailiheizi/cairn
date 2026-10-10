@@ -126,7 +126,7 @@ sounds:
 - The signed portable fact closure and the recovery reference already carry
   `RequiredReaderDependencies` (`server/internal/exact/recovery_closure.go:226`,
   `recovery_reference.go:71`; populated from the repository capability profile,
-  e.g. `restoreweave.repository.local-zstd-v1` plus
+  e.g. `cairn.repository.local-zstd-v1` plus
   `klauspost/compress/zstd@v1.18.7`), so a reader can state what it needs.
 - The retirement rule is frozen: "A repository driver, decoder, model,
   tokenizer, or dictionary cannot be removed while any retained representation
@@ -275,7 +275,7 @@ Music/MV pack:
 
 6. **Track and album browse (already scoped).** The cheapest path to a
    *beautiful* library is an existing OpenSubsonic client over the optional
-   loopback facade (`restoreweaved --facade-listen`), which already carries
+   loopback facade (`cairnd --facade-listen`), which already carries
    artist/album/song listing and `search2`/`search3`
    (experience-completion-plan.md:30, :69) with a pinned Supersonic method
    sequence (:33). Honesty: those adapters are **maintenance-only**,

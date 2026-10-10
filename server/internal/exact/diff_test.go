@@ -3,7 +3,7 @@ package exact
 import (
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func TestDiffManifestsClassifiesPathChanges(t *testing.T) {

@@ -1,5 +1,5 @@
-// Command rw is the RestoreWeave client: a thin cobra front end over the
-// restoreweaved control plane. Every command performs one real envelope round
+// Command cairn is the Cairn client: a thin cobra front end over the
+// cairnd control plane. Every command performs one real envelope round
 // trip over the Unix socket and prints the daemon's honest outcome.
 package main
 
@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/local"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/local"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 // defaultTimeout bounds one socket round trip.
@@ -66,14 +66,14 @@ func (e *clientEnv) do(ctx context.Context, operation string, input any) (comman
 }
 
 // request runs one operation and renders its outcome. A failed round trip
-// prints "cannot reach restoreweaved at <socket>" and exits 1. Degraded
+// prints "cannot reach cairnd at <socket>" and exits 1. Degraded
 // results still render their useful data before returning the declared code.
 func (e *clientEnv) request(cmd *cobra.Command, operation string, input any, render func(cmd *cobra.Command, result command.Result) error) int {
 	ctx, cancel := context.WithTimeout(cmd.Context(), e.timeout)
 	defer cancel()
 	result, err := e.do(ctx, operation, input)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach restoreweaved at %s: %v\n", e.socket, err)
+		fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach cairnd at %s: %v\n", e.socket, err)
 		return 1
 	}
 	if e.jsonOut {
@@ -109,21 +109,21 @@ func (e *clientEnv) request(cmd *cobra.Command, operation string, input any, ren
 	return 0
 }
 
-// NewRootCommand assembles the full rw command tree.
+// NewRootCommand assembles the full cairn command tree.
 func NewRootCommand() *exitCommand {
 	env := &clientEnv{}
 	root := &exitCommand{env: env}
 	root.Command = &cobra.Command{
-		Use:   "rw",
-		Short: "RestoreWeave client",
-		Long: "rw talks to the restoreweaved daemon over its Unix socket using the " +
+		Use:   "cairn",
+		Short: "Cairn client",
+		Long: "cairn talks to the cairnd daemon over its Unix socket using the " +
 			"client/command JSON envelope protocol. Output is plain text by default; " +
 			"--json prints the raw command Result.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
 	root.PersistentFlags().StringVar(&env.socket, "socket", local.DefaultSocketPath(),
-		"restoreweaved Unix socket path (overrides RESTOREWEAVE_SOCKET)")
+		"cairnd Unix socket path (overrides CAIRN_SOCKET)")
 	root.PersistentFlags().BoolVar(&env.jsonOut, "json", false,
 		"print the raw command Result as JSON instead of human-readable output")
 	root.PersistentFlags().DurationVar(&env.timeout, "timeout", defaultTimeout,

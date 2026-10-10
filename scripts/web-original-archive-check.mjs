@@ -69,7 +69,7 @@ assert.deepEqual(released, [["clear", 17], ["revoke", "blob:archive"]], "lease c
 
 const controller = new AbortController();
 const zip = await materializeVerifiedArchive(frozen, async (item) => item.subject_ref === "entry_a" ? new Uint8Array(alpha) : new Uint8Array(), controller.signal, () => {});
-const dir = await mkdtemp(join(tmpdir(), "rw-original-zip-"));
+const dir = await mkdtemp(join(tmpdir(), "cairn-original-zip-"));
 try {
   const zipPath = join(dir, "takeout.zip");
   await writeFile(zipPath, zip);

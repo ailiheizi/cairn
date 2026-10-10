@@ -293,6 +293,6 @@ The product decision is supported by:
 - [Multimodal Fidelity Research](multimodal-fidelity-research.md)
 - [Neural Compression Research](neural-compression-research.md)
 
-The historical review run recorded **14 provider calls** under its shared query identifier. The later open-source adoption audit used query ID `restoreweave-oss-adoption-20260812` and recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**; a focused Processor audit recorded **20 attempts**, **12 provider calls**, **12 successes**, and **8 cache hits**. These counts describe bounded research execution, not ecosystem coverage.
+The historical review run recorded **14 provider calls** under its shared query identifier. The later open-source adoption audit used query ID `cairn-oss-adoption-20260812` and recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**; a focused Processor audit recorded **20 attempts**, **12 provider calls**, **12 successes**, and **8 cache hits**. These counts describe bounded research execution, not ecosystem coverage.
 
 The review does not contain customer interviews, paid-pilot evidence, independent repository benchmarks, a complete license audit, or long-term operational data. Project documentation is treated as documented capability, not independent qualification. Unified-product plausibility is medium, while direct demand and willingness to pay remain unverified.

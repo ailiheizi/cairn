@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure one configured RestoreWeave ingest per raw/zstd candidate.
+"""Measure one configured Cairn ingest per raw/zstd candidate.
 
 This is a disposable qualification harness, not a product command or phase
 qualification. It preserves every directory it creates and never modifies the
@@ -28,7 +28,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-MANIFEST_SCHEMA = "restoreweave.corpus-manifest.v1"
+MANIFEST_SCHEMA = "cairn.corpus-manifest.v1"
 PROFILES = {
     "raw": ("directory-cas-dev-v1", "identity-v1"),
     "zstd": ("local-zstd-v1", "zstd-v1"),
@@ -387,7 +387,7 @@ def free_loopback_address() -> tuple[str, int]:
 
 def post_typed_command(address: str, token: str, operation: str, workspace: str, timeout: int = 300,
                        record: Any = None) -> dict[str, Any]:
-    envelope = {"schema": "org.restoreweave.command.v1", "request_id": uuid.uuid4().hex,
+    envelope = {"schema": "org.cairn.command.v1", "request_id": uuid.uuid4().hex,
                 "operation": operation, "workspace_ref": workspace, "idempotency_key": None,
                 "input": {"workspace_id": workspace}}
     request = urllib.request.Request(f"http://{address}/api/v1/command", data=json.dumps(envelope).encode("utf-8"),
@@ -442,13 +442,13 @@ def extract_web_and_semantic_inputs(package_archive: Path, evidence_root: Path, 
                 if member.issym() or member.islnk() or (not member.isdir() and not member.isfile()):
                     _fail(f"candidate package contains unsupported member type: {member.name}")
                 normalized = clean.as_posix().rstrip("/")
-                if normalized.endswith("/bin/rw") or normalized == "bin/rw":
+                if normalized.endswith("/bin/cairn") or normalized == "bin/cairn":
                     stream = archive.extractfile(member)
                     if stream is None:
                         _fail("candidate package rw member is unreadable")
                     digest = hashlib.sha256(stream.read()).hexdigest()
                     found["rw"] = digest
-                elif normalized.endswith("/bin/restoreweaved") or normalized == "bin/restoreweaved":
+                elif normalized.endswith("/bin/cairnd") or normalized == "bin/cairnd":
                     stream = archive.extractfile(member)
                     if stream is None:
                         _fail("candidate package daemon member is unreadable")
@@ -530,7 +530,7 @@ def create_owned_runtime_root() -> Path:
     os.chmod(created, 0o700)
     os.chown(created, os.getuid(), os.getgid())
     # macOS exposes /tmp as a symlink to /private/tmp. Persist only the
-    # canonical spelling so paths emitted by `rw config validate` compare
+    # canonical spelling so paths emitted by `cairn config validate` compare
     # directly with all harness-created expected paths.
     root = created.resolve(strict=True)
     info = root.stat()
@@ -586,11 +586,11 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     if len(os.fsencode(socket_path)) >= 100:
         _fail("temporary Unix socket path is too long; choose a shorter evidence parent")
     env = os.environ.copy()
-    for key in ("RESTOREWEAVE_CONFIG", "RESTOREWEAVE_CATALOG", "RESTOREWEAVE_REPOSITORY", "RESTOREWEAVE_VECTORS", "RESTOREWEAVE_MODELS", "RESTOREWEAVE_RECOVERY_RECORDS", "RESTOREWEAVE_SOCKET", "RESTOREWEAVE_SEMANTIC_BUNDLE", "RESTOREWEAVE_IMAGE_BUNDLE", "RESTOREWEAVE_BGE_ONNX_RUNTIME", "RESTOREWEAVE_BGE_ONNX_MODEL", "RESTOREWEAVE_BGE_TOKENIZER", "RESTOREWEAVE_ZVEC_LIBRARY", "RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT", "RESTOREWEAVE_RUN_SUPERVISED_ONNX", "ZVEC_LIBRARY_PATH"):
+    for key in ("CAIRN_CONFIG", "CAIRN_CATALOG", "CAIRN_REPOSITORY", "CAIRN_VECTORS", "CAIRN_MODELS", "CAIRN_RECOVERY_RECORDS", "CAIRN_SOCKET", "CAIRN_SEMANTIC_BUNDLE", "CAIRN_IMAGE_BUNDLE", "CAIRN_BGE_ONNX_RUNTIME", "CAIRN_BGE_ONNX_MODEL", "CAIRN_BGE_TOKENIZER", "CAIRN_ZVEC_LIBRARY", "CAIRN_SEMANTIC_BUNDLE_ROOT", "CAIRN_RUN_SUPERVISED_ONNX", "ZVEC_LIBRARY_PATH"):
         env.pop(key, None)
     env["XDG_DATA_HOME"] = str(data_home)
     env["XDG_CONFIG_HOME"] = str(xdg_config)
-    env["RESTOREWEAVE_SOCKET"] = str(socket_path)
+    env["CAIRN_SOCKET"] = str(socket_path)
     env["TMPDIR"] = str(temporary_root)
     env["TMP"] = str(temporary_root)
     env["TEMP"] = str(temporary_root)
@@ -608,12 +608,12 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     def record_typed(item: dict[str, Any]) -> None:
         command_records.append(item)
         _write_json(records_path, command_records)
-    init = invoke([str(rw), "config", "init", "--path", str(config_path)], "rw config init")
+    init = invoke([str(rw), "config", "init", "--path", str(config_path)], "cairn config init")
     if init.returncode != 0:
-        _fail(f"rw config init failed: {init.stderr.strip() or init.stdout.strip()}")
+        _fail(f"cairn config init failed: {init.stderr.strip() or init.stdout.strip()}")
     patch_storage_profile(config_path, profile)
-    config_result = invoke([str(rw), "--json", "config", "validate", "--path", str(config_path)], "rw config validate")
-    effective = decode_cli_json(config_result, "rw config validate")
+    config_result = invoke([str(rw), "--json", "config", "validate", "--path", str(config_path)], "cairn config validate")
+    effective = decode_cli_json(config_result, "cairn config validate")
     config_digest = effective.get("config_digest")
     paths = effective.get("paths")
     storage = effective.get("storage")
@@ -629,11 +629,11 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         roots[name] = Path(value)
     paths_overlap(roots)
     expected_roots = {
-        "catalog": data_home / "restoreweave" / "catalog.sqlite",
-        "repository": data_home / "restoreweave" / "repository",
-        "vectors": data_home / "restoreweave" / "vectors",
-        "models": data_home / "restoreweave" / "models",
-        "recovery_records": data_home / "restoreweave" / "recovery",
+        "catalog": data_home / "cairn" / "catalog.sqlite",
+        "repository": data_home / "cairn" / "repository",
+        "vectors": data_home / "cairn" / "vectors",
+        "models": data_home / "cairn" / "models",
+        "recovery_records": data_home / "cairn" / "recovery",
     }
     for name, expected in expected_roots.items():
         if roots[name] != expected.resolve(strict=False):
@@ -656,7 +656,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
     def start_daemon() -> subprocess.Popen[str]:
         command = [str(daemon), "--config", str(config_path), "--socket", str(socket_path), *api_args]
         def ready(_proc: subprocess.Popen[str]) -> bool:
-            status = invoke([str(rw), "--socket", str(socket_path), "--json", "status"], "rw status", timeout=3)
+            status = invoke([str(rw), "--socket", str(socket_path), "--json", "status"], "cairn status", timeout=3)
             return status.returncode == 0
         try:
             return start_owned_process(command, env, log_file, ready)
@@ -678,8 +678,8 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         if semantic_archive is not None:
             install_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m",
                                      "semantic", "bundle", "install", "--archive", str(semantic_archive)],
-                                    "rw semantic bundle install", timeout=600)
-            semantic_install = result_data(decode_cli_json(install_result, "rw semantic bundle install"), "rw semantic bundle install")
+                                    "cairn semantic bundle install", timeout=600)
+            semantic_install = result_data(decode_cli_json(install_result, "cairn semantic bundle install"), "cairn semantic bundle install")
             if not semantic_install.get("destination") or not semantic_install.get("profile_digest"):
                 _fail("offline semantic install omitted destination or profile digest")
             stop_owned_process(daemon_process)
@@ -688,8 +688,8 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
         pre_ingest_all = measure_roots(sampled_roots)
         assert pre_ingest_all is not None
         verify_corpus(corpus, manifest)
-        planned_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "ingest", str(corpus), "--protection", "STORE_EXACT"], "rw ingest plan", timeout=600)
-        planned = result_data(decode_cli_json(planned_result, "rw ingest plan"), "rw ingest plan")
+        planned_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "ingest", str(corpus), "--protection", "STORE_EXACT"], "cairn ingest plan", timeout=600)
+        planned = result_data(decode_cli_json(planned_result, "cairn ingest plan"), "cairn ingest plan")
         if planned.get("state") != "READY" or planned.get("executable") is not True or planned.get("protection_mode") != "STORE_EXACT":
             _fail("ingest inspection did not produce an executable STORE_EXACT plan")
         if not planned.get("plan_id") or not planned.get("plan_digest") or not planned.get("workspace_id") or not planned.get("config_digest"):
@@ -713,14 +713,14 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
             _fail("ingest plan contains a non-exact or unresolved per-file protection outcome")
 
         applied_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "plan", "apply", planned["plan_id"],
-                                 "--workspace", planned["workspace_id"], "--digest", planned["plan_digest"]], "rw plan apply", timeout=600)
-        applied = result_data(decode_cli_json(applied_result, "rw plan apply"), "rw plan apply")
+                                 "--workspace", planned["workspace_id"], "--digest", planned["plan_digest"]], "cairn plan apply", timeout=600)
+        applied = result_data(decode_cli_json(applied_result, "cairn plan apply"), "cairn plan apply")
         snapshot_ref = applied.get("snapshot_ref")
         if not snapshot_ref or applied.get("workspace_id") != planned.get("workspace_id"):
             _fail("publication reference is absent or belongs to a different workspace")
         verify_corpus(corpus, manifest)
-        verified_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "snapshot", "verify", snapshot_ref, "--mode", "full-bytes"], "rw snapshot verify", timeout=600)
-        verified = result_data(decode_cli_json(verified_result, "rw snapshot verify"), "rw snapshot verify")
+        verified_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "snapshot", "verify", snapshot_ref, "--mode", "full-bytes"], "cairn snapshot verify", timeout=600)
+        verified = result_data(decode_cli_json(verified_result, "cairn snapshot verify"), "cairn snapshot verify")
         if verified.get("ok") is not True or verified.get("bytes") != logical_bytes or verified.get("files") != len(manifest["entries"]):
             _fail("full-byte verification did not match corpus file/byte totals")
 
@@ -734,10 +734,10 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
             _fail("semantic provider state is unexpected without an installed bundle")
         query_text = Path(manifest["entries"][0]["path"]).stem or Path(manifest["entries"][0]["path"]).name
         query_result = invoke([str(rw), "--socket", str(socket_path), "--json", "--timeout", "10m", "search", query_text,
-                               "--workspace", planned["workspace_id"]], "rw search", timeout=600)
-        semantic_query = decode_cli_json(query_result, "rw search", allow_degraded=semantic_archive is None)
+                               "--workspace", planned["workspace_id"]], "cairn search", timeout=600)
+        semantic_query = decode_cli_json(query_result, "cairn search", allow_degraded=semantic_archive is None)
         if semantic_archive is not None:
-            query_data = result_data(semantic_query, "rw search")
+            query_data = result_data(semantic_query, "cairn search")
             components = query_data.get("components", [])
             semantic_component = next((item for item in components if item.get("dimension") == "semantic-embedding"), None)
             if semantic_component is None or semantic_component.get("status") != "SUCCEEDED":
@@ -776,7 +776,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
                      "web": measure_allocated(web_root, seen_objects=fixed_seen)}
     accounting = savings_accounting(logical_bytes, pre_ingest, settled, pre_ingest_all["temporary"], settled_all["temporary"], fixed_runtime)
     return {
-        "schema": "restoreweave.deployment-savings-measurement.v1",
+        "schema": "cairn.deployment-savings-measurement.v1",
         "status": "candidate_measurement",
         "correlation": "BOUND_TO_ONE_CONFIGURED_INGEST_RUN",
         "run_id": run_id,
@@ -816,7 +816,7 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
                        "incremental_temporary_growth_bytes": accounting["settled_temporary_growth_bytes"],
                        "equations": {"incremental": "logical source bytes - (settled five configured roots + settled TMPDIR - pre-ingest five configured roots - pre-ingest TMPDIR)",
                                      "full": "logical source bytes - final catalog/repository/vectors/models/recovery bytes - final TMPDIR bytes - fixed CLI/daemon/Web bytes"}},
-        "candidate_binaries": {"rw_sha256": sha256_file(rw), "restoreweaved_sha256": sha256_file(daemon)},
+        "candidate_binaries": {"rw_sha256": sha256_file(rw), "cairnd_sha256": sha256_file(daemon)},
         "evidence": {"daemon_log": str(log_path), "command_records": str(records_path),
                      "config_path": str(config_path), "config_sha256": sha256_file(config_path),
                      "runtime_root_preserved": str(root), "plan_show": "CLI has no plan show subcommand; immutable ingest plan and profile/config binding are retained in CLI output records",
@@ -827,9 +827,9 @@ def run_profile(profile: str, rw: Path, daemon: Path, corpus: Path, manifest: di
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rw", required=True, type=Path, help="candidate rw CLI binary")
-    parser.add_argument("--daemon", required=True, type=Path, help="matching restoreweaved binary")
+    parser.add_argument("--daemon", required=True, type=Path, help="matching cairnd binary")
     parser.add_argument("--corpus", required=True, type=Path, help="read-only operator-reviewed corpus")
-    parser.add_argument("--corpus-manifest", required=True, type=Path, help="restoreweave.corpus-manifest.v1 JSON")
+    parser.add_argument("--corpus-manifest", required=True, type=Path, help="cairn.corpus-manifest.v1 JSON")
     parser.add_argument("--package-archive", required=True, type=Path, help="candidate package archive containing matching binaries and WebUI")
     parser.add_argument("--semantic-archive", type=Path, help="optional retained offline semantic bundle; installed through normal CLI workflow")
     parser.add_argument("--semantic-from-package", action="store_true", help="install the semantic bundle nested in --package-archive")
@@ -874,7 +874,7 @@ def main(argv: list[str] | None = None) -> int:
             _write_json(evidence_dir / f"{profile}.candidate-measurement.json", result)
         if results["raw"]["corpus"] != results["zstd"]["corpus"]:
             _fail("raw/zstd results are not bound to the same corpus manifest")
-        report = {"schema": "restoreweave.same-profile-deployment-savings.v1", "status": "candidate_measurement",
+        report = {"schema": "cairn.same-profile-deployment-savings.v1", "status": "candidate_measurement",
                   "corpus_manifest_digest": manifest["digest"], "profiles": results,
                   "qualification_note": "Candidate measurement only; generated QA inputs are not representative and this report does not qualify or select a repository."}
         _write_json(evidence_dir / "report.json", report)

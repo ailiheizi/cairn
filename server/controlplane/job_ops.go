@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type jobEventsInput struct {
@@ -204,7 +204,7 @@ func (d *Dispatcher) handleJobCancel(ctx context.Context, env command.Envelope, 
 		return tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
 			ID:          mustAuditID(),
 			WorkspaceID: job.WorkspaceID,
-			Actor:       "restoreweaved",
+			Actor:       "cairnd",
 			Action:      action,
 			TargetType:  "JOB",
 			TargetID:    job.ID,

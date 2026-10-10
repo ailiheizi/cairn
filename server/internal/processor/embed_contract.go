@@ -545,7 +545,7 @@ func canonicalEmbedTextRequestDigest(req EmbedTextRequest) (string, error) {
 		return "", fmt.Errorf("%w: canonical request: %v", ErrInvalidEmbedTextRequest, err)
 	}
 	h := sha256.New()
-	_, _ = h.Write([]byte("restoreweave.embed-text-request.v1\n"))
+	_, _ = h.Write([]byte("cairn.embed-text-request.v1\n"))
 	_, _ = h.Write(payload)
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }

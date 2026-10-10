@@ -3,17 +3,17 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const { chromium } = await import(process.env.RESTOREWEAVE_PLAYWRIGHT_MODULE || "../web/node_modules/playwright/index.mjs");
-const url = process.env.RESTOREWEAVE_PREVIEW_E2E_URL;
-const largeImageName = process.env.RESTOREWEAVE_PREVIEW_E2E_IMAGE_NAME;
-const overBudgetName = process.env.RESTOREWEAVE_PREVIEW_E2E_OVER_BUDGET_NAME;
-const zeroTextName = process.env.RESTOREWEAVE_PREVIEW_E2E_ZERO_TEXT_NAME;
-const textName = process.env.RESTOREWEAVE_PREVIEW_E2E_TEXT_NAME;
-const unsupportedFiles = JSON.parse(process.env.RESTOREWEAVE_PREVIEW_E2E_UNSUPPORTED_FILES || "[]");
-const evidenceDir = process.env.RESTOREWEAVE_PREVIEW_E2E_EVIDENCE_DIR;
-assert(url && largeImageName && overBudgetName, "RESTOREWEAVE_PREVIEW_E2E_URL, _IMAGE_NAME and _OVER_BUDGET_NAME are required");
+const { chromium } = await import(process.env.CAIRN_PLAYWRIGHT_MODULE || "../web/node_modules/playwright/index.mjs");
+const url = process.env.CAIRN_PREVIEW_E2E_URL;
+const largeImageName = process.env.CAIRN_PREVIEW_E2E_IMAGE_NAME;
+const overBudgetName = process.env.CAIRN_PREVIEW_E2E_OVER_BUDGET_NAME;
+const zeroTextName = process.env.CAIRN_PREVIEW_E2E_ZERO_TEXT_NAME;
+const textName = process.env.CAIRN_PREVIEW_E2E_TEXT_NAME;
+const unsupportedFiles = JSON.parse(process.env.CAIRN_PREVIEW_E2E_UNSUPPORTED_FILES || "[]");
+const evidenceDir = process.env.CAIRN_PREVIEW_E2E_EVIDENCE_DIR;
+assert(url && largeImageName && overBudgetName, "CAIRN_PREVIEW_E2E_URL, _IMAGE_NAME and _OVER_BUDGET_NAME are required");
 
-const executablePath = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
+const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const calls = [];
@@ -117,7 +117,7 @@ try {
       await page.getByRole("button", { name: /Open settings|打开设置/ }).click();
       const settings = page.getByRole("dialog", { name: /Settings|设置/ });
       await settings.getByRole("button", { name: /Appearance|外观/ }).click();
-      await settings.locator(`input[name="restoreweave-interface"][value="${interfaceId}"]`).check();
+      await settings.locator(`input[name="cairn-interface"][value="${interfaceId}"]`).check();
       await settings.getByRole("button", { name: /Close settings|关闭设置/ }).click();
       for (const width of [320, 390, 1280]) {
         await page.setViewportSize({ width, height: 900 });
@@ -140,8 +140,8 @@ try {
     await page.setViewportSize({ width: 1280, height: 900 });
   }
   await openEntry(largeImageName);
-  const preview = page.getByRole("main").locator(".details .rw-content-preview");
-  const image = preview.locator("img.rw-content-preview__image");
+  const preview = page.getByRole("main").locator(".details .cairn-content-preview");
+  const image = preview.locator("img.cairn-content-preview__image");
   await image.waitFor({ state: "visible", timeout: 30000 });
   assert.equal(await poll(() => image.evaluate((node) => node.complete && node.naturalWidth > 0), 30000), true, "large exact image should decode after bounded reads and digest verification");
   const desktopGeometry = await assertInspectorImageBounds(image, 1280, "desktop");
@@ -172,7 +172,7 @@ try {
 
   const opensBefore = opens.size;
   await openEntry(overBudgetName);
-  const over = page.getByRole("main").locator(".details .rw-content-preview");
+  const over = page.getByRole("main").locator(".details .cairn-content-preview");
   await over.locator('[data-state="unavailable"][data-reason="size-limit"]').waitFor({ state: "visible", timeout: 10000 });
   await over.getByText(/8 MiB|8 MiB|下载或导出|downloaded or exported/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
   assert.equal(opens.size, opensBefore, "over-budget image must show takeout fallback without opening a content handle");
@@ -182,12 +182,12 @@ try {
     const priorHandles = new Set(opens.keys());
     fault = mode;
     await openEntry(largeImageName);
-    const failed = page.getByRole("main").locator(".details .rw-content-preview");
+    const failed = page.getByRole("main").locator(".details .cairn-content-preview");
     await page.waitForTimeout(1000);
-    const errorCount = await failed.locator(".rw-content-preview__status--error").count();
-    const imageCount = await failed.locator("img.rw-content-preview__image").count();
+    const errorCount = await failed.locator(".cairn-content-preview__status--error").count();
+    const imageCount = await failed.locator("img.cairn-content-preview__image").count();
     assert.equal(errorCount, 1, `${mode} injected read should fail closed (preview text=${await failed.innerText()}, image count=${imageCount})`);
-    assert.equal(await failed.locator("img.rw-content-preview__image").count(), 0, `${mode} content must never render`);
+    assert.equal(await failed.locator("img.cairn-content-preview__image").count(), 0, `${mode} content must never render`);
     const handle = [...opens.keys()].reverse().find((candidate) => !priorHandles.has(candidate));
     assert(handle, `${mode} request must open a scoped handle`);
     await waitClosed(handle);
@@ -205,15 +205,15 @@ try {
   await openEntry(overBudgetName);
   await waitClosed(heldHandle);
   releaseHeldRead();
-  await page.getByRole("main").locator('.details .rw-content-preview [data-state="unavailable"][data-reason="size-limit"]').waitFor({ state: "visible", timeout: 10000 });
+  await page.getByRole("main").locator('.details .cairn-content-preview [data-state="unavailable"][data-reason="size-limit"]').waitFor({ state: "visible", timeout: 10000 });
   assert.equal(closes.get(heldHandle), 1, "canceled in-flight read must close exactly once after becoming stale");
 
   let zeroTextEvidence = null;
   if (zeroTextName) {
     const priorZeroHandles = new Set(opens.keys());
     await openEntry(zeroTextName);
-    const zeroPreview = page.getByRole("main").locator(".details .rw-content-preview");
-    const text = zeroPreview.locator(".rw-content-preview__text");
+    const zeroPreview = page.getByRole("main").locator(".details .cairn-content-preview");
+    const text = zeroPreview.locator(".cairn-content-preview__text");
     await text.waitFor({ state: "visible", timeout: 15000 });
     assert.equal(await text.innerText(), "", "zero-length UTF-8 text remains a valid preview");
     const zeroHandle = [...opens.keys()].reverse().find((candidate) => !priorZeroHandles.has(candidate));
@@ -230,8 +230,8 @@ try {
   let textEvidence = null;
   if (textName) {
     await openEntry(textName);
-    const textPreview = page.getByRole("main").locator(".details .rw-content-preview");
-    await textPreview.locator(".rw-content-preview__text").waitFor({ state: "visible", timeout: 15000 });
+    const textPreview = page.getByRole("main").locator(".details .cairn-content-preview");
+    await textPreview.locator(".cairn-content-preview__text").waitFor({ state: "visible", timeout: 15000 });
     assert.match(await textPreview.innerText(), /UTF-8.*中文/s, "real UTF-8 text remains readable");
     textEvidence = { name: textName, utf8_rendered: true };
   }
@@ -241,10 +241,10 @@ try {
     assert.match(file.sha256, /^[a-f0-9]{64}$/);
     const beforeCount = calls.filter((call) => ["content.open", "content.read"].includes(call.operation)).length;
     await openEntry(file.name);
-    const fallback = page.getByRole("main").locator(".details .rw-content-preview");
+    const fallback = page.getByRole("main").locator(".details .cairn-content-preview");
     await fallback.locator('[data-state="unavailable"][data-reason="unsupported-format"]').waitFor({ state: "visible", timeout: 10000 });
     assert.match(await fallback.innerText(), /下载|download/i, "unsupported format gives original takeout guidance");
-    assert.equal(await fallback.locator(".rw-content-preview__status--error").count(), 0, "unsupported format is distinguished from a read or integrity error");
+    assert.equal(await fallback.locator(".cairn-content-preview__status--error").count(), 0, "unsupported format is distinguished from a read or integrity error");
     assert.equal(calls.filter((call) => ["content.open", "content.read"].includes(call.operation)).length, beforeCount, "unsupported format must not request preview open or read");
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 15000 }),
@@ -259,7 +259,7 @@ try {
   }
   if (evidenceDir) {
     fs.writeFileSync(path.join(evidenceDir, "result.json"), `${JSON.stringify({
-      schema: "restoreweave.web-content-preview-e2e.v1",
+      schema: "cairn.web-content-preview-e2e.v1",
       status: "PASS",
       large_image: { name: largeImageName, content_id: opened.content_id, logical_size: opened.logical_size, max_read: opened.max_read, ranges: reads.map((call) => ({ offset: call.input.offset, length: call.input.length })), browser_reconstructed_sha256: `sha256:${createHash("sha256").update(reconstructed).digest("hex")}`, rendered: true, desktop_geometry: desktopGeometry, narrow_geometry: narrowGeometry, closed_once: true },
       over_budget: { name: overBudgetName, opened: false, fallback: "download/export" },
@@ -283,8 +283,8 @@ async function openEntry(name) {
 }
 
 async function closePreview(preview) {
-  await preview.locator(".rw-content-preview__header .rw-content-preview__close").click();
-  await preview.locator(".rw-content-preview__panel").waitFor({ state: "detached", timeout: 10000 });
+  await preview.locator(".cairn-content-preview__header .cairn-content-preview__close").click();
+  await preview.locator(".cairn-content-preview__panel").waitFor({ state: "detached", timeout: 10000 });
 }
 
 async function waitClosed(handle) {
@@ -295,7 +295,7 @@ async function waitClosed(handle) {
 async function assertInspectorImageBounds(image, viewportWidth, label) {
   const geometry = await image.evaluate((node) => {
     const imageRect = node.getBoundingClientRect();
-    const button = node.closest(".rw-content-preview__image-button");
+    const button = node.closest(".cairn-content-preview__image-button");
     const buttonRect = button.getBoundingClientRect();
     return { width: imageRect.width, height: imageRect.height, buttonWidth: buttonRect.width, naturalWidth: node.naturalWidth, naturalHeight: node.naturalHeight, scrollWidth: document.documentElement.scrollWidth, viewportWidth: window.innerWidth };
   });

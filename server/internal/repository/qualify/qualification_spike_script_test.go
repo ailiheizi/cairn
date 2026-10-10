@@ -370,7 +370,7 @@ func TestSavingsReportHeterogeneousProfileMeasuresBothInTreeProfiles(t *testing.
 		t.Fatalf("generated corpus manifest: %v", err)
 	}
 	for _, marker := range []string{
-		`"schema": "restoreweave.qualification-corpus.v1"`,
+		`"schema": "cairn.qualification-corpus.v1"`,
 		`"license": "self-generated"`,
 		`"category": "pdf"`,
 		`"category": "opaque"`,
@@ -388,7 +388,7 @@ func TestSavingsReportHeterogeneousProfileMeasuresBothInTreeProfiles(t *testing.
 		t.Fatalf("zstd candidate report: %v", err)
 	}
 	for name, body := range map[string][]byte{"raw": report, "zstd": zstdReport} {
-		for _, marker := range []string{`"LogicalBytes": 4213099`, `"DuplicateBytes": 5096`, `"RepositoryGrowthBytes":`} {
+		for _, marker := range []string{`"LogicalBytes": 4212077`, `"DuplicateBytes": 4760`, `"RepositoryGrowthBytes":`} {
 			if !bytes.Contains(body, []byte(marker)) {
 				t.Fatalf("%s candidate report omitted %s", name, marker)
 			}
@@ -419,7 +419,7 @@ func TestSavingsReportRejectsChangedGeneratedCorpusBeforeRepositoryOpen(t *testi
 	qualificationManifest := filepath.Join(root, "generated-corpus.qualification.json")
 	generateCommand := exec.Command("go", "run", "-tags=savingsreport", "./server/internal/repository/savingsreport",
 		"-generate-corpus", corpus,
-		"-generate-seed", "restoreweave-phase5-heterogeneous-v1",
+		"-generate-seed", "cairn-phase5-heterogeneous-v1",
 		"-manifest-out", qualificationManifest)
 	generateCommand.Dir = repoRoot
 	if output, err := generateCommand.CombinedOutput(); err != nil {
@@ -534,7 +534,7 @@ func assertGeneratedOperatorCorpusBinding(t *testing.T, work string) {
 	if err != nil {
 		t.Fatalf("generated operator corpus manifest: %v", err)
 	}
-	if !bytes.Contains(operatorBody, []byte(`"schema": "restoreweave.corpus-manifest.v1"`)) {
+	if !bytes.Contains(operatorBody, []byte(`"schema": "cairn.corpus-manifest.v1"`)) {
 		t.Fatalf("generated operator corpus manifest omitted corpus-manifest.v1: %s", operatorBody)
 	}
 	operatorDigest := mustCandidateCorpusDigest(t, operatorManifest)

@@ -78,7 +78,7 @@ type ImageBundleAsset struct {
 }
 
 const (
-	ImageBundleSchemaV1 = "restoreweave.image-bundle.v1"
+	ImageBundleSchemaV1 = "cairn.image-bundle.v1"
 	// ImageBundleManifestName is the only descriptor filename accepted by
 	// LoadImageBundle. A caller still supplies the already-resolved bundle root;
 	// no current-directory or network lookup is performed.
@@ -141,7 +141,7 @@ func (d ImageBundleDescriptor) ProviderDigest() string {
 		Descriptor ImageBundleDescriptor `json:"descriptor"`
 	}{d}
 	payload, _ := json.Marshal(canonical)
-	digest := sha256.Sum256(append([]byte("restoreweave.image-provider.v1\n"), payload...))
+	digest := sha256.Sum256(append([]byte("cairn.image-provider.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
@@ -308,7 +308,7 @@ func imageBundleProfileDigest(descriptor ImageBundleDescriptor, digests map[stri
 	if err != nil {
 		return "", fmt.Errorf("%w: canonical descriptor: %v", ErrInvalidImageBundle, err)
 	}
-	digest := sha256.Sum256(append([]byte("restoreweave.image-bundle.v1\n"), payload...))
+	digest := sha256.Sum256(append([]byte("cairn.image-bundle.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(digest[:]), nil
 }
 

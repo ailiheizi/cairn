@@ -64,7 +64,7 @@ func TestZvecGenerationStagesAndBindsLibraryDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stageZvecLibrary() error = %v", err)
 	}
-	if staged != spec.Path+".restoreweave-zvec-library" {
+	if staged != spec.Path+".cairn-zvec-library" {
 		t.Fatalf("staged path = %q", staged)
 	}
 	info, err := os.Lstat(staged)

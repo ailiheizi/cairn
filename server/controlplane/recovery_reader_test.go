@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 func openRecoveryReaderDispatcher(t *testing.T) (*Dispatcher, *Dispatcher, command.RecoveryExportData, string, string) {
@@ -27,7 +27,7 @@ func openRecoveryReaderDispatcher(t *testing.T) (*Dispatcher, *Dispatcher, comma
 	if err != nil {
 		t.Fatalf("load independently retained trust anchor: %v", err)
 	}
-	reader, err := NewRecoveryDispatcher("/tmp/restoreweave/recovery-reader-test.sock", &exact.Service{
+	reader, err := NewRecoveryDispatcher("/tmp/cairn/recovery-reader-test.sock", &exact.Service{
 		Repo: readonly, TrustAnchor: &anchor,
 		PublicationDomain: exact.DefaultPublicationDomain, RequireSignedPublication: true,
 	})
@@ -49,17 +49,17 @@ func TestNewRecoveryDispatcherRequiresCatalogFreeSignedReader(t *testing.T) {
 			PublicationDomain: exact.DefaultPublicationDomain, RequireSignedPublication: true,
 		}
 	}
-	if _, err := NewRecoveryDispatcher("/tmp/restoreweave/recovery-reader-test.sock", nil); err == nil {
+	if _, err := NewRecoveryDispatcher("/tmp/cairn/recovery-reader-test.sock", nil); err == nil {
 		t.Fatal("nil service was accepted")
 	}
 	withStore := base()
 	withStore.Store = writer.exact.Store
-	if _, err := NewRecoveryDispatcher("/tmp/restoreweave/recovery-reader-test.sock", withStore); err == nil {
+	if _, err := NewRecoveryDispatcher("/tmp/cairn/recovery-reader-test.sock", withStore); err == nil {
 		t.Fatal("reader accepted an operational catalog")
 	}
 	withSigner := base()
 	withSigner.SigningIdentity = writer.exact.SigningIdentity
-	if _, err := NewRecoveryDispatcher("/tmp/restoreweave/recovery-reader-test.sock", withSigner); err == nil {
+	if _, err := NewRecoveryDispatcher("/tmp/cairn/recovery-reader-test.sock", withSigner); err == nil {
 		t.Fatal("reader accepted a signing identity")
 	}
 

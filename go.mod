@@ -1,4 +1,4 @@
-module github.com/ailiheizi/restoreweave
+module github.com/ailiheizi/cairn
 
 go 1.26.0
 

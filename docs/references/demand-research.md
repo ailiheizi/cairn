@@ -230,7 +230,7 @@ If storage savings are negligible but discovery is strong, narrow to a heterogen
 
 ## 11. Coverage and limitations
 
-The retained research used GitHub, Hacker News, primary project documentation, public incident reports, standards, and technical community discussions. The supplemental Siftline run used query ID `restoreweave-nas-reframe-20260812` and recorded **8 attempts, 8 provider calls, 8 provider successes, 0 cache hits, and 0 failures**. Several direct category queries returned no items; this was treated as a vocabulary and category-maturity signal, not ecosystem absence. The search then pivoted to the jobs users actually name: exact backup, full-text search, OCR, filesystem access, and operating burden.
+The retained research used GitHub, Hacker News, primary project documentation, public incident reports, standards, and technical community discussions. The supplemental Siftline run used query ID `cairn-nas-reframe-20260812` and recorded **8 attempts, 8 provider calls, 8 provider successes, 0 cache hits, and 0 failures**. Several direct category queries returned no items; this was treated as a vocabulary and category-maturity signal, not ecosystem absence. The search then pivoted to the jobs users actually name: exact backup, full-text search, OCR, filesystem access, and operating burden.
 
 Exa, Tavily, and an OpenAI-compatible Web provider were unavailable in the configured research environment. Customer interviews, pricing experiments, proprietary NAS products, authenticated communities, independent product benchmarks, and longitudinal usage data were not covered.
 

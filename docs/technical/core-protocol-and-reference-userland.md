@@ -496,7 +496,7 @@ Optional WebUI and REST services are adapters over the same typed operations. Th
 ### 14.1 Suggested implementation layout
 
 ~~~text
-cmd/restoreweave/                 CLI, controller, and recovery entry points
+cmd/cairn/                 CLI, controller, and recovery entry points
 
 internal/app/                     composition root and configured profiles
 internal/command/                 typed dispatch and authorization

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // newContentCommand forwards content.open/read/close to the daemon.
@@ -15,7 +15,7 @@ func newContentCommand(env *clientEnv) *cobra.Command {
 	content := &cobra.Command{
 		Use:   "content",
 		Short: "Open and read exact content handles",
-		Long: "content.open/read/close talk to restoreweaved. Without the exact " +
+		Long: "content.open/read/close talk to cairnd. Without the exact " +
 			"lane the daemon reports unimplemented; with it, open reads CAS bytes " +
 			"for one regular file entry.",
 	}
@@ -23,7 +23,7 @@ func newContentCommand(env *clientEnv) *cobra.Command {
 	content.AddCommand(newExitCommand(env, "read <handle> [offset] [length]", "Read bytes from a content handle",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) < 1 || len(args) > 3 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw content read <handle> [offset] [length]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn content read <handle> [offset] [length]\n")
 				return 1
 			}
 			input := map[string]any{"handle": args[0]}
@@ -61,7 +61,7 @@ func newContentCommand(env *clientEnv) *cobra.Command {
 	content.AddCommand(newExitCommand(env, "close <handle>", "Close a content handle",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw content close <handle>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn content close <handle>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpContentClose, map[string]any{"handle": args[0]}, nil)
@@ -76,7 +76,7 @@ func newContentOpenCommand(env *clientEnv) *cobra.Command {
 			if len(args) == 1 {
 				input["entry_id"] = args[0]
 			} else if len(args) > 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw content open [entry-id] [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn content open [entry-id] [--workspace <id>]\n")
 				return 1
 			}
 			if lookup := cmd.Flags().Lookup("workspace"); lookup != nil {

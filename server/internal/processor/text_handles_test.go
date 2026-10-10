@@ -220,7 +220,7 @@ func TestTextHandleDoesNotLeakAmbientPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := "/private/restoreweave/source/secret.txt"
+	path := "/private/cairn/source/secret.txt"
 	handle, err := store.Issue(context.Background(), testHandleBinding(), []byte(path))
 	if err != nil {
 		t.Fatal(err)

@@ -47,7 +47,7 @@ Cairn MUST NOT collapse every meaning into one MIME string. A **ClassificationRe
 | Collection role | album track, application bundle member, game mod, source-tree member, dataset shard |
 | Risk property | encrypted, signed, executable, macro-bearing, untrusted archive, possible secret |
 
-Values use versioned namespaces. Examples include an IANA media type, a format registry identifier, or an extension-owned value such as **org.restoreweave.game-save/v1**.
+Values use versioned namespaces. Examples include an IANA media type, a format registry identifier, or an extension-owned value such as **org.cairn.game-save/v1**.
 
 A subject MAY have multiple content classes and roles. For example, a game package may be an archive, application asset collection, and executable distribution. The core does not need game-specific control flow; processors declare which typed combinations they accept.
 

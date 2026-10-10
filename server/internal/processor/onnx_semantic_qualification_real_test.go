@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 const (
-	semanticQualificationReportPath = "RESTOREWEAVE_SEMANTIC_QUALIFICATION_REPORT"
+	semanticQualificationReportPath = "CAIRN_SEMANTIC_QUALIFICATION_REPORT"
 	semanticQualificationConfig     = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 )
 
@@ -64,18 +64,18 @@ type semanticQualificationReport struct {
 // for the pinned default model. It is intentionally opt-in: a fixture vector
 // or an absent local bundle must never be reported as release evidence.
 func TestSupervisedONNXSemanticQualification(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("RESTOREWEAVE_RUN_SUPERVISED_ONNX")) != "1" {
-		t.Skip("RESTOREWEAVE_RUN_SUPERVISED_ONNX=1 is required for semantic qualification")
+	if strings.TrimSpace(os.Getenv("CAIRN_RUN_SUPERVISED_ONNX")) != "1" {
+		t.Skip("CAIRN_RUN_SUPERVISED_ONNX=1 is required for semantic qualification")
 	}
-	bundleRoot := strings.TrimSpace(os.Getenv("RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT"))
+	bundleRoot := strings.TrimSpace(os.Getenv("CAIRN_SEMANTIC_BUNDLE_ROOT"))
 	if bundleRoot == "" {
-		modelPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL"))
+		modelPath := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_MODEL"))
 		if modelPath != "" {
 			bundleRoot = filepath.Dir(modelPath)
 		}
 	}
 	if bundleRoot == "" {
-		t.Skip("RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT or RESTOREWEAVE_BGE_ONNX_MODEL is required")
+		t.Skip("CAIRN_SEMANTIC_BUNDLE_ROOT or CAIRN_BGE_ONNX_MODEL is required")
 	}
 	bundleRoot, err := filepath.Abs(bundleRoot)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestSupervisedONNXSemanticQualification(t *testing.T) {
 		t.Skip("Linux bubblewrap is unavailable for supervised qualification")
 	}
 
-	workerBinary := buildRestoreweavedForWorker(t)
+	workerBinary := buildCairndForWorker(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	started := time.Now()
@@ -260,7 +260,7 @@ func TestSupervisedONNXSemanticQualification(t *testing.T) {
 	}
 
 	report := semanticQualificationReport{
-		Schema: "restoreweave.semantic-qualification.v1", GeneratedAt: time.Now().UTC(), Status: "PASSED",
+		Schema: "cairn.semantic-qualification.v1", GeneratedAt: time.Now().UTC(), Status: "PASSED",
 		OS: runtime.GOOS, Arch: runtime.GOARCH, GoVersion: runtime.Version(),
 		ProfileID: bundle.Descriptor.ProfileID, ProfileDigest: bundle.ProfileDigest,
 		SemanticSpace: manifest.SemanticSpace, Dimension: manifest.Dimension,

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SigningIdentitySchemaV1 = "org.restoreweave.signing-identity.v1"
+	SigningIdentitySchemaV1 = "org.cairn.signing-identity.v1"
 	signingIdentityFileName = "publication-signing-identity.json"
 	trustAnchorFileName     = "publication-trust-anchor.json"
 )
@@ -191,7 +191,7 @@ func loadTrustAnchor(path string) (TrustAnchor, error) {
 
 func writeExclusiveFile(path string, payload []byte, mode os.FileMode) error {
 	directory := filepath.Dir(path)
-	temp, err := os.CreateTemp(directory, ".restoreweave-*")
+	temp, err := os.CreateTemp(directory, ".cairn-*")
 	if err != nil {
 		return err
 	}

@@ -317,7 +317,7 @@ func (p *OnlineDescribeProvider) CheckDescribeReadiness(_ context.Context) error
 // request_digest in every describe egress receipt.
 func DescribeEgressContentDigest(request DescribeRequest) string {
 	h := sha256.New()
-	writeLengthPrefixed(h, []byte("restoreweave.describe-egress-content.v1"))
+	writeLengthPrefixed(h, []byte("cairn.describe-egress-content.v1"))
 	writeLengthPrefixed(h, []byte(request.SubjectID))
 	writeLengthPrefixed(h, []byte(request.Kind))
 	writeLengthPrefixed(h, []byte(request.Language))
@@ -340,7 +340,7 @@ func DescribeEgressContentDigest(request DescribeRequest) string {
 // digest.
 func DescribeEgressOutputDigest(text string) string {
 	h := sha256.New()
-	writeLengthPrefixed(h, []byte("restoreweave.describe-egress-output.v1"))
+	writeLengthPrefixed(h, []byte("cairn.describe-egress-output.v1"))
 	writeLengthPrefixed(h, []byte(text))
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }
@@ -637,7 +637,7 @@ func (p *OnlineDescribeProvider) buildRequestBody(request DescribeRequest) ([]by
 	if strings.TrimSpace(request.Language) != "" {
 		header += " language=" + strings.TrimSpace(request.Language)
 	}
-	userText := "[restoreweave describe " + header + "]\n" + strings.Join(texts, "\n\n")
+	userText := "[cairn describe " + header + "]\n" + strings.Join(texts, "\n\n")
 	body := describeRequestBody{
 		Model:     p.profile.ModelID,
 		MaxTokens: p.profile.MaxOutputTokens,

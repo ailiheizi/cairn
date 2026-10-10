@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // TestCandidateOfflinePackageSemanticLifecycle exercises the candidate outer
@@ -32,13 +32,13 @@ import (
 // temporary XDG root. It needs an operator-retained real pinned bundle; it
 // never downloads model/runtime assets and is not release qualification.
 func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("RESTOREWEAVE_RUN_SUPERVISED_ONNX")) != "1" {
-		t.Skip("RESTOREWEAVE_RUN_SUPERVISED_ONNX=1 is required for real outer-package coverage")
+	if strings.TrimSpace(os.Getenv("CAIRN_RUN_SUPERVISED_ONNX")) != "1" {
+		t.Skip("CAIRN_RUN_SUPERVISED_ONNX=1 is required for real outer-package coverage")
 	}
-	runtimeSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_RUNTIME"))
-	modelSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL"))
-	tokenizerSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_TOKENIZER"))
-	zvecSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	runtimeSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_RUNTIME"))
+	modelSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_MODEL"))
+	tokenizerSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_TOKENIZER"))
+	zvecSource := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if runtimeSource == "" || modelSource == "" || tokenizerSource == "" || zvecSource == "" {
 		t.Skip("real BGE, ONNX runtime, and zvec asset paths are required")
 	}
@@ -48,8 +48,8 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := os.MkdirAll(binDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	rwBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/rw", filepath.Join(binDir, "rw"), "purego")
-	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"), "purego")
+	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "purego")
+	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "purego")
 	webDist := filepath.Join(root, "build", "web-dist")
 	if err := os.MkdirAll(webDist, 0o700); err != nil {
 		t.Fatal(err)
@@ -71,10 +71,10 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if _, err := search.PackageSemanticBundleArchive(context.Background(), semanticArchive, bundleSource, bundleAdmission); err != nil {
 		t.Fatalf("assemble offline semantic archive: %v", err)
 	}
-	artifact := filepath.Join(root, "build", "restoreweave-candidate.tar.gz")
+	artifact := filepath.Join(root, "build", "cairn-candidate.tar.gz")
 	packageScript := exec.Command("bash", filepath.Join(workspaceRoot, "scripts", "package-offline.sh"),
 		"--version", "candidate-test", "--os", runtime.GOOS, "--arch", runtime.GOARCH,
-		"--rw", rwBin, "--daemon", daemonBin, "--web-dist", webDist,
+		"--rw", cairnBin, "--daemon", daemonBin, "--web-dist", webDist,
 		"--semantic-archive", semanticArchive, "--output", artifact)
 	packageScript.Dir = workspaceRoot
 	if output, err := packageScript.CombinedOutput(); err != nil {
@@ -88,7 +88,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := extractCandidateArchive(artifact, installRoot); err != nil {
 		t.Fatalf("extract candidate artifact: %v", err)
 	}
-	packageRoot := filepath.Join(installRoot, "restoreweave-candidate-test-"+runtime.GOOS+"-"+runtime.GOARCH)
+	packageRoot := filepath.Join(installRoot, "cairn-candidate-test-"+runtime.GOOS+"-"+runtime.GOARCH)
 	manifestBytes, err := os.ReadFile(filepath.Join(packageRoot, "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Schema != "restoreweave.candidate-offline-artifact.v1" || manifest.Status != "CANDIDATE_ONLY_NOT_SUPPORTED" || manifest.Platform.OS != runtime.GOOS || manifest.Platform.Arch != runtime.GOARCH {
+	if manifest.Schema != "cairn.candidate-offline-artifact.v1" || manifest.Status != "CANDIDATE_ONLY_NOT_SUPPORTED" || manifest.Platform.OS != runtime.GOOS || manifest.Platform.Arch != runtime.GOARCH {
 		t.Fatalf("candidate manifest must bind actual host and retain candidate status: %+v", manifest)
 	}
 	if err := verifyCandidateChecksums(packageRoot); err != nil {
@@ -122,27 +122,27 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err != nil || json.Unmarshal(outerSBOMBytes, &outerSBOM) != nil || outerSBOM.Status != "INCOMPLETE_NOT_RELEASE_SBOM" {
 		t.Fatalf("candidate package must retain incomplete SBOM status: %s (%v)", outerSBOMBytes, err)
 	}
-	rwBin = filepath.Join(packageRoot, "bin", "rw")
-	daemonBin = filepath.Join(packageRoot, "bin", "restoreweaved")
+	cairnBin = filepath.Join(packageRoot, "bin", "cairn")
+	daemonBin = filepath.Join(packageRoot, "bin", "cairnd")
 	webRoot := filepath.Join(packageRoot, "web", "dist")
 	archivePath := filepath.Join(packageRoot, "semantic", "semantic-bundle.tar.gz")
-	for _, path := range []string{rwBin, daemonBin, archivePath, filepath.Join(webRoot, "index.html")} {
+	for _, path := range []string{cairnBin, daemonBin, archivePath, filepath.Join(webRoot, "index.html")} {
 		if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
 			t.Fatalf("packaged input %s unavailable: %v", path, err)
 		}
 	}
 
 	dataHome := filepath.Join(root, "clean-xdg-data")
-	configPath := filepath.Join(root, "clean-xdg-config", "restoreweave", "config.yaml")
-	socketPath := filepath.Join(os.TempDir(), fmt.Sprintf("rw-package-semantic-%d.sock", os.Getpid()))
+	configPath := filepath.Join(root, "clean-xdg-config", "cairn", "config.yaml")
+	socketPath := filepath.Join(os.TempDir(), fmt.Sprintf("cairn-package-semantic-%d.sock", os.Getpid()))
 	_ = os.Remove(socketPath)
 	defer os.Remove(socketPath)
 	apiAddress := reserveLoopbackAddress(t)
 	env := append(os.Environ(), "XDG_DATA_HOME="+dataHome)
-	initConfig := exec.Command(rwBin, "config", "init", "--path", configPath)
+	initConfig := exec.Command(cairnBin, "config", "init", "--path", configPath)
 	initConfig.Env = env
 	if output, err := initConfig.CombinedOutput(); err != nil {
-		t.Fatalf("packaged rw config init: %v\n%s", err, output)
+		t.Fatalf("packaged cairn config init: %v\n%s", err, output)
 	}
 	config, err := rwconfig.LoadFile(configPath)
 	if err != nil {
@@ -161,10 +161,10 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 			stopDaemonProcess(t, daemon, daemonDone, daemonLog)
 		}
 	}()
-	waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
+	waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
 	assertPackagedWebUI(t, "http://"+apiAddress, webRoot)
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityUnavailable)
-	installed := runRealRWProcess(t, rwBin, socketPath, "semantic", "bundle", "install", "--archive", archivePath)
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityUnavailable)
+	installed := runRealRWProcess(t, cairnBin, socketPath, "semantic", "bundle", "install", "--archive", archivePath)
 	var installData command.SemanticBundleInstallData
 	decodeProcessResult(t, installed, &installData)
 	if installData.ProfileID != search.SemanticBundleBGEProfileID || !installData.Changed || !installData.RestartRequired {
@@ -183,11 +183,11 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	}
 	restart := func() {
 		daemon, daemonDone, daemonLog = start()
-		waitForRealDaemonCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
+		waitForRealDaemonCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
 	}
 	stop()
 	restart()
-	assertModelBundleCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	assertModelBundleCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
 
 	source := filepath.Join(root, "source")
 	if err := os.MkdirAll(source, 0o700); err != nil {
@@ -197,29 +197,29 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(source, "semantic.txt"), payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	planned := runRealRWProcess(t, rwBin, socketPath, "ingest", source)
+	planned := runRealRWProcess(t, cairnBin, socketPath, "ingest", source)
 	var ingest command.PlanIngestData
 	decodeProcessResult(t, planned, &ingest)
-	applied := runRealRWProcess(t, rwBin, socketPath, "plan", "apply", ingest.PlanID, "--workspace", ingest.WorkspaceID, "--digest", ingest.PlanDigest)
+	applied := runRealRWProcess(t, cairnBin, socketPath, "plan", "apply", ingest.PlanID, "--workspace", ingest.WorkspaceID, "--digest", ingest.PlanDigest)
 	var appliedData command.PlanApplyData
 	decodeProcessResult(t, applied, &appliedData)
-	resolved := runRealRWProcess(t, rwBin, socketPath, "namespace", "resolve", "semantic.txt", "--workspace", appliedData.WorkspaceID, "--root", appliedData.RootID)
+	resolved := runRealRWProcess(t, cairnBin, socketPath, "namespace", "resolve", "semantic.txt", "--workspace", appliedData.WorkspaceID, "--root", appliedData.RootID)
 	var resolvedData command.NamespaceResolveData
 	decodeProcessResult(t, resolved, &resolvedData)
-	descriptionResult := runRealRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "恢复说明", "--body", "洪水城市档案恢复说明")
+	descriptionResult := runRealRWProcess(t, cairnBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "恢复说明", "--body", "洪水城市档案恢复说明")
 	var description command.DescriptionCreateData
 	decodeProcessResult(t, descriptionResult, &description)
-	playwrightModule := os.Getenv("RESTOREWEAVE_PLAYWRIGHT_MODULE")
+	playwrightModule := os.Getenv("CAIRN_PLAYWRIGHT_MODULE")
 	if playwrightModule == "" {
 		playwrightModule = filepath.Join(workspaceRoot, "web", "node_modules", "playwright", "index.mjs")
 	}
-	chromePath := os.Getenv("RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH")
+	chromePath := os.Getenv("CAIRN_PLAYWRIGHT_EXECUTABLE_PATH")
 	if chromePath == "" {
 		chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 	}
 	browserRun := exec.Command("node", filepath.Join(workspaceRoot, "scripts", "web-semantic-package-e2e.mjs"))
 	browserRun.Dir = workspaceRoot
-	browserRun.Env = append(os.Environ(), "RESTOREWEAVE_WEB_E2E_URL=http://"+apiAddress+"/", "RESTOREWEAVE_PLAYWRIGHT_MODULE="+playwrightModule, "RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH="+chromePath)
+	browserRun.Env = append(os.Environ(), "CAIRN_WEB_E2E_URL=http://"+apiAddress+"/", "CAIRN_PLAYWRIGHT_MODULE="+playwrightModule, "CAIRN_PLAYWRIGHT_EXECUTABLE_PATH="+chromePath)
 	browserOutput, browserErr := browserRun.CombinedOutput()
 	if browserErr != nil {
 		t.Fatalf("packaged WebUI settings/rebuild/search browser E2E: %v\n%s", browserErr, browserOutput)
@@ -237,7 +237,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if browserResult.Provider != search.ProviderSemanticONNX || browserResult.Dimension != search.DimensionSemantic || browserResult.GenerationID == "" || browserResult.HitCount == 0 || browserResult.SegmentSource != "DESCRIPTION" {
 		t.Fatalf("packaged browser semantic evidence = %+v\n%s", browserResult, browserOutput)
 	}
-	query := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	query := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var semanticData command.SearchQueryData
 	decodeProcessResult(t, query, &semanticData)
 	if semanticData.Provider != search.ProviderSemanticONNX || len(semanticData.Hits) != 1 || len(semanticData.Hits[0].Segments) == 0 {
@@ -246,7 +246,7 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 
 	stop()
 	restart()
-	reopened := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	reopened := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var reopenedData command.SearchQueryData
 	decodeProcessResult(t, reopened, &reopenedData)
 	if reopenedData.GenerationID != semanticData.GenerationID || len(reopenedData.Hits) == 0 {
@@ -270,25 +270,25 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	installedBundle := filepath.Join(dataHome, "restoreweave", "models", "bge-small-zh-v1.5", runtime.GOOS+"-"+runtime.GOARCH)
+	installedBundle := filepath.Join(dataHome, "cairn", "models", "bge-small-zh-v1.5", runtime.GOOS+"-"+runtime.GOARCH)
 	suspendedBundle := filepath.Join(root, "suspended-semantic-bundle")
 	if err := os.Rename(installedBundle, suspendedBundle); err != nil {
 		t.Fatalf("isolate installed bundle to simulate unavailable provider: %v", err)
 	}
 	restart()
-	capabilities := runRealRWProcess(t, rwBin, socketPath, "capability", "list")
+	capabilities := runRealRWProcess(t, cairnBin, socketPath, "capability", "list")
 	assertSemanticCapability(t, capabilities, command.CapabilityUnavailable)
-	degraded := runRWProcessAllowStatus(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	degraded := runRWProcessAllowStatus(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	if degraded.Status != command.StatusDegraded {
 		t.Fatalf("missing-provider semantic query status = %s", degraded.Status)
 	}
-	lexical := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionLexical)
+	lexical := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionLexical)
 	var lexicalData command.SearchQueryData
 	decodeProcessResult(t, lexical, &lexicalData)
 	if len(lexicalData.Hits) == 0 || lexicalData.Provider == search.ProviderSemanticONNX {
 		t.Fatalf("lexical query did not remain available without the semantic provider: %+v", lexicalData)
 	}
-	verified := runRealRWProcess(t, rwBin, socketPath, "snapshot", "verify", appliedData.SnapshotRef, "--mode", command.VerifyFullBytes)
+	verified := runRealRWProcess(t, cairnBin, socketPath, "snapshot", "verify", appliedData.SnapshotRef, "--mode", command.VerifyFullBytes)
 	var verifyData command.SnapshotVerifyData
 	decodeProcessResult(t, verified, &verifyData)
 	if !verifyData.OK || verifyData.Files != 1 || verifyData.Bytes != int64(len(payload)) {
@@ -299,18 +299,18 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	}
 	stop()
 	restart()
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), search.IndexStateNotBuilt)
-	createdAgain := runRealRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "恢复说明 2", "--body", "洪水城市档案恢复说明")
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), search.IndexStateNotBuilt)
+	createdAgain := runRealRWProcess(t, cairnBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "恢复说明 2", "--body", "洪水城市档案恢复说明")
 	if createdAgain.Status != command.StatusSucceeded {
 		t.Fatalf("semantic rebuild trigger = %s, reasons=%+v", createdAgain.Status, createdAgain.Reasons)
 	}
-	rebuilt := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	rebuilt := runRealRWProcess(t, cairnBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var rebuiltData command.SearchQueryData
 	decodeProcessResult(t, rebuilt, &rebuiltData)
 	if len(rebuiltData.Hits) == 0 || rebuiltData.GenerationID == semanticData.GenerationID {
 		t.Fatalf("semantic provider restore did not build a fresh generation: %+v", rebuiltData)
 	}
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityAvailable)
+	assertSemanticCapability(t, runRealRWProcess(t, cairnBin, socketPath, "capability", "list"), command.CapabilityAvailable)
 }
 
 func extractCandidateArchive(archivePath, destination string) error {

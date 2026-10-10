@@ -6,7 +6,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // LexicalSubjectCoverage returns the subject IDs actually present in one

@@ -318,7 +318,7 @@ func SemanticEgressConfirmationFrom(ctx context.Context) (SemanticEgressConfirma
 // same value recorded as request_digest in every egress receipt.
 func SemanticEgressContentDigest(inputs []SemanticTextInput) string {
 	h := sha256.New()
-	writeLengthPrefixed(h, []byte("restoreweave.semantic-egress-content.v1"))
+	writeLengthPrefixed(h, []byte("cairn.semantic-egress-content.v1"))
 	for _, input := range inputs {
 		writeLengthPrefixed(h, []byte(input.SubjectID))
 		writeLengthPrefixed(h, []byte(input.SegmentID))
@@ -1209,7 +1209,7 @@ func (p *OnlineEmbeddingProvider) decodeOnlineEmbeddingResponse(
 // digest.
 func SemanticEgressOutputDigest(results []SemanticVector) string {
 	h := sha256.New()
-	writeLengthPrefixed(h, []byte("restoreweave.semantic-egress-output.v1"))
+	writeLengthPrefixed(h, []byte("cairn.semantic-egress-output.v1"))
 	var lane [4]byte
 	for _, result := range results {
 		writeLengthPrefixed(h, []byte(result.SubjectID))

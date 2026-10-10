@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ailiheizi/restoreweave/server/internal/releasequal"
+	"github.com/ailiheizi/cairn/server/internal/releasequal"
 )
 
 func main() {

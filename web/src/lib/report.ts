@@ -103,12 +103,12 @@ export type SelectionReportInput = {
 };
 
 /**
- * `restoreweave-selection-<UTC timestamp>.md`. The stamp is the ISO-8601 UTC
+ * `cairn-selection-<UTC timestamp>.md`. The stamp is the ISO-8601 UTC
  * time with `:` replaced, so the name is valid on every platform.
  */
 export function selectionReportFilename(generatedAt: Date): string {
   const stamp = generatedAt.toISOString().replace(/\.\d{3}Z$/, "Z").replace(/:/g, "-");
-  return `restoreweave-selection-${stamp}.md`;
+  return `cairn-selection-${stamp}.md`;
 }
 
 /** The log name the report is written under; also the document's title. */

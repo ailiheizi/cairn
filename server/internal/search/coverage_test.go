@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestSemanticGenerationReceiptBindsGenerationSnapshotAndRoot(t *testing.T) {

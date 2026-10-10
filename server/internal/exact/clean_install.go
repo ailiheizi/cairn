@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // RecoveryImportResult is the admission summary returned after an

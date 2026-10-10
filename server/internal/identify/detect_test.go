@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 func TestSuffixRuleTableComplete(t *testing.T) {

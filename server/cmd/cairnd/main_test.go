@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type semanticLeaseFencer struct {
@@ -183,7 +183,7 @@ func TestSemanticBundleCapabilitySeparatesOperatorOverrideFromPinnedDefault(t *t
 	}
 	sources := map[string]string{}
 	asset := func(name string) search.SemanticBundleAsset {
-		payload := []byte("restoreweave " + name + " test asset")
+		payload := []byte("cairn " + name + " test asset")
 		source := filepath.Join(sourceRoot, name+".source")
 		if err := os.WriteFile(source, payload, 0o600); err != nil {
 			t.Fatal(err)
@@ -239,11 +239,11 @@ func TestSemanticBundleInstallerDisabledForOperatorOverride(t *testing.T) {
 func TestNormalDaemonRequiresPersistedConfig(t *testing.T) {
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"))
+	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"))
 
 	root := t.TempDir()
 	missingConfig := filepath.Join(root, "config", "missing.toml")
-	socketPath := filepath.Join(root, "runtime", "restoreweaved.sock")
+	socketPath := filepath.Join(root, "runtime", "cairnd.sock")
 	paths := []string{
 		filepath.Join(root, "catalog.sqlite"),
 		filepath.Join(root, "repository"),
@@ -254,12 +254,12 @@ func TestNormalDaemonRequiresPersistedConfig(t *testing.T) {
 	}
 	cmd := exec.Command(daemonBin, "--config", missingConfig, "--socket", socketPath)
 	cmd.Env = append(os.Environ(),
-		"RESTOREWEAVE_CONFIG="+missingConfig,
-		"RESTOREWEAVE_CATALOG="+paths[0],
-		"RESTOREWEAVE_REPOSITORY="+paths[1],
-		"RESTOREWEAVE_VECTORS="+paths[2],
-		"RESTOREWEAVE_MODELS="+paths[3],
-		"RESTOREWEAVE_RECOVERY_RECORDS="+paths[4],
+		"CAIRN_CONFIG="+missingConfig,
+		"CAIRN_CATALOG="+paths[0],
+		"CAIRN_REPOSITORY="+paths[1],
+		"CAIRN_VECTORS="+paths[2],
+		"CAIRN_MODELS="+paths[3],
+		"CAIRN_RECOVERY_RECORDS="+paths[4],
 	)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
@@ -381,7 +381,7 @@ func TestRunWithOptionsAPIBindFailureLeavesUnixSocketUnavailable(t *testing.T) {
 	if err := rwconfig.Save(configPath, cfg); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
-	socketPath := filepath.Join(root, "runtime", "restoreweaved.sock")
+	socketPath := filepath.Join(root, "runtime", "cairnd.sock")
 	err = runWithOptions(context.Background(), daemonOptions{
 		configPath: configPath,
 		socketPath: socketPath,
@@ -443,8 +443,8 @@ func TestConfigureSemanticBindingRequiresLocalZvecSelection(t *testing.T) {
 func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) {
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"))
-	rwBin := buildTestBinary(t, workspaceRoot, "./client/cmd/rw", filepath.Join(binDir, "rw"))
+	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"))
+	cairnBin := buildTestBinary(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"))
 
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "xdg-data")
@@ -458,23 +458,23 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	}
 	configPath := filepath.Join(root, "config", "config.toml")
 	cliEnv := append(os.Environ(), "XDG_DATA_HOME="+dataHome)
-	initConfig := exec.Command(rwBin, "config", "init", "--path", configPath)
+	initConfig := exec.Command(cairnBin, "config", "init", "--path", configPath)
 	initConfig.Env = cliEnv
 	initOutput, err := initConfig.CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw config init: %v\n%s", err, initOutput)
+		t.Fatalf("cairn config init: %v\n%s", err, initOutput)
 	}
 	if !strings.Contains(string(initOutput), configPath) || !strings.Contains(string(initOutput), "sha256:") {
-		t.Fatalf("rw config init output = %s", initOutput)
+		t.Fatalf("cairn config init output = %s", initOutput)
 	}
-	validateConfig := exec.Command(rwBin, "--json", "config", "validate", "--path", configPath)
+	validateConfig := exec.Command(cairnBin, "--json", "config", "validate", "--path", configPath)
 	validateConfig.Env = cliEnv
 	validateOutput, err := validateConfig.CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw config validate: %v\n%s", err, validateOutput)
+		t.Fatalf("cairn config validate: %v\n%s", err, validateOutput)
 	}
 	if !strings.Contains(string(validateOutput), "config_digest") || !strings.Contains(string(validateOutput), dataHome) {
-		t.Fatalf("rw config validate output = %s", validateOutput)
+		t.Fatalf("cairn config validate output = %s", validateOutput)
 	}
 	cfg, err := rwconfig.LoadFile(configPath)
 	if err != nil {
@@ -493,15 +493,15 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		cfg.Storage.CompressionProfile != rwconfig.CompressionProfileZstdV1 {
 		t.Fatalf("persisted storage tuple = %q/%q", cfg.Storage.RepositoryProfile, cfg.Storage.CompressionProfile)
 	}
-	validateZstdConfig := exec.Command(rwBin, "--json", "config", "validate", "--path", configPath)
+	validateZstdConfig := exec.Command(cairnBin, "--json", "config", "validate", "--path", configPath)
 	validateZstdConfig.Env = cliEnv
 	validateZstdOutput, err := validateZstdConfig.CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw config validate zstd candidate: %v\n%s", err, validateZstdOutput)
+		t.Fatalf("cairn config validate zstd candidate: %v\n%s", err, validateZstdOutput)
 	}
 	if !strings.Contains(string(validateZstdOutput), rwconfig.RepositoryProfileLocalZstdV1) ||
 		!strings.Contains(string(validateZstdOutput), rwconfig.CompressionProfileZstdV1) {
-		t.Fatalf("rw config validate zstd output = %s", validateZstdOutput)
+		t.Fatalf("cairn config validate zstd output = %s", validateZstdOutput)
 	}
 	for _, path := range []string{cfg.Paths.Catalog, cfg.Paths.Repository, cfg.Paths.Vectors, cfg.Paths.RecoveryRecords} {
 		if !strings.HasPrefix(path, dataHome+string(filepath.Separator)) {
@@ -509,13 +509,13 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		}
 	}
 
-	socketPath := fmt.Sprintf("/tmp/rw-e2e-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
+	socketPath := fmt.Sprintf("/tmp/cairn-e2e-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	daemon, daemonDone, daemonLog := startDaemonProcessWithEnv(t, cliEnv, daemonBin, socketPath, "--config", configPath)
 	defer stopDaemonProcess(t, daemon, daemonDone, daemonLog)
-	waitForCLI(t, rwBin, socketPath, daemonDone, daemonLog, "status")
+	waitForCLI(t, cairnBin, socketPath, daemonDone, daemonLog, "status")
 
-	capabilityResult := runRWProcess(t, rwBin, socketPath, "capability", "list")
+	capabilityResult := runRWProcess(t, cairnBin, socketPath, "capability", "list")
 	var capabilityData command.CapabilityListData
 	decodeProcessResult(t, capabilityResult, &capabilityData)
 	semanticUnavailable := false
@@ -529,7 +529,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		t.Fatalf("real daemon did not report unavailable semantic dependency: %+v", capabilityData.Capabilities)
 	}
 
-	planned := runRWProcess(t, rwBin, socketPath, "ingest", source)
+	planned := runRWProcess(t, cairnBin, socketPath, "ingest", source)
 	var ingest command.PlanIngestData
 	decodeProcessResult(t, planned, &ingest)
 	if ingest.State != "READY" || !ingest.Executable || ingest.PlanID == "" || ingest.PlanDigest == "" || ingest.Files != 1 {
@@ -543,21 +543,21 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		t.Fatalf("ingest protection decisions = %+v", ingest.ProtectionDecisions)
 	}
 
-	applied := runRWProcess(t, rwBin, socketPath, "plan", "apply", ingest.PlanID,
+	applied := runRWProcess(t, cairnBin, socketPath, "plan", "apply", ingest.PlanID,
 		"--workspace", ingest.WorkspaceID, "--digest", ingest.PlanDigest)
 	var appliedData command.PlanApplyData
 	decodeProcessResult(t, applied, &appliedData)
 	if appliedData.SnapshotRef == "" || appliedData.ManifestDigest == "" || appliedData.ProtectionDigest == "" || appliedData.Files != 1 {
 		t.Fatalf("real CLI plan apply did not publish signed exact result = %+v", appliedData)
 	}
-	resolved := runRWProcess(t, rwBin, socketPath, "namespace", "resolve", "nested/payload.bin",
+	resolved := runRWProcess(t, cairnBin, socketPath, "namespace", "resolve", "nested/payload.bin",
 		"--workspace", appliedData.WorkspaceID, "--root", appliedData.RootID)
 	var resolvedData command.NamespaceResolveData
 	decodeProcessResult(t, resolved, &resolvedData)
 	if resolvedData.PathRef == "" || resolvedData.Entry.ContentID == "" {
 		t.Fatalf("real CLI namespace resolve = %+v", resolvedData)
 	}
-	created := runRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef,
+	created := runRWProcess(t, cairnBin, socketPath, "description", "create", resolvedData.PathRef,
 		"--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "en",
 		"--title", "Recovery note", "--body", "A flooded city archive is ready for recovery.", "--accepted")
 	var createdData command.DescriptionCreateData
@@ -565,7 +565,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if createdData.Document.ID == "" || createdData.Document.SubjectRef != resolvedData.Entry.SubjectRef || len(createdData.Document.Segments) == 0 {
 		t.Fatalf("real CLI description create = %+v", createdData.Document)
 	}
-	searched := runRWProcessAllowDegraded(t, rwBin, socketPath, "search", "flooded",
+	searched := runRWProcessAllowDegraded(t, cairnBin, socketPath, "search", "flooded",
 		"--workspace", appliedData.WorkspaceID, "--filter", "language=EN", "--filter", "suffix=bin")
 	var searchData command.SearchQueryData
 	decodeProcessResult(t, searched, &searchData)
@@ -594,7 +594,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		t.Fatalf("real CLI lexical match span = %+v", segment)
 	}
 	lexicalGeneration := searchData.Components[0].GenerationID
-	repeatedSearch := runRWProcessAllowDegraded(t, rwBin, socketPath, "search", "flooded",
+	repeatedSearch := runRWProcessAllowDegraded(t, cairnBin, socketPath, "search", "flooded",
 		"--workspace", appliedData.WorkspaceID, "--filter", "language=EN", "--filter", "suffix=bin")
 	var repeatedSearchData command.SearchQueryData
 	decodeProcessResult(t, repeatedSearch, &repeatedSearchData)
@@ -604,7 +604,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		repeatedSearchData.Hits[0].Segments[0].MatchedText != segment.MatchedText {
 		t.Fatalf("same-generation real daemon requery changed provenance: first=%+v repeat=%+v", searchData, repeatedSearchData)
 	}
-	wrongLanguage := runRWProcess(t, rwBin, socketPath, "search", "flooded",
+	wrongLanguage := runRWProcess(t, cairnBin, socketPath, "search", "flooded",
 		"--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionLexical,
 		"--filter", "language=fr", "--filter", "suffix=bin")
 	var wrongLanguageData command.SearchQueryData
@@ -612,7 +612,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if len(wrongLanguageData.Hits) != 0 {
 		t.Fatalf("real CLI wrong-language filter hits = %+v, want none", wrongLanguageData.Hits)
 	}
-	tagged := runRWProcess(t, rwBin, socketPath, "tag", "add", resolvedData.PathRef, "curated",
+	tagged := runRWProcess(t, cairnBin, socketPath, "tag", "add", resolvedData.PathRef, "curated",
 		"--workspace", appliedData.WorkspaceID)
 	var taggedData command.AnnotationUpsertData
 	decodeProcessResult(t, tagged, &taggedData)
@@ -620,7 +620,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		taggedData.Annotation.Body != "curated" || taggedData.Annotation.SubjectRef != resolvedData.Entry.SubjectRef {
 		t.Fatalf("real CLI tag add = %+v", taggedData.Annotation)
 	}
-	noted := runRWProcess(t, rwBin, socketPath, "note", "set", resolvedData.PathRef,
+	noted := runRWProcess(t, cairnBin, socketPath, "note", "set", resolvedData.PathRef,
 		"--workspace", appliedData.WorkspaceID, "--body", "retain exact bytes")
 	var notedData command.AnnotationUpsertData
 	decodeProcessResult(t, noted, &notedData)
@@ -628,27 +628,27 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		notedData.Annotation.Body != "retain exact bytes" || notedData.Annotation.SubjectRef != resolvedData.Entry.SubjectRef {
 		t.Fatalf("real CLI note set = %+v", notedData.Annotation)
 	}
-	annotationSearch := runRWProcess(t, rwBin, socketPath, "search", "curated",
+	annotationSearch := runRWProcess(t, cairnBin, socketPath, "search", "curated",
 		"--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionLexical, "--axis", "tags")
 	var annotationSearchData command.SearchQueryData
 	decodeProcessResult(t, annotationSearch, &annotationSearchData)
 	if len(annotationSearchData.Hits) != 1 || annotationSearchData.Hits[0].SubjectRef != resolvedData.Entry.SubjectRef {
 		t.Fatalf("real CLI annotation search = %+v", annotationSearchData.Hits)
 	}
-	viewSaved := runRWProcess(t, rwBin, socketPath, "view", "save", "recoverable", "flooded")
+	viewSaved := runRWProcess(t, cairnBin, socketPath, "view", "save", "recoverable", "flooded")
 	var viewData command.ViewData
 	decodeProcessResult(t, viewSaved, &viewData)
 	if viewData.ViewID == "" || viewData.Name != "recoverable" || viewData.Query != "flooded" || viewData.Revision != 1 {
 		t.Fatalf("real CLI view save = %+v", viewData)
 	}
-	viewEvaluated := runRWProcess(t, rwBin, socketPath, "view", "evaluate", "recoverable", "--limit", "10")
+	viewEvaluated := runRWProcess(t, cairnBin, socketPath, "view", "evaluate", "recoverable", "--limit", "10")
 	var viewEvaluateData command.ViewEvaluateData
 	decodeProcessResult(t, viewEvaluated, &viewEvaluateData)
 	if viewEvaluateData.ViewID != viewData.ViewID || len(viewEvaluateData.Hits) != 1 ||
 		viewEvaluateData.Hits[0].SubjectRef != resolvedData.Entry.SubjectRef {
 		t.Fatalf("real CLI view evaluate = %+v", viewEvaluateData)
 	}
-	manifestPlanned := runRWProcess(t, rwBin, socketPath, "export", "plan", "--view", "recoverable")
+	manifestPlanned := runRWProcess(t, cairnBin, socketPath, "export", "plan", "--view", "recoverable")
 	var manifestData command.ExportManifestData
 	decodeProcessResult(t, manifestPlanned, &manifestData)
 	if manifestData.ManifestID == "" || manifestData.ManifestDigest == "" || manifestData.ViewID != viewData.ViewID ||
@@ -656,13 +656,13 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		t.Fatalf("real CLI export plan = %+v", manifestData)
 	}
 	exportDestination := filepath.Join(root, "exported")
-	materialized := runRWProcess(t, rwBin, socketPath, "export", "apply", manifestData.ManifestID, exportDestination)
+	materialized := runRWProcess(t, cairnBin, socketPath, "export", "apply", manifestData.ManifestID, exportDestination)
 	var materializedData command.ExportApplyVerifyData
 	decodeProcessResult(t, materialized, &materializedData)
 	if !materializedData.Verified || materializedData.ManifestID != manifestData.ManifestID || materializedData.Items != 1 {
 		t.Fatalf("real CLI export apply = %+v", materializedData)
 	}
-	exportVerified := runRWProcess(t, rwBin, socketPath, "export", "verify", manifestData.ManifestID, exportDestination)
+	exportVerified := runRWProcess(t, cairnBin, socketPath, "export", "verify", manifestData.ManifestID, exportDestination)
 	var exportVerifiedData command.ExportApplyVerifyData
 	decodeProcessResult(t, exportVerified, &exportVerifiedData)
 	if !exportVerifiedData.Verified || exportVerifiedData.ManifestDigest != manifestData.ManifestDigest || exportVerifiedData.Items != 1 {
@@ -685,13 +685,13 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 
 	referencePath := filepath.Join(root, "portable", "recovery-reference.json")
 	anchorPath := filepath.Join(root, "portable", "trust-anchor.json")
-	exported := runRWProcess(t, rwBin, socketPath, "recovery", "export", appliedData.SnapshotRef, referencePath)
+	exported := runRWProcess(t, cairnBin, socketPath, "recovery", "export", appliedData.SnapshotRef, referencePath)
 	var exportData command.RecoveryExportData
 	decodeProcessResult(t, exported, &exportData)
 	if !exportData.IndependentlyStored || exportData.ManifestDigest != appliedData.ManifestDigest || exportData.Files != 1 {
 		t.Fatalf("real CLI recovery export = %+v", exportData)
 	}
-	anchored := runRWProcess(t, rwBin, socketPath, "recovery", "anchor", "export", anchorPath)
+	anchored := runRWProcess(t, cairnBin, socketPath, "recovery", "anchor", "export", anchorPath)
 	var anchorData command.RecoveryAnchorExportData
 	decodeProcessResult(t, anchored, &anchorData)
 	if anchorData.ArtifactPath != anchorPath || anchorData.KeyID == "" || anchorData.PublicKeyDigest == "" {
@@ -760,36 +760,36 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		t.Fatalf("vector index projection still exists before clean-install reader: %v", err)
 	}
 
-	cleanSocket := fmt.Sprintf("/tmp/rw-e2e-clean-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
+	cleanSocket := fmt.Sprintf("/tmp/cairn-e2e-clean-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
 	t.Cleanup(func() { _ = os.Remove(cleanSocket) })
 	repositoryBefore := recoveryProcessTree(t, cfg.Paths.Repository)
 	cleanDaemon, cleanDone, cleanLog := startDaemonProcessWithEnv(t, cliEnv, daemonBin, cleanSocket,
 		"--recovery-reader", "--repository", cfg.Paths.Repository,
 		"--recovery-reference", referencePath, "--trust-anchor", anchorPath)
 	defer stopDaemonProcess(t, cleanDaemon, cleanDone, cleanLog)
-	waitForCLI(t, rwBin, cleanSocket, cleanDone, cleanLog, "snapshot", "list")
+	waitForCLI(t, cairnBin, cleanSocket, cleanDone, cleanLog, "snapshot", "list")
 
-	imported := runRWProcess(t, rwBin, cleanSocket, "recovery", "import", referencePath, anchorPath)
+	imported := runRWProcess(t, cairnBin, cleanSocket, "recovery", "import", referencePath, anchorPath)
 	var importData command.RecoveryImportData
 	decodeProcessResult(t, imported, &importData)
 	if importData.Schema != exact.RecoveryReferenceSchemaV2 || importData.SnapshotRef != appliedData.SnapshotRef ||
 		importData.FactHealth != exact.RecoveryFactHealthComplete || importData.CatalogCreated {
 		t.Fatalf("clean-install import = %+v", importData)
 	}
-	verified := runRWProcess(t, rwBin, cleanSocket, "snapshot", "verify", appliedData.SnapshotRef, "--mode", command.VerifyFullBytes)
+	verified := runRWProcess(t, cairnBin, cleanSocket, "snapshot", "verify", appliedData.SnapshotRef, "--mode", command.VerifyFullBytes)
 	var verifyData command.SnapshotVerifyData
 	decodeProcessResult(t, verified, &verifyData)
 	if !verifyData.OK || verifyData.CatalogUsed || verifyData.PassedFiles != 1 {
 		t.Fatalf("clean-install verify = %+v", verifyData)
 	}
 	destination := filepath.Join(root, "restored")
-	plannedRestore := runRWProcess(t, rwBin, cleanSocket, "restore", appliedData.SnapshotRef, destination)
+	plannedRestore := runRWProcess(t, cairnBin, cleanSocket, "restore", appliedData.SnapshotRef, destination)
 	var restorePlan command.PlanRestoreData
 	decodeProcessResult(t, plannedRestore, &restorePlan)
 	if restorePlan.Wrote || !restorePlan.Executable || restorePlan.PlanID == "" || restorePlan.PlanDigest == "" {
 		t.Fatalf("clean-install restore plan = %+v", restorePlan)
 	}
-	rawApplied := runRWProcess(t, rwBin, cleanSocket, "plan", "apply", restorePlan.PlanID,
+	rawApplied := runRWProcess(t, cairnBin, cleanSocket, "plan", "apply", restorePlan.PlanID,
 		"--workspace", restorePlan.WorkspaceID, "--digest", restorePlan.PlanDigest)
 	var restoreData command.PlanApplyData
 	decodeProcessResult(t, rawApplied, &restoreData)
@@ -813,14 +813,14 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 
 // TestRealDaemonCrossProcessFenceSerializesPublication proves the production
 // daemon wiring, rather than only the exact package seam: two independent
-// restoreweaved processes sharing one catalog and repository can publish
+// cairnd processes sharing one catalog and repository can publish
 // concurrently, but signed root commits remain one authenticated generation
 // chain with strictly increasing fence tokens.
 func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"))
-	rwBin := buildTestBinary(t, workspaceRoot, "./client/cmd/rw", filepath.Join(binDir, "rw"))
+	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"))
+	cairnBin := buildTestBinary(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"))
 
 	root := t.TempDir()
 	cfg := rwconfig.Default()
@@ -854,7 +854,7 @@ func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	socketPrefix := fmt.Sprintf("/tmp/rw-fence-%d-%d", os.Getpid(), time.Now().UnixNano())
+	socketPrefix := fmt.Sprintf("/tmp/cairn-fence-%d-%d", os.Getpid(), time.Now().UnixNano())
 	socketA := socketPrefix + "-a.sock"
 	socketB := socketPrefix + "-b.sock"
 	t.Cleanup(func() {
@@ -862,14 +862,14 @@ func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 		_ = os.Remove(socketB)
 	})
 	processA, doneA, logA := startDaemonProcess(t, daemonBin, socketA, "--config", configPath)
-	waitForCLI(t, rwBin, socketA, doneA, logA, "status")
+	waitForCLI(t, cairnBin, socketA, doneA, logA, "status")
 	processB, doneB, logB := startDaemonProcess(t, daemonBin, socketB, "--config", configPath)
 	defer stopDaemonProcess(t, processA, doneA, logA)
 	defer stopDaemonProcess(t, processB, doneB, logB)
-	waitForCLI(t, rwBin, socketB, doneB, logB, "status")
+	waitForCLI(t, cairnBin, socketB, doneB, logB, "status")
 
-	plannedA := runRWProcess(t, rwBin, socketA, "ingest", sourceA)
-	plannedB := runRWProcess(t, rwBin, socketB, "ingest", sourceB)
+	plannedA := runRWProcess(t, cairnBin, socketA, "ingest", sourceA)
+	plannedB := runRWProcess(t, cairnBin, socketB, "ingest", sourceB)
 	var planA, planB command.PlanIngestData
 	decodeProcessResult(t, plannedA, &planA)
 	decodeProcessResult(t, plannedB, &planB)
@@ -888,7 +888,7 @@ func TestRealDaemonCrossProcessFenceSerializesPublication(t *testing.T) {
 	}
 	apply := func(socket string, plan command.PlanIngestData, outcomes chan<- applyOutcome, start <-chan struct{}) {
 		<-start
-		cmd := exec.Command(rwBin, "--socket", socket, "--json", "plan", "apply", plan.PlanID,
+		cmd := exec.Command(cairnBin, "--socket", socket, "--json", "plan", "apply", plan.PlanID,
 			"--workspace", plan.WorkspaceID, "--digest", plan.PlanDigest)
 		output, err := cmd.CombinedOutput()
 		outcome := applyOutcome{err: err, output: output}
@@ -1038,7 +1038,7 @@ func TestRecoveryReaderDaemonIsCatalogAndSigningMaterialFree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join("/tmp", "rw-recovery-"+filepath.Base(t.TempDir())+".sock")
+	socketPath := filepath.Join("/tmp", "cairn-recovery-"+filepath.Base(t.TempDir())+".sock")
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	readerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1183,9 +1183,9 @@ func TestRecoveryReaderCleanInstallUsesRealDaemonAndCLIProcesses(t *testing.T) {
 
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/restoreweaved", filepath.Join(binDir, "restoreweaved"))
-	rwBin := buildTestBinary(t, workspaceRoot, "./client/cmd/rw", filepath.Join(binDir, "rw"))
-	socketPath := fmt.Sprintf("/tmp/rw-clean-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
+	daemonBin := buildTestBinary(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"))
+	cairnBin := buildTestBinary(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"))
+	socketPath := fmt.Sprintf("/tmp/cairn-clean-%d-%d.sock", os.Getpid(), time.Now().UnixNano())
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 
 	probeRoot := t.TempDir()
@@ -1198,10 +1198,10 @@ func TestRecoveryReaderCleanInstallUsesRealDaemonAndCLIProcesses(t *testing.T) {
 		"--socket", socketPath,
 	)
 	daemon.Env = append(os.Environ(),
-		"RESTOREWEAVE_CONFIG="+filepath.Join(probeRoot, "missing-config.yaml"),
-		"RESTOREWEAVE_CATALOG="+catalogProbe,
-		"RESTOREWEAVE_RECOVERY_RECORDS="+recoveryProbe,
-		"RESTOREWEAVE_VECTORS="+vectorsProbe,
+		"CAIRN_CONFIG="+filepath.Join(probeRoot, "missing-config.yaml"),
+		"CAIRN_CATALOG="+catalogProbe,
+		"CAIRN_RECOVERY_RECORDS="+recoveryProbe,
+		"CAIRN_VECTORS="+vectorsProbe,
 	)
 	var daemonLog bytes.Buffer
 	daemon.Stdout = &daemonLog
@@ -1219,21 +1219,21 @@ func TestRecoveryReaderCleanInstallUsesRealDaemonAndCLIProcesses(t *testing.T) {
 		_ = daemon.Process.Kill()
 		<-daemonDone
 	}()
-	waitForReaderCLI(t, rwBin, socketPath, daemonDone, &daemonLog)
+	waitForReaderCLI(t, cairnBin, socketPath, daemonDone, &daemonLog)
 
-	imported := runRWProcess(t, rwBin, socketPath, "recovery", "import", referencePath, anchorPath)
+	imported := runRWProcess(t, cairnBin, socketPath, "recovery", "import", referencePath, anchorPath)
 	var importData command.RecoveryImportData
 	decodeProcessResult(t, imported, &importData)
 	if importData.Schema != exact.RecoveryReferenceSchemaV2 || importData.SnapshotRef != published.SnapshotRef || importData.CatalogCreated {
 		t.Fatalf("real CLI recovery.import = %+v", importData)
 	}
-	listed := runRWProcess(t, rwBin, socketPath, "snapshot", "list")
+	listed := runRWProcess(t, cairnBin, socketPath, "snapshot", "list")
 	var listData command.SnapshotListData
 	decodeProcessResult(t, listed, &listData)
 	if len(listData.Snapshots) != 1 || listData.Snapshots[0].SnapshotRef != published.SnapshotRef {
 		t.Fatalf("real CLI snapshot.list = %+v", listData)
 	}
-	verified := runRWProcess(t, rwBin, socketPath, "snapshot", "verify", published.SnapshotRef, "--mode", command.VerifyFullBytes)
+	verified := runRWProcess(t, cairnBin, socketPath, "snapshot", "verify", published.SnapshotRef, "--mode", command.VerifyFullBytes)
 	var verifyData command.SnapshotVerifyData
 	decodeProcessResult(t, verified, &verifyData)
 	if !verifyData.OK || verifyData.CatalogUsed {
@@ -1241,13 +1241,13 @@ func TestRecoveryReaderCleanInstallUsesRealDaemonAndCLIProcesses(t *testing.T) {
 	}
 
 	destination := filepath.Join(t.TempDir(), "restored")
-	planned := runRWProcess(t, rwBin, socketPath, "restore", published.SnapshotRef, destination)
+	planned := runRWProcess(t, cairnBin, socketPath, "restore", published.SnapshotRef, destination)
 	var restorePlan command.PlanRestoreData
 	decodeProcessResult(t, planned, &restorePlan)
 	if restorePlan.Wrote || restorePlan.PlanID == "" || restorePlan.PlanDigest == "" || restorePlan.WorkspaceID == "" {
 		t.Fatalf("real CLI restore plan = %+v", restorePlan)
 	}
-	applied := runRWProcess(t, rwBin, socketPath, "plan", "apply", restorePlan.PlanID,
+	applied := runRWProcess(t, cairnBin, socketPath, "plan", "apply", restorePlan.PlanID,
 		"--workspace", restorePlan.WorkspaceID, "--digest", restorePlan.PlanDigest)
 	var applyData command.PlanApplyData
 	decodeProcessResult(t, applied, &applyData)
@@ -1323,7 +1323,7 @@ func startDaemonProcessWithEnv(t *testing.T, env []string, daemonBin, socketPath
 	process.Stdout = &log
 	process.Stderr = &log
 	if err := process.Start(); err != nil {
-		t.Fatalf("start restoreweaved process: %v", err)
+		t.Fatalf("start cairnd process: %v", err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- process.Wait() }()
@@ -1341,33 +1341,33 @@ func stopDaemonProcess(t *testing.T, process *exec.Cmd, done <-chan error, daemo
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Errorf("restoreweaved process exit: %v\n%s", err, daemonLog.String())
+			t.Errorf("cairnd process exit: %v\n%s", err, daemonLog.String())
 		}
 	case <-time.After(5 * time.Second):
 		_ = process.Process.Kill()
-		t.Errorf("restoreweaved process did not stop\n%s", daemonLog.String())
+		t.Errorf("cairnd process did not stop\n%s", daemonLog.String())
 	}
 }
 
-func waitForCLI(t *testing.T, rwBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer, args ...string) {
+func waitForCLI(t *testing.T, cairnBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer, args ...string) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-daemonDone:
-			t.Fatalf("restoreweaved exited before readiness: %v\n%s", err, daemonLog.String())
+			t.Fatalf("cairnd exited before readiness: %v\n%s", err, daemonLog.String())
 		default:
 		}
 		commandArgs := append([]string{"--socket", socketPath, "--json"}, args...)
-		if err := exec.Command(rwBin, commandArgs...).Run(); err == nil {
+		if err := exec.Command(cairnBin, commandArgs...).Run(); err == nil {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatalf("restoreweaved CLI readiness timed out\n%s", daemonLog.String())
+	t.Fatalf("cairnd CLI readiness timed out\n%s", daemonLog.String())
 }
 
-func waitForReaderCLI(t *testing.T, rwBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer) {
+func waitForReaderCLI(t *testing.T, cairnBin, socketPath string, daemonDone <-chan error, daemonLog *bytes.Buffer) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
@@ -1376,7 +1376,7 @@ func waitForReaderCLI(t *testing.T, rwBin, socketPath string, daemonDone <-chan 
 			t.Fatalf("recovery reader exited before readiness: %v\n%s", err, daemonLog.String())
 		default:
 		}
-		cmd := exec.Command(rwBin, "--socket", socketPath, "--json", "snapshot", "list")
+		cmd := exec.Command(cairnBin, "--socket", socketPath, "--json", "snapshot", "list")
 		if err := cmd.Run(); err == nil {
 			return
 		}
@@ -1385,20 +1385,20 @@ func waitForReaderCLI(t *testing.T, rwBin, socketPath string, daemonDone <-chan 
 	t.Fatalf("recovery reader CLI readiness timed out\n%s", daemonLog.String())
 }
 
-func runRWProcess(t *testing.T, rwBin, socketPath string, args ...string) command.Result {
+func runRWProcess(t *testing.T, cairnBin, socketPath string, args ...string) command.Result {
 	t.Helper()
 	fullArgs := append([]string{"--socket", socketPath, "--json"}, args...)
-	cmd := exec.Command(rwBin, fullArgs...)
+	cmd := exec.Command(cairnBin, fullArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("rw %s: %v\n%s", strings.Join(args, " "), err, output)
+		t.Fatalf("cairn %s: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	var result command.Result
 	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("decode rw %s result: %v\n%s", strings.Join(args, " "), err, output)
+		t.Fatalf("decode cairn %s result: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	if result.Status != command.StatusSucceeded {
-		t.Fatalf("rw %s status = %s, reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
+		t.Fatalf("cairn %s status = %s, reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
 	}
 	return result
 }
@@ -1406,20 +1406,20 @@ func runRWProcess(t *testing.T, rwBin, socketPath string, args ...string) comman
 // runRWProcessAllowDegraded accepts the CLI's intentional degraded-search
 // contract while keeping unexpected failures fatal. The broker returns useful
 // lexical data when semantic search is unavailable and exits with code 5.
-func runRWProcessAllowDegraded(t *testing.T, rwBin, socketPath string, args ...string) command.Result {
+func runRWProcessAllowDegraded(t *testing.T, cairnBin, socketPath string, args ...string) command.Result {
 	t.Helper()
 	fullArgs := append([]string{"--socket", socketPath, "--json"}, args...)
-	output, processErr := exec.Command(rwBin, fullArgs...).CombinedOutput()
+	output, processErr := exec.Command(cairnBin, fullArgs...).CombinedOutput()
 	var result command.Result
 	if decodeErr := json.Unmarshal(output, &result); decodeErr != nil {
-		t.Fatalf("decode rw %s result: %v (process error %v)\n%s", strings.Join(args, " "), decodeErr, processErr, output)
+		t.Fatalf("decode cairn %s result: %v (process error %v)\n%s", strings.Join(args, " "), decodeErr, processErr, output)
 	}
 	if result.Status != command.StatusDegraded {
-		t.Fatalf("rw %s status = %s, want DEGRADED; reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
+		t.Fatalf("cairn %s status = %s, want DEGRADED; reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
 	}
 	var exitErr *exec.ExitError
 	if !errors.As(processErr, &exitErr) || exitErr.ExitCode() != 5 {
-		t.Fatalf("rw %s process error = %v, want exit status 5", strings.Join(args, " "), processErr)
+		t.Fatalf("cairn %s process error = %v, want exit status 5", strings.Join(args, " "), processErr)
 	}
 	return result
 }

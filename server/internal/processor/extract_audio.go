@@ -14,7 +14,7 @@ import (
 // Vorbis comments, OGG Vorbis comments, MP4/M4A audio, WAVE, and MPEG audio.
 // It never opens paths and does not rewrite source bytes.
 //
-// The artifact body (schema restoreweave.domain.audio.track/v1,
+// The artifact body (schema cairn.domain.audio.track/v1,
 // application/json) carries the tag facts and, additively, the technical facts
 // the container declares: duration, sample rate, channel count, and codec. A
 // codec field is reported only when the container declares one. A duration

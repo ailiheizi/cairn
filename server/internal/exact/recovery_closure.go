@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	RecoveryTrustAnchorSchemaV1     = "org.restoreweave.trust-anchor.v1"
-	PreparedClosureSchemaV1         = "org.restoreweave.prepared-closure.v1"
-	PublicationCommitSchemaV1       = "org.restoreweave.publication-commit.v1"
-	ProcessorAttemptClosureSchemaV1 = "org.restoreweave.processor-attempt-closure.v1"
-	ProcessorAttemptClosureSchemaV2 = "org.restoreweave.processor-attempt-closure.v2"
-	PortableFactClosureSchemaV1     = "org.restoreweave.portable-fact-closure.v1"
-	PortableFactClosureSchemaV2     = "org.restoreweave.portable-fact-closure.v2"
-	RecoverySignatureDomainV1       = "org.restoreweave.rw-mvp-1.recovery.v1"
+	RecoveryTrustAnchorSchemaV1     = "org.cairn.trust-anchor.v1"
+	PreparedClosureSchemaV1         = "org.cairn.prepared-closure.v1"
+	PublicationCommitSchemaV1       = "org.cairn.publication-commit.v1"
+	ProcessorAttemptClosureSchemaV1 = "org.cairn.processor-attempt-closure.v1"
+	ProcessorAttemptClosureSchemaV2 = "org.cairn.processor-attempt-closure.v2"
+	PortableFactClosureSchemaV1     = "org.cairn.portable-fact-closure.v1"
+	PortableFactClosureSchemaV2     = "org.cairn.portable-fact-closure.v2"
+	RecoverySignatureDomainV1       = "org.cairn.mvp-1.recovery.v1"
 
 	PreparedClosureKind         = "PREPARED_CLOSURE"
 	PublicationCommitKind       = "PUBLICATION_COMMIT"
@@ -354,7 +354,7 @@ func verifyRecord(anchor TrustAnchor, schema, domain string, payload, signature 
 }
 
 func signingMessage(schema, domain string, payload []byte) []byte {
-	prefix := "restoreweave-signature-v1\x00" + schema + "\x00" + domain + "\x00"
+	prefix := "cairn-signature-v1\x00" + schema + "\x00" + domain + "\x00"
 	return append([]byte(prefix), payload...)
 }
 

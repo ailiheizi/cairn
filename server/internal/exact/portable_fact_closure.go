@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
-	PortableFactBundleSchemaV1 = "org.restoreweave.portable-fact-bundle.v1"
-	PortableFactRecordSchemaV1 = "org.restoreweave.portable-fact-record.v1"
-	PortableFactBundleSchemaV2 = "org.restoreweave.portable-fact-bundle.v2"
-	PortableFactRecordSchemaV2 = "org.restoreweave.portable-fact-record.v2"
+	PortableFactBundleSchemaV1 = "org.cairn.portable-fact-bundle.v1"
+	PortableFactRecordSchemaV1 = "org.cairn.portable-fact-record.v1"
+	PortableFactBundleSchemaV2 = "org.cairn.portable-fact-bundle.v2"
+	PortableFactRecordSchemaV2 = "org.cairn.portable-fact-record.v2"
 )
 
 type PortableFactClosureEnvelope struct {
@@ -270,8 +270,8 @@ func (s *Service) PublishPortableFactClosure(ctx context.Context, workspaceID, s
 }
 
 const (
-	PortableFactClosureEnvelopeSchemaV1 = "org.restoreweave.portable-fact-closure-envelope.v1"
-	PortableFactClosureEnvelopeSchemaV2 = "org.restoreweave.portable-fact-closure-envelope.v2"
+	PortableFactClosureEnvelopeSchemaV1 = "org.cairn.portable-fact-closure-envelope.v1"
+	PortableFactClosureEnvelopeSchemaV2 = "org.cairn.portable-fact-closure-envelope.v2"
 )
 
 func (s *Service) admittedProcessorAttemptDigest(ctx context.Context, workspaceID, snapshotRef, parentDigest string) (string, error) {
@@ -667,7 +667,7 @@ func portableFactReaderDependenciesForSchema(repo repository.Driver, closureSche
 	return []string{
 		"canonicalization:encoding/json-compact-v1",
 		"repository:" + profile.Repository + "/" + profile.Compression,
-		"restoreweave-reader:portable-fact-" + readerVersion,
+		"cairn-reader:portable-fact-" + readerVersion,
 		"signature:ed25519-v1",
 	}
 }

@@ -127,7 +127,7 @@ export async function assertSourceChangeSummary(ctx) {
     // 2. Publish the second restore point with one added subject, then refresh
     // the shell projection. The daemon's own diff answer is the only accepted
     // source for the rendered counts.
-    writeFileSync(join(sourcePath, "change-fixture"), "restoreweave source change comparison fixture\n");
+    writeFileSync(join(sourcePath, "change-fixture"), "cairn source change comparison fixture\n");
     await publish();
     await reloadSourcesView(ctx);
     await changeStateReached(ctx, "READY");
@@ -283,7 +283,7 @@ export async function assertSourcePlanAndSave(ctx, { sourcePath }) {
   const addDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await addDrawer.waitFor({ state: "visible", timeout: 10000 });
   await addDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
-  const pathInput = addDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
+  const pathInput = addDrawer.getByRole("textbox", { name: /Cairn 主机上的路径|Path on Cairn host/ });
   // The drawer's next step is one sticky action bar at the bottom edge. With no
   // path it offers the preview action, disabled, and it stays in view without
   // scrolling the review body.
@@ -337,7 +337,7 @@ export async function assertSourcePreviewOnEnter(ctx, { sourcePath }) {
   const enterDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await enterDrawer.waitFor({ state: "visible", timeout: 10000 });
   await enterDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
-  const enterInput = enterDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
+  const enterInput = enterDrawer.getByRole("textbox", { name: /Cairn 主机上的路径|Path on Cairn host/ });
   await enterInput.waitFor({ state: "visible", timeout: 10000 });
   // The keyboard lands on the path field, not on the bar: a user opens the
   // drawer and types immediately.
@@ -376,7 +376,7 @@ export async function assertSourceSuggestionRecheck(ctx, { sourcePath }) {
   assert.equal(normalizePath(await sourceChip.getAttribute("title")), normalizePath(sourcePath), "the configured source path must be the offered suggestion");
   await sourceChip.click();
   await chipDrawer.getByRole("heading", { name: /重新检查来源|Recheck source/ }).waitFor({ state: "visible", timeout: 10000 });
-  const chipInput = chipDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
+  const chipInput = chipDrawer.getByRole("textbox", { name: /Cairn 主机上的路径|Path on Cairn host/ });
   assert.equal(normalizePath(await chipInput.inputValue()), normalizePath(sourcePath), "a suggestion chip must fill the path field");
   await chipDrawer.getByText(/存储计划已生成|Storage plan is ready/).waitFor({ state: "visible", timeout: 15000 });
   assert.equal(await chipDrawer.getByRole("heading", { name: /重新检查来源|Recheck source/ }).count(), 1, "rechecking a configured source must stay a recheck, not a fresh add");
@@ -396,7 +396,7 @@ export async function assertBrowserUploadIntake(ctx) {
   const digest = createHash("sha256").update(bytes).digest("hex");
   async function assertNotProtected(name) {
     const listing = await ctx.page.evaluate(async (itemName) => {
-      const workspaceID = localStorage.getItem("restoreweave.workspace_id") ?? "";
+      const workspaceID = localStorage.getItem("cairn.workspace_id") ?? "";
       if (!workspaceID) return { workspaceID, httpOk: false, status: "", items: null };
       const response = await fetch("/api/v1/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "content.list", input: { workspace_id: workspaceID } }) });
       let body;
@@ -435,7 +435,7 @@ export async function assertBrowserUploadIntake(ctx) {
   const pickerText = "file chooser intake remains staged\n";
   const pickerBytes = Buffer.from(pickerText, "utf8");
   const pickerDigest = createHash("sha256").update(pickerBytes).digest("hex");
-  const pickerPath = `/tmp/restoreweave-picker-${process.pid}.txt`;
+  const pickerPath = `/tmp/cairn-picker-${process.pid}.txt`;
   writeFileSync(pickerPath, pickerBytes);
   try {
     await ctx.button(/添加内容|Add content|添加来源|Add source/).first().click();
@@ -444,7 +444,7 @@ export async function assertBrowserUploadIntake(ctx) {
     await pickerDrawer.locator('input[type="file"]').setInputFiles(pickerPath);
     await pickerDrawer.locator('.upload-rows[data-staged="1"]').waitFor({ state: "visible", timeout: 10000 });
     assert.match(await pickerDrawer.locator(".upload-rows").innerText(), new RegExp(pickerDigest.slice(0, 12)), "the real browser file picker must stage a file with its daemon-reported digest");
-    await assertNotProtected("restoreweave-picker-" + process.pid + ".txt");
+    await assertNotProtected("cairn-picker-" + process.pid + ".txt");
     await pickerDrawer.getByRole("button", { name: /关闭添加来源|Close add source/ }).click();
   } finally {
     unlinkSync(pickerPath);

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func newAudioCommand(env *clientEnv) *cobra.Command {
@@ -21,7 +21,7 @@ func newAudioListCommand(env *clientEnv) *cobra.Command {
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			workspace := workspaceValue(cmd)
 			if workspace == "" {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw audio list --workspace <id>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn audio list --workspace <id>\n")
 				return 1
 			}
 			input := map[string]any{"workspace_id": workspace}

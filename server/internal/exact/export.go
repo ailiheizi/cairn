@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
-const RecoveryExportBundleSchemaV1 = "org.restoreweave.recovery-export.v1"
+const RecoveryExportBundleSchemaV1 = "org.cairn.recovery-export.v1"
 
 type recoveryExportBundle struct {
 	Schema                    string                  `json:"schema"`

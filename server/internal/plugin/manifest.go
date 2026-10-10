@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-const ManifestSchemaV1Alpha1 = "restoreweave.plugin/v1alpha1"
+const ManifestSchemaV1Alpha1 = "cairn.plugin/v1alpha1"
 
 // Digest is an algorithm-qualified lowercase hexadecimal content digest, for
 // example sha256:0123.... It deliberately does not accept mutable references.

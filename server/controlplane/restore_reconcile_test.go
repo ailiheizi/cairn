@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func TestPlanApplyRestoreReconcilesOutputAfterJobCrash(t *testing.T) {

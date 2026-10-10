@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // TestJobListReportsRecordedJobColumns proves the job.list projection carries
@@ -28,7 +28,7 @@ func TestJobListReportsRecordedJobColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -220,7 +220,7 @@ func TestStatusGetReportsCatalogSchemaAndRepositoryWritability(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -261,7 +261,7 @@ func TestStatusGetReportsCatalogSchemaAndRepositoryWritability(t *testing.T) {
 	}
 
 	missingRoot := filepath.Join(t.TempDir(), "missing")
-	unknownDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	unknownDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  writabilityUnknownDriver{Driver: repo, root: missingRoot},
 	}))
@@ -310,7 +310,7 @@ func TestStatusGetIndexProjectionMatchesPerItemVocabulary(t *testing.T) {
 	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:status-index", seed.RootID); err != nil {
 		t.Fatalf("initial rebuild: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	dispatcher.search = indexer
 
 	nodes, err := store.ListNamespaceSubtree(ctx, seed.WorkspaceID, seed.RootID, "")

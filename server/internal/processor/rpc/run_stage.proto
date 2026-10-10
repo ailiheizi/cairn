@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package restoreweave.processor.v1;
+package cairn.processor.v1;
 
-option go_package = "github.com/ailiheizi/restoreweave/server/internal/processor/rpc";
+option go_package = "github.com/ailiheizi/cairn/server/internal/processor/rpc";
 
 // Private experimental control schema. Large bytes travel on pre-opened
 // file descriptors (SCM_RIGHTS), never in these messages. grpc-go wrapping

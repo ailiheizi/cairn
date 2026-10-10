@@ -427,9 +427,9 @@ type ContentExtent struct {
 type OwnershipMode string
 
 const (
-	OwnershipRestoreWeavePacks OwnershipMode = "RESTOREWEAVE_PACKS"
-	OwnershipEngineManaged     OwnershipMode = "ENGINE_MANAGED_OBJECTS"
-	OwnershipInline            OwnershipMode = "INLINE"
+	OwnershipCairnPacks    OwnershipMode = "CAIRN_PACKS"
+	OwnershipEngineManaged OwnershipMode = "ENGINE_MANAGED_OBJECTS"
+	OwnershipInline        OwnershipMode = "INLINE"
 )
 
 type LocatorKind string

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestSemanticMultimodalFuse(t *testing.T) {
@@ -28,7 +28,7 @@ func TestSemanticMultimodalFuse(t *testing.T) {
 		Processors: append(processor.DefaultProcessors(),
 			processor.AudioFingerprint{}, processor.TextEmbedding{}, processor.ClipEmbedding{}),
 	})
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithFixtureDimensions(), WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithFixtureDimensions(), WithExact(&exact.Service{
 		Store:     store,
 		Repo:      repo,
 		Processor: host,

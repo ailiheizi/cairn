@@ -204,8 +204,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
           {library.hasActiveFilters && <button className="library-return" onClick={library.clearLibraryFilters}><X size={14} />{t("Clear filters")}</button>}
           {viewMode === "search" && <button className="library-return" onClick={library.clearSearchScope}><X size={14} />{t("Clear search")}</button>}
           {viewMode === "path" && workspaceID && <button className="library-return" onClick={() => void library.loadContentLibrary(workspaceID, undefined, true)}><Home size={14} />{t("All content")}</button>}
-          {renderedHits.length > 0 && <span className="sort-control" role="group" aria-label={t("Sort library")} aria-describedby="restoreweave-sort-description">
-            <span className="sr-only" id="restoreweave-sort-description">{t(sortAvailable ? "Sorts the items already loaded in this browser. The library listing is the complete publication set, so this is not a server query. Items without a logical size sort last." : "Search results keep their relevance order, so sorting is unavailable here.")}</span>
+          {renderedHits.length > 0 && <span className="sort-control" role="group" aria-label={t("Sort library")} aria-describedby="cairn-sort-description">
+            <span className="sr-only" id="cairn-sort-description">{t(sortAvailable ? "Sorts the items already loaded in this browser. The library listing is the complete publication set, so this is not a server query. Items without a logical size sort last." : "Search results keep their relevance order, so sorting is unavailable here.")}</span>
             <select className="sort-field" aria-label={t("Sort field")} value={view.sortField} disabled={!sortAvailable} onChange={(event) => view.changeSortField(event.target.value as "name" | "size" | "type" | "path")}>
               <option value="name">{t("Name")}</option>
               <option value="size">{t("Size")}</option>

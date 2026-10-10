@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // BuildAdmittedSemanticBundleArchive creates a candidate-only offline archive

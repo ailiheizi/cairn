@@ -251,7 +251,7 @@ Cairn should concentrate on the shared identities, policies, representation life
 
 ## 12. Coverage and limitations
 
-The retained research used GitHub, Hacker News, canonical repositories, official documentation, RFCs, standards, and papers. The open-source adoption run used Siftline query ID `restoreweave-oss-adoption-20260812`; its final machine ledger recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**. A separate focused Processor run recorded **20 attempts**, **12 provider calls**, **12 successes**, and **8 cache hits**. These counts describe execution history, not ecosystem-wide market coverage.
+The retained research used GitHub, Hacker News, canonical repositories, official documentation, RFCs, standards, and papers. The open-source adoption run used Siftline query ID `cairn-oss-adoption-20260812`; its final machine ledger recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**. A separate focused Processor run recorded **20 attempts**, **12 provider calls**, **12 successes**, and **8 cache hits**. These counts describe execution history, not ecosystem-wide market coverage.
 
 GitHub and Hacker News were available. Exa, Tavily, and the configured OpenAI-compatible Web provider remained unavailable because credentials were not configured.
 

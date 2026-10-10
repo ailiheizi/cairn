@@ -46,11 +46,11 @@ const (
 	// required egress scope: a v1 document has no disclosed data classes,
 	// budgets, expiry, or revocation identity, so it cannot authorize any
 	// disclosure and is refused by name instead of being read as malformed.
-	OnlineEmbeddingProfileSchemaV2 = "restoreweave.online-embedding-profile.v2"
+	OnlineEmbeddingProfileSchemaV2 = "cairn.online-embedding-profile.v2"
 
 	// OnlineEmbeddingProfileSchemaV1 is the superseded schema. It is kept so
 	// the refusal can name the exact version an operator installed.
-	OnlineEmbeddingProfileSchemaV1 = "restoreweave.online-embedding-profile.v1"
+	OnlineEmbeddingProfileSchemaV1 = "cairn.online-embedding-profile.v1"
 
 	// OnlineEmbeddingProfileDirName and OnlineEmbeddingProfileFileName are the
 	// only accepted location below the configured paths.models root:
@@ -181,7 +181,7 @@ type OnlineSpaceFingerprint struct {
 // provider.
 func (f OnlineSpaceFingerprint) CanonicalDigest() string {
 	payload, _ := json.Marshal(f)
-	h := sha256.Sum256(append([]byte("restoreweave.online-embedding-space.v1\n"), payload...))
+	h := sha256.Sum256(append([]byte("cairn.online-embedding-space.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 
@@ -284,10 +284,10 @@ func (p OnlineEmbeddingProfile) EmbeddingGenerationManifest(configDigest string)
 	}
 	fingerprint := p.Fingerprint()
 	return EmbeddingGenerationManifest{
-		RuntimeDigest:       "provider-managed:" + digestOfString("restoreweave.online-endpoint.v1", p.Provider, p.APIStyle, p.Endpoint),
-		ModelDigest:         digestOfString("restoreweave.online-model.v1", p.Provider, p.ModelID, p.ModelRevision),
+		RuntimeDigest:       "provider-managed:" + digestOfString("cairn.online-endpoint.v1", p.Provider, p.APIStyle, p.Endpoint),
+		ModelDigest:         digestOfString("cairn.online-model.v1", p.Provider, p.ModelID, p.ModelRevision),
 		TokenizerDigest:     "provider-managed:" + strings.TrimSpace(p.Tokenizer),
-		PreprocessingDigest: digestOfString("restoreweave.online-preprocessing.v1", p.InputType, p.Instruction, p.InstructionField, p.DocumentPrefix, p.QueryPrefix),
+		PreprocessingDigest: digestOfString("cairn.online-preprocessing.v1", p.InputType, p.Instruction, p.InstructionField, p.DocumentPrefix, p.QueryPrefix),
 		Pooling:             strings.TrimSpace(p.Pooling),
 		Normalization:       p.Normalization,
 		ElementType:         p.ElementType,

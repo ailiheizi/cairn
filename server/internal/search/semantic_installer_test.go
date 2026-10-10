@@ -170,7 +170,7 @@ func TestSemanticBundleInstallerInstallsAndRepeatsWithoutDownload(t *testing.T) 
 	if err := json.Unmarshal(sbomJSON, &sbom); err != nil {
 		t.Fatalf("decode SBOM: %v", err)
 	}
-	if sbom.Schema != "restoreweave.semantic-bundle.sbom.v1" {
+	if sbom.Schema != "cairn.semantic-bundle.sbom.v1" {
 		t.Fatalf("SBOM schema = %q", sbom.Schema)
 	}
 	var sbomFacts map[string]any
@@ -1322,11 +1322,11 @@ func TestSemanticInstallerOverlapResolvesDarwinPathAliases(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("Darwin alias check")
 	}
-	overlaps, samePath := semanticInstallerPathsOverlap("/tmp/restoreweave-source", "/private/tmp/restoreweave-source/nested")
+	overlaps, samePath := semanticInstallerPathsOverlap("/tmp/cairn-source", "/private/tmp/cairn-source/nested")
 	if !overlaps || samePath {
 		t.Fatalf("alias ancestor overlap = (%v, %v), want (true, false)", overlaps, samePath)
 	}
-	overlaps, samePath = semanticInstallerPathsOverlap("/tmp/restoreweave-source", "/private/tmp/restoreweave-source")
+	overlaps, samePath = semanticInstallerPathsOverlap("/tmp/cairn-source", "/private/tmp/cairn-source")
 	if !overlaps || !samePath {
 		t.Fatalf("alias equal path = (%v, %v), want (true, true)", overlaps, samePath)
 	}

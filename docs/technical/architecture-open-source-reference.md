@@ -6,7 +6,7 @@ The purpose of this note is to keep later work from optimizing one slice in a wa
 
 ## 1. Decision
 
-Write the authority-owning core. Consume mature open-source software for parsers, repository engines, protocol stacks, and later experience UIs. Do not embed those UIs or media servers into `restoreweaved`.
+Write the authority-owning core. Consume mature open-source software for parsers, repository engines, protocol stacks, and later experience UIs. Do not embed those UIs or media servers into `cairnd`.
 
 Keep two proofs separate. The **recovery proof** is authenticated clean restore. The **product proof** is ingest -> fused search -> saved view -> frozen export -> materialize/verify, without internal IDs. Neither waits for a WebUI, facade, live FUSE mount, or media server.
 
@@ -21,7 +21,7 @@ Core command ABI and FileAccess
   -> file-shaped bytes via restore or FileAccess; other tools may mount that
 ```
 
-Cairn does not own a kernel filesystem adapter. `plan.restore` writes a real directory; export materialization, `content.open`/`read`, and `FileAccess` hand out exact bytes. External tools may mount or share those outputs. That work stays outside `restoreweaved`, and no mount code or dependency remains in tree.
+Cairn does not own a kernel filesystem adapter. `plan.restore` writes a real directory; export materialization, `content.open`/`read`, and `FileAccess` hand out exact bytes. External tools may mount or share those outputs. That work stays outside `cairnd`, and no mount code or dependency remains in tree.
 
 Progress, bookmarks, tags, and notes remain Cairn annotations bound to `SubjectRef` / `SegmentRef`. A client-private database is not recovery authority. Pointing Navidrome, Komga, or Jellyfin at a mount demonstrates that a snapshot is readable. It does not demonstrate a unified catalog.
 
@@ -72,7 +72,7 @@ GPL/AGPL projects may run beside Cairn. Linking them into a permissively license
 | Control plane | Cobra, read-only MCP, private gRPC | Stabilize the command ABI before any WebUI | Use MCP as an internal bus or mutation surface |
 | Browser UI | Small React/Vite client over the HTTP adapter | Keep it disposable and read-only with respect to source content; do not use it as release completion or grow a second catalog |
 | Mixed indexer analogue | sist2 | External Processor or design reference | Let a second index become recovery authority |
-| Music | Navidrome and Subsonic clients | Consume an explicit restore/export or a later approved adapter. | Embed a media server or library scanner in `restoreweaved` |
+| Music | Navidrome and Subsonic clients | Consume an explicit restore/export or a later approved adapter. | Embed a media server or library scanner in `cairnd` |
 | Books / comics | Komga (MIT), Kavita/calibre (GPL) | Consume an explicit restore/export or a later approved adapter. | Make a custom renderer the identity of a book |
 | Video | Jellyfin server and jellyfin-web | Later than music/books. Keep NFO-next-to-file and adjacent artwork off; transcode only in a qualified sandbox. | Let Jellyfin own storage, exact bytes, or the daily catalog |
 | Photos | Immich | Do not embed; at most consume an export/mount | Create a second photo catalog and identity |
@@ -127,7 +127,7 @@ Related documents:
 
 Four independent read-only reviews challenged the first draft of this note: counterexample strategy, FUSE feasibility, license/confidentiality, and operator/product. They agreed on the authority boundary and disagreed with the default experience path.
 
-**Held.** Do not embed a player, reader, or media server in `restoreweaved`. A client-private database is not recovery authority. File Browser must not own writable source-tree semantics. Stars do not select Kopia and do not authorize GPL linking. The core must restore without a WebUI. The local-zstd candidate does not waive release Driver gates. Tika/ffprobe stay isolated.
+**Held.** Do not embed a player, reader, or media server in `cairnd`. A client-private database is not recovery authority. File Browser must not own writable source-tree semantics. Stars do not select Kopia and do not authorize GPL linking. The core must restore without a WebUI. The local-zstd candidate does not waive release Driver gates. Tika/ffprobe stay isolated.
 
 **Reversed or tightened.**
 

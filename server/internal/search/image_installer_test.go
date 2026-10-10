@@ -214,11 +214,11 @@ func writeArchiveWithExtraFile(t *testing.T, sourceRoot, destination, extraName 
 
 // TestImageBundleArchiveRoundTripsTheInstalledBundle exercises the transport
 // path against the real, operator-installed image bundle. It is opt-in because
-// it needs that artifact: set RESTOREWEAVE_IMAGE_BUNDLE to the bundle root.
+// it needs that artifact: set CAIRN_IMAGE_BUNDLE to the bundle root.
 func TestImageBundleArchiveRoundTripsTheInstalledBundle(t *testing.T) {
-	root := strings.TrimSpace(os.Getenv("RESTOREWEAVE_IMAGE_BUNDLE"))
+	root := strings.TrimSpace(os.Getenv("CAIRN_IMAGE_BUNDLE"))
 	if root == "" {
-		t.Skip("RESTOREWEAVE_IMAGE_BUNDLE is not set")
+		t.Skip("CAIRN_IMAGE_BUNDLE is not set")
 	}
 	ctx := context.Background()
 	source, err := LoadImageBundle(root)

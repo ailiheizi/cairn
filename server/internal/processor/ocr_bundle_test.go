@@ -201,7 +201,7 @@ func TestOCRBundleRejectsMissingTamperedAndOverclaimingBundles(t *testing.T) {
 	for name, mutate := range map[string]func(*OCRBundleManifest){
 		"profile":  func(manifest *OCRBundleManifest) { manifest.ProfileID = "someone-elses-profile" },
 		"platform": func(manifest *OCRBundleManifest) { manifest.PlatformOS = "plan9" },
-		"schema":   func(manifest *OCRBundleManifest) { manifest.Schema = "restoreweave.ocr-bundle.v2" },
+		"schema":   func(manifest *OCRBundleManifest) { manifest.Schema = "cairn.ocr-bundle.v2" },
 		"language": func(manifest *OCRBundleManifest) { manifest.Languages = nil },
 		"capi":     func(manifest *OCRBundleManifest) { manifest.ONNXRuntimeCAPI = 1 },
 		"bounds":   func(manifest *OCRBundleManifest) { manifest.DetLimitSide = 4 },

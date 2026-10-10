@@ -132,7 +132,7 @@ func TestInstallOnlineEmbeddingProfileRefusesUnsafeSources(t *testing.T) {
 	invalidProfile.Egress.DestinationHost = "elsewhere.invalid"
 	invalidSource := writeOnlineProfileDocument(t, t.TempDir(), invalidProfile)
 	invalidJSON := filepath.Join(t.TempDir(), "profile.json")
-	if err := os.WriteFile(invalidJSON, []byte(`{"schema":"restoreweave.online-embedding-profile.v1","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(invalidJSON, []byte(`{"schema":"cairn.online-embedding-profile.v1","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

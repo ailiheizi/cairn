@@ -8,7 +8,7 @@ import (
 )
 
 func TestOnlineCredentialRefSchemeValidation(t *testing.T) {
-	accepted := []string{"env://RW_KEY", "keychain://restoreweave/semantic"}
+	accepted := []string{"env://RW_KEY", "keychain://cairn/semantic"}
 	for _, ref := range accepted {
 		if _, err := OnlineCredentialRefScheme(ref); err != nil {
 			t.Fatalf("reference %q rejected: %v", ref, err)
@@ -57,14 +57,14 @@ func TestKeychainOnlineCredentialResolver(t *testing.T) {
 	secret := "keychain-secret-value"
 	runner := func(_ context.Context, args ...string) ([]byte, error) {
 		joined := strings.Join(args, " ")
-		if !strings.Contains(joined, "find-generic-password") || !strings.Contains(joined, "-s restoreweave") ||
+		if !strings.Contains(joined, "find-generic-password") || !strings.Contains(joined, "-s cairn") ||
 			!strings.Contains(joined, "-a semantic") {
 			return nil, errors.New("unexpected keychain query")
 		}
 		return []byte(secret + "\n"), nil
 	}
 	resolver := KeychainOnlineCredentialResolver{GOOS: "darwin", Run: runner}
-	credential, err := resolver.Resolve(context.Background(), "keychain://restoreweave/semantic")
+	credential, err := resolver.Resolve(context.Background(), "keychain://cairn/semantic")
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -76,13 +76,13 @@ func TestKeychainOnlineCredentialResolver(t *testing.T) {
 	failing := KeychainOnlineCredentialResolver{GOOS: "darwin", Run: func(context.Context, ...string) ([]byte, error) {
 		return []byte(secret), errors.New("security: exit 44")
 	}}
-	if _, err := failing.Resolve(context.Background(), "keychain://restoreweave/semantic"); err == nil ||
+	if _, err := failing.Resolve(context.Background(), "keychain://cairn/semantic"); err == nil ||
 		strings.Contains(err.Error(), secret) {
 		t.Fatalf("keychain failure error = %v", err)
 	}
 	// Other platforms fail closed.
 	other := KeychainOnlineCredentialResolver{GOOS: "linux", Run: runner}
-	if _, err := other.Resolve(context.Background(), "keychain://restoreweave/semantic"); err == nil ||
+	if _, err := other.Resolve(context.Background(), "keychain://cairn/semantic"); err == nil ||
 		!strings.Contains(err.Error(), "not available") {
 		t.Fatalf("non-darwin keychain error = %v", err)
 	}
@@ -95,13 +95,13 @@ func TestKeychainOnlineCredentialResolver(t *testing.T) {
 
 func TestDefaultOnlineCredentialResolverDispatchesAndRedacts(t *testing.T) {
 	resolver := DefaultOnlineCredentialResolver()
-	if _, err := resolver.Resolve(context.Background(), "env://RESTOREWEAVE_TEST_ABSENT_KEY"); err == nil {
+	if _, err := resolver.Resolve(context.Background(), "env://CAIRN_TEST_ABSENT_KEY"); err == nil {
 		t.Fatal("absent environment variable must not resolve")
 	}
 	if _, err := resolver.Resolve(context.Background(), "https://api.example.invalid"); err == nil {
 		t.Fatal("unsupported scheme must not resolve")
 	}
-	if got := RedactedOnlineCredentialRef("keychain://restoreweave/semantic"); got != "keychain://restoreweave/semantic" {
+	if got := RedactedOnlineCredentialRef("keychain://cairn/semantic"); got != "keychain://cairn/semantic" {
 		t.Fatalf("redacted reference = %q", got)
 	}
 	if got := RedactedOnlineCredentialRef("plain-secret-value"); got != "[unresolved-credential-reference]" {

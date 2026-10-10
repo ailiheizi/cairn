@@ -46,8 +46,8 @@ func TestMeasureSavingsSeparatesMechanisms(t *testing.T) {
 
 	// Two distinct compressible payloads: repeated bytes compress strongly and
 	// keep physical length well below logical length.
-	payloadA := bytes.Repeat([]byte("restoreweave savings measurement a "), 2048)
-	payloadB := bytes.Repeat([]byte("restoreweave savings measurement b "), 2048)
+	payloadA := bytes.Repeat([]byte("cairn savings measurement a "), 2048)
+	payloadB := bytes.Repeat([]byte("cairn savings measurement b "), 2048)
 
 	// Place A twice (second placement is a duplicate) and B once. The second
 	// placement of A must reuse the stored object without adding physical

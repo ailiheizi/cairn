@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // TestOCRTextReachesLexicalSearchThroughTheExistingExtractPath proves the

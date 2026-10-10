@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func artifactRecoveryReferenceFixture(t *testing.T) (signedPublicationFixture, IngestResult, RecoveryReference) {
@@ -726,7 +726,7 @@ func TestRecoveryReferenceValidatesMixedV1V2FactChain(t *testing.T) {
 	// though the reference-level tuple belongs to the v2 successor.
 	tampered := reference
 	tampered.PortableFactClosures = append([]RecoveryFactClosureReference(nil), reference.PortableFactClosures...)
-	tampered.PortableFactClosures[0].Envelope.Closure.RequiredReaderDependencies = []string{"restoreweave-reader:portable-fact-v2"}
+	tampered.PortableFactClosures[0].Envelope.Closure.RequiredReaderDependencies = []string{"cairn-reader:portable-fact-v2"}
 	tampered.PortableFactClosures[0].Envelope.Closure.Signature = nil
 	tampered.PortableFactClosures[0].Envelope.Closure, err = SignPortableFactClosure(*evidence.fixture.service.SigningIdentity, tampered.PortableFactClosures[0].Envelope.Closure)
 	if err != nil {

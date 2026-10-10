@@ -40,8 +40,8 @@ func TestMVPPluginCatalogRejectsExternalRuntime(t *testing.T) {
 	manifest.EntryPoints[0].Runtime = RuntimeDescriptor{
 		Kind:           RuntimeWASM,
 		Lifecycle:      RuntimeOneShot,
-		AdapterID:      "restoreweave.wasi.v1",
-		Protocol:       "restoreweave.rpc/v1",
+		AdapterID:      "cairn.wasi.v1",
+		Protocol:       "cairn.rpc/v1",
 		ArtifactDigest: testDigest('f'),
 		Entrypoint:     "detect",
 	}
@@ -112,7 +112,7 @@ func validTestManifest() Manifest {
 			ID:                 BuiltinCorePackageID,
 			Version:            "0.1.0-test",
 			Compatibility:      ">=0.1.0 <0.2.0",
-			Publisher:          "restoreweave-test",
+			Publisher:          "cairn-test",
 			PublisherKeyID:     "test-release-key",
 			PublisherSignature: testDigest('1'),
 			ArtifactDigest:     testDigest('2'),

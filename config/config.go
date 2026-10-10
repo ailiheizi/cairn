@@ -27,7 +27,7 @@ import (
 
 const (
 	// SchemaV1 is the only schema accepted by this package.
-	SchemaV1 = "restoreweave.config.v1"
+	SchemaV1 = "cairn.config.v1"
 
 	// These are the only storage profiles implemented by the current daemon.
 	// They are deliberately named as development profiles so a generated
@@ -47,12 +47,12 @@ const (
 	PublicationSigningLocalEd25519        = "local-ed25519-v1"
 	DefaultPublicationDomain              = "workspace:default"
 
-	ConfigEnv          = "RESTOREWEAVE_CONFIG"
-	CatalogEnv         = "RESTOREWEAVE_CATALOG"
-	RepositoryEnv      = "RESTOREWEAVE_REPOSITORY"
-	VectorsEnv         = "RESTOREWEAVE_VECTORS"
-	ModelsEnv          = "RESTOREWEAVE_MODELS"
-	RecoveryRecordsEnv = "RESTOREWEAVE_RECOVERY_RECORDS"
+	ConfigEnv          = "CAIRN_CONFIG"
+	CatalogEnv         = "CAIRN_CATALOG"
+	RepositoryEnv      = "CAIRN_REPOSITORY"
+	VectorsEnv         = "CAIRN_VECTORS"
+	ModelsEnv          = "CAIRN_MODELS"
+	RecoveryRecordsEnv = "CAIRN_RECOVERY_RECORDS"
 )
 
 // Paths identifies the independent operational stores.  Repository may be a
@@ -165,7 +165,7 @@ type ResolveOptions struct {
 
 // LoadOptions controls LoadEffective.
 type LoadOptions struct {
-	// Path is the persisted config path.  Empty selects RESTOREWEAVE_CONFIG or
+	// Path is the persisted config path.  Empty selects CAIRN_CONFIG or
 	// the platform default.
 	Path string
 	// AllowMissing returns the platform default profile when Path does not
@@ -188,7 +188,7 @@ type ResolvedConfig struct {
 	ConfigDigest string `json:"-"`
 }
 
-// DefaultConfigPath returns the persisted config location.  RESTOREWEAVE_CONFIG
+// DefaultConfigPath returns the persisted config location.  CAIRN_CONFIG
 // has precedence over the platform XDG location.
 func DefaultConfigPath() string {
 	if value := strings.TrimSpace(os.Getenv(ConfigEnv)); value != "" {
@@ -198,7 +198,7 @@ func DefaultConfigPath() string {
 }
 
 // PlatformConfigPath returns the config location without consulting the
-// RESTOREWEAVE_CONFIG override.
+// CAIRN_CONFIG override.
 func PlatformConfigPath() string {
 	return platformConfigPath()
 }
@@ -209,13 +209,13 @@ func platformConfigPath() string {
 
 func platformConfigPathForEnv(env map[string]string) string {
 	if value := strings.TrimSpace(env["XDG_CONFIG_HOME"]); value != "" {
-		return filepath.Join(value, "restoreweave", "config.toml")
+		return filepath.Join(value, "cairn", "config.toml")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {
-		return filepath.Join(os.TempDir(), "restoreweave", "config.toml")
+		return filepath.Join(os.TempDir(), "cairn", "config.toml")
 	}
-	return filepath.Join(home, ".config", "restoreweave", "config.toml")
+	return filepath.Join(home, ".config", "cairn", "config.toml")
 }
 
 // Default returns the current runnable development storage profile and the
@@ -269,13 +269,13 @@ func DefaultConfig() Config { return Default() }
 
 func platformDataPath(name string) string {
 	if value := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); value != "" {
-		return filepath.Join(value, "restoreweave", name)
+		return filepath.Join(value, "cairn", name)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {
-		return filepath.Join(os.TempDir(), "restoreweave", name)
+		return filepath.Join(os.TempDir(), "cairn", name)
 	}
-	return filepath.Join(home, ".local", "share", "restoreweave", name)
+	return filepath.Join(home, ".local", "share", "cairn", name)
 }
 
 // LoadFile decodes one strict persisted profile and validates its schema. TOML
@@ -916,7 +916,7 @@ func validatePublicationDomain(value string) error {
 
 func containsSecretValue(value string) bool {
 	// Credential references are deliberately opaque names such as
-	// "keychain://restoreweave/openai".  Reject common accidental secret forms
+	// "keychain://cairn/openai".  Reject common accidental secret forms
 	// while allowing ordinary references.
 	lower := strings.ToLower(strings.TrimSpace(value))
 	return strings.HasPrefix(lower, "sk-") || strings.Contains(lower, "api_key=") || strings.Contains(lower, "token=") || strings.Contains(lower, "password=") || strings.Contains(lower, "secret=")
@@ -1047,18 +1047,18 @@ func withDefaults(cfg Config) Config {
 func defaultForEnvironment(env map[string]string) Config {
 	defaults := Default()
 	if value := strings.TrimSpace(env["XDG_DATA_HOME"]); value != "" {
-		defaults.Paths.Catalog = filepath.Join(value, "restoreweave", "catalog.sqlite")
-		defaults.Paths.Repository = filepath.Join(value, "restoreweave", "repository")
-		defaults.Paths.Vectors = filepath.Join(value, "restoreweave", "vectors")
-		defaults.Paths.Models = filepath.Join(value, "restoreweave", "models")
-		defaults.Paths.RecoveryRecords = filepath.Join(value, "restoreweave", "recovery")
+		defaults.Paths.Catalog = filepath.Join(value, "cairn", "catalog.sqlite")
+		defaults.Paths.Repository = filepath.Join(value, "cairn", "repository")
+		defaults.Paths.Vectors = filepath.Join(value, "cairn", "vectors")
+		defaults.Paths.Models = filepath.Join(value, "cairn", "models")
+		defaults.Paths.RecoveryRecords = filepath.Join(value, "cairn", "recovery")
 	}
 	return defaults
 }
 
 func withDefaultsFrom(cfg Config, defaults Config) Config {
 	if cfg.Schema == "" {
-		// Decode callers receive the same defaults as `rw config init`; an
+		// Decode callers receive the same defaults as `cairn config init`; an
 		// explicitly unknown non-empty schema is still rejected.
 		cfg.Schema = defaults.Schema
 	}

@@ -7,14 +7,14 @@
 //
 // Isolation follows scripts/web-content-visual-e2e.mjs: this file owns a
 // temporary config, catalog, repository, vectors, models, recovery directory and
-// Chrome profile; it builds `restoreweaved` and `rw` with `go build -tags purego`
+// Chrome profile; it builds `cairnd` and `cairn` with `go build -tags purego`
 // into that temporary directory, starts its own daemon on a probed loopback port,
 // and launches its own Playwright Chrome against the installed Google Chrome. It
 // never touches a saved user profile or the persistent QA daemon, and it removes
 // its temporary directory on exit. It exercises the prebuilt web/dist bundle
 // exactly like the other browser harnesses; no web build step runs here. Like its
 // neighbours it runs unconditionally; the only knob is the shared
-// RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH executable override.
+// CAIRN_PLAYWRIGHT_EXECUTABLE_PATH executable override.
 //
 // Fixtures are synthesized deterministically in Node: a real mono 16-bit PCM WAV
 // (the supported control) and a real 8x8 RGB PNG renamed to .mp3 (the non-audio
@@ -54,7 +54,7 @@ import { deflateSync } from "node:zlib";
 import { chromium } from "../web/node_modules/playwright/index.mjs";
 
 const repo = resolve(new URL("..", import.meta.url).pathname);
-const chrome = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 4561;
 const supportedName = "Tone-Valid.wav";
 const unsupportedName = "Renamed-Original.mp3";
@@ -330,11 +330,11 @@ try {
   });
   await new Promise((resolveProbe, rejectProbe) => portProbe.close((error) => error ? rejectProbe(error) : resolveProbe()));
 
-  const temp = await mkdtemp(join(tmpdir(), "rw-audio-unsupported-"));
+  const temp = await mkdtemp(join(tmpdir(), "cairn-audio-unsupported-"));
   try {
-    const daemonBin = join(temp, "restoreweaved");
-    const rwBin = join(temp, "rw");
-    for (const [bin, pkg] of [[daemonBin, "./server/cmd/restoreweaved"], [rwBin, "./client/cmd/rw"]]) {
+    const daemonBin = join(temp, "cairnd");
+    const cairnBin = join(temp, "cairn");
+    for (const [bin, pkg] of [[daemonBin, "./server/cmd/cairnd"], [cairnBin, "./client/cmd/cairn"]]) {
       const built = spawnSync("go", ["build", "-tags", "purego", "-o", bin, pkg], { cwd: repo, stdio: "inherit" });
       assert.equal(built.status, 0, `build ${pkg}`);
     }
@@ -345,9 +345,9 @@ try {
     await writeFile(join(source, unsupportedName), unsupportedBytes);
 
     const config = join(temp, "config.toml");
-    const init = spawnSync(rwBin, ["config", "init", "--path", config], { cwd: repo, stdio: "ignore" });
+    const init = spawnSync(cairnBin, ["config", "init", "--path", config], { cwd: repo, stdio: "ignore" });
     assert.equal(init.status, 0, "initialize temporary config");
-    const env = { ...process.env, RESTOREWEAVE_CATALOG: join(temp, "catalog.sqlite"), RESTOREWEAVE_REPOSITORY: join(temp, "repository"), RESTOREWEAVE_VECTORS: join(temp, "vectors"), RESTOREWEAVE_MODELS: join(temp, "models"), RESTOREWEAVE_RECOVERY_RECORDS: join(temp, "recovery") };
+    const env = { ...process.env, CAIRN_CATALOG: join(temp, "catalog.sqlite"), CAIRN_REPOSITORY: join(temp, "repository"), CAIRN_VECTORS: join(temp, "vectors"), CAIRN_MODELS: join(temp, "models"), CAIRN_RECOVERY_RECORDS: join(temp, "recovery") };
     const daemonLogFD = openSync(join(temp, "daemon.log"), "a");
     daemon = spawn(daemonBin, ["--config", config, "--socket", join(temp, "daemon.sock"), "--api-listen", `127.0.0.1:${port}`, "--web-root", join(repo, "web/dist")], { cwd: repo, env, stdio: ["ignore", daemonLogFD, daemonLogFD] });
     await new Promise((resolveSpawn, rejectSpawn) => { daemon.once("spawn", resolveSpawn); daemon.once("error", rejectSpawn); });

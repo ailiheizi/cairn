@@ -224,7 +224,7 @@ func (m EmbeddingGenerationManifest) CanonicalDigest() string {
 		return ""
 	}
 	payload, _ := json.Marshal(m)
-	h := sha256.Sum256(append([]byte("restoreweave.embedding-generation-manifest.v1\n"), payload...))
+	h := sha256.Sum256(append([]byte("cairn.embedding-generation-manifest.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 
@@ -262,7 +262,7 @@ func FixtureIndexBinding(configDigest string) IndexBinding {
 // host configuration creates new work, while this digest records which
 // immutable retrieval implementation produced the bytes.
 func ProfileDigest(dimension, profile string) string {
-	h := sha256.Sum256([]byte("restoreweave.index-profile.v1\n" + strings.TrimSpace(dimension) + "\n" + strings.TrimSpace(profile)))
+	h := sha256.Sum256([]byte("cairn.index-profile.v1\n" + strings.TrimSpace(dimension) + "\n" + strings.TrimSpace(profile)))
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 

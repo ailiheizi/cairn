@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // ImageTextTokenizerProfileID is the admitted tokenizer profile identity for
@@ -295,6 +295,6 @@ func l2NormalizeImageVector(vector []float32) ([]float32, error) {
 // fingerprint's own CanonicalDigest is.
 func spaceFingerprintDigest(fingerprint search.ImageSpaceFingerprint) string {
 	payload, _ := json.Marshal(fingerprint)
-	sum := sha256.Sum256(append([]byte("restoreweave.image-space.diagnostic.v1\n"), payload...))
+	sum := sha256.Sum256(append([]byte("cairn.image-space.diagnostic.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }

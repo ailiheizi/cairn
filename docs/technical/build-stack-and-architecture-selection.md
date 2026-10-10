@@ -94,7 +94,7 @@ Fallback position: if dependency discipline ultimately outweighs ergonomics, std
 ### 4.2 Proposed tree
 
 ```
-cmd/restoreweave/            CLI, controller, and recovery entry points; composition root only
+cmd/cairn/            CLI, controller, and recovery entry points; composition root only
 internal/app/                composition root: wires config, store, journal, seams (from core-protocol-and-reference-userland.md:497)
 internal/command/            typed Core Command dispatch and authorization (core-protocol-and-reference-userland.md:200-228)
 internal/controller/         plan/apply/job/publication orchestration; the single writer of operations
@@ -784,7 +784,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   identity, Notes records, search policy, authorization, and data semantics
   remain shared.
 - **State and fallback:** Experience selection reuses the existing guarded,
-  origin-local browser preference key `restoreweave.appearance`; it adds no
+  origin-local browser preference key `cairn.appearance`; it adds no
   durable database or server setting. Keep existing appearance and palette
   fields compatible. Missing, malformed, or unknown experience values resolve
   to `workspace`. A selection change must not remount the client state owner,

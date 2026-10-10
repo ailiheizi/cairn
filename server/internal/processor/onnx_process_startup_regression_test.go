@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const startupRegressionHolderEnv = "RESTOREWEAVE_ONNX_STARTUP_STDERR_HOLDER"
+const startupRegressionHolderEnv = "CAIRN_ONNX_STARTUP_STDERR_HOLDER"
 const startupRegressionHolderLifetime = 2 * time.Second
 
 // This test binary doubles as a child that exits before dialing control.sock.
@@ -122,7 +122,7 @@ func isolateProofWorkerTempDir(t *testing.T) {
 
 func proofWorkerTempRoots(t *testing.T) map[string]struct{} {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(os.TempDir(), "restoreweave-onnx-worker-*"))
+	paths, err := filepath.Glob(filepath.Join(os.TempDir(), "cairn-onnx-worker-*"))
 	if err != nil {
 		t.Fatal(err)
 	}

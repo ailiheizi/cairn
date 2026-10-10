@@ -97,7 +97,7 @@ func TestAdmitSemanticBundleRejectsUnsafeOrMismatchedBundles(t *testing.T) {
 		{
 			name: "wrong schema",
 			mutate: func(t *testing.T, root string, d *SemanticBundleDescriptor) {
-				d.Schema = "restoreweave.semantic-bundle.v2"
+				d.Schema = "cairn.semantic-bundle.v2"
 			},
 		},
 		{
@@ -558,8 +558,8 @@ func testSemanticBundle(t *testing.T) (string, SemanticBundleDescriptor) {
 		"zvec.dylib":   []byte("zvec-native-fixture"),
 		"zvec-go.txt":  []byte("zvec-go-binding-fixture"),
 		"LICENSE":      []byte("MIT\nApache-2.0\n"),
-		"NOTICE":       []byte("RestoreWeave semantic bundle notices\n"),
-		"sbom.json":    []byte(`{"name":"restoreweave-semantic-bundle"}`),
+		"NOTICE":       []byte("Cairn semantic bundle notices\n"),
+		"sbom.json":    []byte(`{"name":"cairn-semantic-bundle"}`),
 	}
 	for name, data := range files {
 		if err := os.WriteFile(filepath.Join(root, name), data, 0o600); err != nil {

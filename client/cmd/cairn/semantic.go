@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // newSemanticCommand exposes the semantic provider profile lifecycle and the
@@ -59,7 +59,7 @@ func newSemanticProviderCommand(env *clientEnv) *cobra.Command {
 	install := newExitCommand(env, "install <path>", "Install one online provider profile from a local absolute path",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw semantic provider install <path> --digest sha256:...")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn semantic provider install <path> --digest sha256:...")
 				return 1
 			}
 			digest, err := cmd.Flags().GetString("digest")
@@ -219,7 +219,7 @@ func newSemanticEgressCommand(env *clientEnv) *cobra.Command {
 	revoke := newExitCommand(env, "revoke <grant-id>", "Revoke one egress grant by appending a revocation",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw semantic egress revoke <grant-id> --reason \"...\"")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn semantic egress revoke <grant-id> --reason \"...\"")
 				return 1
 			}
 			reason, _ := cmd.Flags().GetString("reason")

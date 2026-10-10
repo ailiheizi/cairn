@@ -21,7 +21,7 @@ The repository currently contains:
 - A local-tree `CaptureDriver`, raw development and local-zstd candidate `RepositoryDriver` profiles, capture-qualified catalog adoption, signed portable snapshot publication, and catalog-free restore.
 - SQLite records for namespace, representation, capture bindings, and publications.
 - `SnapshotTree`, `FileAccess`, bounded repository reads, storage-range reads, and representation-decoder interfaces.
-- A Unix-socket control plane (`restoreweaved` / `rw`) and a legacy `internal/plugin` prototype.
+- A Unix-socket control plane (`cairnd` / `cairn`) and a legacy `internal/plugin` prototype.
 
 The legacy plugin prototype is not the implementation target. It exposes many historical categories, mixes representation concerns, and lacks the current route, artifact, provenance, resource, and decoder contracts. External execution is disabled, so the prototype may be replaced without preserving it as a public ABI.
 
@@ -179,7 +179,7 @@ Status (2026-08-13): host-owned suffix/magic identification already lives in `se
 - Implement input handles, staging handles, sealing, host digesting, schema validation, admission, and artifact lineage.
 - Implement the reference control plane with protobuf schemas and gRPC over a Unix-domain socket. Pass large input and output through pre-opened file descriptors rather than protobuf, JSON, REST, or MCP messages. This is private implementation plumbing until cross-version conformance proves a public wire contract.
 
-> Landing note: part of the M2 control-plane slice is implemented as the `client/command` JSON-envelope Unix-socket daemon (`server/controlplane`), the thin client transport (`client/transport`), the `rw` CLI (`client/cmd/rw`), and the stdio MCP server (`client/mcp`). Processor RUN_STAGE protobuf frames plus SCM_RIGHTS live in `server/internal/processor/rpc` (private, experimental). grpc-go wrapping uses the same messages over a Unix handshake that still passes FDs out of band.
+> Landing note: part of the M2 control-plane slice is implemented as the `client/command` JSON-envelope Unix-socket daemon (`server/controlplane`), the thin client transport (`client/transport`), the `cairn` CLI (`client/cmd/cairn`), and the stdio MCP server (`client/mcp`). Processor RUN_STAGE protobuf frames plus SCM_RIGHTS live in `server/internal/processor/rpc` (private, experimental). grpc-go wrapping uses the same messages over a Unix handshake that still passes FDs out of band.
 - Run one isolated out-of-process deterministic Processor through `RUN_STAGE`, with bubblewrap, namespaces, seccomp, `no_new_privs`, rlimits, cgroup v2, an allowlisted environment, no network, no ambient source mount, and host-owned staging.
 - Add resource pools, quotas, cancellation, fencing, retry ceilings, crash-loop quarantine, and dead-letter handling.
 

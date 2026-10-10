@@ -4,10 +4,10 @@
 // and validates the daemon's captured responses.
 import assert from "node:assert/strict";
 
-const url = process.env.RESTOREWEAVE_WEB_E2E_URL;
-const playwrightModule = process.env.RESTOREWEAVE_PLAYWRIGHT_MODULE || "playwright";
-const executablePath = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH;
-assert.ok(url, "RESTOREWEAVE_WEB_E2E_URL is required");
+const url = process.env.CAIRN_WEB_E2E_URL;
+const playwrightModule = process.env.CAIRN_PLAYWRIGHT_MODULE || "playwright";
+const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH;
+assert.ok(url, "CAIRN_WEB_E2E_URL is required");
 const { chromium } = await import(playwrightModule);
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
 try {

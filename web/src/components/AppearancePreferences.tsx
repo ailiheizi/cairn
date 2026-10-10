@@ -35,7 +35,7 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
         {interfaceCatalog.map((definition) => <label className="interface-option" key={definition.id}>
           <input
             type="radio"
-            name="restoreweave-interface"
+            name="cairn-interface"
             value={definition.id}
             checked={preference.interfaceId === definition.id}
             onChange={() => changeInterface(definition.id)}
@@ -70,7 +70,7 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
         {appearanceModes.map((mode) => <label className="appearance-mode-option" key={mode}>
           <input
             type="radio"
-            name="restoreweave-appearance-mode"
+            name="cairn-appearance-mode"
             value={mode}
             checked={preference.appearance === mode}
             onChange={() => changeAppearance(mode)}
@@ -86,7 +86,7 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
         {themes.map((theme) => <label className="appearance-theme-option" key={theme.id}>
           <input
             type="radio"
-            name="restoreweave-theme-palette"
+            name="cairn-theme-palette"
             value={theme.id}
             checked={preference.themeId === theme.id}
             onChange={() => changeTheme(theme.id)}

@@ -291,10 +291,10 @@ These rules complement the normative [Release Qualification and Traceability](..
 
 ## 11. Research coverage and limits
 
-The main Siftline run used query ID `restoreweave-oss-adoption-20260812`. Its final machine ledger recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**. GitHub and Hacker News were available. Exa, Tavily, and the configured OpenAI-compatible Web provider were unavailable because credentials were not configured.
+The main Siftline run used query ID `cairn-oss-adoption-20260812`. Its final machine ledger recorded **68 attempts**, **63 provider calls**, **63 provider successes**, and **5 cache hits**. GitHub and Hacker News were available. Exa, Tavily, and the configured OpenAI-compatible Web provider were unavailable because credentials were not configured.
 
-A separate focused Processor run, `restoreweave-processor-baseline-20260812`, recorded **20 attempts**, **12 provider calls**, **12 provider successes**, and **8 cache hits**.
+A separate focused Processor run, `cairn-processor-baseline-20260812`, recorded **20 attempts**, **12 provider calls**, **12 provider successes**, and **8 cache hits**.
 
-A focused capture, snapshot, watcher, and namespace run, `restoreweave-capture-namespace-20260812`, recorded **20 attempts**, **19 provider calls**, **19 provider successes**, and **1 cache hit**. It verified the retained projects and primary repository artifacts for path resolution, watchers, ZFS/Btrfs lifecycle, and FUSE implementation patterns.
+A focused capture, snapshot, watcher, and namespace run, `cairn-capture-namespace-20260812`, recorded **20 attempts**, **19 provider calls**, **19 provider successes**, and **1 cache hit**. It verified the retained projects and primary repository artifacts for path resolution, watchers, ZFS/Btrfs lifecycle, and FUSE implementation patterns.
 
 The research used repository search, source trees, release tags, primary README and API files, actual LICENSE and NOTICE files, official specifications, and focused community queries. It did not reproduce all performance claims, conduct legal advice, inspect every transitive dependency, benchmark proprietary NAS products, or qualify a shipped binary. “Not retained” therefore means “not decision-changing within this bounded audit,” not “the project does not exist or can never fit.”

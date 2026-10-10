@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func TestIngestFIFORetainsMetadataProtectionAndPortableClosure(t *testing.T) {

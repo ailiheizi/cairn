@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
-// Server is the restoreweaved control-plane listener. Each accepted
+// Server is the cairnd control-plane listener. Each accepted
 // connection is handled in its own goroutine: frames are read, envelopes are
 // dispatched, and results are written back. Connection-level failures close
 // only that connection.

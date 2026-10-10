@@ -9,7 +9,7 @@
 // recovered) and passes it to the surface assertion modules in
 // `scripts/e2e/<surface>.mjs`, in the documented order.
 
-const playwrightModule = process.env.RESTOREWEAVE_PLAYWRIGHT_MODULE || "playwright";
+const playwrightModule = process.env.CAIRN_PLAYWRIGHT_MODULE || "playwright";
 const { chromium } = await import(playwrightModule);
 
 /**
@@ -22,9 +22,9 @@ export async function createHarness({ url, executablePath, headless = true }) {
   const text = (pattern) => page.getByText(pattern);
   // The paths the harness received from the shell script. Surface modules use
   // them to write their own fixture files and destinations.
-  const sourcePath = process.env.RESTOREWEAVE_WEB_E2E_SOURCE;
-  const restoreDestination = process.env.RESTOREWEAVE_WEB_E2E_RESTORE_DEST;
-  const exportDestination = process.env.RESTOREWEAVE_WEB_E2E_EXPORT_DEST;
+  const sourcePath = process.env.CAIRN_WEB_E2E_SOURCE;
+  const restoreDestination = process.env.CAIRN_WEB_E2E_RESTORE_DEST;
+  const exportDestination = process.env.CAIRN_WEB_E2E_EXPORT_DEST;
 
   // Capture state. Everything here is filled from the daemon's own traffic, so
   // a surface module can assert against what was returned or received instead

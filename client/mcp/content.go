@@ -11,8 +11,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 const (

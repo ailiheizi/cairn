@@ -48,11 +48,11 @@ configure storage
 Use Go 1.26 (or the version declared by `go.mod`) and a Node.js version supported by Vite 7:
 
 ```bash
-git clone https://github.com/ailiheizi/restoreweave.git
-cd restoreweave
-go build -tags=purego -o bin/restoreweaved ./server/cmd/restoreweaved
-go build -o bin/rw ./client/cmd/rw
-bin/rw config init --path ./restoreweave.toml
+git clone https://github.com/ailiheizi/cairn.git
+cd cairn
+go build -tags=purego -o bin/cairnd ./server/cmd/cairnd
+go build -o bin/cairn ./client/cmd/cairn
+bin/cairn config init --path ./cairn.toml
 ```
 
 Enable the local WebUI API:
@@ -67,7 +67,7 @@ Start the daemon and frontend in separate terminals:
 
 ```bash
 # Terminal 1
-bin/restoreweaved --config ./restoreweave.toml --socket /tmp/restoreweaved.sock
+bin/cairnd --config ./cairn.toml --socket /tmp/cairnd.sock
 
 # Terminal 2
 cd web

@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/api"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/api"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestHTTPAPIUsesTheSameDispatcherResult(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/restoreweave-test.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-test.sock")
 	handler := api.Handler(dispatcher.Handle, api.Options{})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/command", strings.NewReader(`{"operation":"status.get","input":{}}`))
 	resp := httptest.NewRecorder()

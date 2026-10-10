@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 func TestMeasureDeploymentOverheadScansFilesAndDirectories(t *testing.T) {

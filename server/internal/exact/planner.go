@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
-	"github.com/ailiheizi/restoreweave/server/internal/identify"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/identify"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 var (
@@ -525,7 +525,7 @@ func captureBasisDigest(binding capture.BindingRecord, entries []scanner.EntryRe
 		HashVersion      string       `json:"hash_version"`
 		Entries          []basisEntry `json:"entries"`
 	}{
-		Schema: "org.restoreweave.exact.capture-basis.v2", BindingDigest: binding.IdentityDigest(),
+		Schema: "org.cairn.exact.capture-basis.v2", BindingDigest: binding.IdentityDigest(),
 		TraversalVersion: scanner.TraversalVersion, MetadataVersion: scanner.MetadataVersion,
 		HashVersion: scanner.HashVersion, Entries: ordered,
 	})

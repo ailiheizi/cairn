@@ -142,9 +142,9 @@ func TestBuildManifestRejectsSymlinkAndEmptyCorpus(t *testing.T) {
 }
 
 func TestGenerateForQualificationRunner(t *testing.T) {
-	output := os.Getenv("RESTOREWEAVE_QUALIFICATION_CORPUS_OUT")
+	output := os.Getenv("CAIRN_QUALIFICATION_CORPUS_OUT")
 	if output == "" {
-		t.Skip("set RESTOREWEAVE_QUALIFICATION_CORPUS_OUT to emit a temporary corpus")
+		t.Skip("set CAIRN_QUALIFICATION_CORPUS_OUT to emit a temporary corpus")
 	}
 	manifest, err := Generate(output)
 	if err != nil {

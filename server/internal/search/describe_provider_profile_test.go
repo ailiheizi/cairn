@@ -105,7 +105,7 @@ func TestParseOnlineDescribeProfileRejectsUnsafeManifests(t *testing.T) {
 	}{
 		{"unknown field", func(d map[string]any) { d["surprise"] = true }, "unknown field"},
 		{"embedding schema", func(d map[string]any) { d["schema"] = OnlineEmbeddingProfileSchemaV2 }, "schema must be"},
-		{"unknown schema", func(d map[string]any) { d["schema"] = "restoreweave.online-describe-profile.v2" }, "schema must be"},
+		{"unknown schema", func(d map[string]any) { d["schema"] = "cairn.online-describe-profile.v2" }, "schema must be"},
 		{"api style", func(d map[string]any) { d["api_style"] = "openai-embeddings-v1" }, "api_style"},
 		{"plain http to remote host", func(d map[string]any) { d["endpoint"] = "http://api.example.invalid/v1/chat/completions" }, "https"},
 		{"endpoint userinfo", func(d map[string]any) { d["endpoint"] = "https://user:pass@api.example.invalid/v1/chat/completions" }, "userinfo"},
@@ -163,7 +163,7 @@ func TestOnlineDescribeProfileDigestBindsEveryFact(t *testing.T) {
 		"system instruction": func(p *OnlineDescribeProfile) { p.SystemInstruction = "different instruction" },
 		"max output tokens":  func(p *OnlineDescribeProfile) { p.MaxOutputTokens = 256 },
 		"timeout":            func(p *OnlineDescribeProfile) { p.TimeoutMS = 9000 },
-		"credential ref":     func(p *OnlineDescribeProfile) { p.CredentialRef = "keychain://restoreweave/describe" },
+		"credential ref":     func(p *OnlineDescribeProfile) { p.CredentialRef = "keychain://cairn/describe" },
 		"egress data classes": func(p *OnlineDescribeProfile) {
 			p.Egress.DisclosedDataClasses = []string{EgressDataClassTextSubjectContext, EgressDataClassImageBytes}
 		},

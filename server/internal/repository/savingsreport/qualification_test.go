@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 // TestSameCorpusRepositoryReadRelocateAndMigrateQualification is bounded
@@ -218,7 +218,7 @@ func writeQualificationCorpus(t *testing.T, root string) {
 	jsonFixture.WriteString("]\n")
 
 	files := map[string][]byte{
-		"README.txt":                bytes.Repeat([]byte("RestoreWeave exact storage qualification fixture.\n"), 512),
+		"README.txt":                bytes.Repeat([]byte("Cairn exact storage qualification fixture.\n"), 512),
 		"中文/说明.txt":                 bytes.Repeat([]byte("这是用于验证无损读回、搬迁与去重的确定性中文内容。\n"), 512),
 		"records.json":              []byte(jsonFixture.String()),
 		"duplicates/a-original.bin": duplicate,

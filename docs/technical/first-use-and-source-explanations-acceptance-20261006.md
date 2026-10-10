@@ -672,7 +672,7 @@ the promotion result SHA-256 is
 
 A separate fresh Darwin candidate passed its pinned online semantic installer
 in 266.134 seconds using a daemon-scoped proxy, then the outer candidate package
-`restoreweave-20261007-phase4-origin-v1-darwin-arm64.tar.gz` passed offline
+`cairn-20261007-phase4-origin-v1-darwin-arm64.tar.gz` passed offline
 semantic and lexical queries and independent-anchor catalog-free restore of
 89 bytes (`5060f8d7a5987ed4452a9cc4f84eb41697d08bc307ec1140888f466e64137a4a`).
 The outer package SHA-256 is

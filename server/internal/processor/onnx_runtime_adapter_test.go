@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 type probeOnlyONNXBackend struct {

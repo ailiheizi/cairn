@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type representationPolicy struct {
@@ -19,7 +19,7 @@ type representationPolicy struct {
 func representationProfile(mode sqlite.ProtectionMode) representationPolicy {
 	if mode == sqlite.ProtectionStoreExact || mode == sqlite.ProtectionStoreExactWithExternalFallback {
 		return representationPolicy{
-			ownership: sqlite.OwnershipRestoreWeavePacks,
+			ownership: sqlite.OwnershipCairnPacks,
 			codec:     "identity/sha256-v1",
 			access:    sqlite.AccessRandomNative,
 			metadata:  json.RawMessage(`{"availability":"local-verified"}`),
@@ -238,7 +238,7 @@ func externalRecoveryRecords(item prepared, bindingDigest string) (json.RawMessa
 		})
 	}
 	recipe, err := json.Marshal(map[string]any{
-		"schema":            "org.restoreweave.external-recovery-recipe.v1",
+		"schema":            "org.cairn.external-recovery-recipe.v1",
 		"binding_digest":    bindingDigest,
 		"content_id":        item.entry.Content.ContentID,
 		"logical_length":    item.entry.Content.BytesRead,

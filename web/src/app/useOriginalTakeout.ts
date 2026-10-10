@@ -15,7 +15,7 @@ export type OriginalTakeoutState = {
   manifestDigest?: string;
 };
 
-const filename = "restoreweave-takeout.zip";
+const filename = "cairn-takeout.zip";
 const initial: OriginalTakeoutState = { status: "idle", currentFile: 0, totalFiles: 0, requestedFilename: filename };
 function reason(error: unknown): string { return error instanceof Error ? error.message : "The original ZIP could not be prepared."; }
 

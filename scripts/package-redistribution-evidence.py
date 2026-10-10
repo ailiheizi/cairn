@@ -19,7 +19,7 @@ import tarfile
 from typing import Any
 
 
-SCHEMA = "restoreweave.redistribution-evidence.v1"
+SCHEMA = "cairn.redistribution-evidence.v1"
 DESCRIPTOR_KEYS = (
     "schema", "profile_id", "platform_os", "platform_arch", "onnx_runtime_version",
     "onnx_runtime_build", "onnx_runtime_c_api", "onnx_go_binding_commit",
@@ -154,7 +154,7 @@ def inspect_semantic_archive(path: Path) -> dict[str, Any]:
                 extras = sorted(set(by_name) - expected_members)
                 raise EvidenceError(f"semantic archive has unlisted members: {extras}")
             profile_payload = canonical_json({"descriptor": descriptor, "assets": dict(sorted(asset_digests.items()))})
-            profile_digest = "sha256:" + hashlib.sha256(b"restoreweave.semantic-bundle.v1\n" + profile_payload).hexdigest()
+            profile_digest = "sha256:" + hashlib.sha256(b"cairn.semantic-bundle.v1\n" + profile_payload).hexdigest()
             platform_os = descriptor.get("platform_os")
             platform_arch = descriptor.get("platform_arch")
             if not isinstance(platform_os, str) or not isinstance(platform_arch, str):

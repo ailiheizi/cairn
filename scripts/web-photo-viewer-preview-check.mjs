@@ -19,16 +19,16 @@
 //   node scripts/web-photo-viewer-preview-check.mjs [url]
 //
 // Environment:
-//   RESTOREWEAVE_BASE_URL                     default http://127.0.0.1:4648/
-//   RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
+//   CAIRN_BASE_URL                     default http://127.0.0.1:4648/
+//   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
 //
 // A failure exits nonzero with the concrete observation that failed.
 
 import assert from "node:assert/strict";
 import { chromium } from "../web/node_modules/playwright/index.mjs";
 
-const base = (process.argv[2] || process.env.RESTOREWEAVE_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
-const chrome = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const base = (process.argv[2] || process.env.CAIRN_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
+const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const observed = {};
 let failure;
 let browser;
@@ -49,7 +49,7 @@ const readViewer = (page) => page.evaluate(() => {
   const body = document.querySelector(".photo-viewer__body");
   if (!body) return { mounted: false };
   const image = body.querySelector("img");
-  const status = body.querySelector('[role="status"], [role="alert"], .rw-content-preview__status');
+  const status = body.querySelector('[role="status"], [role="alert"], .cairn-content-preview__status');
   const name = document.querySelector(".photo-viewer__identity h2")?.textContent?.trim() ?? "";
   const position = document.querySelector(".photo-viewer__identity span")?.textContent?.trim() ?? "";
   return {

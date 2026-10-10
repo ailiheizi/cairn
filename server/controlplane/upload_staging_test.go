@@ -16,11 +16,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/api"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/api"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // apiUploadStagingForTest is the same six-line adapter the daemon uses to
@@ -117,7 +117,7 @@ func newUploadDispatcher(t *testing.T) (*Dispatcher, string) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, filepath.Join(dataRoot, "catalog.sqlite"), "/tmp/rw.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
+	dispatcher := NewDispatcher(store, filepath.Join(dataRoot, "catalog.sqlite"), "/tmp/cairn.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
 	inbox := filepath.Join(dataRoot, inboxDirName)
 	if dispatcher.inboxRoot != inbox {
 		t.Fatalf("derived inbox root = %q, want %q", dispatcher.inboxRoot, inbox)
@@ -289,7 +289,7 @@ func TestUploadEndpointRejectsTraversalAndDisallowedNames(t *testing.T) {
 
 func TestUploadWithoutStagingSupportIsTypedUnavailable(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, filepath.Join(t.TempDir(), "catalog.sqlite"), "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, filepath.Join(t.TempDir(), "catalog.sqlite"), "/tmp/cairn.sock")
 	handler := api.Handler(dispatcher.Handle, api.Options{})
 	request, _ := mustUploadRequestBuilt(t, []uploadFixture{{name: "a.txt", content: []byte("x")}})
 	recorder := httptest.NewRecorder()
@@ -309,7 +309,7 @@ func TestUploadRefusedWhenInboxOverlapsTheRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, filepath.Join(dataRoot, "catalog.sqlite"), "/tmp/rw.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
+	dispatcher := NewDispatcher(store, filepath.Join(dataRoot, "catalog.sqlite"), "/tmp/cairn.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
 	if _, err := dispatcher.BeginUploadSession(); err == nil {
 		t.Fatal("upload session started although the inbox overlaps the repository")
 	}

@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestProjectSearchSegmentsPreservesAnnotationProvenance(t *testing.T) {
@@ -30,7 +30,7 @@ func TestProjectSearchSegmentsPreservesAnnotationProvenance(t *testing.T) {
 func TestAuthorizeHitsReconstructsDisplayPathForProviderHit(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
 	seed := testutil.SeedNamespace(t, store)
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	hits := dispatcher.authorizeHits(context.Background(), seed.WorkspaceID, "", []search.Hit{{
 		SubjectID: seed.FileEntryID,
 	}}, nil)
@@ -49,7 +49,7 @@ func TestSearchQueryTypedStructuredFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -206,7 +206,7 @@ func TestSearchQueryDescriptionSegmentProvenanceProjectsForNormalAndFusedHits(t 
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))

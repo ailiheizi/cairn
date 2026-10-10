@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 func TestBuildCorpusManifestIsDeterministicAndUnicodeSafe(t *testing.T) {
@@ -92,7 +92,7 @@ func TestReadCorpusManifestRejectsUnknownFieldsAndBadCanonicalDigest(t *testing.
 		t.Fatal(err)
 	}
 	unknown := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(unknown, []byte(`{"schema":"restoreweave.corpus-manifest.v1","entries":[],"digest":"x","extra":true}`), 0o600); err != nil {
+	if err := os.WriteFile(unknown, []byte(`{"schema":"cairn.corpus-manifest.v1","entries":[],"digest":"x","extra":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ReadCorpusManifest(unknown); err == nil {

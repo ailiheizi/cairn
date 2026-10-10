@@ -37,7 +37,7 @@ func RunONNXWorkerProcess(ctx context.Context, bundleRoot string) error {
 	noncePath := os.Getenv(onnxWorkerNoncePathEnv)
 	var nonceFile *os.File
 	if noncePath != "" {
-		if noncePath != "/restoreweave-worker-nonce" {
+		if noncePath != "/cairn-worker-nonce" {
 			return fmt.Errorf("%w: nonce path is not the fixed sandbox path", errONNXWorkerProofInvalid)
 		}
 		var err error
@@ -46,7 +46,7 @@ func RunONNXWorkerProcess(ctx context.Context, bundleRoot string) error {
 			return fmt.Errorf("%w: open nonce file: %v", errONNXWorkerProofInvalid, err)
 		}
 	} else {
-		nonceFile = os.NewFile(uintptr(3), "restoreweave-onnx-worker-nonce")
+		nonceFile = os.NewFile(uintptr(3), "cairn-onnx-worker-nonce")
 		if nonceFile == nil {
 			return fmt.Errorf("%w: nonce descriptor is unavailable", errONNXWorkerProofInvalid)
 		}

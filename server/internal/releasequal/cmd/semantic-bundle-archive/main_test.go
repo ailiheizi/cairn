@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func repositoryRoot(t *testing.T) string {
@@ -60,9 +60,9 @@ func TestSemanticBundleArchiveCommandMissingSourceDoesNotCreateOutput(t *testing
 }
 
 func TestSemanticBundleArchiveCommandRealBundleAndInstaller(t *testing.T) {
-	source := os.Getenv("RESTOREWEAVE_REAL_SEMANTIC_BUNDLE")
+	source := os.Getenv("CAIRN_REAL_SEMANTIC_BUNDLE")
 	if source == "" {
-		t.Skip("RESTOREWEAVE_REAL_SEMANTIC_BUNDLE is not set; no live model lookup or download is permitted")
+		t.Skip("CAIRN_REAL_SEMANTIC_BUNDLE is not set; no live model lookup or download is permitted")
 	}
 	root := repositoryRoot(t)
 	archive := filepath.Join(t.TempDir(), "semantic-bundle.tar.gz")

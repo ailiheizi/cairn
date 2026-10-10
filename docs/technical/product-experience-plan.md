@@ -249,7 +249,7 @@ gate.
 | V3 | Musly's licence is unverified (Namida's EULA is confirmed) | Blocks any reuse of a Flutter client |
 | V4 | The reference app's synchronisation mechanism is unverified | Blocks SP-8 scheduling |
 | V5 | `scripts/web-e2e.sh` prints `SKIP: optional npm package playwright is not installed` and **exits 0**, so browser-layer "passes" were no-ops while Playwright was absent | Every UI claim must state whether the browser layer actually ran; the skip must be distinguishable from a pass |
-| V6 | The Go semantic and zvec tests skip unless `RESTOREWEAVE_ZVEC_LIBRARY` and friends are set | "`go test ./...` passes" does not mean semantic search was exercised |
+| V6 | The Go semantic and zvec tests skip unless `CAIRN_ZVEC_LIBRARY` and friends are set | "`go test ./...` passes" does not mean semantic search was exercised |
 
 ## Open decisions for the operator
 

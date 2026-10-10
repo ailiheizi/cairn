@@ -107,7 +107,7 @@ func migrateProfileWithHooks(ctx context.Context, sourceProfile, sourcePath, tar
 	if err := os.MkdirAll(targetParent, 0o700); err != nil {
 		return report, fmt.Errorf("create migration target parent: %w", err)
 	}
-	stageRoot, err := os.MkdirTemp(targetParent, filepath.Base(targetRoot)+".restoreweave-migration-*")
+	stageRoot, err := os.MkdirTemp(targetParent, filepath.Base(targetRoot)+".cairn-migration-*")
 	if err != nil {
 		return report, fmt.Errorf("create migration staging directory: %w", err)
 	}

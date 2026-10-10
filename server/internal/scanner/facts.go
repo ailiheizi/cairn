@@ -123,7 +123,7 @@ func hardLinkFacts(
 	}
 
 	hash := sha256.New()
-	writeHashPart(hash, []byte("restoreweave:hard-link-group:v1"))
+	writeHashPart(hash, []byte("cairn:hard-link-group:v1"))
 	writeHashPart(hash, []byte(generationID))
 	writeHashPart(hash, []byte(sourceID))
 	var native [16]byte
@@ -161,14 +161,14 @@ func sparseFacts(kind EntryKind, metadata MetadataSnapshot) SparseFacts {
 
 func rootPathID(sourceID string) string {
 	hash := sha256.New()
-	writeHashPart(hash, []byte("restoreweave:root-path:v1"))
+	writeHashPart(hash, []byte("cairn:root-path:v1"))
 	writeHashPart(hash, []byte(sourceID))
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil))
 }
 
 func childPathID(parentID string, rawName []byte) string {
 	hash := sha256.New()
-	writeHashPart(hash, []byte("restoreweave:child-path:v1"))
+	writeHashPart(hash, []byte("cairn:child-path:v1"))
 	writeHashPart(hash, []byte(parentID))
 	writeHashPart(hash, rawName)
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil))

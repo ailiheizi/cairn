@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func newSearchRebuildDispatcher(t *testing.T, fixtures bool) *Dispatcher {
@@ -30,7 +30,7 @@ func newSearchRebuildDispatcher(t *testing.T, fixtures bool) *Dispatcher {
 	if fixtures {
 		opts = append(opts, WithFixtureDimensions())
 	}
-	return NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", opts...)
+	return NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", opts...)
 }
 
 func TestSearchRebuildCreatesLexicalGenerationAndReportsSemanticDegraded(t *testing.T) {
@@ -90,7 +90,7 @@ func TestSearchRebuildReportsFixtureSemanticReady(t *testing.T) {
 		ProviderDigest: "provider", ConfigDigest: "config",
 	}
 	zvec := &rebuildSemanticZvec{}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithConfigDigest(manifest.ConfigDigest),
 		WithSemanticIndexerBinding(rebuildSemanticProvider{}, zvec, "/tmp/libzvec", "sha256:"+strings.Repeat("a", 64), manifest),
 		WithExact(&exact.Service{Store: store, Repo: repo, ConfigDigest: manifest.ConfigDigest}))

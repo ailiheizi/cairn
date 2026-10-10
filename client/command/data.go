@@ -141,7 +141,7 @@ type Capability struct {
 }
 
 // ConfigData is the daemon-owned persisted operator profile. Config contains
-// the validated restoreweave.config.v1 document as a JSON object. Credential
+// the validated cairn.config.v1 document as a JSON object. Credential
 // fields are references only; secret values are rejected by config validation.
 type ConfigData struct {
 	ConfigPath          string          `json:"config_path"`
@@ -364,7 +364,7 @@ type JobCancelData struct {
 	CancellationAsked bool   `json:"cancellation_asked"`
 }
 
-const PlanReceiptSchema = "org.restoreweave.plan.v1"
+const PlanReceiptSchema = "org.cairn.plan.v1"
 
 type PlanGetData struct {
 	PlanID            string          `json:"plan_id"`
@@ -630,7 +630,7 @@ type NamespaceReadlinkData struct {
 	TargetRaw     []byte `json:"target_raw,omitempty"`
 }
 
-const AnnotationBundleSchema = "org.restoreweave.annotations.v1"
+const AnnotationBundleSchema = "org.cairn.annotations.v1"
 
 type AnnotationData struct {
 	ID                  string `json:"annotation_id"`
@@ -666,12 +666,12 @@ type AnnotationExportData struct {
 // {schema, kind, workspace_id, from, to, subjects} with subjects sorted by
 // subject_ref and each subject's changes in the fixed add-then-tombstone
 // order. Planning writes nothing, including no plan row.
-const AnnotationTagPlanSchema = "org.restoreweave.annotation-tag-plan.v1"
+const AnnotationTagPlanSchema = "org.cairn.annotation-tag-plan.v1"
 
 // AnnotationTagApplySchema names the digest-bound apply result. It reports one
 // outcome per planned subject; a partial apply is a first-class outcome and is
 // never collapsed into success.
-const AnnotationTagApplySchema = "org.restoreweave.annotation-tag-apply.v1"
+const AnnotationTagApplySchema = "org.cairn.annotation-tag-apply.v1"
 
 // AnnotationTagPlanAction* are the only two changes a tag rename/merge plan
 // carries. A subject that already carries the target name keeps its ADD_TAG
@@ -1444,7 +1444,7 @@ const (
 // ExportSidecarFileName is the destination-relative name of the one derived
 // handoff sidecar the implemented policy writes. It is derived output, never a
 // frozen subject name and never content identity.
-const ExportSidecarFileName = "restoreweave-export.json"
+const ExportSidecarFileName = "cairn-export.json"
 
 // ExportPlanInput is the export.plan input. It names a saved view or explicit
 // subject set, output naming policy, and optional sidecar policy.

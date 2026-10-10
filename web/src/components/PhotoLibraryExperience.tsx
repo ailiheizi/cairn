@@ -88,7 +88,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     function onKeyDown(event: KeyboardEvent) {
       const dialog = viewerDialogRef.current;
       if (!dialog) return;
-      const nestedViewer = document.querySelector<HTMLElement>(".rw-image-viewer");
+      const nestedViewer = document.querySelector<HTMLElement>(".cairn-image-viewer");
       const focusInsideNestedViewer = Boolean(nestedViewer && nestedViewer.contains(document.activeElement));
       if (event.key === "Escape") {
         if (focusInsideNestedViewer) return;
@@ -161,11 +161,11 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     stopSwipeTracking();
     if (event.button !== 0 || !event.isPrimary || visibleItems.length < 2) return;
     const target = event.target;
-    if (!(target instanceof Element) || target.closest(".rw-image-viewer")) return;
+    if (!(target instanceof Element) || target.closest(".cairn-image-viewer")) return;
     const control = target.closest('button, a[href], input, select, textarea, [contenteditable="true"]');
     // The preview image is wrapped in a button, but it is the media surface
     // itself; every other control keeps its own tap/click behaviour.
-    if (control && !control.classList.contains("rw-content-preview__image-button")) return;
+    if (control && !control.classList.contains("cairn-content-preview__image-button")) return;
     swipeRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
     trackSwipe(event.pointerId);
   }

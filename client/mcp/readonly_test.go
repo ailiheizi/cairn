@@ -20,8 +20,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ func TestValidateLocalSocketPathRefusesNetworkAddresses(t *testing.T) {
 			t.Fatalf("ValidateLocalSocketPath(%q) accepted a non-local address", rejected)
 		}
 	}
-	for _, accepted := range []string{"/tmp/restoreweave/restoreweaved.sock", "/run/user/1000/restoreweave.sock"} {
+	for _, accepted := range []string{"/tmp/cairn/cairnd.sock", "/run/user/1000/cairn.sock"} {
 		if err := ValidateLocalSocketPath(accepted); err != nil {
 			t.Fatalf("ValidateLocalSocketPath(%q) = %v", accepted, err)
 		}
@@ -958,7 +958,7 @@ func TestReadOnlyWorkspaceResolutionIsHonestWithoutDurableState(t *testing.T) {
 		case command.OpSnapshotList:
 			return fakeReply{data: command.SnapshotListData{}}
 		case command.OpStatusGet:
-			return fakeReply{data: command.StatusData{Controller: "restoreweaved"}}
+			return fakeReply{data: command.StatusData{Controller: "cairnd"}}
 		}
 		t.Fatalf("unexpected operation %q", env.Operation)
 		return fakeReply{}
@@ -1065,7 +1065,7 @@ func startFakeDaemon(t *testing.T, respond func(command.Envelope) fakeReply) *fa
 	// A short path in the system temp directory: a Unix socket path is limited
 	// to about 104 bytes on Darwin, and t.TempDir() embeds the test name.
 	socketPath := filepath.Join(os.TempDir(),
-		fmt.Sprintf("rw-mcp-test-%d-%d.sock", os.Getpid(), atomic.AddInt64(&fakeSocketCounter, 1)))
+		fmt.Sprintf("cairn-mcp-test-%d-%d.sock", os.Getpid(), atomic.AddInt64(&fakeSocketCounter, 1)))
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {

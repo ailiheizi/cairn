@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // ReconcileIngestPublication reconstructs the result of an ingest whose

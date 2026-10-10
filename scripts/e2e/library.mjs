@@ -24,8 +24,8 @@ export async function assertLibraryTiles(ctx) {
 
   const tinyTile = page.locator(".result-list .result-row").filter({ hasText: /tiny\.png/ }).first();
   await tinyTile.waitFor({ state: "visible", timeout: 10000 });
-  await tinyTile.locator(".rw-content-preview__thumb-image").waitFor({ state: "visible", timeout: 10000 });
-  const tinyBadge = tinyTile.locator(".rw-content-preview__thumb-size");
+  await tinyTile.locator(".cairn-content-preview__thumb-image").waitFor({ state: "visible", timeout: 10000 });
+  const tinyBadge = tinyTile.locator(".cairn-content-preview__thumb-size");
   await tinyBadge.waitFor({ state: "visible", timeout: 10000 });
   assert.equal((await tinyBadge.innerText()).trim(), "1x1", "the 1x1 image tile must show its natural size");
   // A text tile is the type glyph and the name. It must contain no preview
@@ -36,7 +36,7 @@ export async function assertLibraryTiles(ctx) {
       name: row.querySelector(".result-open-copy strong")?.textContent?.trim() ?? "tile",
       glyph: Boolean(icon?.querySelector("svg")),
       format: icon?.querySelector(".result-format")?.textContent?.trim() ?? "",
-      preview: Boolean(icon?.querySelector(".rw-content-preview")),
+      preview: Boolean(icon?.querySelector(".cairn-content-preview")),
       image: Boolean(icon?.querySelector("img")),
       iconText: (icon?.textContent ?? "").trim(),
     };
@@ -66,26 +66,26 @@ export async function assertDetailsViewerNotesAndGuard(ctx) {
   const { page, button } = ctx;
   const tinyItem = page.getByRole("main").getByRole("button", { name: /tiny\.png/ }).first();
   await tinyItem.click();
-  const previewPanel = page.locator(".rw-content-preview__panel");
-  await previewPanel.locator(".rw-content-preview__image").waitFor({ state: "visible", timeout: 10000 });
+  const previewPanel = page.locator(".cairn-content-preview__panel");
+  await previewPanel.locator(".cairn-content-preview__image").waitFor({ state: "visible", timeout: 10000 });
   const viewerTrigger = previewPanel.getByRole("button", { name: /查看原图|View full size/ }).first();
   await viewerTrigger.click();
   const viewer = page.getByRole("dialog", { name: /图片查看器|Image viewer/ });
   await viewer.waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await viewer.getAttribute("aria-modal"), "true", "the image viewer must be a modal dialog");
-  const viewerName = (await viewer.locator(".rw-image-viewer__name").innerText()).trim();
+  const viewerName = (await viewer.locator(".cairn-image-viewer__name").innerText()).trim();
   assert.equal(viewerName, "tiny.png", `the viewer must name the file it shows: ${viewerName}`);
-  const viewerSize = (await viewer.locator(".rw-image-viewer__size").innerText()).trim();
+  const viewerSize = (await viewer.locator(".cairn-image-viewer__size").innerText()).trim();
   assert.match(viewerSize, /1\s*×\s*1/, `the viewer must report the natural pixel size: ${viewerSize}`);
   assert.equal((await viewer.getAttribute("data-zoom-min")), "10", "the viewer must bound the minimum zoom");
   assert.equal((await viewer.getAttribute("data-zoom-max")), "800", "the viewer must bound the maximum zoom");
-  const zoomValue = viewer.locator(".rw-image-viewer__zoom-value");
+  const zoomValue = viewer.locator(".cairn-image-viewer__zoom-value");
   const initialZoom = (await zoomValue.innerText()).trim();
   await viewer.getByRole("button", { name: /放大|Zoom in/ }).click();
   await page.waitForTimeout(50);
   const buttonZoom = (await zoomValue.innerText()).trim();
   assert.notEqual(buttonZoom, initialZoom, `the zoom control must change the percentage: ${initialZoom} -> ${buttonZoom}`);
-  await viewer.locator(".rw-image-viewer__stage").dispatchEvent("wheel", { deltaY: -120 });
+  await viewer.locator(".cairn-image-viewer__stage").dispatchEvent("wheel", { deltaY: -120 });
   await page.waitForTimeout(50);
   const wheelZoom = (await zoomValue.innerText()).trim();
   assert.notEqual(wheelZoom, buttonZoom, `the mouse wheel must zoom the viewer: ${buttonZoom} -> ${wheelZoom}`);
@@ -176,7 +176,7 @@ export async function assertLibrarySortAndSelection(ctx) {
   await sortField.selectOption("path");
   if (await listDirection() !== "asc") await sortDirection.click();
   assert.deepEqual(await tileNames(), ["alpha.txt", "beta.txt", "tiny.png"], "ascending path order must order the tiles by path");
-  const sortDescription = await page.locator("#restoreweave-sort-description").innerText();
+  const sortDescription = await page.locator("#cairn-sort-description").innerText();
   assert.match(sortDescription, /不是服务器查询|not a server query/, `the sort control must say that it sorts loaded items: ${sortDescription}`);
 
   // Search results keep the relevance order the daemon returned. Descending
@@ -413,7 +413,7 @@ export async function assertOriginalDownloads(ctx) {
     const box = await action.boundingBox();
     assert.ok(box && box.x >= 0 && box.x + box.width <= 390, "mobile inspector actions must fit within the viewport");
   }
-  const evidenceDir = "/tmp/restoreweave-download-evidence-20261005";
+  const evidenceDir = "/tmp/cairn-download-evidence-20261005";
   mkdirSync(evidenceDir, { recursive: true });
   await page.screenshot({ path: `${evidenceDir}/390-download-details.png`, fullPage: true, animations: "disabled" });
   await page.setViewportSize({ width: 1280, height: 900 });

@@ -140,7 +140,7 @@ export async function assertNotesSurface(ctx) {
   };
 
   // 1. The workspace, the listing, and two file subjects.
-  const workspaceID = await page.evaluate(() => window.localStorage.getItem("restoreweave.workspace_id") ?? "");
+  const workspaceID = await page.evaluate(() => window.localStorage.getItem("cairn.workspace_id") ?? "");
   assert.ok(workspaceID, "the online phase must have published a workspace the shell recorded");
   const listing = await daemonCommand("content.list", { workspace_id: workspaceID });
   const listingItems = (listing.items ?? []).filter((item) => item.entry_type !== "DIRECTORY");
@@ -155,13 +155,13 @@ export async function assertNotesSurface(ctx) {
   // and one description chain on alpha whose successor must hide its
   // predecessor.
   const stamp = Date.now();
-  const alphaBody = `rw-notes-alpha-${stamp} a durable note body`;
-  const betaBody = `rw-notes-beta-${stamp} another durable note body`;
+  const alphaBody = `cairn-notes-alpha-${stamp} a durable note body`;
+  const betaBody = `cairn-notes-beta-${stamp} another durable note body`;
   const alphaNote = (await daemonCommand("annotation.upsert", { workspace_id: workspaceID, subject_ref: alphaRef, kind: "NOTE", body: alphaBody, expected_revision: 0 })).annotation;
   const betaNote = (await daemonCommand("annotation.upsert", { workspace_id: workspaceID, subject_ref: betaRef, kind: "NOTE", body: betaBody, expected_revision: 0 })).annotation;
   assert.ok(alphaNote?.annotation_id && betaNote?.annotation_id, "the seeded notes must carry the daemon's own record ids");
-  const predecessorBody = `rw-notes-description-predecessor-${stamp}`;
-  const successorBody = `rw-notes-description-successor-${stamp}`;
+  const predecessorBody = `cairn-notes-description-predecessor-${stamp}`;
+  const successorBody = `cairn-notes-description-successor-${stamp}`;
   const predecessor = (await daemonCommand("description.create", { workspace_id: workspaceID, subject_ref: alphaRef, kind: "IMPORTED", body: predecessorBody })).document;
   assert.ok(predecessor?.description_document_id, "the seeded description must carry the daemon's own document id");
   const successor = (await daemonCommand("description.create", {

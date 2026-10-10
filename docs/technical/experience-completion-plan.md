@@ -27,7 +27,7 @@ The D1–D5 harness experiments are closed to new feature work. Their coded test
 Present:
 
 - Command ABI: ingest, search, tags/notes, `PROGRESS`, `audio.list`, `books.list`, bounded `content.open`/`read`/`close`, verify, restore preflight and write, `doctor.check`, `plan.get`/`apply`/`revise`/`abandon`, `job.events`/`job.cancel`, `snapshot.list`/`diff`/`verify`, `recovery.export`, `namespace.resolve`/`stat`/`readlink`, `annotation.export`/`import`.
-- Optional loopback facade (`restoreweaved --facade-listen`): OpenSubsonic client-viable methods; OPDS navigation/search/pagination/acquire; `POST /opds/progress` JSON write-back; thin Inbox at `/inbox` plus `/inbox/api/*` (status, search, item, preview, progress, verify, restore preflight/write, doctor, plan, job, snapshots, diff, annotations export/import, path resolve, recovery export).
+- Optional loopback facade (`cairnd --facade-listen`): OpenSubsonic client-viable methods; OPDS navigation/search/pagination/acquire; `POST /opds/progress` JSON write-back; thin Inbox at `/inbox` plus `/inbox/api/*` (status, search, item, preview, progress, verify, restore preflight/write, doctor, plan, job, snapshots, diff, annotations export/import, path resolve, recovery export).
 - IDs on the facade are `SubjectRef`. The facade calls the command ABI only. No fourth public REST catalog.
 - Inbox item page streams exact bytes and writes `PROGRESS`. Item JSON includes display path, `snapshot_ref`, representations, and annotations. Delete the page and CLI recovery still works.
 - D5 pin: this host’s Supersonic 0.22.1 method sequence is harness-covered (`TestD5PinnedSupersonicCallSequence`). XML artist/album lists emit Subsonic attributes (`name="…"`).
@@ -158,4 +158,4 @@ Status (2026-08-14): **not started**. Jellyfin-style APIs, video transcode, game
 
 ## 6. Non-goals
 
-The completion-plan non-goals still hold: no fake-CAS replacement in this Darwin session, no engine selection, no writable NAS, no `allow_other`, no ffmpeg/Tika as identity, no requirement-document expansion, no player or reader shipped inside `restoreweaved`.
+The completion-plan non-goals still hold: no fake-CAS replacement in this Darwin session, no engine selection, no writable NAS, no `allow_other`, no ffmpeg/Tika as identity, no requirement-document expansion, no player or reader shipped inside `cairnd`.

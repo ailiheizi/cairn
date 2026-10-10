@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type planGetInput struct {
@@ -76,7 +76,7 @@ type planBody struct {
 }
 
 const (
-	planSchemaV2       = "org.restoreweave.plan.v2"
+	planSchemaV2       = "org.cairn.plan.v2"
 	planInspectJobKind = "PLAN_INSPECT"
 	planApplyJobKind   = "PLAN_APPLY"
 )
@@ -282,7 +282,7 @@ func (d *Dispatcher) claimPlanApplyJob(
 		var acquireErr error
 		fencingToken, acquireErr = tx.AcquireJobLease(
 			ctx, job.WorkspaceID, job.ID, job.Revision,
-			"restoreweaved", leaseToken, now, now.Add(10*time.Minute),
+			"cairnd", leaseToken, now, now.Add(10*time.Minute),
 		)
 		if acquireErr != nil {
 			return acquireErr
@@ -292,7 +292,7 @@ func (d *Dispatcher) claimPlanApplyJob(
 			"attempt": job.Attempt + 1,
 		})
 		return tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
-			ID: mustAuditID(), WorkspaceID: job.WorkspaceID, Actor: "restoreweaved",
+			ID: mustAuditID(), WorkspaceID: job.WorkspaceID, Actor: "cairnd",
 			Action: "JOB_STARTED", TargetType: "JOB", TargetID: job.ID,
 			RequestID: env.RequestID, Attempt: job.Attempt + 1,
 			FencingToken: fencingToken, Outcome: "SUCCEEDED", Details: details,
@@ -413,7 +413,7 @@ func (d *Dispatcher) finishPlanApplyJob(
 			action, outcome = "JOB_FAILED", "FAILED"
 		}
 		return tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
-			ID: mustAuditID(), WorkspaceID: job.WorkspaceID, Actor: "restoreweaved",
+			ID: mustAuditID(), WorkspaceID: job.WorkspaceID, Actor: "cairnd",
 			Action: action, TargetType: "JOB", TargetID: job.ID,
 			RequestID: env.RequestID, Attempt: job.Attempt,
 			FencingToken: job.FencingToken, Outcome: outcome, Details: payload,
@@ -886,7 +886,7 @@ func (d *Dispatcher) recordIngestPlan(
 		details := json.RawMessage(resultJSON)
 		for _, action := range []string{"JOB_STARTED", "JOB_SUCCEEDED"} {
 			if err := tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
-				ID: mustAuditID(), WorkspaceID: workspaceID, Actor: "restoreweaved",
+				ID: mustAuditID(), WorkspaceID: workspaceID, Actor: "cairnd",
 				Action: action, TargetType: "JOB", TargetID: jobID, RequestID: jobID,
 				Attempt: 1, Outcome: "SUCCEEDED", Details: details,
 			}); err != nil {

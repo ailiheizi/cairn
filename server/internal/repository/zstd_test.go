@@ -40,7 +40,7 @@ func TestZstdDirReadbackCompressionAndDeduplication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payload := bytes.Repeat([]byte("restoreweave semantic content "), 4096)
+	payload := bytes.Repeat([]byte("cairn semantic content "), 4096)
 	first, err := repo.Place(ctx, bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)

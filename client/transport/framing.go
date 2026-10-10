@@ -1,5 +1,5 @@
 // Package transport is the thin client-side socket layer for the
-// restoreweaved control plane. It sends one command envelope per connection
+// cairnd control plane. It sends one command envelope per connection
 // round trip over 4-byte big-endian length-prefixed JSON frames. It keeps no
 // cache and performs no retries.
 package transport

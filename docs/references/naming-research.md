@@ -82,10 +82,10 @@ The following engineering-level checks were performed on 2026-08-10:
 
 - Siftline GitHub repository search for Cairn: no exact repository result.
 - Siftline Hacker News search for Cairn and “Restore Weave”: no result.
-- GitHub user lookup for `restoreweave`: not found.
-- npm package lookup for `restoreweave`: not found.
-- PyPI JSON endpoint for `restoreweave`: not found.
-- DNS lookup for `restoreweave.com` and `restoreweave.dev`: no returned record during the check.
+- GitHub user lookup for `cairn`: not found.
+- npm package lookup for `cairn`: not found.
+- PyPI JSON endpoint for `cairn`: not found.
+- DNS lookup for `cairn.com` and `cairn.dev`: no returned record during the check.
 
 Crates.io could not be reliably checked because its API rejected the request under its data-access policy.
 

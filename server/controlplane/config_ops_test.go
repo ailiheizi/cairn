@@ -7,19 +7,19 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "restoreweave.toml")
+	configPath := filepath.Join(t.TempDir(), "cairn.toml")
 	resolved, err := rwconfig.Init(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	store := testutil.OpenStore(t, ":memory:")
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithOperatorConfig(resolved))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithOperatorConfig(resolved))
 
 	got := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpConfigGet, map[string]any{}))
 	if got.Status != command.StatusSucceeded {
@@ -38,7 +38,7 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 	}
 	candidate.Semantic.EmbeddingMode = "hybrid"
 	candidate.Semantic.OnlineProfile = "operator-semantic-v1"
-	candidate.Semantic.OnlineCredentialRef = "keychain://restoreweave/semantic"
+	candidate.Semantic.OnlineCredentialRef = "keychain://cairn/semantic"
 	payload, err := json.Marshal(candidate)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if persisted.Semantic.EmbeddingMode != "hybrid" || persisted.Semantic.OnlineProfile != "operator-semantic-v1" || persisted.Semantic.OnlineCredentialRef != "keychain://restoreweave/semantic" {
+	if persisted.Semantic.EmbeddingMode != "hybrid" || persisted.Semantic.OnlineProfile != "operator-semantic-v1" || persisted.Semantic.OnlineCredentialRef != "keychain://cairn/semantic" {
 		t.Fatalf("persisted semantic config = %+v", persisted.Semantic)
 	}
 	info, err := os.Stat(configPath)
@@ -71,13 +71,13 @@ func TestDispatcherConfigGetAndUpdatePersistValidatedProfile(t *testing.T) {
 }
 
 func TestDispatcherConfigUpdateRejectsStaleAndInvalidProfiles(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "restoreweave.toml")
+	configPath := filepath.Join(t.TempDir(), "cairn.toml")
 	resolved, err := rwconfig.Init(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	store := testutil.OpenStore(t, ":memory:")
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithOperatorConfig(resolved))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithOperatorConfig(resolved))
 	payload, err := json.Marshal(resolved.Config)
 	if err != nil {
 		t.Fatal(err)

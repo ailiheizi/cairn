@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/api"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/api"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestHTTPDownloadFailsBeforeAttachmentForMissingOrCorruptEmptyObject(t *testing.T) {
@@ -28,7 +28,7 @@ func TestHTTPDownloadFailsBeforeAttachmentForMissingOrCorruptEmptyObject(t *test
 			if err != nil {
 				t.Fatal(err)
 			}
-			dispatcher := NewDispatcher(catalog, "catalog.sqlite", "/tmp/rw-download-test.sock",
+			dispatcher := NewDispatcher(catalog, "catalog.sqlite", "/tmp/cairn-download-test.sock",
 				WithExact(&exact.Service{Store: catalog, Repo: repo}))
 			if err := os.WriteFile(filepath.Join(root, "empty.dat"), nil, 0o600); err != nil {
 				t.Fatal(err)

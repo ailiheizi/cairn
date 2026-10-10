@@ -360,24 +360,24 @@ Only a completed restore with exact post-restore digest comparison may report `R
 The first command family is:
 
 ```text
-restoreweave doctor [<source>] [--to <target>] [--credential <credential-ref>]
-restoreweave plan <source> --to <target> [--credential <credential-ref>] [--save-profile <name>]
-restoreweave plan revise <base-plan-ref> --digest <base-plan-digest> [--decisions <json-file>]
-restoreweave apply <plan-ref> --digest <plan-digest>
-restoreweave profile run <profile-name>
-restoreweave status [<job-or-snapshot-ref>] [--events] [--after <sequence>] [--limit <count>]
-restoreweave search <query> [--snapshot <snapshot-ref>]
-restoreweave tag add <subject-ref> <tag> [--expected-revision <revision>]
-restoreweave tag remove <subject-ref> <tag> [--expected-revision <revision>]
-restoreweave note set <subject-ref> --from-file <file> [--expected-revision <revision>]
-restoreweave note remove <subject-ref> [--expected-revision <revision>]
-restoreweave browse [<snapshot-ref>[:<path>]]
-restoreweave cat <snapshot-ref>:<path> [--to-file <new-file>]
-restoreweave verify <snapshot-ref> [--mode authenticated-metadata|sampled-content|full-bytes]
-restoreweave recovery export <snapshot-ref> --to-file <new-file>
-restoreweave restore <snapshot-ref>:<path> <destination>
-restoreweave restore --from <target> --recovery-reference <file> --to <destination> --credential <credential-ref>
-restoreweave mcp serve --stdio
+cairn doctor [<source>] [--to <target>] [--credential <credential-ref>]
+cairn plan <source> --to <target> [--credential <credential-ref>] [--save-profile <name>]
+cairn plan revise <base-plan-ref> --digest <base-plan-digest> [--decisions <json-file>]
+cairn apply <plan-ref> --digest <plan-digest>
+cairn profile run <profile-name>
+cairn status [<job-or-snapshot-ref>] [--events] [--after <sequence>] [--limit <count>]
+cairn search <query> [--snapshot <snapshot-ref>]
+cairn tag add <subject-ref> <tag> [--expected-revision <revision>]
+cairn tag remove <subject-ref> <tag> [--expected-revision <revision>]
+cairn note set <subject-ref> --from-file <file> [--expected-revision <revision>]
+cairn note remove <subject-ref> [--expected-revision <revision>]
+cairn browse [<snapshot-ref>[:<path>]]
+cairn cat <snapshot-ref>:<path> [--to-file <new-file>]
+cairn verify <snapshot-ref> [--mode authenticated-metadata|sampled-content|full-bytes]
+cairn recovery export <snapshot-ref> --to-file <new-file>
+cairn restore <snapshot-ref>:<path> <destination>
+cairn restore --from <target> --recovery-reference <file> --to <destination> --credential <credential-ref>
+cairn mcp serve --stdio
 ```
 
 Every non-raw-content command supports `--format human|json|jsonl`. Human output is rendered from the same typed result as machine output.

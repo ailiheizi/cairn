@@ -16,9 +16,9 @@ root only when the operator explicitly supplies it.
 The normal inspection commands are:
 
 ```text
-rw config init
-rw config validate
-rw config show --effective
+cairn config init
+cairn config validate
+cairn config show --effective
 ```
 
 One-shot CLI values take precedence over environment overrides, persisted
@@ -92,8 +92,8 @@ The fixed development bundle is installed explicitly, never as a hidden
 first-query download:
 
 ```text
-rw semantic bundle install
-rw semantic bundle install --archive /absolute/path/to/bundle.tar.gz
+cairn semantic bundle install
+cairn semantic bundle install --archive /absolute/path/to/bundle.tar.gz
 ```
 
 After installation, restart the daemon and rebuild the semantic generation when
@@ -146,7 +146,7 @@ codec implementations are outside the current core queue.
 ## Verification entry points
 
 For an operator workflow, start with [Quick start](quick-start.md), then use
-`rw doctor`, `rw config validate`, a read-only ingest/plan review, digest-bound
+`cairn doctor`, `cairn config validate`, a read-only ingest/plan review, digest-bound
 apply, sampled verification, search, recovery export, and an explicit restore
 verification. The [CLI and MCP Contract](../requirements/cli-and-mcp-contract.md)
 defines command behavior; the [Core MVP Execution Plan](../technical/core-mvp-execution-plan.md)

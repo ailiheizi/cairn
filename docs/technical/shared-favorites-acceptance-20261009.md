@@ -31,7 +31,7 @@ not rewritten by the shortcut.
 
 ## Artifact and environment
 
-Checkout: `/Users/macos/Documents/other_project/restoreweave`, HEAD
+Checkout: `/Users/macos/Documents/other_project/cairn`, HEAD
 `5fae20ae1e00c11d774c1b5ffa6b5928abcbc47a`, with unrelated existing changes
 preserved. No commit was made. The existing localhost preview on port 4648
 continues to serve `dist/personal-experiences-20261009/web-dist`; only static

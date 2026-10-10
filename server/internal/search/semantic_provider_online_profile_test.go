@@ -48,7 +48,7 @@ func TestParseOnlineEmbeddingProfileRejectsUnsafeManifests(t *testing.T) {
 	}{
 		{"unknown field", func(d map[string]any) { d["surprise"] = true }, "unknown field"},
 		{"legacy schema without an egress scope", func(d map[string]any) { d["schema"] = OnlineEmbeddingProfileSchemaV1 }, "not admitted"},
-		{"unknown schema", func(d map[string]any) { d["schema"] = "restoreweave.online-embedding-profile.v3" }, "schema must be"},
+		{"unknown schema", func(d map[string]any) { d["schema"] = "cairn.online-embedding-profile.v3" }, "schema must be"},
 		{"api style", func(d map[string]any) { d["api_style"] = "grpc-v1" }, "api_style"},
 		{"plain http to remote host", func(d map[string]any) { d["endpoint"] = "http://api.example.invalid/v1/embeddings" }, "https"},
 		{"endpoint userinfo", func(d map[string]any) { d["endpoint"] = "https://user:pass@api.example.invalid/v1/embeddings" }, "userinfo"},

@@ -1,11 +1,11 @@
 # Phase 5 operator corpus manifest
 
 The savings qualification spike accepts an operator-supplied JSON corpus
-manifest with schema `restoreweave.corpus-manifest.v1`:
+manifest with schema `cairn.corpus-manifest.v1`:
 
 ```json
 {
-  "schema": "restoreweave.corpus-manifest.v1",
+  "schema": "cairn.corpus-manifest.v1",
   "entries": [{"path": "relative/name", "bytes": 12, "sha256": "..."}],
   "digest": "..."
 }
@@ -51,11 +51,11 @@ extra, changed, symlinked, or special corpus member fails before placement.
 
 Generated small and heterogeneous corpora used by `scripts/savings-report.sh`
 are not operator-reviewed inputs by themselves. After the generated tree
-exists, the script writes `restoreweave.corpus-manifest.v1` with
+exists, the script writes `cairn.corpus-manifest.v1` with
 `-manifest-only` and passes that file as `-manifest-in` for every profile.
 The copy retained in the work directory is
 `generated-corpus.operator.manifest.json`. The heterogeneous
-`restoreweave.qualification-corpus.v1` sidecar remains seed, license, and
+`cairn.qualification-corpus.v1` sidecar remains seed, license, and
 category evidence and is not a corpus-manifest. Changing a generated file
 after that operator manifest is written fails closed before a repository is
 opened. This binding does not make the generated tree representative or

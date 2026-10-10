@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // Remote embedding egress receipts
@@ -32,7 +32,7 @@ const (
 	AuditTargetSemanticProvider        = "SEMANTIC_PROVIDER"
 	AuditActionSemanticEgressSucceeded = "SEMANTIC_EGRESS_SUCCEEDED"
 	AuditActionSemanticEgressFailed    = "SEMANTIC_EGRESS_FAILED"
-	auditActorSemanticEgress           = "restoreweaved"
+	auditActorSemanticEgress           = "cairnd"
 	auditSourceSemanticEgress          = "semantic.embedding.online"
 
 	// Grant lifecycle events share the same append-only ledger.

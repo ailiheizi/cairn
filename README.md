@@ -48,11 +48,11 @@ Cairn 的方向是把照片、音频、视频、文档和其他可读文件放�
 需要 Go 1.26（或 `go.mod` 声明的版本）以及 Vite 7 支持的 Node.js：
 
 ```bash
-git clone https://github.com/ailiheizi/restoreweave.git
-cd restoreweave
-go build -tags=purego -o bin/restoreweaved ./server/cmd/restoreweaved
-go build -o bin/rw ./client/cmd/rw
-bin/rw config init --path ./restoreweave.toml
+git clone https://github.com/ailiheizi/cairn.git
+cd cairn
+go build -tags=purego -o bin/cairnd ./server/cmd/cairnd
+go build -o bin/cairn ./client/cmd/cairn
+bin/cairn config init --path ./cairn.toml
 ```
 
 在配置中启用本机 WebUI API：
@@ -67,7 +67,7 @@ listen = "127.0.0.1:4534"
 
 ```bash
 # 终端 1
-bin/restoreweaved --config ./restoreweave.toml --socket /tmp/restoreweaved.sock
+bin/cairnd --config ./cairn.toml --socket /tmp/cairnd.sock
 
 # 终端 2
 cd web

@@ -11,10 +11,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
@@ -820,7 +820,7 @@ const (
 	AuditTargetDescribeProvider        = "DESCRIBE_PROVIDER"
 	AuditActionDescribeEgressSucceeded = "DESCRIBE_EGRESS_SUCCEEDED"
 	AuditActionDescribeEgressFailed    = "DESCRIBE_EGRESS_FAILED"
-	auditActorDescribeEgress           = "restoreweaved"
+	auditActorDescribeEgress           = "cairnd"
 	auditSourceDescribeEgress          = "description.generate"
 )
 

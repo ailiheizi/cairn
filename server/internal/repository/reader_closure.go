@@ -25,7 +25,7 @@ import (
 // It never grants recovery authority, never widens what a reader may decode,
 // and never substitutes for the signed RequiredReaderDependencies carried by a
 // portable recovery record.
-const ReaderClosureSchemaV1 = "org.restoreweave.reader-closure.v1"
+const ReaderClosureSchemaV1 = "org.cairn.reader-closure.v1"
 
 // Retention states how one reader dependency remains obtainable.
 const (
@@ -278,14 +278,14 @@ const (
 const (
 	ReaderDependencyCanonicalizationCompactJSON = "canonicalization:encoding/json-compact-v1"
 	ReaderDependencySignatureEd25519V1          = "signature:ed25519-v1"
-	ReaderDependencyPortableFactReaderV1        = "restoreweave-reader:portable-fact-v1"
-	ReaderDependencyPortableFactReaderV2        = "restoreweave-reader:portable-fact-v2"
+	ReaderDependencyPortableFactReaderV1        = "cairn-reader:portable-fact-v1"
+	ReaderDependencyPortableFactReaderV2        = "cairn-reader:portable-fact-v2"
 	ReaderDependencyHostKeyProviderV1           = "host-key-provider:v1"
 
-	ReaderDependencyDirectoryCASDev      = "restoreweave.repository.directory-cas-dev-v1"
-	ReaderDependencyLocalZstdV1          = "restoreweave.repository.local-zstd-v1"
-	ReaderDependencyLocalZstdEncryptedV1 = "restoreweave.repository.local-zstd-encrypted-v1"
-	ReaderDependencyMemoryTest           = "restoreweave.memory-test"
+	ReaderDependencyDirectoryCASDev      = "cairn.repository.directory-cas-dev-v1"
+	ReaderDependencyLocalZstdV1          = "cairn.repository.local-zstd-v1"
+	ReaderDependencyLocalZstdEncryptedV1 = "cairn.repository.local-zstd-encrypted-v1"
+	ReaderDependencyMemoryTest           = "cairn.memory-test"
 	ReaderDependencyPinnedZstd           = zstdDependency
 )
 
@@ -720,7 +720,7 @@ func recordDeclaration(dependency string) ReaderClosureDeclaration {
 		}
 	case ReaderDependencySignatureEd25519V1:
 		declaration.Role = ReaderRoleSignature
-		declaration.Description = "Ed25519 signatures over restoreweave-signature-v1 domain-separated canonical bytes using the standard library implementation"
+		declaration.Description = "Ed25519 signatures over cairn-signature-v1 domain-separated canonical bytes using the standard library implementation"
 		declaration.Artifacts = []ReaderRetainedArtifact{
 			sourceSetArtifact("server/internal/exact/recovery_closure.go"),
 			executableArtifact(),
@@ -792,7 +792,7 @@ func keyProviderDeclaration() ReaderClosureDeclaration {
 	return declaration
 }
 
-const readerClosureRebuildProcedure = "go build ./server/cmd/restoreweaved from the retained source revision with the pinned modules recorded in go.sum (go mod download); no network-only or registry-only component is required"
+const readerClosureRebuildProcedure = "go build ./server/cmd/cairnd from the retained source revision with the pinned modules recorded in go.sum (go mod download); no network-only or registry-only component is required"
 
 const readerClosureVerifyProcedure = "go mod verify for the pinned module bytes, then go test ./server/internal/repository/... ./server/internal/exact/... which decodes the committed conformance vectors and golden payload frames byte-exactly"
 
@@ -911,7 +911,7 @@ func sourceSetDigestAt(root string, refs ...string) (string, error) {
 	sorted := append([]string(nil), refs...)
 	sort.Strings(sorted)
 	hasher := sha256.New()
-	_, _ = hasher.Write([]byte("restoreweave-reader-source-set-v1\x00"))
+	_, _ = hasher.Write([]byte("cairn-reader-source-set-v1\x00"))
 	for _, ref := range sorted {
 		payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref)))
 		if err != nil {

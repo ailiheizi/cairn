@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	onnxWorkerTransportSchema       = "restoreweave.onnx-worker-embed.v1"
+	onnxWorkerTransportSchema       = "cairn.onnx-worker-embed.v1"
 	onnxWorkerTransportRequestKind  = "EMBED_TEXT_REQUEST"
 	onnxWorkerTransportResponseKind = "EMBED_TEXT_RESPONSE"
 	onnxWorkerTransportFrameLimit   = 128 << 20

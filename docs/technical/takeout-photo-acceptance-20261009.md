@@ -7,7 +7,7 @@ three Luna agents implemented archive, photo rendition and host integration.
 
 ## Build and scope identity
 
-- Checkout: `/Users/macos/Documents/other_project/restoreweave`, HEAD
+- Checkout: `/Users/macos/Documents/other_project/cairn`, HEAD
   `5fae20ae1e00c11d774c1b5ffa6b5928abcbc47a`, 212 dirty/untracked paths at final
   check. The tree contained substantial prior work; unrelated edits were kept.
 - URL: `http://127.0.0.1:4648/`; final DOM references

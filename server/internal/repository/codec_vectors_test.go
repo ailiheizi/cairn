@@ -23,8 +23,8 @@ import (
 const (
 	codecVectorDir      = "testdata/codec"
 	codecVectorManifest = "vectors.json"
-	codecVectorWriteEnv = "RESTOREWEAVE_WRITE_CODEC_VECTORS"
-	codecVectorSchema   = "org.restoreweave.codec-vector.v1"
+	codecVectorWriteEnv = "CAIRN_WRITE_CODEC_VECTORS"
+	codecVectorSchema   = "org.cairn.codec-vector.v1"
 )
 
 type codecVector struct {
@@ -51,9 +51,9 @@ func codecVectorPayloads() []struct {
 		Profile string
 		Payload []byte
 	}{
-		{Name: "identity-payload", Profile: RepositoryProfileDirectoryCASDev, Payload: bytes.Repeat([]byte("restoreweave identity codec vector\n"), 64)},
-		{Name: "zstd-frame", Profile: RepositoryProfileLocalZstdV1, Payload: bytes.Repeat([]byte("restoreweave zstd codec vector, compressible on purpose\n"), 256)},
-		{Name: "zstd-frame-incompressible", Profile: RepositoryProfileLocalZstdV1, Payload: prefixBytes("restoreweave-zstd-vector", 4096)},
+		{Name: "identity-payload", Profile: RepositoryProfileDirectoryCASDev, Payload: bytes.Repeat([]byte("cairn identity codec vector\n"), 64)},
+		{Name: "zstd-frame", Profile: RepositoryProfileLocalZstdV1, Payload: bytes.Repeat([]byte("cairn zstd codec vector, compressible on purpose\n"), 256)},
+		{Name: "zstd-frame-incompressible", Profile: RepositoryProfileLocalZstdV1, Payload: prefixBytes("cairn-zstd-vector", 4096)},
 	}
 }
 

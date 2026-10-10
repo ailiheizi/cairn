@@ -13,7 +13,7 @@ a media-server profile, a closed core phase, or release qualification.
   supported audio -> explicit playback/controls -> client navigation -> stop;
   supported named query -> save -> refresh -> recall.
 - Decision and limits: [ADR-025](build-stack-and-architecture-selection.md#adr-025-admit-dedicated-personal-client-workflows-without-a-new-media-service).
-- Checkout: `/Users/macos/Documents/other_project/restoreweave`, branch `main`,
+- Checkout: `/Users/macos/Documents/other_project/cairn`, branch `main`,
   base HEAD `5fae20ae1e00c11d774c1b5ffa6b5928abcbc47a`, dirty before this cohort.
   Unrelated changes were preserved; HEAD alone does not identify this build.
 - Preview: `http://127.0.0.1:4648/`, original configured local catalog/repository

@@ -74,7 +74,7 @@ function App() {
   const [statusData, setStatusData] = useState<any>();
   const [capabilities, setCapabilities] = useState<any[]>([]);
   const [snapshotRef, setSnapshotRef] = useState("");
-  const [workspaceID, setWorkspaceID] = useState(() => window.localStorage.getItem("restoreweave.workspace_id") ?? "");
+  const [workspaceID, setWorkspaceID] = useState(() => window.localStorage.getItem("cairn.workspace_id") ?? "");
   const workspaceIDRef = useRef(workspaceID);
   workspaceIDRef.current = workspaceID;
   // Selection is a second, explicit concept on top of the one details subject:
@@ -175,7 +175,7 @@ function App() {
     }
   }
 
-  function rememberWorkspace(value: unknown) { if (typeof value === "string" && value.trim()) { setWorkspaceID(value); window.localStorage.setItem("restoreweave.workspace_id", value); } }
+  function rememberWorkspace(value: unknown) { if (typeof value === "string" && value.trim()) { setWorkspaceID(value); window.localStorage.setItem("cairn.workspace_id", value); } }
   function rememberDrawerTrigger(trigger?: EventTarget | null) {
     drawerTriggerRef.current = trigger instanceof HTMLElement
       ? trigger
@@ -196,7 +196,7 @@ function App() {
   }
   function clearCatalogBackedState() {
     setWorkspaceID("");
-    window.localStorage.removeItem("restoreweave.workspace_id");
+    window.localStorage.removeItem("cairn.workspace_id");
     resetCatalogProjection();
   }
   function clearRepositoryDependentState() {
@@ -441,7 +441,7 @@ function App() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen, settingsOpen]);
   useEffect(() => {
-    window.localStorage.setItem("restoreweave.locale", locale);
+    window.localStorage.setItem("cairn.locale", locale);
     document.documentElement.lang = locale;
   }, [locale]);
   useEffect(() => {
@@ -858,7 +858,7 @@ function App() {
 }
 
 bootstrapAppearance();
-const rootElement = document.getElementById("root")! as HTMLElement & { restoreWeaveRoot?: ReturnType<typeof createRoot> };
-const root = rootElement.restoreWeaveRoot ?? createRoot(rootElement);
-rootElement.restoreWeaveRoot = root;
+const rootElement = document.getElementById("root")! as HTMLElement & { cairnRoot?: ReturnType<typeof createRoot> };
+const root = rootElement.cairnRoot ?? createRoot(rootElement);
+rootElement.cairnRoot = root;
 root.render(<App />);

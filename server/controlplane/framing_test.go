@@ -11,7 +11,7 @@ import (
 
 func TestFrameRoundTrip(t *testing.T) {
 	var buffer bytes.Buffer
-	payload := []byte(`{"schema":"org.restoreweave.command.v1","operation":"status.get"}`)
+	payload := []byte(`{"schema":"org.cairn.command.v1","operation":"status.get"}`)
 	if err := WriteFrame(&buffer, payload); err != nil {
 		t.Fatalf("WriteFrame: %v", err)
 	}

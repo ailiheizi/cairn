@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
 )
 
 // recoveryReaderState retains only ephemeral restore workflow state. The

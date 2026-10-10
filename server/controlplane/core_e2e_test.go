@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // TestCoreWorkflowThroughDispatcher proves the ordinary first-run loop at the
@@ -21,7 +21,7 @@ import (
 // and must not be faked by a fixture in this test.
 func TestCoreWorkflowThroughDispatcher(t *testing.T) {
 	ctx := context.Background()
-	configPath := filepath.Join(t.TempDir(), "restoreweave.toml")
+	configPath := filepath.Join(t.TempDir(), "cairn.toml")
 	resolved, err := rwconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("initialize config: %v", err)
@@ -31,7 +31,7 @@ func TestCoreWorkflowThroughDispatcher(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithOperatorConfig(resolved), WithExact(&exact.Service{Store: store, Repo: repo}))
 
 	configured := dispatcher.Handle(ctx, mustEnvelope(t, command.OpConfigGet, map[string]any{}))

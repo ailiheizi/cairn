@@ -3,7 +3,7 @@
 // This file adds a second, deliberately narrower MCP server: four tools
 // (search, get_subject, list_recent, read_text_extract) that can only dispatch
 // an enumerated allowlist of read-only typed operations to a local
-// restoreweaved over its Unix socket. It adds no policy, job, catalog, or
+// cairnd over its Unix socket. It adds no policy, job, catalog, or
 // recovery state of its own; it is a bounded local adapter over the typed
 // command ABI described by docs/requirements/cli-and-mcp-contract.md.
 //
@@ -12,7 +12,7 @@
 //   - §3.7 "Read-only automation first. Initial MCP tools inspect committed and
 //     local durable state but cannot start capture, apply plans, restore,
 //     delete, migrate, or garbage-collect."
-//   - §16.1 "The initial adapter runs only as `restoreweave mcp serve --stdio`.
+//   - §16.1 "The initial adapter runs only as `cairn mcp serve --stdio`.
 //     It opens no TCP listener ... It uses the same dispatcher, schemas,
 //     authorization, and reason codes as CLI JSON."
 //   - §16.2 "It cannot mutate protected state through the initial MCP server."
@@ -38,8 +38,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 // Read-only MCP tool names. These four names are the complete surface.
@@ -61,9 +61,9 @@ const (
 // None of these values is ever logged, echoed in a tool result, or sent to the
 // daemon. The token gates this surface only.
 const (
-	ReadOnlyTokenEnvVar      = "RESTOREWEAVE_MCP_READ_TOKEN"
-	ReadOnlyWriteTokenEnvVar = "RESTOREWEAVE_MCP_WRITE_TOKEN"
-	APIWriteTokenEnvVar      = "RESTOREWEAVE_API_TOKEN"
+	ReadOnlyTokenEnvVar      = "CAIRN_MCP_READ_TOKEN"
+	ReadOnlyWriteTokenEnvVar = "CAIRN_MCP_WRITE_TOKEN"
+	APIWriteTokenEnvVar      = "CAIRN_API_TOKEN"
 	readOnlyTokenMinBytes    = 16
 )
 
@@ -221,7 +221,7 @@ func RunReadOnlyStdio(ctx context.Context, socketPath string, options ReadOnlyOp
 	return server.Run(ctx, &mcpsdk.StdioTransport{})
 }
 
-const readOnlyServerName = "restoreweave-readonly"
+const readOnlyServerName = "cairn-readonly"
 
 // readOnlyGateway is the only path from this surface to the daemon. It
 // enforces, in order:

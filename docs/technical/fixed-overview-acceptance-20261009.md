@@ -31,7 +31,7 @@ tags, Notes and browser local storage are not substitutes.
 
 ## Artifact and environment
 
-Checkout: `/Users/macos/Documents/other_project/restoreweave`, HEAD
+Checkout: `/Users/macos/Documents/other_project/cairn`, HEAD
 `5fae20ae1e00c11d774c1b5ffa6b5928abcbc47a`, with existing unrelated worktree
 changes preserved. No commit, backend endpoint, schema, signed format, provider
 or deployment change was made by this slice.

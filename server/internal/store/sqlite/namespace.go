@@ -713,7 +713,7 @@ func (tx *Tx) InsertPhysicalLocator(ctx context.Context, record *PhysicalLocator
 	if err := requireID("workspace id", record.WorkspaceID); err != nil {
 		return err
 	}
-	if record.OwnershipMode != OwnershipRestoreWeavePacks && record.OwnershipMode != OwnershipInline {
+	if record.OwnershipMode != OwnershipCairnPacks && record.OwnershipMode != OwnershipInline {
 		return fmt.Errorf("invalid ownership mode %q", record.OwnershipMode)
 	}
 	if !validLocatorKind(record.Kind) {

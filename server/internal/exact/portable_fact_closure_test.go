@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type attachmentPlacementBoundaryRepo struct {
@@ -413,7 +413,7 @@ func TestPortableFactClosureExtensionAdmission(t *testing.T) {
 	if err := signed.Verify(*fixture.service.TrustAnchor); err != nil {
 		t.Fatalf("signed optional extension did not verify: %v", err)
 	}
-	record.CriticalExtensions = []string{"org.restoreweave.future-required.v1"}
+	record.CriticalExtensions = []string{"org.cairn.future-required.v1"}
 	if _, err := SignPortableFactClosure(*fixture.service.SigningIdentity, record); err == nil {
 		t.Fatal("unknown critical extension was accepted")
 	}

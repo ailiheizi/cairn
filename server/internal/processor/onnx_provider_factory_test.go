@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func TestONNXSemanticProviderFactoryInvalidationFailsClosedAndStopsWorkers(t *testing.T) {

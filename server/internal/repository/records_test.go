@@ -17,7 +17,7 @@ func TestDirPortableRecordsAreRoleScopedAndDiscoverable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payload := []byte(`{"schema":"restoreweave.publication-commit.v1"}`)
+	payload := []byte(`{"schema":"cairn.publication-commit.v1"}`)
 	receipt, err := repo.PlaceRecord(ctx, RecordPublicationCommit, bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)

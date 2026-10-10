@@ -43,7 +43,7 @@ var (
 const (
 	RepositoryProfileLocalZstdEncryptedV1 = "local-zstd-encrypted-v1"
 	EncryptionProfileAES256GCMZstdV1      = "aes-256-gcm-zstd-v1"
-	encryptionMetadataSchemaV1            = "restoreweave.repository-encryption.v1"
+	encryptionMetadataSchemaV1            = "cairn.repository-encryption.v1"
 	encryptedBlobMagic                    = "RWZSTDENC1\x00"
 )
 

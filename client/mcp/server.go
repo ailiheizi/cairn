@@ -1,4 +1,4 @@
-// Package mcp exposes restoreweaved operations as a local, read-only MCP
+// Package mcp exposes cairnd operations as a local, read-only MCP
 // server over stdio. Every tool executes a real command-envelope round trip
 // through client/transport; nothing is fabricated when the daemon reports an
 // operation as unimplemented.
@@ -12,12 +12,12 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 const (
-	serverName    = "restoreweave"
+	serverName    = "cairn"
 	serverVersion = "0.1.0"
 )
 
@@ -70,7 +70,7 @@ type statusGetInput struct{}
 func addStatusGet(server *mcpsdk.Server, conn *transport.Conn) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        command.OpStatusGet,
-		Description: "Report restoreweaved daemon status: catalog health, identify rules digest, and the list of operations this build does not implement.",
+		Description: "Report cairnd daemon status: catalog health, identify rules digest, and the list of operations this build does not implement.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ statusGetInput) (*mcpsdk.CallToolResult, command.StatusData, error) {
 		result, err := call(ctx, conn, command.OpStatusGet, map[string]any{})
 		if err != nil {

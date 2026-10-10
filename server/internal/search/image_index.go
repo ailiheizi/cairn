@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // ImageContent is one admitted image byte stream resolved by the host. The

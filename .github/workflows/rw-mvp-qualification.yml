@@ -27,13 +27,13 @@ jobs:
           sudo apt-get install --yes bubblewrap jq
 
       - name: Run native qualification
-        run: bash scripts/linux-qualification.sh --artifacts "$RUNNER_TEMP/restoreweave-evidence"
+        run: bash scripts/linux-qualification.sh --artifacts "$RUNNER_TEMP/cairn-evidence"
 
       - name: Upload bounded evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: restoreweave-linux-arm64-evidence
-          path: ${{ runner.temp }}/restoreweave-evidence
+          name: cairn-linux-arm64-evidence
+          path: ${{ runner.temp }}/cairn-evidence
           if-no-files-found: error
           retention-days: 14

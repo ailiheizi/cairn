@@ -15,9 +15,9 @@ import (
 )
 
 func TestZvecGenerationLifecycle(t *testing.T) {
-	libraryPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	libraryPath := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if libraryPath == "" {
-		t.Skip("RESTOREWEAVE_ZVEC_LIBRARY is required for the opt-in native test")
+		t.Skip("CAIRN_ZVEC_LIBRARY is required for the opt-in native test")
 	}
 	manifest := testZvecManifest()
 	payload, err := os.ReadFile(libraryPath)
@@ -138,10 +138,10 @@ func TestZvecGenerationLifecycle(t *testing.T) {
 }
 
 func TestZvecReadinessBindsExplicitLibraryBeforeAmbientLoad(t *testing.T) {
-	const helperEnv = "RESTOREWEAVE_ZVEC_EXPLICIT_BINDING_HELPER"
-	libraryPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	const helperEnv = "CAIRN_ZVEC_EXPLICIT_BINDING_HELPER"
+	libraryPath := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if libraryPath == "" {
-		t.Skip("RESTOREWEAVE_ZVEC_LIBRARY is required for the opt-in native test")
+		t.Skip("CAIRN_ZVEC_LIBRARY is required for the opt-in native test")
 	}
 	if os.Getenv(helperEnv) != "1" {
 		payload, err := os.ReadFile(libraryPath)
@@ -186,9 +186,9 @@ func TestZvecReadinessBindsExplicitLibraryBeforeAmbientLoad(t *testing.T) {
 }
 
 func TestZvecGenerationRejectsTamperedStagedLibrary(t *testing.T) {
-	libraryPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	libraryPath := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if libraryPath == "" {
-		t.Skip("RESTOREWEAVE_ZVEC_LIBRARY is required for the opt-in native test")
+		t.Skip("CAIRN_ZVEC_LIBRARY is required for the opt-in native test")
 	}
 	payload, err := os.ReadFile(libraryPath)
 	if err != nil {
@@ -197,7 +197,7 @@ func TestZvecGenerationRejectsTamperedStagedLibrary(t *testing.T) {
 	digest := sha256.Sum256(payload)
 	spec := ZvecGenerationSpec{Path: filepath.Join(t.TempDir(), "generation"), LibraryPath: libraryPath, LibraryDigest: "sha256:" + hex.EncodeToString(digest[:]), Manifest: testZvecManifest()}
 	spec.ProfileDigest = spec.Manifest.CanonicalDigest()
-	staged := spec.Path + ".restoreweave-zvec-library"
+	staged := spec.Path + ".cairn-zvec-library"
 	if err := os.MkdirAll(filepath.Dir(staged), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -211,9 +211,9 @@ func TestZvecGenerationRejectsTamperedStagedLibrary(t *testing.T) {
 }
 
 func TestZvecGenerationRejectsAmbientFallbackWhenExplicitLibraryIsMissing(t *testing.T) {
-	libraryPath := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	libraryPath := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if libraryPath == "" {
-		t.Skip("RESTOREWEAVE_ZVEC_LIBRARY is required for the opt-in native test")
+		t.Skip("CAIRN_ZVEC_LIBRARY is required for the opt-in native test")
 	}
 	payload, err := os.ReadFile(libraryPath)
 	if err != nil {

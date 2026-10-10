@@ -47,7 +47,7 @@ func validParserEvidence() ParserEvidence {
 	return ParserEvidence{
 		Subject: SubjectRef{ObservationID: "obs-archive", ContentID: testDigest('4')},
 		Parser: EntryPointRef{
-			PackageID:     "org.restoreweave.test-parser",
+			PackageID:     "org.cairn.test-parser",
 			PackageDigest: testDigest('5'),
 			EntryPointID:  "parser.test.v1",
 			RulesDigest:   testDigest('6'),

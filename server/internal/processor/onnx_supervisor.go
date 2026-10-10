@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // ONNXWorkerSupervisorOptions is the host-owned input to the real local

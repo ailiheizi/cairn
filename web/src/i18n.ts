@@ -70,7 +70,7 @@ const chinese: Record<string, string> = {
 };
 
 export function resolveInitialLocale(): Locale {
-  const stored = window.localStorage.getItem("restoreweave.locale");
+  const stored = window.localStorage.getItem("cairn.locale");
   if (stored === "en" || stored === "zh-CN") return stored;
   return window.navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }

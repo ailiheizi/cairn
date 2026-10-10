@@ -213,7 +213,7 @@ retention, or any core phase or release gate.
 Reported validation passed: `npm --prefix web run build`,
 `node scripts/web-i18n-check.mjs` (1498 merged keys / 44 TSX files),
 `git diff --check`, Chrome online/offline/recovered E2E with
-`RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' RESTOREWEAVE_WEB_E2E=1 scripts/web-e2e.sh`,
+`CAIRN_PLAYWRIGHT_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' CAIRN_WEB_E2E=1 scripts/web-e2e.sh`,
 `node scripts/web-content-visual-e2e.mjs`, and the independently run
 `go test -tags purego ./...`. The latter is a repository-level check, not proof
 of a browser feature or release qualification. The prior browser slice and its

@@ -23,7 +23,7 @@ Status (2026-08-13): done and tested on this checkout.
 1. Admit OGG Vorbis comments through `extract.audio.tags.v1` and list them with ID3/FLAC in `audio.list`.
 2. Add `extract.book.meta.v1` for EPUB OPF (`dc:title` / `dc:creator` / date) using `archive/zip` and `encoding/xml`. Do not add Tika.
 3. Add `.epub` and `.md` suffix rules so those files get a processing route. `.txt` already routes to UTF-8 EXTRACT; `books.list` also projects those admitted text artifacts as works.
-4. Expose `books.list` on the Unix-socket control plane, `rw books list`, and read-only MCP. Keep mutation off MCP.
+4. Expose `books.list` on the Unix-socket control plane, `cairn books list`, and read-only MCP. Keep mutation off MCP.
 5. Keep default ingest `RUN_STAGE` in-process. Processor panic/timeout must still not block exact ingest, verify, or restore.
 
 Exit: ingest a tree with MP3, OGG, TXT, Markdown, and EPUB; `audio.list` and `books.list` show titles; lexical search hits extracted titles; exact restore still matches SHA-256. Covered by processor extract tests plus `TestBooksListAfterIngest` / MCP list tests.
@@ -48,7 +48,7 @@ Still later, not this Darwin session:
 
 ## Phase C — later experiences and release
 
-Introduce experience UIs as separate clients over Cairn-owned surfaces, not as code inside `restoreweaved`. The long sequence is [Experience Completion Plan](experience-completion-plan.md). Named discovery dimensions are [Index Dimension Plan](index-dimension-plan.md). See [Whole-Architecture Open-Source Reference](architecture-open-source-reference.md). Product proof and engineering gates stay on separate tracks.
+Introduce experience UIs as separate clients over Cairn-owned surfaces, not as code inside `cairnd`. The long sequence is [Experience Completion Plan](experience-completion-plan.md). Named discovery dimensions are [Index Dimension Plan](index-dimension-plan.md). See [Whole-Architecture Open-Source Reference](architecture-open-source-reference.md). Product proof and engineering gates stay on separate tracks.
 
 1. Keep the command ABI as the only catalog/read/annotation path. A thin Inbox shell now binds that ABI at `/inbox` when the loopback facade is enabled; it is not an `RW-MVP-1` restore dependency.
 2. Protocol facades first: loopback OpenSubsonic for Subsonic clients and OPDS for KOReader-class clients. Song IDs are `SubjectRef`. `scrobble` writes a `PROGRESS` annotation. Do not embed a player or media server.

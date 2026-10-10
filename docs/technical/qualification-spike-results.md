@@ -251,8 +251,8 @@ candidate measurement, not a conclusion.
 
 The internal `server/internal/repository/qualificationcorpus` package now
 generates a self-contained, symlink-free corpus for repeatable engine probes.
-The corpus manifest is `restoreweave.qualification-corpus.v1` and records the
-seed (`restoreweave-phase5-heterogeneous-v1`), generator provenance,
+The corpus manifest is `cairn.qualification-corpus.v1` and records the
+seed (`cairn-phase5-heterogeneous-v1`), generator provenance,
 `license=self-generated`, per-file category, size, SHA-256, and exact/near
 duplicate relationships. Generation rejects existing or overlapping targets
 and symlink parents; the generated files are never committed.

@@ -10,11 +10,11 @@ import (
 // Socket environment variables. The server resolves its socket and catalog
 // paths itself and never imports the client's path package.
 const (
-	SocketEnv      = "RESTOREWEAVE_SOCKET"
-	CatalogEnv     = "RESTOREWEAVE_CATALOG"
-	RepositoryEnv  = "RESTOREWEAVE_REPOSITORY"
-	socketRelPath  = "restoreweave/restoreweaved.sock"
-	catalogRelDir  = "restoreweave"
+	SocketEnv      = "CAIRN_SOCKET"
+	CatalogEnv     = "CAIRN_CATALOG"
+	RepositoryEnv  = "CAIRN_REPOSITORY"
+	socketRelPath  = "cairn/cairnd.sock"
+	catalogRelDir  = "cairn"
 	catalogName    = "catalog.sqlite"
 	repositoryName = "repository"
 )
@@ -65,7 +65,7 @@ func DefaultRepositoryPath() string {
 
 // ErrSocketInUse is returned when a stale socket file cannot be reclaimed
 // because another daemon is already listening on it.
-var ErrSocketInUse = errors.New("socket path is already in use by another restoreweaved")
+var ErrSocketInUse = errors.New("socket path is already in use by another cairnd")
 
 // prepareSocketPath creates the socket parent directory and reclaims a stale
 // socket file: if the path exists but nothing is listening, it is removed.

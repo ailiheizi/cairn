@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 type capacityErrorDriver struct{ repository.Driver }
@@ -36,7 +36,7 @@ func (d capacityErrorDriver) DescribeHealthAndCapacity(context.Context) (reposit
 func newTestDispatcher(t *testing.T) (*Dispatcher, *sqlite.Store) {
 	t.Helper()
 	store := testutil.OpenStore(t, ":memory:")
-	dispatcher := NewDispatcher(store, "/catalog/harness.sqlite", "/tmp/restoreweave/harness.sock")
+	dispatcher := NewDispatcher(store, "/catalog/harness.sqlite", "/tmp/cairn/harness.sock")
 	return dispatcher, store
 }
 
@@ -47,7 +47,7 @@ func TestDispatcherBindsDaemonIndexerToResolvedProfile(t *testing.T) {
 		t.Fatalf("open repository: %v", err)
 	}
 	binding := search.FixtureIndexBinding("sha256:config-a")
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithConfigDigest(binding.ConfigDigest), WithIndexBinding(binding), WithExact(&exact.Service{
 			Store: store,
 			Repo:  repo,
@@ -70,7 +70,7 @@ func TestDispatcherBindsDaemonIndexerToResolvedProfile(t *testing.T) {
 		{WithConfigDigest(binding.ConfigDigest), WithIndexBinding(stale)},
 		{WithIndexBinding(stale), WithConfigDigest(binding.ConfigDigest)},
 	} {
-		candidate := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+		candidate := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 			append(opts, WithExact(&exact.Service{Store: store, Repo: repo}))...)
 		if candidate.search == nil || candidate.search.ConfigDigest != binding.ConfigDigest ||
 			candidate.search.LexicalProfileDigest != binding.LexicalProfileDigest ||
@@ -89,7 +89,7 @@ func TestDispatcherUsesConfiguredVectorPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithVectorPath(vectorRoot), WithExact(&exact.Service{Store: store, Repo: repo}))
 	if dispatcher.search == nil || dispatcher.search.Engine == nil {
 		t.Fatal("dispatcher did not create search engine")
@@ -130,7 +130,7 @@ func TestDispatcherWiresAdmittedSemanticBinding(t *testing.T) {
 		VectorSchema: "float32:512", SemanticSpace: "space", Distance: "cosine", IndexConfig: "index", QueryConfig: "query",
 		ProviderDigest: "provider", ConfigDigest: "config",
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithConfigDigest(manifest.ConfigDigest),
 		WithSemanticIndexerBinding(dispatcherSemanticProvider{}, dispatcherSemanticZvec{}, "/explicit/libzvec.dylib", "sha256:"+strings.Repeat("a", 64), manifest),
 		WithExact(&exact.Service{Store: store, Repo: repo}))
@@ -271,7 +271,7 @@ func TestDispatcherStatusGet(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("decode status data: %v", err)
 	}
-	if data.Controller != "restoreweaved" {
+	if data.Controller != "cairnd" {
 		t.Fatalf("controller = %q", data.Controller)
 	}
 	if !data.Catalog.OK || data.Catalog.Path != "/catalog/harness.sqlite" {
@@ -309,7 +309,7 @@ func TestDispatcherStatusPreservesCapacityProbeError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  capacityErrorDriver{Driver: base},
 	}))
@@ -374,7 +374,7 @@ func TestDispatcherCapabilityListKeepsBundleAndSemanticReadinessIndependent(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithSemanticBundleCapability(command.Capability{
 			Kind: "model-bundle", ID: search.SemanticBundleBGEProfileID,
 			State: command.CapabilityAvailable, Version: "sha256:test",

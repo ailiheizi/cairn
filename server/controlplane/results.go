@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // Reason codes returned inside command.Result.Reasons.
@@ -89,7 +89,7 @@ func unknownExternalOutcomeResult(env command.Envelope, started time.Time, err e
 func unimplementedResult(env command.Envelope, started time.Time) command.Result {
 	return failed(env, started, newReason(
 		ReasonCodeUnimplemented,
-		"operation "+env.Operation+" is not implemented by this restoreweaved build",
+		"operation "+env.Operation+" is not implemented by this cairnd build",
 	))
 }
 

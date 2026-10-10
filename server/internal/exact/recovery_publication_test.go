@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func TestSignedPublicationAuthenticatesPortableFileFacts(t *testing.T) {

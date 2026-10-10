@@ -88,13 +88,13 @@ const libraryPageSize = 200;
 
 // The export destination and sidecar choice this browser last used for one
 // workspace. This is a convenience for this browser only, following the
-// `restoreweave.*` recents prefix and its try/catch storage pattern: it is
+// `cairn.*` recents prefix and its try/catch storage pattern: it is
 // never a plan, a frozen manifest, a durable default, or recovery evidence.
 // The manifest, the destination the daemon checks, and the written bytes stay
 // with the daemon catalog. The key is scoped per workspace so one workspace's
 // convenience never leaks into another's, and a missing or unreadable value
 // pre-fills nothing rather than inventing a default.
-const exportPresetPrefix = "restoreweave.export_preset.";
+const exportPresetPrefix = "cairn.export_preset.";
 type ExportPreset = { destination: string; sidecars: string };
 // The selector's closed vocabulary. The daemon implements exactly one policy
 // besides the empty default, so a stored value outside it is dropped instead of

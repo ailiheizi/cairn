@@ -3,7 +3,7 @@ package identify
 import (
 	"context"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 // ScannerDetector adapts the in-process Detector to the scanner host contract

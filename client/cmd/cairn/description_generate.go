@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
-// rw description generate
+// cairn description generate
 //
 // One explicit, on-demand description generation for one subject. The daemon
 // runs the egress-gated DESCRIBE_SUBJECT provider; this command never carries
@@ -31,7 +31,7 @@ func newDescriptionGenerateCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "generate <subject-ref>", "Generate one candidate description through the egress-gated provider",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw description generate <subject-ref> --workspace <id> --kind <AI_SUMMARY|AI_ANALYSIS> [--grant <grant-id>]")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn description generate <subject-ref> --workspace <id> --kind <AI_SUMMARY|AI_ANALYSIS> [--grant <grant-id>]")
 				return 1
 			}
 			input := map[string]any{

@@ -62,7 +62,7 @@ func TestLinuxQualificationExtractsTopLevelBundleAssetsSafely(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "bundle")
 	manifest := filepath.Join(t.TempDir(), "semantic-bundle.json")
 	fixture := map[string]any{
-		"schema":    "restoreweave.semantic-bundle.v1",
+		"schema":    "cairn.semantic-bundle.v1",
 		"runtime":   map[string]any{"path": "runtime/libonnxruntime.so"},
 		"model":     map[string]any{"path": "models/foo..bar.onnx"},
 		"tokenizer": map[string]any{"path": "tokenizer.json"},
@@ -102,7 +102,7 @@ func TestLinuxQualificationExtractsTopLevelBundleAssetsSafely(t *testing.T) {
 	}
 
 	fixture["model"] = map[string]any{"path": "models/model.onnx"}
-	fixture["schema"] = "restoreweave.semantic-bundle.v2"
+	fixture["schema"] = "cairn.semantic-bundle.v2"
 	payload, err = json.Marshal(fixture)
 	if err != nil {
 		t.Fatal(err)

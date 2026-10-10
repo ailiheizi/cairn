@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 const (
-	SchemaBindingV1         = "org.restoreweave.capture.binding.v1"
+	SchemaBindingV1         = "org.cairn.capture.binding.v1"
 	ProfileLocalTree        = "local-tree"
 	ClaimLiveValidated      = "LIVE_VALIDATED_OBSERVATION"
 	identityDigestAlgorithm = "sha256"

@@ -10,10 +10,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ailiheizi/restoreweave/server/internal/decode"
-	"github.com/ailiheizi/restoreweave/server/internal/readsvc"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/decode"
+	"github.com/ailiheizi/cairn/server/internal/readsvc"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type readSession struct {

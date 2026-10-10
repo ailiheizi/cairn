@@ -40,7 +40,7 @@ its status panel. No new domain operation, catalog, service, durable schema,
 provider, or signed record was added.
 
 `interfaceId` uses the existing guarded origin-local
-`restoreweave.appearance` preference. Old palette-only preferences select
+`cairn.appearance` preference. Old palette-only preferences select
 workspace while retaining valid palette/mode fields. Unknown or malformed IDs
 resolve to workspace. Changes apply immediately and persist across reloads.
 This setting is disposable browser state, not a server preference or backup

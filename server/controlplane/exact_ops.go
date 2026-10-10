@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type planIngestInput struct {
@@ -538,7 +538,7 @@ func (d *Dispatcher) recordSnapshotVerificationReceipt(
 		return tx.AppendAuditEvent(ctx, &sqlite.AuditEvent{
 			ID:          mustAuditID(),
 			WorkspaceID: root.WorkspaceID,
-			Actor:       "restoreweaved",
+			Actor:       "cairnd",
 			Action:      action,
 			TargetType:  sqlite.AuditTargetSnapshot,
 			TargetID:    snapshotRef,

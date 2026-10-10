@@ -155,7 +155,7 @@ func (d *puregoZvecGenerationDriver) Build(ctx context.Context, spec ZvecGenerat
 }
 
 func (d *puregoZvecGenerationDriver) buildNative(spec ZvecGenerationSpec, segments []ZvecSegment) (ZvecGenerationReceipt, error) {
-	schema := zvec.NewCollectionSchema("restoreweave_semantic_generation")
+	schema := zvec.NewCollectionSchema("cairn_semantic_generation")
 	if schema == nil {
 		return ZvecGenerationReceipt{}, fmt.Errorf("%w: create schema", ErrZvecUnavailable)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	BuiltinCorePackageID         = "org.restoreweave.core"
+	BuiltinCorePackageID         = "org.cairn.core"
 	BuiltinIdentificationEntryID = "detector.extension-magic.v1"
 )
 
@@ -228,11 +228,11 @@ func BuiltinIdentificationEntryPointManifest() EntryPointManifest {
 		ExecutionClass:      ExecutionByteDeterministic,
 		Inputs: []PortDeclaration{{
 			Name: "request", Type: PortDetectionRequest,
-			SchemaID: "restoreweave.detection-request/v1", Required: true,
+			SchemaID: "cairn.detection-request/v1", Required: true,
 		}},
 		Outputs: []PortDeclaration{{
 			Name: "evidence", Type: PortDetectionEvidence,
-			SchemaID: "restoreweave.detection-evidence/v1", Required: true,
+			SchemaID: "cairn.detection-evidence/v1", Required: true,
 		}},
 		Support: SupportDeclaration{Formats: formats},
 		Capabilities: CapabilitySet{
@@ -243,16 +243,16 @@ func BuiltinIdentificationEntryPointManifest() EntryPointManifest {
 		Runtime: RuntimeDescriptor{
 			Kind:       RuntimeBuiltin,
 			Lifecycle:  RuntimeOneShot,
-			AdapterID:  "restoreweave.builtin.v1",
-			Protocol:   "restoreweave.internal/v1",
+			AdapterID:  "cairn.builtin.v1",
+			Protocol:   "cairn.internal/v1",
 			Entrypoint: BuiltinIdentificationEntryID,
 		},
 		Enablement:          EnablementEnabled,
 		Qualification:       QualificationQualified,
 		CanExecuteNewWork:   true,
 		CanDecodeHistorical: false,
-		ConfigurationSchema: "restoreweave.detector.extension-magic.config/v1",
-		ConformanceSuiteID:  "restoreweave.detector.extension-magic.conformance/v1",
+		ConfigurationSchema: "cairn.detector.extension-magic.config/v1",
+		ConformanceSuiteID:  "cairn.detector.extension-magic.conformance/v1",
 	}
 }
 

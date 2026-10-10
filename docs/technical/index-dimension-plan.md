@@ -24,7 +24,7 @@ A phase is done only when the listed exit test is green. “Sounds like modern s
 
 **Do not own in this fixture plan.** The required local text embedding and zvec runtime must be implemented and qualified under Core Phase 4, not by extending I1–I9 fixtures. Chromaprint/Shazam services, CLIP, alternate embedding spaces, graph stores, or a Cairn player remain later processors or foreign tools. Their features, if added, attach to the same `SubjectRef` and never become `ContentIdentity`.
 
-**Occam.** Do not add a fourth public catalog. Do not add an `rw identify-song` product. Do not put ffmpeg/Tika on the identity path. Do not select or promote a release repository in this plan. Do not expand `RW-MVP-1`.
+**Occam.** Do not add a fourth public catalog. Do not add an `cairn identify-song` product. Do not put ffmpeg/Tika on the identity path. Do not select or promote a release repository in this plan. Do not expand `RW-MVP-1`.
 
 ## 3. Current checkout (generation 0)
 
@@ -198,7 +198,7 @@ Status (2026-08-15): **fixture-contract-complete** as a disposable projection of
 | Unknown relation | Contract error | `lyrics:foo` is invalid input |
 | Disposable generation | Separate `index_generations.dimension` | Delete the graph file; graph search degrades; verify still matches SHA-256 |
 
-Do not add `rw graph`. Use `rw search --dimension graph-relation`. OpenSubsonic `search3` stays lexical.
+Do not add `cairn graph`. Use `cairn search --dimension graph-relation`. OpenSubsonic `search3` stays lexical.
 
 ## 6. How this is tested
 
@@ -217,7 +217,7 @@ Do not drive Supersonic, Feishin, or KOReader to prove an index phase.
 
 ## 7. Non-goals
 
-- Embedding a player, recognizer, or media server in `restoreweaved`.
+- Embedding a player, recognizer, or media server in `cairnd`.
 - Making ffmpeg, Tika, Chromaprint, or a vector database core identity.
 - Replacing the in-tree directory CAS.
 - A fourth public REST catalog or a Unix-socket app SDK.

@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type memorySink struct {
@@ -907,11 +907,11 @@ func insertDetectionEvidence(ctx context.Context, tx *sqlite.Tx, workspaceID, ob
 	}
 	detectorDigest := detectorVersion
 	if !strings.HasPrefix(detectorDigest, "sha256:") {
-		detectorDigest = DigestBytes([]byte("restoreweave.detector:" + detectorID + "\x00" + detectorVersion))
+		detectorDigest = DigestBytes([]byte("cairn.detector:" + detectorID + "\x00" + detectorVersion))
 	}
 	// The scanner detector runs in-process under host control; this digest
 	// identifies that policy and does not claim a separate sandbox boundary.
-	sandboxPolicyHash := DigestBytes([]byte("restoreweave.detection.host.in-process.v1"))
+	sandboxPolicyHash := DigestBytes([]byte("cairn.detection.host.in-process.v1"))
 	for index, evidence := range result.Evidence {
 		kind := strings.ToUpper(strings.TrimSpace(evidence.Method))
 		if kind == "" {
@@ -1287,7 +1287,7 @@ func newManifestPortableFact(name string, state PortableFactState, sourceProfile
 
 func exactRecoveryRecords(contentID string, logicalLength int64, representationID string) (json.RawMessage, json.RawMessage, error) {
 	recipe, err := json.Marshal(map[string]any{
-		"schema":         "org.restoreweave.recovery-recipe.v1",
+		"schema":         "org.cairn.recovery-recipe.v1",
 		"content_id":     contentID,
 		"logical_length": logicalLength,
 		"representation": representationID,

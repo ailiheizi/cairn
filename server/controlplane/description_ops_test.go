@@ -7,9 +7,9 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestDescriptionCreateReviseListGetAndSegmentSpans(t *testing.T) {
@@ -199,7 +199,7 @@ func TestDescriptionSegmentationDoesNotPersistWhitespaceOnlyChunks(t *testing.T)
 func TestDescriptionCreateBindsConfigAndProfileIdentities(t *testing.T) {
 	store := testutil.OpenStore(t, ":memory:")
 	configDigest := "sha256:description-config-v1"
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithConfigDigest(configDigest))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithConfigDigest(configDigest))
 	seed := testutil.SeedNamespace(t, store)
 	result := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpDescriptionCreate, map[string]any{
 		"workspace_id":     seed.WorkspaceID,
@@ -234,7 +234,7 @@ func TestDescriptionConfigSwitchCreatesBoundSuccessor(t *testing.T) {
 	store := testutil.OpenStore(t, ":memory:")
 	seed := testutil.SeedNamespace(t, store)
 	ctx := context.Background()
-	firstDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-a.sock", WithConfigDigest("sha256:description-config-a"))
+	firstDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-a.sock", WithConfigDigest("sha256:description-config-a"))
 	first := firstDispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionCreate, map[string]any{
 		"workspace_id": seed.WorkspaceID, "subject_ref": seed.FileEntryID,
 		"kind": "USER", "body": "first revision", "producer_profile": "operator-v1",
@@ -246,7 +246,7 @@ func TestDescriptionConfigSwitchCreatesBoundSuccessor(t *testing.T) {
 	if err := json.Unmarshal(first.Data, &firstData); err != nil {
 		t.Fatal(err)
 	}
-	secondDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-b.sock", WithConfigDigest("sha256:description-config-b"))
+	secondDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-b.sock", WithConfigDigest("sha256:description-config-b"))
 	second := secondDispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionCreate, map[string]any{
 		"workspace_id": seed.WorkspaceID, "subject_ref": seed.FileEntryID,
 		"kind": "USER", "body": "second revision", "producer_profile": "operator-v1",

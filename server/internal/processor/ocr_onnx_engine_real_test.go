@@ -14,14 +14,14 @@ import (
 
 // TestOCROnnxEngineAgainstOperatorInstalledBundle is the real-engine smoke
 // test. It never downloads anything: it runs only when the operator has
-// installed a bundle and points RESTOREWEAVE_OCR_BUNDLE at it (either the
+// installed a bundle and points CAIRN_OCR_BUNDLE at it (either the
 // bundle root itself or the models root that contains
 // <profile>/<goos-goarch>). Without that bundle it skips with an explicit
 // statement instead of faking a pass.
 func TestOCROnnxEngineAgainstOperatorInstalledBundle(t *testing.T) {
-	configured := strings.TrimSpace(os.Getenv("RESTOREWEAVE_OCR_BUNDLE"))
+	configured := strings.TrimSpace(os.Getenv("CAIRN_OCR_BUNDLE"))
 	if configured == "" {
-		t.Skip("RESTOREWEAVE_OCR_BUNDLE is not set: no operator-installed OCR bundle is present, so the in-process ONNX detection/recognition path cannot be exercised. The image pipeline, artifact shape, bounds, honest states, and search feed are covered by the fixture-engine tests instead.")
+		t.Skip("CAIRN_OCR_BUNDLE is not set: no operator-installed OCR bundle is present, so the in-process ONNX detection/recognition path cannot be exercised. The image pipeline, artifact shape, bounds, honest states, and search feed are covered by the fixture-engine tests instead.")
 	}
 	root := configured
 	if _, err := os.Stat(filepath.Join(root, OCRBundleManifestName)); err != nil {

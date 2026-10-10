@@ -17,7 +17,7 @@ const linkedHelper = transpile(helperSource).replaceAll('"./operations"', JSON.s
 const helperURL = `data:text/javascript;base64,${Buffer.from(linkedHelper).toString("base64")}`;
 const { AUDIO_PLAYBACK_LIMIT, fetchVerifiedAudio } = await import(helperURL);
 
-const bytes = new TextEncoder().encode("restoreweave bounded playback");
+const bytes = new TextEncoder().encode("cairn bounded playback");
 const digest = createHash("sha256").update(bytes).digest("hex");
 const track = (overrides = {}) => ({
   workspaceID: "workspace-test",
@@ -33,7 +33,7 @@ try {
   // Complete body: verify exact length and SHA-256 before returning audio MIME.
   let request;
   globalThis.fetch = async (url, options) => {
-    request = { url: new URL(url, "http://restoreweave.local"), options };
+    request = { url: new URL(url, "http://cairn.local"), options };
     return response(bytes, { "Content-Length": String(bytes.byteLength) });
   };
   const blob = await fetchVerifiedAudio(track(), new AbortController().signal);

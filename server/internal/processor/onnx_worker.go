@@ -17,15 +17,15 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 const (
 	// ONNXWorkerCapabilityID is a stable capability identity. It is not a
 	// readiness claim and is never registered by DefaultProcessors.
 	ONNXWorkerCapabilityID          = "embed.text.onnx.bge-small-zh-v1.5.v1"
-	ONNXWorkerProtocol              = "restoreweave.processor.embed-text.v1"
-	ONNXWorkerSchema                = "restoreweave.processor.embed-text-result.v1"
+	ONNXWorkerProtocol              = "cairn.processor.embed-text.v1"
+	ONNXWorkerSchema                = "cairn.processor.embed-text-result.v1"
 	ONNXWorkerReasonBundle          = "BUNDLE_UNAVAILABLE"
 	ONNXWorkerReasonProfile         = "PROFILE_MISMATCH"
 	ONNXWorkerReasonRuntime         = "RUNTIME_UNAVAILABLE"
@@ -324,7 +324,7 @@ func onnxWorkerPreprocessingDigest(bundle search.SemanticBundleAdmission, purpos
 		return "", err
 	}
 	h := sha256.New()
-	_, _ = h.Write([]byte("restoreweave.onnx-worker-preprocessing.v1\n"))
+	_, _ = h.Write([]byte("cairn.onnx-worker-preprocessing.v1\n"))
 	_, _ = h.Write(payload)
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }

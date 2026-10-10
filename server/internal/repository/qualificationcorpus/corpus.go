@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	Schema        = "restoreweave.qualification-corpus.v1"
-	DefaultSeed   = "restoreweave-phase5-heterogeneous-v1"
+	Schema        = "cairn.qualification-corpus.v1"
+	DefaultSeed   = "cairn-phase5-heterogeneous-v1"
 	SelfGenerated = "self-generated"
 )
 
@@ -353,7 +353,7 @@ type generatedFile struct {
 }
 
 func buildFiles(seed string, sizeMiB int) ([]generatedFile, error) {
-	textBody := []byte("RestoreWeave qualification corpus.\nThis is deterministic self-generated text for lossless storage tests.\n")
+	textBody := []byte("Cairn qualification corpus.\nThis is deterministic self-generated text for lossless storage tests.\n")
 	textBody = bytes.Repeat(textBody, 48)
 	nearText := append([]byte(nil), textBody...)
 	nearText[len(nearText)/2] = 'X'
@@ -599,7 +599,7 @@ func encodedTARGZ() ([]byte, error) {
 }
 
 func minimalPDF() []byte {
-	stream := "BT /F1 12 Tf 20 50 Td (RestoreWeave) Tj ET\n"
+	stream := "BT /F1 12 Tf 20 50 Td (Cairn) Tj ET\n"
 	objects := []string{
 		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
 		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",

@@ -31,15 +31,15 @@ import { assertDescriptionAction } from "./e2e/description.mjs";
 import { assertNotesSurface } from "./e2e/notes.mjs";
 
 const phase = process.argv[2] ?? "online";
-const url = process.env.RESTOREWEAVE_WEB_E2E_URL ?? "http://127.0.0.1:5174/";
-const sourcePath = process.env.RESTOREWEAVE_WEB_E2E_SOURCE;
-const restoreDestination = process.env.RESTOREWEAVE_WEB_E2E_RESTORE_DEST;
-const exportDestination = process.env.RESTOREWEAVE_WEB_E2E_EXPORT_DEST;
+const url = process.env.CAIRN_WEB_E2E_URL ?? "http://127.0.0.1:5174/";
+const sourcePath = process.env.CAIRN_WEB_E2E_SOURCE;
+const restoreDestination = process.env.CAIRN_WEB_E2E_RESTORE_DEST;
+const exportDestination = process.env.CAIRN_WEB_E2E_EXPORT_DEST;
 // CI and developer machines may already provide a managed browser (for
 // example, the system Google Chrome) without a Playwright-downloaded binary.
 // Keep the default unchanged, but allow the harness to point at that browser
 // explicitly so a missing cache does not turn a real E2E run into a false skip.
-const executablePath = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
+const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
 
 const ctx = await createHarness({ url, executablePath });
 try {
@@ -53,9 +53,9 @@ try {
   } else if (phase === "recovered") {
     await assertRecoveredPhase(ctx);
   } else {
-    assert(sourcePath, "RESTOREWEAVE_WEB_E2E_SOURCE is required for online phase");
-    assert(restoreDestination, "RESTOREWEAVE_WEB_E2E_RESTORE_DEST is required for online phase");
-    assert(exportDestination, "RESTOREWEAVE_WEB_E2E_EXPORT_DEST is required for online phase");
+    assert(sourcePath, "CAIRN_WEB_E2E_SOURCE is required for online phase");
+    assert(restoreDestination, "CAIRN_WEB_E2E_RESTORE_DEST is required for online phase");
+    assert(exportDestination, "CAIRN_WEB_E2E_EXPORT_DEST is required for online phase");
     await assertOnline(ctx);
   }
 } finally {

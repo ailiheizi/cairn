@@ -263,7 +263,7 @@ export async function assertNarrowDrawers(ctx) {
   const addDrawer = page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await addDrawer.waitFor({ state: "visible", timeout: 10000 });
   await addDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
-  assert.ok(await addDrawer.getByRole("textbox", { name: /路径|Path on RestoreWeave host/ }).isVisible());
+  assert.ok(await addDrawer.getByRole("textbox", { name: /路径|Path on Cairn host/ }).isVisible());
   await assertNoHorizontalOverflow(ctx);
   await addDrawer.getByRole("button", { name: /关闭添加来源|Close add source/ }).click();
   await assertFocusReturned(ctx, addTrigger);
@@ -309,7 +309,7 @@ export async function assertImageBundleInstallControl(ctx) {
       return;
     }
   }
-  await field.fill("/nonexistent/restoreweave-image-bundle.tar.gz");
+  await field.fill("/nonexistent/cairn-image-bundle.tar.gz");
   assert.equal(await install.isDisabled(), false, "a path must enable the install control when the daemon offers the operation");
   await install.click();
   const failure = settings.locator(".model-action-message.error");

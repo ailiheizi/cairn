@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func newIngestCommand(env *clientEnv) *cobra.Command {
@@ -25,7 +25,7 @@ func newIngestCommand(env *clientEnv) *cobra.Command {
 	exit := newExitCommand(env, "ingest <root>", "Capture a local tree using the configured protection policy",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw ingest <root>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn ingest <root>\n")
 				return 1
 			}
 			locators := make([]command.IngestLocatorInput, 0, len(locatorValues))
@@ -128,7 +128,7 @@ func renderPlanIngest(out io.Writer, data command.PlanIngestData) {
 	fmt.Fprintf(out, "plan:        %s\n", data.PlanID)
 	fmt.Fprintf(out, "plan digest: %s\n", data.PlanDigest)
 	if data.Executable && data.PlanDigest != "" {
-		fmt.Fprintf(out, "next:        rw plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
+		fmt.Fprintf(out, "next:        cairn plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
 	}
 }
 
@@ -204,7 +204,7 @@ func newRestoreCommand(env *clientEnv) *cobra.Command {
 		"Create a restore plan; apply it separately to write an empty directory",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 && len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw restore <snapshot-ref> [destination]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn restore <snapshot-ref> [destination]\n")
 				return 1
 			}
 			input := map[string]any{"snapshot_ref": args[0]}
@@ -245,7 +245,7 @@ func renderPlanRestore(out io.Writer, data command.PlanRestoreData) {
 	fmt.Fprintf(out, "plan:         %s\n", data.PlanID)
 	fmt.Fprintf(out, "plan digest:  %s\n", data.PlanDigest)
 	if data.Executable && data.Destination != "" && data.PlanDigest != "" && data.WorkspaceID != "" {
-		fmt.Fprintf(out, "next:         rw plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
+		fmt.Fprintf(out, "next:         cairn plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
 	}
 }
 
@@ -273,7 +273,7 @@ func newSnapshotCommand(env *clientEnv) *cobra.Command {
 		"Compare two portable snapshots by original path",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw snapshot diff <from-ref> <to-ref>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn snapshot diff <from-ref> <to-ref>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpSnapshotDiff, map[string]any{
@@ -302,7 +302,7 @@ func newSnapshotCommand(env *clientEnv) *cobra.Command {
 	verify := newExitCommand(env, "verify <snapshot-ref>", "Verify a published snapshot at one declared level",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw snapshot verify <snapshot-ref> [--mode ...] [--destination <dir>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn snapshot verify <snapshot-ref> [--mode ...] [--destination <dir>]\n")
 				return 1
 			}
 			input := map[string]any{"snapshot_ref": args[0], "mode": cmd.Flags().Lookup("mode").Value.String()}
@@ -342,7 +342,7 @@ func newRecoveryCommand(env *clientEnv) *cobra.Command {
 		"Copy the portable snapshot JSON to a new file without overwriting",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw recovery export <snapshot-ref> <destination>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn recovery export <snapshot-ref> <destination>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpRecoveryExport, map[string]any{
@@ -368,7 +368,7 @@ func newRecoveryCommand(env *clientEnv) *cobra.Command {
 		"Export the public recovery trust anchor without overwriting",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw recovery anchor export <destination>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn recovery anchor export <destination>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpRecoveryAnchorExport, map[string]any{
@@ -393,7 +393,7 @@ func newRecoveryCommand(env *clientEnv) *cobra.Command {
 		"Verify a portable recovery artifact against an independently retained trust anchor",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw recovery import <artifact> <trust-anchor>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn recovery import <artifact> <trust-anchor>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpRecoveryImport, map[string]any{
@@ -424,7 +424,7 @@ func newRecoveryCommand(env *clientEnv) *cobra.Command {
 		"Export a deterministic proof envelope over one subject's recovery reference",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) < 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw recovery token export <snapshot-ref> <subject-path>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn recovery token export <snapshot-ref> <subject-path>\n")
 				return 1
 			}
 			input := map[string]any{"snapshot_ref": args[0]}

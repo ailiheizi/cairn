@@ -164,12 +164,12 @@ func TestPreparedClosureRejectsWrongAnchorAndMutations(t *testing.T) {
 		t.Fatalf("changed field error = %v, want signature error", err)
 	}
 	mutated = prepared
-	mutated.Schema = "org.restoreweave.prepared-closure.v2"
+	mutated.Schema = "org.cairn.prepared-closure.v2"
 	if err := mutated.Verify(anchor); !errors.Is(err, ErrRecoveryRecordInvalid) {
 		t.Fatalf("changed schema error = %v, want record error", err)
 	}
 	mutated = prepared
-	mutated.SignatureDomain = "org.restoreweave.other-domain"
+	mutated.SignatureDomain = "org.cairn.other-domain"
 	if err := mutated.Verify(anchor); !errors.Is(err, ErrRecoveryRecordInvalid) {
 		t.Fatalf("changed domain error = %v, want record error", err)
 	}

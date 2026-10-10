@@ -1,6 +1,6 @@
 # NAS Product Power Review
 
-> **Review status:** This audit was updated on 2026-08-12 from the current Cairn repository, Siftline query ID `restoreweave-nas-reframe-20260812`, a focused demand scan, and a fresh primary-source competitor review. Architecture feasibility, adjacent adoption, direct demand, and current implementation are kept separate.
+> **Review status:** This audit was updated on 2026-08-12 from the current Cairn repository, Siftline query ID `cairn-nas-reframe-20260812`, a focused demand scan, and a fresh primary-source competitor review. Architecture feasibility, adjacent adoption, direct demand, and current implementation are kept separate.
 
 > **Historical decision note (superseded 2026-08-19):** Bundled-FUSE and embedding-optional recommendations below are retained as research history, not current requirements. The active profile uses explicit export materialization, has no Cairn mount API, and requires the bundled local ONNX/BGE plus in-process zvec semantic profile described in [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
 

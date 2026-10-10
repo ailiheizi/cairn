@@ -33,8 +33,8 @@ const reservedModes: ReadonlySet<string> = new Set([
 ]);
 const reservedRoutes: ReadonlySet<string> = new Set([...reservedModes, "", "settings", "restore", "export"]);
 const reservedPageIDs: ReadonlySet<string> = new Set([
-  "restoreweave:content", "restoreweave:search", "restoreweave:sources", "restoreweave:activity",
-  "restoreweave:duplicates", "restoreweave:tags", "restoreweave:notes", "restoreweave:settings",
+  "cairn:content", "cairn:search", "cairn:sources", "cairn:activity",
+  "cairn:duplicates", "cairn:tags", "cairn:notes", "cairn:settings",
 ]);
 const reservedSlots: ReadonlySet<string> = new Set([
   "host.shell", "host.navigation", "host.primary-navigation", "host.content", "host.details",
@@ -102,10 +102,10 @@ export function validateLibraryRendererIDs(pages: readonly LibraryPageDefinition
 
 /** Compiled first-party metadata. Renderer implementations are bound by LibraryPageHost. */
 export const libraryPages: readonly LibraryPageDefinition[] = [
-  { id: "restoreweave:photos", mode: "photos", route: "photos", slot: "page.restoreweave.photos", label: "Photos", presentationLabel: "Photo wall", description: "Photos shows image files saved in your Library.", context: "loaded-library", mediaClass: "image" },
-  { id: "restoreweave:music", mode: "music", route: "music", slot: "page.restoreweave.music", label: "Music", description: "Audio shows files in your Library; browsing does not play them.", context: "loaded-library", mediaClass: "audio" },
-  { id: "restoreweave:exhibition", mode: "page:restoreweave:exhibition", route: "exhibition", slot: "page.restoreweave.exhibition", label: "Exhibition", presentationOf: "restoreweave:photos", presentationLabel: "Exhibition", description: "Walk through your saved images in a focused gallery.", context: "loaded-library", chrome: "immersive", mediaClass: "image" },
-  { id: "restoreweave:overview", mode: "page:restoreweave:overview", route: "overview", slot: "page.restoreweave.overview", label: "Content overview", description: "Photos, music and other content together in the current Library scope.", context: "loaded-library", mediaClass: "all", navigationKind: "layout" },
+  { id: "cairn:photos", mode: "photos", route: "photos", slot: "page.cairn.photos", label: "Photos", presentationLabel: "Photo wall", description: "Photos shows image files saved in your Library.", context: "loaded-library", mediaClass: "image" },
+  { id: "cairn:music", mode: "music", route: "music", slot: "page.cairn.music", label: "Music", description: "Audio shows files in your Library; browsing does not play them.", context: "loaded-library", mediaClass: "audio" },
+  { id: "cairn:exhibition", mode: "page:cairn:exhibition", route: "exhibition", slot: "page.cairn.exhibition", label: "Exhibition", presentationOf: "cairn:photos", presentationLabel: "Exhibition", description: "Walk through your saved images in a focused gallery.", context: "loaded-library", chrome: "immersive", mediaClass: "image" },
+  { id: "cairn:overview", mode: "page:cairn:overview", route: "overview", slot: "page.cairn.overview", label: "Content overview", description: "Photos, music and other content together in the current Library scope.", context: "loaded-library", mediaClass: "all", navigationKind: "layout" },
 ];
 
 validateLibraryPages(libraryPages);

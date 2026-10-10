@@ -96,7 +96,7 @@ func restoreDestinationBasis(destination string) (string, error) {
 		Mode      uint32 `json:"mode,omitempty"`
 		ModTimeNS int64  `json:"mod_time_ns,omitempty"`
 	}
-	value := basis{Schema: "org.restoreweave.restore-destination-basis.v1", Path: destination}
+	value := basis{Schema: "org.cairn.restore-destination-basis.v1", Path: destination}
 	info, err := os.Lstat(destination)
 	if errors.Is(err, os.ErrNotExist) {
 		value.State = "ABSENT"

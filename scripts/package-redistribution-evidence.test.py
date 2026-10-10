@@ -22,7 +22,7 @@ SPEC.loader.exec_module(evidence)
 def write_archive(path: Path, platform: tuple[str, str] = ("linux", "arm64"), reverse_descriptor: bool = False, reverse_asset_fields: bool = False) -> None:
     assets: dict[str, bytes] = {}
     scalar_values: dict[str, object] = {
-        "schema": "restoreweave.semantic-bundle.v1", "profile_id": "bge-small-zh-v1.5",
+        "schema": "cairn.semantic-bundle.v1", "profile_id": "bge-small-zh-v1.5",
         "platform_os": platform[0], "platform_arch": platform[1],
         "onnx_runtime_version": "1.29.0", "onnx_runtime_build": "test",
         "onnx_runtime_c_api": 29, "onnx_go_binding_commit": "test",
@@ -57,7 +57,7 @@ class RedistributionEvidenceTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.archive = self.root / "semantic.tar.gz"
         write_archive(self.archive)
-        self.cli = self.root / "rw"
+        self.cli = self.root / "cairn"
         self.cli.write_bytes(b"cli bytes")
         self.daemon = self.root / "daemon"
         self.daemon.write_bytes(b"daemon bytes")

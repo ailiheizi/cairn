@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
@@ -139,7 +139,7 @@ func (s *Service) locker() publicationLocker {
 // publicationOwner is a stable per-process owner name derived from the
 // process identifier and the configured publication domain.
 func (s *Service) publicationOwner() string {
-	return fmt.Sprintf("restoreweave:%d", os.Getpid())
+	return fmt.Sprintf("cairn:%d", os.Getpid())
 }
 
 // publicationFenceDomain scopes the runtime lease to the repository whose

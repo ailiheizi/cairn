@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 	ort "github.com/yalue/onnxruntime_go"
 )
 
@@ -346,7 +346,7 @@ func stageVerifiedONNXRuntime(runtimeBytes []byte, expectedDigest string) (root,
 	if "sha256:"+hex.EncodeToString(sum[:]) != expectedDigest {
 		return "", "", errors.New("verified ONNX Runtime bytes do not match admitted digest")
 	}
-	root, err = os.MkdirTemp("", "restoreweave-onnx-runtime-")
+	root, err = os.MkdirTemp("", "cairn-onnx-runtime-")
 	if err != nil {
 		return "", "", fmt.Errorf("create ONNX Runtime staging: %w", err)
 	}

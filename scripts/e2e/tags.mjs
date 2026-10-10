@@ -156,7 +156,7 @@ export async function assertTagsSurface(ctx) {
   };
 
   // 1. The workspace and the published listing come from the daemon.
-  const workspaceID = await page.evaluate(() => window.localStorage.getItem("restoreweave.workspace_id") ?? "");
+  const workspaceID = await page.evaluate(() => window.localStorage.getItem("cairn.workspace_id") ?? "");
   assert.ok(workspaceID, "the online phase must have published a workspace the shell recorded");
   const listing = await daemonCommand("content.list", { workspace_id: workspaceID });
   const listingItems = (listing.items ?? []).filter((item) => item.entry_type !== "DIRECTORY");
@@ -171,10 +171,10 @@ export async function assertTagsSurface(ctx) {
   // have a truth to compare against: one tag on both subjects, one on beta
   // only, and two case variants of the same spelling.
   const stamp = Date.now();
-  const pairTag = `rw-tags-seeded-${stamp}`;
-  const singleTag = `rw-tags-single-${stamp}`;
-  const upperTag = `rw-tags-Case-${stamp}`;
-  const lowerTag = `rw-tags-case-${stamp}`;
+  const pairTag = `cairn-tags-seeded-${stamp}`;
+  const singleTag = `cairn-tags-single-${stamp}`;
+  const upperTag = `cairn-tags-Case-${stamp}`;
+  const lowerTag = `cairn-tags-case-${stamp}`;
   for (const [subjectRef, body] of [[alphaRef, pairTag], [betaRef, pairTag], [betaRef, singleTag], [alphaRef, upperTag], [betaRef, lowerTag]]) {
     await daemonCommand("annotation.upsert", { workspace_id: workspaceID, subject_ref: subjectRef, kind: "TAG", body, expected_revision: 0 });
   }
@@ -352,8 +352,8 @@ export async function assertTagsSurface(ctx) {
   // own answer — subjects, ordered add-then-tombstone changes, the explicit
   // no-op case, and the canonical digest — and zero writes may be issued
   // before the confirmation.
-  const planSource = `rw-tags-plan-src-${stamp}`;
-  const planTarget = `rw-tags-plan-dst-${stamp}`;
+  const planSource = `cairn-tags-plan-src-${stamp}`;
+  const planTarget = `cairn-tags-plan-dst-${stamp}`;
   for (const [subjectRef, body] of [[alphaRef, planSource], [betaRef, planSource], [alphaRef, planTarget]]) {
     await daemonCommand("annotation.upsert", { workspace_id: workspaceID, subject_ref: subjectRef, kind: "TAG", body, expected_revision: 0 });
   }
@@ -490,7 +490,7 @@ export async function assertTagsSurface(ctx) {
   // interruption between the add and the tombstone.
   await surface.locator(`.tag-row[data-tag-body="${planSource}"] .tag-row-button`).click();
   await page.waitForFunction((body) => document.querySelector(".tags-detail-heading [data-fact='selected-tag']")?.textContent === body, planSource, { timeout: 10000 });
-  const partialTarget = `rw-tags-partial-${stamp}`;
+  const partialTarget = `cairn-tags-partial-${stamp}`;
   const plansBeforePartial = daemon.tagPlanAnswers.length;
   await surface.locator(".tags-rename-field input").fill(partialTarget);
   await surface.locator('[data-action="preview-rename"]').click();
@@ -511,7 +511,7 @@ export async function assertTagsSurface(ctx) {
       status: "DEGRADED",
       reasons: [{ code: "unavailable", message: "2 of 2 subjects did not complete; each subject's own outcome and reason are listed and this is not a clean rename" }],
       data: {
-        schema: "org.restoreweave.annotation-tag-apply.v1",
+        schema: "org.cairn.annotation-tag-apply.v1",
         workspace_id: workspaceID,
         from: planSource,
         to: partialTarget,
@@ -564,7 +564,7 @@ export async function assertTagsSurface(ctx) {
   // refusal, renders no applied record, and the refusal writes nothing.
   await surface.locator(`.tag-row[data-tag-body="${planSource}"] .tag-row-button`).click();
   await page.waitForFunction((body) => document.querySelector(".tags-detail-heading [data-fact='selected-tag']")?.textContent === body, planSource, { timeout: 10000 });
-  const refusedTarget = `rw-tags-refused-${stamp}`;
+  const refusedTarget = `cairn-tags-refused-${stamp}`;
   await surface.locator(".tags-rename-field input").fill(refusedTarget);
   await surface.locator('[data-action="preview-rename"]').click();
   await surface.locator(".tags-preview").waitFor({ state: "visible", timeout: 10000 });

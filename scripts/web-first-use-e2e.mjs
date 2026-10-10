@@ -14,9 +14,9 @@ import { tmpdir } from "node:os";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = join(repo, "web");
-const tempRoot = await mkdtemp(join(tmpdir(), "restoreweave-first-use-"));
-const evidenceDir = process.env.RESTOREWEAVE_FIRST_USE_EVIDENCE_DIR
-  ? resolve(process.env.RESTOREWEAVE_FIRST_USE_EVIDENCE_DIR)
+const tempRoot = await mkdtemp(join(tmpdir(), "cairn-first-use-"));
+const evidenceDir = process.env.CAIRN_FIRST_USE_EVIDENCE_DIR
+  ? resolve(process.env.CAIRN_FIRST_USE_EVIDENCE_DIR)
   : join(repo, "dist", "whole-product-20261006", "first-use");
 let daemon;
 let browserContext;
@@ -57,7 +57,7 @@ async function setInterface(page, interfaceId) {
   await page.getByRole("button", { name: /Open settings|打开设置/ }).click();
   const settings = page.getByRole("dialog", { name: /Settings|设置/ });
   await settings.getByRole("button", { name: /Appearance|外观/ }).click();
-  await settings.locator(`input[name="restoreweave-interface"][value="${interfaceId}"]`).check();
+  await settings.locator(`input[name="cairn-interface"][value="${interfaceId}"]`).check();
   await page.locator(`.interface-frame[data-interface="${interfaceId}"]`).waitFor({ state: "visible", timeout: 10000 });
   await settings.getByRole("button", { name: /Close settings|关闭设置/ }).click();
 }
@@ -91,11 +91,11 @@ async function hashDirectory(directory) {
 function isolatedEnvironment(extra = {}) {
   const env = { ...process.env, ...extra };
   for (const key of [
-    "RESTOREWEAVE_API_TOKEN", "RESTOREWEAVE_SEMANTIC_BUNDLE", "RESTOREWEAVE_IMAGE_BUNDLE",
-    "RESTOREWEAVE_BGE_ONNX_RUNTIME", "RESTOREWEAVE_BGE_ONNX_MODEL", "RESTOREWEAVE_BGE_TOKENIZER",
-    "RESTOREWEAVE_ZVEC_LIBRARY", "RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT", "RESTOREWEAVE_RUN_SUPERVISED_ONNX",
-    "ZVEC_LIBRARY_PATH", "RESTOREWEAVE_CATALOG", "RESTOREWEAVE_REPOSITORY", "RESTOREWEAVE_VECTORS",
-    "RESTOREWEAVE_MODELS", "RESTOREWEAVE_RECOVERY_RECORDS", "RESTOREWEAVE_CONFIG",
+    "CAIRN_API_TOKEN", "CAIRN_SEMANTIC_BUNDLE", "CAIRN_IMAGE_BUNDLE",
+    "CAIRN_BGE_ONNX_RUNTIME", "CAIRN_BGE_ONNX_MODEL", "CAIRN_BGE_TOKENIZER",
+    "CAIRN_ZVEC_LIBRARY", "CAIRN_SEMANTIC_BUNDLE_ROOT", "CAIRN_RUN_SUPERVISED_ONNX",
+    "ZVEC_LIBRARY_PATH", "CAIRN_CATALOG", "CAIRN_REPOSITORY", "CAIRN_VECTORS",
+    "CAIRN_MODELS", "CAIRN_RECOVERY_RECORDS", "CAIRN_CONFIG",
   ]) delete env[key];
   return env;
 }
@@ -111,11 +111,11 @@ async function executableFrom(override, name, packagePath, outputPath) {
 }
 
 async function buildWebDist() {
-  const suppliedWebDist = process.env.RESTOREWEAVE_WEB_DIST || process.env.WEB_DIST;
+  const suppliedWebDist = process.env.CAIRN_WEB_DIST || process.env.WEB_DIST;
   if (suppliedWebDist) {
     const path = resolve(suppliedWebDist);
-    assert.ok(isAbsolute(path), "RESTOREWEAVE_WEB_DIST must resolve to an absolute path");
-    assert.ok((await readFile(join(path, "index.html"))).length > 0, "RESTOREWEAVE_WEB_DIST must contain index.html");
+    assert.ok(isAbsolute(path), "CAIRN_WEB_DIST must resolve to an absolute path");
+    assert.ok((await readFile(join(path, "index.html"))).length > 0, "CAIRN_WEB_DIST must contain index.html");
     return path;
   }
   const output = join(tempRoot, "web-dist");
@@ -146,29 +146,29 @@ async function stopDaemon() {
 }
 
 try {
-  const daemonBin = await executableFrom(process.env.RESTOREWEAVE_DAEMON_BIN || process.env.DAEMON_BIN, "DAEMON_BIN", "./server/cmd/restoreweaved", join(tempRoot, "restoreweaved"));
-  const rwBin = await executableFrom(process.env.RESTOREWEAVE_RW_BIN || process.env.RW_BIN, "RW_BIN", "./client/cmd/rw", join(tempRoot, "rw"));
+  const daemonBin = await executableFrom(process.env.CAIRN_DAEMON_BIN || process.env.DAEMON_BIN, "DAEMON_BIN", "./server/cmd/cairnd", join(tempRoot, "cairnd"));
+  const cairnBin = await executableFrom(process.env.CAIRN_BIN || process.env.BIN, "BIN", "./client/cmd/cairn", join(tempRoot, "cairn"));
   const webDist = await buildWebDist();
   const webDigest = await hashDirectory(webDist);
-  const binaryDigests = { daemon: sha256(await readFile(daemonBin)), rw: sha256(await readFile(rwBin)), web: webDigest };
+  const binaryDigests = { daemon: sha256(await readFile(daemonBin)), rw: sha256(await readFile(cairnBin)), web: webDigest };
   console.log(`FIRST_USE_BUILD daemon=${daemonBin} sha256=${binaryDigests.daemon}`);
-  console.log(`FIRST_USE_BUILD rw=${rwBin} sha256=${binaryDigests.rw}`);
+  console.log(`FIRST_USE_BUILD rw=${cairnBin} sha256=${binaryDigests.rw}`);
   console.log(`FIRST_USE_BUILD web_dist=${webDist} tree_sha256=${binaryDigests.web}`);
 
   const configPath = join(tempRoot, "config.toml");
-  const socketPath = join(tempRoot, "restoreweaved.sock");
+  const socketPath = join(tempRoot, "cairnd.sock");
   const dataRoot = join(tempRoot, "data");
   await mkdir(dataRoot, { recursive: true });
   const daemonEnv = isolatedEnvironment({
     XDG_CONFIG_HOME: join(tempRoot, "xdg-config"),
     XDG_DATA_HOME: join(tempRoot, "xdg-data"),
-    RESTOREWEAVE_CATALOG: join(dataRoot, "catalog.sqlite"),
-    RESTOREWEAVE_REPOSITORY: join(dataRoot, "repository"),
-    RESTOREWEAVE_VECTORS: join(dataRoot, "vectors"),
-    RESTOREWEAVE_MODELS: join(dataRoot, "models"),
-    RESTOREWEAVE_RECOVERY_RECORDS: join(dataRoot, "recovery"),
+    CAIRN_CATALOG: join(dataRoot, "catalog.sqlite"),
+    CAIRN_REPOSITORY: join(dataRoot, "repository"),
+    CAIRN_VECTORS: join(dataRoot, "vectors"),
+    CAIRN_MODELS: join(dataRoot, "models"),
+    CAIRN_RECOVERY_RECORDS: join(dataRoot, "recovery"),
   });
-  run(rwBin, ["config", "init", "--path", configPath], { env: daemonEnv });
+  run(cairnBin, ["config", "init", "--path", configPath], { env: daemonEnv });
   const port = await pickPort();
   const baseURL = `http://127.0.0.1:${port}`;
   daemon = spawn(daemonBin, ["--config", configPath, "--socket", socketPath, "--api-listen", `127.0.0.1:${port}`, "--web-root", webDist], {
@@ -178,17 +178,17 @@ try {
   });
   await waitForHealth(baseURL, daemon);
 
-  let playwrightPath = process.env.RESTOREWEAVE_PLAYWRIGHT_MODULE;
+  let playwrightPath = process.env.CAIRN_PLAYWRIGHT_MODULE;
   if (!playwrightPath) {
     const candidate = join(webDir, "node_modules", "playwright", "index.mjs");
     try { await readFile(candidate); playwrightPath = candidate; } catch { playwrightPath = "playwright"; }
   }
   const playwright = await import(playwrightPath.startsWith(".") || isAbsolute(playwrightPath) ? pathToFileURL(resolve(playwrightPath)).href : playwrightPath);
-  const browser = await playwright.chromium.launch({ headless: true, ...(process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
+  const browser = await playwright.chromium.launch({ headless: true, ...(process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
   browserContext = browser;
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   const fixtureName = `first-use-${process.pid}.txt`;
-  const fixtureBody = `RestoreWeave first-use exact bytes ${process.pid}\nSearchable note and tag journey.\n`;
+  const fixtureBody = `Cairn first-use exact bytes ${process.pid}\nSearchable note and tag journey.\n`;
   const fixtureBytes = Buffer.from(fixtureBody, "utf8");
   const fixturePath = join(tempRoot, fixtureName);
   const expectedDigest = sha256(fixtureBytes);
@@ -229,7 +229,7 @@ try {
   assert.match(await intake.locator(".plan-file-list").innerText(), /STORE_EXACT/, "the review must use the exact-save default");
   await capture("03-explicit-store-exact-review");
 
-  const workspaceID = await page.evaluate(() => localStorage.getItem("restoreweave.workspace_id") ?? "");
+  const workspaceID = await page.evaluate(() => localStorage.getItem("cairn.workspace_id") ?? "");
   assert.ok(workspaceID, "the reviewed plan should establish the workspace for the daemon query");
   const beforeApply = await page.evaluate(async (input) => {
     const response = await fetch("/api/v1/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "snapshot.list", input }) });
@@ -368,13 +368,13 @@ try {
 
   await page.route("**/api/v1/**", (route) => route.abort());
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByRole("alert").filter({ hasText: /RestoreWeave service is unavailable|服务不可用/ }).waitFor({ state: "visible", timeout: 10000 });
+  await page.getByRole("alert").filter({ hasText: /Cairn service is unavailable|服务不可用/ }).waitFor({ state: "visible", timeout: 10000 });
   await capture("09-service-offline-explicit");
   const report = {
     status: "PASS",
     date: new Date().toISOString(),
     scope: "fresh empty browser profile using existing upload, plan/apply, query, annotation, and original-download operations",
-    build: { daemonPath: daemonBin, daemonSha256: binaryDigests.daemon, rwPath: rwBin, rwSha256: binaryDigests.rw, webDistPath: webDist, webDistTreeSha256: binaryDigests.web },
+    build: { daemonPath: daemonBin, daemonSha256: binaryDigests.daemon, rwPath: cairnBin, rwSha256: binaryDigests.rw, webDistPath: webDist, webDistTreeSha256: binaryDigests.web },
     isolatedRuntime: { config: configPath, catalog: join(dataRoot, "catalog.sqlite"), repository: join(dataRoot, "repository"), recovery: join(dataRoot, "recovery"), socket: socketPath, listener: baseURL, profileRoot: tempRoot },
     generatedFile: { name: fixtureName, logicalBytes: fixtureBytes.length, sha256: expectedDigest, stagingUnprotectedBeforeApply: true, noPublishedSnapshotBeforeConfirmation: true, reviewProtectionMode: "STORE_EXACT" },
     userJourney: { freshEmptyGuide: true, explicitReviewAndConfirm: true, foundByName: true, taggedAndNoteAdded: true, foundByTag: true, foundByNoteText: true, originalDownloadBytesMatch: true, originalDownloadSha256: expectedDigest },

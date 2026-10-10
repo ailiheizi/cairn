@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -79,7 +79,7 @@ func TestPlanApplyPersistsUnknownExternalOutcomeForReplay(t *testing.T) {
 		SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: "workspace:default", RequireSignedPublication: true,
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(service))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(service))
 	root := t.TempDir()
 	if err := writeTestFile(filepath.Join(root, "payload.txt"), []byte("prepared-only ambiguity")); err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestPlanApplyReconcilesProjectionFailureAfterDurableRoot(t *testing.T) {
 		Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: "workspace:default", RequireSignedPublication: true,
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(service))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(service))
 	root := t.TempDir()
 	if err := writeTestFile(filepath.Join(root, "payload.txt"), []byte("projection failure after root")); err != nil {
 		t.Fatal(err)
@@ -321,7 +321,7 @@ func TestPlanApplyPersistsAndExecutesPortableChildReconciliation(t *testing.T) {
 		Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: "workspace:default", RequireSignedPublication: true,
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(service))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(service))
 	root := t.TempDir()
 	if err := writeTestFile(filepath.Join(root, "payload.txt"), []byte("portable child reconciliation")); err != nil {
 		t.Fatal(err)

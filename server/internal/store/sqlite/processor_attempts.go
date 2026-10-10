@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const ProcessorAttemptExportSchema = "restoreweave.processor-attempts/v1"
+const ProcessorAttemptExportSchema = "cairn.processor-attempts/v1"
 
 // ProcessorAttemptExport is a portable projection of one attempt. It does
 // not include processor output bytes; ArtifactRefs point to separately

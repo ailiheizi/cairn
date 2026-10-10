@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestDispatcherExactIngestAndRestore(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDispatcherExactIngestAndRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -294,7 +294,7 @@ func TestDispatcherPlanApplyPersistsExactDuplicateSavingsAndReplaysIt(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{Store: store, Repo: repo}))
 	root := t.TempDir()
 	payload := []byte("duplicate plan apply payload")
 	if err := os.WriteFile(filepath.Join(root, "first.txt"), payload, 0o600); err != nil {
@@ -349,7 +349,7 @@ func TestDispatcherRecoveryAnchorExportIsPublicAndExclusive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open signing material: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store, Repo: repo, TrustAnchor: &anchor,
 	}))
 
@@ -389,7 +389,7 @@ func TestDispatcherLinkOnlyIngestIsExplicitAndVisible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store, Repo: repo, AllowLinkOnly: true, LinkOnlyRequiresConfirmation: true,
 	}))
 	root := t.TempDir()
@@ -436,7 +436,7 @@ func TestSnapshotVerifyModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))

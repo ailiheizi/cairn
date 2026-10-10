@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestGRPCRunStagePassesBytesOnFDsNotInMessages(t *testing.T) {

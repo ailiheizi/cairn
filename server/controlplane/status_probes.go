@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // writableProbePrefix marks the single empty file the repository writability
 // probe creates and removes. The prefix keeps a leftover probe file
 // recognizable and outside normal repository object naming.
-const writableProbePrefix = ".restoreweave-writable-probe-"
+const writableProbePrefix = ".cairn-writable-probe-"
 
 // repositoryWritability is the fact reported for one zero-byte probe run.
 type repositoryWritability struct {

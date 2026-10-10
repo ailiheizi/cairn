@@ -153,7 +153,7 @@ if [[ "$GENERATED_CORPUS" -eq 1 ]]; then
         GENERATED_CORPUS_MANIFEST="$TMP_BASE/generated-corpus.qualification.json"
         go run -tags=savingsreport "$RUNNER" \
             -generate-corpus "$CORPUS_DIR" -generate-size-mib 4 \
-            -generate-seed restoreweave-phase5-heterogeneous-v1 \
+            -generate-seed cairn-phase5-heterogeneous-v1 \
             -manifest-out "$GENERATED_CORPUS_MANIFEST"
     else
         mkdir -p "$CORPUS_DIR"

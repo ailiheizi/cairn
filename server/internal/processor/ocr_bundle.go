@@ -20,7 +20,7 @@ import (
 // Runtime, detection model, recognition model, dictionary) by digest. Nothing
 // is downloaded automatically, and no ad hoc config key may partially override
 // the profile.
-const OCRBundleSchemaV1 = "restoreweave.ocr-bundle.v1"
+const OCRBundleSchemaV1 = "cairn.ocr-bundle.v1"
 
 // OCRBundleManifestName is the fixed manifest file name inside a bundle root.
 const OCRBundleManifestName = "manifest.json"

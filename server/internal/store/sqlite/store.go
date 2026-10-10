@@ -1,4 +1,4 @@
-// Package sqlite implements RestoreWeave's rebuildable operational catalog.
+// Package sqlite implements Cairn's rebuildable operational catalog.
 // Signed manifests, placement ledgers, receipts, and audit exports remain
 // independently durable recovery authority; this package only indexes them.
 package sqlite

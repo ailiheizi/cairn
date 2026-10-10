@@ -18,14 +18,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const processorRunStageMethod = "/restoreweave.processor.v1.Processor/RunStage"
+const processorRunStageMethod = "/cairn.processor.v1.Processor/RunStage"
 
 type runStageServer interface {
 	RunStageRPC(ctx context.Context, req *Request) (*Response, error)
 }
 
 var processorServiceDesc = grpc.ServiceDesc{
-	ServiceName: "restoreweave.processor.v1.Processor",
+	ServiceName: "cairn.processor.v1.Processor",
 	HandlerType: (*runStageServer)(nil),
 	Methods: []grpc.MethodDesc{{
 		MethodName: "RunStage",

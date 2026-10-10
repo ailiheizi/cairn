@@ -1,4 +1,4 @@
-// Command restoreweaved runs the Cairn control-plane daemon. It
+// Command cairnd runs the Cairn control-plane daemon. It
 // exposes the client/command envelope protocol over a Unix socket.
 package main
 
@@ -18,28 +18,28 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/controlplane"
-	"github.com/ailiheizi/restoreweave/server/internal/api"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/controlplane"
+	"github.com/ailiheizi/cairn/server/internal/api"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("restoreweaved: %v", err)
+		log.Fatalf("cairnd: %v", err)
 	}
 }
 
 func run() error {
 	var (
 		socketPath = flag.String("socket", controlplane.DefaultSocketPath(),
-			"Unix socket path (overrides RESTOREWEAVE_SOCKET)")
+			"Unix socket path (overrides CAIRN_SOCKET)")
 		recoveryReader = flag.Bool("recovery-reader", false,
 			"serve a catalog-free read-only recovery reader")
 		recoveryReference = flag.String("recovery-reference", "",
@@ -47,18 +47,18 @@ func run() error {
 		trustAnchorPath = flag.String("trust-anchor", "",
 			"independently retained public trust anchor for --recovery-reader")
 		configPath = flag.String("config", "",
-			"persisted Cairn config path (overrides RESTOREWEAVE_CONFIG)")
+			"persisted Cairn config path (overrides CAIRN_CONFIG)")
 		catalogPath = flag.String("catalog", "",
-			"SQLite catalog path (overrides persisted config and RESTOREWEAVE_CATALOG)")
+			"SQLite catalog path (overrides persisted config and CAIRN_CATALOG)")
 		repositoryPath = flag.String("repository", "",
-			"Exact-lane repository path (overrides persisted config and RESTOREWEAVE_REPOSITORY)")
-		semanticBundle = flag.String("semantic-bundle", os.Getenv("RESTOREWEAVE_SEMANTIC_BUNDLE"),
+			"Exact-lane repository path (overrides persisted config and CAIRN_REPOSITORY)")
+		semanticBundle = flag.String("semantic-bundle", os.Getenv("CAIRN_SEMANTIC_BUNDLE"),
 			"operator-provided custom semantic bundle root (overrides configured paths.models profile; not the release-pinned default; disables fixed bundle installation)")
-		imageBundle = flag.String("image-bundle", os.Getenv("RESTOREWEAVE_IMAGE_BUNDLE"),
+		imageBundle = flag.String("image-bundle", os.Getenv("CAIRN_IMAGE_BUNDLE"),
 			"operator-provided custom image bundle root (overrides configured paths.models profile; not the release-pinned default)")
 		apiListen               = flag.String("api-listen", "", "HTTP /api/v1 listen address (overrides api.listen; empty uses config)")
 		webRoot                 = flag.String("web-root", "", "explicit absolute pre-built WebUI root served on the loopback API listener")
-		apiToken                = flag.String("api-token", os.Getenv("RESTOREWEAVE_API_TOKEN"), "Bearer token for HTTP /api/v1")
+		apiToken                = flag.String("api-token", os.Getenv("CAIRN_API_TOKEN"), "Bearer token for HTTP /api/v1")
 		onnxWorkerProcessBundle = flag.String("onnx-worker-process", "",
 			"private host-supervisor ONNX worker bundle root")
 	)
@@ -149,7 +149,7 @@ func startLocalSemanticBinding(ctx context.Context, resolved rwconfig.ResolvedCo
 	if err != nil {
 		return semanticWorkerBinding{}, err
 	}
-	owner := fmt.Sprintf("restoreweave-semantic-%d", os.Getpid())
+	owner := fmt.Sprintf("cairn-semantic-%d", os.Getpid())
 	leaseToken := fmt.Sprintf("semantic:%d", time.Now().UnixNano())
 	domain := resolved.Config.Recovery.PublicationDomain + ":semantic-worker"
 	now := time.Now()
@@ -720,19 +720,19 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	go func() {
 		defer close(retryDone)
 		_ = exactLane.RunProcessorRetryWorker(runCtx, exact.ProcessorRetryWorkerOptions{
-			Owner:   fmt.Sprintf("restoreweaved-%d", os.Getpid()),
+			Owner:   fmt.Sprintf("cairnd-%d", os.Getpid()),
 			OnError: func(err error) { log.Printf("processor retry worker: %v", err) },
 		})
 	}()
 	if apiServer != nil {
 		go func() {
-			log.Printf("restoreweaved API listening on %s", apiAddress)
+			log.Printf("cairnd API listening on %s", apiAddress)
 			if err := apiServer.Serve(apiListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Printf("api: %v", err)
 			}
 		}()
 	}
-	log.Printf("restoreweaved listening on %s (catalog %s, repository %s)", server.SocketPath(), catalogPath, repositoryPath)
+	log.Printf("cairnd listening on %s (catalog %s, repository %s)", server.SocketPath(), catalogPath, repositoryPath)
 
 	<-ctx.Done()
 	log.Printf("shutting down")
@@ -850,7 +850,7 @@ func runRecoveryReader(ctx context.Context, options daemonOptions) error {
 			log.Printf("serve recovery reader: %v", err)
 		}
 	}()
-	log.Printf("restoreweaved recovery reader listening on %s (repository %s, profile %s)", server.SocketPath(), repo.Root(), profile)
+	log.Printf("cairnd recovery reader listening on %s (repository %s, profile %s)", server.SocketPath(), repo.Root(), profile)
 	<-ctx.Done()
 	if err := server.Close(); err != nil {
 		return fmt.Errorf("close recovery reader: %w", err)

@@ -73,11 +73,11 @@ boundaries; only the final binary below is current acceptance.
 
 ## Current local build
 
-- Daemon: `dist/retrieval-accounting-20261006/restoreweaved`, SHA-256
+- Daemon: `dist/retrieval-accounting-20261006/cairnd`, SHA-256
   `4196d63d2230b8151fc307fd9847f024de54dbf6148cae39a4d2e60200cedf46`.
 - CLI unchanged: `dist/all-completion-20261006/integration/rw`, SHA-256
   `2a25a1cf5a2e4508fc8ef3e587b3d9b3b073e33196f6b78231f81ef71ba2a2e8`.
-- Candidate: `dist/retrieval-accounting-20261006/restoreweave-20261006-retrieval-accounting-darwin-arm64.tar.gz`,
+- Candidate: `dist/retrieval-accounting-20261006/cairn-20261006-retrieval-accounting-darwin-arm64.tar.gz`,
   SHA-256 `e150d7f8b391d23ccbe7bee1a8f469b7b27bbdd219a52fcf284f227ef1d4570c`.
 - Existing preview remains `http://127.0.0.1:4648/`, with the same persisted
   profile and browser assets. Runtime metadata is in `live/runtime.json`;

@@ -15,7 +15,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/identify"
+	"github.com/ailiheizi/cairn/server/internal/identify"
 )
 
 const (
@@ -28,15 +28,15 @@ const (
 	CapabilityTextEmbedding     = "embed.text.fixture.v1"
 	CapabilityClipEmbedding     = "embed.clip.fixture.v1"
 	CapabilityOCRImageText      = "ocr.image.text.v1"
-	SchemaExtractedTextV1       = "restoreweave.artifact.extracted-text.v1"
-	SchemaAudioTrackV1          = "restoreweave.domain.audio.track/v1"
-	SchemaBookWorkV1            = "restoreweave.domain.book.work/v1"
-	SchemaImageMetaV1           = "restoreweave.domain.image.meta/v1"
-	SchemaVideoMetaV1           = "restoreweave.domain.video.meta/v1"
-	SchemaAcousticFingerprintV1 = "restoreweave.artifact.acoustic-fingerprint.v1"
-	SchemaTextEmbeddingV1       = "restoreweave.artifact.text-embedding.v1"
-	SchemaClipEmbeddingV1       = "restoreweave.artifact.clip-embedding.v1"
-	SchemaOCRTextV1             = "restoreweave.artifact.ocr-text.v1"
+	SchemaExtractedTextV1       = "cairn.artifact.extracted-text.v1"
+	SchemaAudioTrackV1          = "cairn.domain.audio.track/v1"
+	SchemaBookWorkV1            = "cairn.domain.book.work/v1"
+	SchemaImageMetaV1           = "cairn.domain.image.meta/v1"
+	SchemaVideoMetaV1           = "cairn.domain.video.meta/v1"
+	SchemaAcousticFingerprintV1 = "cairn.artifact.acoustic-fingerprint.v1"
+	SchemaTextEmbeddingV1       = "cairn.artifact.text-embedding.v1"
+	SchemaClipEmbeddingV1       = "cairn.artifact.clip-embedding.v1"
+	SchemaOCRTextV1             = "cairn.artifact.ocr-text.v1"
 	MediaTypeUTF8Text           = "text/plain; charset=utf-8"
 	MediaTypeAudioJSON          = "application/json"
 	MediaTypeBookJSON           = "application/json"
@@ -159,9 +159,9 @@ type Processor interface {
 // names the field inside it. The host, not the processor, decides which keys
 // may become durable rows.
 const (
-	FactNamespaceImage = "restoreweave.domain.image"
-	FactNamespaceVideo = "restoreweave.domain.video"
-	FactNamespaceAudio = "restoreweave.domain.audio"
+	FactNamespaceImage = "cairn.domain.image"
+	FactNamespaceVideo = "cairn.domain.video"
+	FactNamespaceAudio = "cairn.domain.audio"
 )
 
 // Admitted durable fact keys. A key outside this table is a processor defect

@@ -146,10 +146,10 @@ function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, mu
 }
 
 const rendererEntries: ReadonlyArray<readonly [LibraryPageId, PageRenderer]> = [
-  ["restoreweave:photos", renderPhotos],
-  ["restoreweave:music", renderMusic],
-  ["restoreweave:exhibition", renderExhibition],
-  ["restoreweave:overview", renderOverview],
+  ["cairn:photos", renderPhotos],
+  ["cairn:music", renderMusic],
+  ["cairn:exhibition", renderExhibition],
+  ["cairn:overview", renderOverview],
 ];
 validateLibraryRendererIDs(libraryPages, rendererEntries.map(([id]) => id));
 const renderers: ReadonlyMap<LibraryPageId, PageRenderer> = new Map(rendererEntries);
@@ -188,7 +188,7 @@ export function LibraryPageHost(props: LibraryPageHostProps) {
     function onKeyDown(event: KeyboardEvent) {
       const dialog = photoPreviewDialog.current;
       if (!dialog) return;
-      const nestedViewer = document.querySelector<HTMLElement>(".rw-image-viewer");
+      const nestedViewer = document.querySelector<HTMLElement>(".cairn-image-viewer");
       if (event.key === "Escape") {
         if (nestedViewer?.contains(document.activeElement)) return;
         event.preventDefault(); event.stopPropagation(); closePhotoPreview(); return;

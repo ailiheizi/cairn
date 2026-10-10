@@ -34,7 +34,7 @@ const (
 	// accepted by this package. Unlike the embedding profile there is no
 	// superseded version: the schema carries the required egress scope from
 	// the start.
-	OnlineDescribeProfileSchemaV1 = "restoreweave.online-describe-profile.v1"
+	OnlineDescribeProfileSchemaV1 = "cairn.online-describe-profile.v1"
 
 	// OnlineDescribeProfileDirName and OnlineDescribeProfileFileName are the
 	// only accepted location below the configured paths.models root:
@@ -52,7 +52,7 @@ const (
 	// OnlineDescribeOutputSchema is the schema reference recorded in every
 	// describe egress receipt: the admitted chat-completions response shape
 	// (one choice carrying a UTF-8 message content string).
-	OnlineDescribeOutputSchema = "restoreweave.online-describe-output.v1"
+	OnlineDescribeOutputSchema = "cairn.online-describe-output.v1"
 
 	// Output bounds. The durable description revision cap remains the
 	// content-store contract's 16 MiB; a describe profile can never declare a

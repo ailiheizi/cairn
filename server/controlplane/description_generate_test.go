@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // seedExtractArtifact writes one admitted EXTRACT text artifact for a subject,
@@ -181,7 +181,7 @@ func wireDescribeDispatcher(t *testing.T, store *sqlite.Store, endpoint, modelsR
 	if err != nil {
 		t.Fatalf("new describe provider: %v", err)
 	}
-	return NewDispatcher(store, "catalog.sqlite", "/tmp/rw-describe.sock",
+	return NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-describe.sock",
 		WithConfigDigest("sha256:describe-config-v1"),
 		WithDescribeProvider(provider, modelsRoot))
 }
@@ -267,7 +267,7 @@ func TestDescriptionGenerateUnhealthyProfileReturnsTypedUnavailable(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-unhealthy.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-unhealthy.sock",
 		WithConfigDigest("sha256:describe-config-v1"), WithDescribeProvider(provider, modelsRoot))
 	seed := testutil.SeedNamespace(t, store)
 	seedExtractArtifact(t, store, seed.WorkspaceID, seed.FileEntryID, "标题：雪后的城市。")
@@ -543,7 +543,7 @@ func TestDescriptionGenerateRejectsBadInputsAndUnhealthyProfiles(t *testing.T) {
 		}
 	})
 	// A profile that is not installed leaves the operation unimplemented.
-	emptyDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-empty.sock",
+	emptyDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-empty.sock",
 		WithConfigDigest("sha256:describe-config-v1"))
 	result := emptyDispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionGenerate, map[string]any{
 		"workspace_id": seed.WorkspaceID, "subject_ref": seed.FileEntryID, "kind": "AI_SUMMARY",
@@ -575,7 +575,7 @@ func TestCapabilityListAdvertisesDescriptionGenerateOnlyWhenWired(t *testing.T) 
 	if !advertised {
 		t.Fatal("capability.list must advertise a bound description.generate as available")
 	}
-	unbound := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-unbound.sock")
+	unbound := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-unbound.sock")
 	capabilities = unbound.Handle(context.Background(), mustEnvelope(t, command.OpCapabilityList, map[string]any{}))
 	if err := json.Unmarshal(capabilities.Data, &data); err != nil {
 		t.Fatal(err)

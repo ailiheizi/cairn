@@ -57,10 +57,10 @@ The current bounded implementation exposes:
 - `GET /api/v1/healthz` for a transport-only liveness check;
 - `POST /api/v1/upload` for the bounded upload channel: multipart `files`, 1 GiB per file, 200 files per request, a process-wide in-flight byte cap; lands into the daemon-managed inbox staging area and echoes per-file SHA-256 and length; staged bytes are unprotected until an ingest plan is reviewed and applied.
 - `GET /api/v1/download` for one exact regular file, identified by the existing `workspace_id` and snapshot-local `entry_id`, with an optional safe single-component presentation `filename`. It composes the same `content.open/read/close` operations behind the same token gate, accepts no host path, URL, or caller-supplied handle, and reads at most 1 MiB per chunk. Before attachment headers, it verifies the logical length and complete SHA-256; while streaming, it verifies again and withholds the trailing chunk until the identity matches. A late failure aborts the incomplete response, cancellation closes the private handle, and early failures remain visible. This local convenience read does not freeze a selection or replace `ExportManifest` materialization and verification.
-- `POST /api/v1/command` with a strict `org.restoreweave.command.v1`
-  envelope, returning the unchanged `org.restoreweave.result.v1` envelope;
+- `POST /api/v1/command` with a strict `org.cairn.command.v1`
+  envelope, returning the unchanged `org.cairn.result.v1` envelope;
 - optional `Authorization: Bearer <token>` validation when the host supplies
-  `RESTOREWEAVE_API_TOKEN` or `--api-token`.
+  `CAIRN_API_TOKEN` or `--api-token`.
 
 The daemon may additionally expose `config.get` and `config.update` through
 the same strict command endpoint when it was started from a persisted operator

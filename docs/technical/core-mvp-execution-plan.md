@@ -106,7 +106,7 @@ This table is checkout status, not a change to phase gates:
 
 | Phase | Current checkout | Still required before the phase gate closes |
 | --- | --- | --- |
-| 0 | Strict persisted `restoreweave.config.v1`; XDG paths; `rw config init/validate/show --effective`; config digest on ingest plans, snapshots, publications, real lexical generations, and daemon-created description revisions; immutable embedding-generation manifest fields and fail-closed config/profile/semantic-space matching; verified ONNX/BGE + zvec bundle loading, an explicit fixed development-time bundle installer, startup inference probe, generation warm-up, and explicit degraded state | Supported model packaging and release/default qualification remain open; the development installer is not a release package |
+| 0 | Strict persisted `cairn.config.v1`; XDG paths; `cairn config init/validate/show --effective`; config digest on ingest plans, snapshots, publications, real lexical generations, and daemon-created description revisions; immutable embedding-generation manifest fields and fail-closed config/profile/semantic-space matching; verified ONNX/BGE + zvec bundle loading, an explicit fixed development-time bundle installer, startup inference probe, generation warm-up, and explicit degraded state | Supported model packaging and release/default qualification remain open; the development installer is not a release package |
 | 1 | `ProtectionRecord`, `RecoveryReference`, `SourceBinding`, multiple credential-free `ExternalLocator` rows, raw names/paths and before/after metadata in the manifest; per-file `STORE_EXACT`, `STORE_EXACT_WITH_EXTERNAL_FALLBACK`, `LINK_ONLY`, and `METADATA_ONLY` decisions bound by a protection digest; typed planned outcome/reason/identity; visible exact fallback for unresolved readable content; failed/unstable entries retained with requested mode, `BLOCKED`/`UNAVAILABLE` outcome, path, state, and reason in a non-executable plan; a narrow successor-plan resolution admits only explicitly selected, stable rooted regular-file read failures as `METADATA_ONLY` and preserves `INCOMPLETE` scan authority; immutable per-subject processor attempts persist terminal outcomes and a signed post-commit child binds their deterministic bundle to the exact parent; `snapshot.v2` records typed hard-link, sparse indication, boundary, detection, xattr/ACL observed-or-degraded facts, and explicit unsupported extent/stream/fork/flag facts with per-record provenance digests | Broader platform capture qualification, sparse extent maps, and per-field ownership/mode/time provenance remain open; the admitted recovery profile is closed by the Phase 3 portable closure |
 | 2 | **Implemented and tested for the admitted bounded model:** non-mutating ingest and restore planning, digest-bound apply, source/config/manifest/destination revalidation, same-plan replay, committed-publication reconciliation, verified completed-restore reconciliation, typed ingest-protection revision with reinspection/recomputation, fail-closed apply for blocked plans, per-subject degraded processor reporting, durable append-only processor terminal outcomes, a signed complete-state successor lineage that retains later outcomes without rewriting earlier attempts, and bounded automatic retry of the same signed processor plan with idempotency, leases/fencing, reconciliation, restart/resume, retry ceilings, and pre-execution retry-input/publication/target binding checks. Invalid retry input is claimed through the normal lease state transition and then fails closed without invoking the processor. The qualification matrix exercises two-worker competition, expired-lease fencing, a real process crash followed by cross-process lease takeover, unknown-outcome reconciliation, and exact restore. The exact apply Job remains successful after post-publication processor/index failure. **The Phase 2 gate is closed for this bounded contract.** | No Phase 2 blocker remains. Arbitrary manual, rerouted, or general reprocessing stays disabled and requires a separately reviewed signed successor contract; production repository and release-host qualification belong to Phases 5 and 7 |
 | 3 | **Implemented and tested for the admitted development profile (2026-08-24):** Ed25519 `PREPARED_CLOSURE`, `PUBLICATION_COMMIT`, `PROCESSOR_ATTEMPT_CLOSURE`, and `PORTABLE_FACT_CLOSURE` records; portable mapping, descriptions/annotations, artifact-body attachments, typed filesystem facts, token-set export, immutable placement and independently hashed readback, generation/parent lineage, catalog-free validation/restore, clean-install import, independent-anchor validation, no-follow input/repository reads, cross-process fencing (including two real daemon processes sharing one catalog/repository), unknown-outcome reconciliation, bounded retry of the same signed processor plan, and raw/zstd relocation/corruption/reader-dependency evidence. The daemon enables signed publication by default | This is not release qualification. Manual reprocessing needs an explicit signed successor lineage; broader metadata/provenance capture, production repository selection (Phase 5), and full release acceptance remain open |
@@ -164,9 +164,9 @@ The persisted configuration is the operator's small set of choices, not an arbit
 ### Required commands
 
 ```text
-rw config init
-rw config validate
-rw config show --effective
+cairn config init
+cairn config validate
+cairn config show --effective
 ```
 
 Path precedence is `one-shot CLI flag -> environment override -> persisted config -> platform default`. The resolved, redacted configuration is printed at startup and its digest is bound into plans, representations, descriptions, index generations, and publications.
@@ -196,10 +196,10 @@ Every namespace subject receives a `ProtectionRecord` independent of whether a l
 The current command shape supports a tree default plus explicit per-file overrides:
 
 ```text
-rw ingest <root> --protection LINK_ONLY --confirm-link-only \
+cairn ingest <root> --protection LINK_ONLY --confirm-link-only \
   --locator 'relative/path.ext=https://example.invalid/path.ext' \
   --locator 'relative/path.ext=ipfs://content-address/path.ext'  # creates READY plan
-rw plan apply <plan-id> --workspace <workspace-id> --digest <plan-digest>
+cairn plan apply <plan-id> --workspace <workspace-id> --digest <plan-digest>
 ```
 
 For a mixed tree, repeat `--file-protection 'relative/path=MODE'`. The READY plan lists each regular file's planned outcome, reason, expected SHA-256 identity and length, and locator count; all of those facts contribute to `protection_digest` and the outer plan digest.
@@ -395,11 +395,11 @@ the required decoder can make data unrecoverable.
 Implement the user-facing organization loop:
 
 ```text
-rw view create <name> --query <query>
-rw view list
-rw export create --view <name> --to-manifest <file>
-rw export apply <manifest> --to <directory>
-rw export verify <manifest> --to <directory>
+cairn view create <name> --query <query>
+cairn view list
+cairn export create --view <name> --to-manifest <file>
+cairn export apply <manifest> --to <directory>
+cairn export verify <manifest> --to <directory>
 ```
 
 Add one minimal LinkGroup path to the same typed core and adapters:

@@ -6,7 +6,7 @@ package config
 import (
 	"io"
 
-	shared "github.com/ailiheizi/restoreweave/config"
+	shared "github.com/ailiheizi/cairn/config"
 )
 
 const (

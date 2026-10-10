@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -81,7 +81,7 @@ type semanticGenerationReceiptFile struct {
 	Identities     []ZvecCoverageIdentity `json:"identities"`
 }
 
-const semanticGenerationReceiptSchema = "restoreweave.semantic-generation-receipt.v1"
+const semanticGenerationReceiptSchema = "cairn.semantic-generation-receipt.v1"
 
 // Receipts are disposable search projection evidence, not an unbounded
 // metadata channel. Keep the limit high enough for a large real generation,
@@ -125,7 +125,7 @@ func writeSemanticGenerationReceipt(generation sqlite.IndexGeneration, libraryDi
 	// writer cannot silently reinterpret an existing generation.
 	finalPath := semanticGenerationReceiptPath(generation.DBPath)
 	parent := filepath.Dir(finalPath)
-	file, err := os.CreateTemp(parent, ".restoreweave-semantic-receipt-*")
+	file, err := os.CreateTemp(parent, ".cairn-semantic-receipt-*")
 	if err != nil {
 		return err
 	}

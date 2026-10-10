@@ -1,25 +1,25 @@
 {
-  "schema": "org.restoreweave.codec-vector.v1",
+  "schema": "org.cairn.codec-vector.v1",
   "vectors": [
     {
       "name": "identity-payload",
       "repository_profile": "directory-cas-dev-v1",
       "blob": "identity-payload.blob",
-      "content_id": "sha256:9c8e75ea2a3ab91dc0de0d475a5cb12602078e85aebaa196f42e550775316ae5",
-      "logical_length": 2240
+      "content_id": "sha256:746b2d3f713d7f99ea8745d9e2a7c2e2eb78d30ad15dd8ea204a4cdd4078038f",
+      "logical_length": 1792
     },
     {
       "name": "zstd-frame",
       "repository_profile": "local-zstd-v1",
       "blob": "zstd-frame.blob",
-      "content_id": "sha256:747b598aacee704d441b9dd57ba888cd8699ffcb548854c01d7a4fdbe9ca5108",
-      "logical_length": 14336
+      "content_id": "sha256:104924667afc15f6a0f4aaccb0648c6bcd9493bece833649742c2edd1b2de05b",
+      "logical_length": 12544
     },
     {
       "name": "zstd-frame-incompressible",
       "repository_profile": "local-zstd-v1",
       "blob": "zstd-frame-incompressible.blob",
-      "content_id": "sha256:c4b14c92d449978e5c56a8f893fee390c50418ce473eebe5a886217227eddfac",
+      "content_id": "sha256:0e45a26f2c031526a7c4cd4b0adcdd3ed14c7d59c94d9e26e3afd5beca4fa352",
       "logical_length": 4096
     }
   ]

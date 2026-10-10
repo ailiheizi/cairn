@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // subject.facts.list is the bounded subject-scoped read of durable typed
@@ -20,7 +20,7 @@ type subjectFactsListInput struct {
 	WorkspaceID string `json:"workspace_id"`
 	SubjectRef  string `json:"subject_ref"`
 	// Namespace is an optional exact filter, for a caller that wants one fact
-	// vocabulary (for example restoreweave.domain.image) instead of all of them.
+	// vocabulary (for example cairn.domain.image) instead of all of them.
 	Namespace string `json:"namespace,omitempty"`
 }
 

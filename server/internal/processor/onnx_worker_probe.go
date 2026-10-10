@@ -3,7 +3,7 @@ package processor
 import (
 	"context"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // ProbeForIsolatedWorker returns complete model/session facts after the

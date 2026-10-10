@@ -94,9 +94,9 @@ func TestBertTokenizerRejectsProfileDrift(t *testing.T) {
 }
 
 func TestBertTokenizerConformsToPinnedBGEAsset(t *testing.T) {
-	root := os.Getenv("RESTOREWEAVE_BGE_TEST_ASSETS")
+	root := os.Getenv("CAIRN_BGE_TEST_ASSETS")
 	if root == "" {
-		t.Skip("RESTOREWEAVE_BGE_TEST_ASSETS is not set")
+		t.Skip("CAIRN_BGE_TEST_ASSETS is not set")
 	}
 	payload, err := os.ReadFile(filepath.Join(root, "tokenizer.json"))
 	if err != nil {

@@ -15,7 +15,7 @@ func TestScanCapturesXAttrsWithExplicitACLAndExtentStates(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "facts.bin")
 	mustWriteFile(t, path, []byte("filesystem facts"))
-	const name = "user.restoreweave.test"
+	const name = "user.cairn.test"
 	value := []byte{0, 1, 2, 255}
 	if err := unix.Lsetxattr(path, name, value, 0); err != nil {
 		t.Skipf("filesystem does not permit test xattrs: %v", err)
@@ -111,7 +111,7 @@ func TestScanSymlinkFactsDoNotInheritTargetXAttrs(t *testing.T) {
 	target := filepath.Join(root, "target.bin")
 	link := filepath.Join(root, "link.bin")
 	mustWriteFile(t, target, []byte("target"))
-	if err := unix.Lsetxattr(target, "user.restoreweave.target", []byte("target-only"), 0); err != nil {
+	if err := unix.Lsetxattr(target, "user.cairn.target", []byte("target-only"), 0); err != nil {
 		t.Skipf("filesystem does not permit test xattrs: %v", err)
 	}
 	if err := os.Symlink("target.bin", link); err != nil {
@@ -131,7 +131,7 @@ func TestScanSymlinkFactsDoNotInheritTargetXAttrs(t *testing.T) {
 		t.Fatalf("symlink filesystem facts lack explicit states: %+v", record.Filesystem)
 	}
 	for _, attribute := range record.Filesystem.XAttrs.Attributes {
-		if attribute.Name == "user.restoreweave.target" {
+		if attribute.Name == "user.cairn.target" {
 			t.Fatalf("symlink inherited target xattr: %+v", record.Filesystem.XAttrs)
 		}
 	}

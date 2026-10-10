@@ -307,7 +307,7 @@ The name should be reviewed after operator testing and formal trademark work, no
 The earlier research run used stable query ID:
 
 ~~~text
-restoreweave-product-reframe-2026-08-11
+cairn-product-reframe-2026-08-11
 ~~~
 
 It searched GitHub and Hacker News for semantic filesystems, unstructured processing, backup and NAS recovery discussion, and MCP filesystem servers.

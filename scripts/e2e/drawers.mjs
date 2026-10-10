@@ -342,9 +342,9 @@ export async function assertExportSidecarPolicy(ctx) {
 // the fields the daemon accepts.
 export async function assertExportBrowserPreset(ctx) {
   const { page, button } = ctx;
-  const workspaceID = String(await page.evaluate(() => localStorage.getItem("restoreweave.workspace_id") ?? "")).trim();
+  const workspaceID = String(await page.evaluate(() => localStorage.getItem("cairn.workspace_id") ?? "")).trim();
   assert.ok(workspaceID, "the harness must have selected a workspace before the preset can be stored");
-  const presetKey = `restoreweave.export_preset.${workspaceID}`;
+  const presetKey = `cairn.export_preset.${workspaceID}`;
   // The previous phase planned an export with this destination and the handoff
   // sidecar, so both must now be remembered for this workspace.
   const stored = JSON.parse(await page.evaluate((key) => localStorage.getItem(key) ?? "null", presetKey) ?? "null");

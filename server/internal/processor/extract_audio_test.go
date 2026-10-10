@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func TestAudioTagsExtractID3AndFLAC(t *testing.T) {
@@ -122,7 +122,7 @@ func buildFLAC(title, artist, album string, track, rate, samples int) []byte {
 		"ALBUM=" + album,
 		"TRACKNUMBER=" + itoa(track),
 	}
-	vendor := []byte("restoreweave-test")
+	vendor := []byte("cairn-test")
 	var vorbis bytes.Buffer
 	_ = binary.Write(&vorbis, binary.LittleEndian, uint32(len(vendor)))
 	vorbis.Write(vendor)
@@ -191,7 +191,7 @@ func buildOGG(title, artist, album string, track int) []byte {
 		"ALBUM=" + album,
 		"TRACKNUMBER=" + itoa(track),
 	}
-	vendor := []byte("restoreweave-test")
+	vendor := []byte("cairn-test")
 	var vorbis bytes.Buffer
 	vorbis.WriteByte(3)
 	vorbis.WriteString("vorbis")

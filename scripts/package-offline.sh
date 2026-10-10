@@ -10,13 +10,13 @@ usage() {
   echo "usage: $0 --version VERSION --os OS --arch ARCH --rw FILE --daemon FILE --web-dist DIR --semantic-archive FILE [--redistribution-evidence DIR] --output FILE" >&2
 }
 
-version=""; target_os=""; target_arch=""; rw_bin=""; daemon_bin=""; web_dist=""; semantic_archive=""; redistribution_evidence=""; output=""
+version=""; target_os=""; target_arch=""; cairn_bin=""; daemon_bin=""; web_dist=""; semantic_archive=""; redistribution_evidence=""; output=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) version="${2:-}"; shift 2;;
     --os) target_os="${2:-}"; shift 2;;
     --arch) target_arch="${2:-}"; shift 2;;
-    --rw) rw_bin="${2:-}"; shift 2;;
+    --rw) cairn_bin="${2:-}"; shift 2;;
     --daemon) daemon_bin="${2:-}"; shift 2;;
     --web-dist) web_dist="${2:-}"; shift 2;;
     --semantic-archive) semantic_archive="${2:-}"; shift 2;;
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$version" && -n "$target_os" && -n "$target_arch" && -n "$rw_bin" && -n "$daemon_bin" && -n "$web_dist" && -n "$semantic_archive" && -n "$output" ]] || { usage; exit 2; }
+[[ -n "$version" && -n "$target_os" && -n "$target_arch" && -n "$cairn_bin" && -n "$daemon_bin" && -n "$web_dist" && -n "$semantic_archive" && -n "$output" ]] || { usage; exit 2; }
 [[ "$version" =~ ^[A-Za-z0-9._+-]+$ && "$target_os" =~ ^[A-Za-z0-9._+-]+$ && "$target_arch" =~ ^[A-Za-z0-9._+-]+$ ]] || { echo "error: unsafe version or platform" >&2; exit 2; }
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -65,8 +65,8 @@ canonical_dir() {
   (cd "$path" && pwd -P)
 }
 
-rw_bin="$(canonical_file "$rw_bin")"; daemon_bin="$(canonical_file "$daemon_bin")"; semantic_archive="$(canonical_file "$semantic_archive")"; web_dist="$(canonical_dir "$web_dist")"
-executable_file "$rw_bin"; executable_file "$daemon_bin"; regular_file "$semantic_archive"; regular_dir "$web_dist"
+cairn_bin="$(canonical_file "$cairn_bin")"; daemon_bin="$(canonical_file "$daemon_bin")"; semantic_archive="$(canonical_file "$semantic_archive")"; web_dist="$(canonical_dir "$web_dist")"
+executable_file "$cairn_bin"; executable_file "$daemon_bin"; regular_file "$semantic_archive"; regular_dir "$web_dist"
 if [[ -n "$redistribution_evidence" ]]; then
   redistribution_evidence="$(canonical_dir "$redistribution_evidence")"
   [[ -f "$script_root/web/package-lock.json" && ! -L "$script_root/web/package-lock.json" ]] || { echo "error: Web package lock is unavailable for redistribution evidence" >&2; exit 2; }
@@ -105,7 +105,7 @@ go_cmd="$(command -v go || true)"
 [[ -n "$go_cmd" ]] || { echo "error: Go is required to inspect binary BuildInfo" >&2; exit 2; }
 daemon_build_info="$($go_cmd version -m "$daemon_bin" 2>/dev/null)" || { echo "error: daemon has no readable Go BuildInfo" >&2; exit 2; }
 daemon_main_path="$(printf '%s\n' "$daemon_build_info" | awk '$1 == "path" { print $2; exit }')"
-[[ "$daemon_main_path" == "github.com/ailiheizi/restoreweave/server/cmd/restoreweaved" ]] || { echo "error: daemon BuildInfo main path is not restoreweaved" >&2; exit 2; }
+[[ "$daemon_main_path" == "github.com/ailiheizi/cairn/server/cmd/cairnd" ]] || { echo "error: daemon BuildInfo main path is not cairnd" >&2; exit 2; }
 daemon_tags="$(printf '%s\n' "$daemon_build_info" | awk -F= '$1 ~ /\tbuild\t-tags/ { print $2; exit }')"
 [[ "$daemon_tags" == "purego" ]] || { echo "error: daemon must be built with exactly -tags=purego (in-process zvec)" >&2; exit 2; }
 zvec_module="github.com/zvec-ai/zvec-go"
@@ -129,9 +129,9 @@ daemon_goarch="$(printf '%s\n' "$daemon_build_info" | awk -F= '$1 ~ /\tbuild\tGO
 # Validate the companion CLI independently: an executable bit alone also
 # admits scripts, unrelated programs, and binaries for a different host.
 # Inspect BuildInfo without executing an input binary on the packaging host.
-cli_build_info="$($go_cmd version -m "$rw_bin" 2>/dev/null)" || { echo "error: CLI has no readable Go BuildInfo" >&2; exit 2; }
+cli_build_info="$($go_cmd version -m "$cairn_bin" 2>/dev/null)" || { echo "error: CLI has no readable Go BuildInfo" >&2; exit 2; }
 cli_main_path="$(printf '%s\n' "$cli_build_info" | awk '$1 == "path" { print $2; exit }')"
-[[ "$cli_main_path" == "github.com/ailiheizi/restoreweave/client/cmd/rw" ]] || { echo "error: CLI BuildInfo main path is not rw" >&2; exit 2; }
+[[ "$cli_main_path" == "github.com/ailiheizi/cairn/client/cmd/cairn" ]] || { echo "error: CLI BuildInfo main path is not cairn" >&2; exit 2; }
 cli_go_version="$(printf '%s\n' "$cli_build_info" | sed -n '1s/.*: //p')"
 [[ "$cli_go_version" =~ ^go[0-9]+\.[0-9]+(\.[0-9]+)?([a-z0-9._+-]*)$ ]] || { echo "error: CLI Go version is not a safe token" >&2; exit 2; }
 cli_goos="$(printf '%s\n' "$cli_build_info" | awk -F= '$1 ~ /\tbuild\tGOOS/ { print $2; exit }')"
@@ -146,12 +146,12 @@ cli_goarch="$(printf '%s\n' "$cli_build_info" | awk -F= '$1 ~ /\tbuild\tGOARCH/ 
   exit 2
 }
 
-package_name="restoreweave-${version}-${target_os}-${target_arch}"
-stage="$(mktemp -d "${TMPDIR:-/tmp}/restoreweave-package.XXXXXX")"
+package_name="cairn-${version}-${target_os}-${target_arch}"
+stage="$(mktemp -d "${TMPDIR:-/tmp}/cairn-package.XXXXXX")"
 cleanup() { rm -rf "$stage"; }
 trap cleanup EXIT
 root="$stage/$package_name"; mkdir -p "$root/bin" "$root/web/dist" "$root/semantic" "$root/licenses"
-cp "$rw_bin" "$root/bin/rw"; cp "$daemon_bin" "$root/bin/restoreweaved"
+cp "$cairn_bin" "$root/bin/cairn"; cp "$daemon_bin" "$root/bin/cairnd"
 cp -R "$web_dist"/. "$root/web/dist/"
 cp "$semantic_archive" "$root/semantic/semantic-bundle.tar.gz"
 
@@ -166,7 +166,7 @@ if [[ -n "$redistribution_evidence" ]]; then
     --semantic-archive "$semantic_archive" \
     --platform-os "$target_os" \
     --platform-arch "$target_arch" \
-    --cli "$rw_bin" \
+    --cli "$cairn_bin" \
     --daemon "$daemon_bin" \
     --web-dist "$web_dist" \
     --web-lockfile "$script_root/web/package-lock.json" \
@@ -183,7 +183,7 @@ See licenses/Unihan.LICENSE.txt for the required Unicode License V3 notice.
 NOTICE
 cat >"$root/SBOM.json" <<EOF
 {
-  "schema": "restoreweave.candidate-artifact-sbom.v1",
+  "schema": "cairn.candidate-artifact-sbom.v1",
   "status": "INCOMPLETE_NOT_RELEASE_SBOM",
   "note": "Candidate wrapper; it is not a complete release dependency inventory.",
   "semantic_bundle_sbom": "licenses/semantic-bundle.sbom.json"$(if [[ -n "$redistribution_evidence" ]]; then printf ',\n  "redistribution_evidence": {"status":"PARTIAL_CANDIDATE_EVIDENCE","manifest":"licenses/redistribution-evidence/manifest.json"}'; fi)
@@ -193,14 +193,14 @@ EOF
 archive_digest="$(hash_file "$root/semantic/semantic-bundle.tar.gz")" || { echo "error: hashing semantic archive failed" >&2; exit 1; }
 cat >"$root/manifest.json" <<EOF
 {
-  "schema": "restoreweave.candidate-offline-artifact.v1",
+  "schema": "cairn.candidate-offline-artifact.v1",
   "status": "CANDIDATE_ONLY_NOT_SUPPORTED",
   "version": "${version}",
   "platform": {"os": "${target_os}", "arch": "${target_arch}"},
   "daemon_build": {"main_path": "${daemon_main_path}", "go_version": "${daemon_go_version}", "goos": "${daemon_goos}", "goarch": "${daemon_goarch}", "build_tags": "${daemon_tags}", "zvec_go": {"module": "${zvec_module}", "version": "${zvec_version}", "sum": "${zvec_sum}", "commit": "${zvec_commit}"}},
   "cli_build": {"main_path": "${cli_main_path}", "go_version": "${cli_go_version}", "goos": "${cli_goos}", "goarch": "${cli_goarch}"},
   "semantic_archive_sha256": "sha256:${archive_digest}"$(if [[ -n "$redistribution_evidence" ]]; then printf ',\n  "redistribution_evidence": "licenses/redistribution-evidence/manifest.json"'; fi),
-  "layout": {"daemon": "bin/restoreweaved", "cli": "bin/rw", "web": "web/dist", "semantic": "semantic/semantic-bundle.tar.gz"}
+  "layout": {"daemon": "bin/cairnd", "cli": "bin/cairn", "web": "web/dist", "semantic": "semantic/semantic-bundle.tar.gz"}
 }
 EOF
 
@@ -217,7 +217,7 @@ find "$root" -exec touch -t 197001010000 {} +
 mkdir -p "$(dirname "$output")"
 tar_stage="$stage/package.tar"
 COPYFILE_DISABLE=1 "$tar_cmd" -cf "$tar_stage" -C "$stage" "$package_name"
-output_tmp="$(mktemp "$(dirname "$output")/.restoreweave-offline.XXXXXX")"
+output_tmp="$(mktemp "$(dirname "$output")/.cairn-offline.XXXXXX")"
 trap 'rm -rf "$stage" "$output_tmp"' EXIT
 gzip -n -c "$tar_stage" >"$output_tmp"
 sync

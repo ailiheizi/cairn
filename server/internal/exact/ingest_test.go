@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type payloadPlacementResponseLossRepo struct {
@@ -187,7 +187,7 @@ func TestIngestAdoptsExactPayloadAfterPlacementResponseLoss(t *testing.T) {
 
 func TestIngestReportsReceiptBoundSavingsForRawAndZstd(t *testing.T) {
 	ctx := context.Background()
-	payload := bytes.Repeat([]byte("restoreweave savings "), 256)
+	payload := bytes.Repeat([]byte("cairn savings "), 256)
 	for _, tc := range []struct {
 		name string
 		open func(string) (repository.Driver, error)
@@ -520,7 +520,7 @@ func TestIngestPlacesAndRestoresAfterCatalogLoss(t *testing.T) {
 	if err := os.WriteFile(unknown, payload, 0o600); err != nil {
 		t.Fatalf("write unknown binary: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(source, "readme.txt"), []byte("hello restoreweave"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(source, "readme.txt"), []byte("hello cairn"), 0o644); err != nil {
 		t.Fatalf("write text: %v", err)
 	}
 	if err := os.Symlink("nested/unknown.bin", filepath.Join(source, "alias.bin")); err != nil {

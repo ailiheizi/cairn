@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/exact"
 )
 
 func TestFixtureFingerprintIsNotContentIdentity(t *testing.T) {

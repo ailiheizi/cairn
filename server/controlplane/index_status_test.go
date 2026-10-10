@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestContentIndexStatusDoesNotAdvertiseStaleLexicalGenerationAfterFailedRebuild(t *testing.T) {
@@ -24,7 +24,7 @@ func TestContentIndexStatusDoesNotAdvertiseStaleLexicalGenerationAfterFailedRebu
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	dispatcher.search = indexer
 	ready, err := dispatcher.contentIndexStatuses(ctx, seed.WorkspaceID, entries)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestContentIndexStatusDistinguishesSemanticNotBuiltFromUnavailable(t *testi
 
 	// A bound provider/backend with no semantic generation means the file has
 	// not been analysed yet, rather than that semantic search is broken.
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	dispatcher.search = &search.Indexer{
 		Store:            store,
 		Engine:           &search.Engine{Dir: t.TempDir()},

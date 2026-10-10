@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/controlplane"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/server/controlplane"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // startEgressCLIDaemon runs the real control-plane server with an online

@@ -48,7 +48,7 @@ func TestLogicalSnapshotNamespacePathTreeAndRangeLookup(t *testing.T) {
 	nativeRepresentation := Representation{
 		ID: testID(t, IDPrefixRepresentation), WorkspaceID: workspace.ID,
 		ContentID: "sha256:native-segment", DecodedLength: 4,
-		OwnershipMode: OwnershipRestoreWeavePacks, CodecProfileRef: "raw/v1",
+		OwnershipMode: OwnershipCairnPacks, CodecProfileRef: "raw/v1",
 		AccessMode: AccessRandomNative, MinimumReadableUnit: 4,
 		RecordDigest: "sha256:native-representation",
 	}
@@ -162,9 +162,9 @@ func TestLogicalSnapshotNamespacePathTreeAndRangeLookup(t *testing.T) {
 	packLocator := PhysicalLocator{
 		ID: testID(t, IDPrefixPhysicalLocator), WorkspaceID: workspace.ID,
 		RepresentationID: nativeRepresentation.ID, ContentID: nativeRepresentation.ContentID,
-		OwnershipMode: OwnershipRestoreWeavePacks, Kind: LocatorPackRange,
+		OwnershipMode: OwnershipCairnPacks, Kind: LocatorPackRange,
 		BackendID: "backend:native-a", RepositoryID: "repository:native-a",
-		PlacementGeneration: 7, ContainerRef: "restoreweave-pack:abc123",
+		PlacementGeneration: 7, ContainerRef: "cairn-pack:abc123",
 		ByteOffset: &offset, ByteLength: &length, EncodedLength: &encodedLength,
 		EncodedDigest:    "sha256:encoded-segment-1",
 		AuthorityRef:     "signed-placement:receipt-7",

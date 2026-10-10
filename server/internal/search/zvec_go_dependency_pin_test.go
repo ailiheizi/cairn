@@ -39,8 +39,8 @@ func TestZvecGoBuildDependencyMatchesBundlePin(t *testing.T) {
 		// inspect its executable BuildInfo instead; this still avoids running
 		// the daemon and therefore cannot initialize native zvec.
 		moduleRoot := moduleRootForDependencyTest(t)
-		binary := filepath.Join(t.TempDir(), "restoreweaved")
-		build := exec.Command("go", "build", "-tags=purego", "-o", binary, "./server/cmd/restoreweaved")
+		binary := filepath.Join(t.TempDir(), "cairnd")
+		build := exec.Command("go", "build", "-tags=purego", "-o", binary, "./server/cmd/cairnd")
 		build.Dir = moduleRoot
 		if output, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("build purego daemon for dependency provenance: %v\n%s", err, output)

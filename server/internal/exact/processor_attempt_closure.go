@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
-const ProcessorAttemptClosureEnvelopeSchemaV1 = "org.restoreweave.processor-attempt-closure-envelope.v1"
+const ProcessorAttemptClosureEnvelopeSchemaV1 = "org.cairn.processor-attempt-closure-envelope.v1"
 
 // ProcessorAttemptClosureEnvelope keeps the signed child and the exact
 // deterministic SQLite projection together. The bundle is supplemental: its

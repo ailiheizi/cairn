@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
-const corpusManifestSchema = "restoreweave.corpus-manifest.v1"
+const corpusManifestSchema = "cairn.corpus-manifest.v1"
 
 // CorpusEntry is the only input fact used by the savings runner. Path is a
 // slash-separated path relative to the corpus root, never an absolute host
@@ -492,7 +492,7 @@ func candidateEvidence(manifest CorpusManifest, driver repository.Driver, profil
 		capabilities = reporter.DescribeCapabilities()
 	}
 	return CandidateEvidence{
-		Schema:               "restoreweave.storage-savings-candidate.v1",
+		Schema:               "cairn.storage-savings-candidate.v1",
 		Status:               "CANDIDATE_MEASUREMENT_ONLY",
 		GeneratedAt:          time.Now().UTC().Format(time.RFC3339Nano),
 		OS:                   runtime.GOOS,

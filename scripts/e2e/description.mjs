@@ -59,7 +59,7 @@ function generationRequests(operations) {
 }
 
 // A configured, healthy-looking settings document for the mocked enabled paths.
-const configuredDescriptions = { enabled: true, generate: "on_demand", provider_profile: "fixture-describe-v1", credential_ref: "keychain://restoreweave/notes", retain_full_text: true };
+const configuredDescriptions = { enabled: true, generate: "on_demand", provider_profile: "fixture-describe-v1", credential_ref: "keychain://cairn/notes", retain_full_text: true };
 
 // The live DESCRIBE egress grant row the enabled paths resolve, shaped like a
 // real `egress.grant.list` entry.
@@ -89,7 +89,7 @@ async function fulfillCapabilitiesWithGenerate(route) {
   try { payload = await response.json(); } catch { await route.fulfill({ response }); return; }
   payload.data = payload.data ?? {};
   payload.data.capabilities = payload.data.capabilities ?? [];
-  payload.data.capabilities.push({ kind: "operation", id: "description.generate", state: "AVAILABLE", notes: "implemented by restoreweaved" });
+  payload.data.capabilities.push({ kind: "operation", id: "description.generate", state: "AVAILABLE", notes: "implemented by cairnd" });
   await route.fulfill({ status: response.status(), contentType: "application/json", body: JSON.stringify(payload) });
 }
 
@@ -199,12 +199,12 @@ export async function assertDescriptionAction(ctx) {
       () => observed.descriptionListInputs.map((input) => String(input.subject_ref ?? "")).findLast((value) => value.length > 0),
       "the inspector must read the selected subject's descriptions from the daemon",
     );
-    await capture("/tmp/rw-describe-disabled.png", ".detail-column .notes-section .describe-action");
+    await capture("/tmp/cairn-describe-disabled.png", ".detail-column .notes-section .describe-action");
     await assertNoOverflow("disabled action at 1512x950");
     await page.setViewportSize({ width: 390, height: 844 });
     await assertNoOverflow("disabled Notes action at 390x844");
     assert.equal(await describeAction().locator("details.describe-reason-details").evaluate((element) => element.open), false, "the phone-width Notes view must keep detailed gates collapsed by default");
-    await capture("/tmp/rw-describe-disabled-390.png", ".detail-column .notes-section");
+    await capture("/tmp/cairn-describe-disabled-390.png", ".detail-column .notes-section");
     await page.setViewportSize({ width: 1512, height: 950 });
     await page.waitForTimeout(100);
 
@@ -243,11 +243,11 @@ export async function assertDescriptionAction(ctx) {
       let payload;
       try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
       if (payload?.operation === "description.list") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.list", status: "SUCCEEDED", data: { documents: [modelSummary], truncated: false } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "description.list", status: "SUCCEEDED", data: { documents: [modelSummary], truncated: false } }) });
         return;
       }
       if (payload?.operation === "description.get") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.get", status: "SUCCEEDED", data: { document: { ...modelSummary, body: modelBody, metadata: {}, segments: [] } } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "description.get", status: "SUCCEEDED", data: { document: { ...modelSummary, body: modelBody, metadata: {}, segments: [] } } }) });
         return;
       }
       await route.continue();
@@ -264,7 +264,7 @@ export async function assertDescriptionAction(ctx) {
     assert.match(modelMeta, /版本 1|revision 1/, `the rendered note must keep its durable revision: ${modelMeta}`);
     assert.equal(await page.getByText(modelBody, { exact: true }).count(), 1, "model text must never be copied into a second note");
     assert.deepEqual(generationRequests(observed.operations), [], `rendering a model note must not send a generation request: ${JSON.stringify(observed.operations)}`);
-    await capture("/tmp/rw-describe-done.png", ".notes-list .note-row.source-note");
+    await capture("/tmp/cairn-describe-done.png", ".notes-list .note-row.source-note");
     await assertNoOverflow("daemon model note at 1512x950");
     await page.unroute("**/api/v1/command");
     await openSubject("beta.txt");
@@ -325,7 +325,7 @@ export async function assertDescriptionAction(ctx) {
       let payload;
       try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
       if (payload?.operation === "config.get") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: { enabled: true, generate: "on_demand", provider_profile: "fixture-describe-v1", credential_ref: "keychain://restoreweave/notes", retain_full_text: true } } } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: { enabled: true, generate: "on_demand", provider_profile: "fixture-describe-v1", credential_ref: "keychain://cairn/notes", retain_full_text: true } } } }) });
         return;
       }
       await route.continue();
@@ -349,12 +349,12 @@ export async function assertDescriptionAction(ctx) {
       let payload;
       try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
       if (payload?.operation === "config.get") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
         return;
       }
       if (payload?.operation === "capability.list") { await fulfillCapabilitiesWithGenerate(route); return; }
       if (payload?.operation === "egress.grant.list") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [] } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [] } }) });
         return;
       }
       await route.continue();
@@ -385,16 +385,16 @@ export async function assertDescriptionAction(ctx) {
       let payload;
       try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
       if (payload?.operation === "config.get") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "config.get", status: "SUCCEEDED", data: { config: { descriptions: configuredDescriptions } } }) });
         return;
       }
       if (payload?.operation === "capability.list") { await fulfillCapabilitiesWithGenerate(route); return; }
       if (payload?.operation === "egress.grant.list") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [fixtureGrant] } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "egress.grant.list", status: "SUCCEEDED", data: { grants: [fixtureGrant] } }) });
         return;
       }
       if (payload?.operation === "description.list") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.list", status: "SUCCEEDED", data: { documents: [], truncated: false } }) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "description.list", status: "SUCCEEDED", data: { documents: [], truncated: false } }) });
         return;
       }
       if (payload?.operation === "description.generate") {
@@ -408,7 +408,7 @@ export async function assertDescriptionAction(ctx) {
         assert.equal(confirmation.purpose, "DESCRIBE", "the egress confirmation must carry the DESCRIBE purpose");
         assert.equal(confirmation.grant_id, fixtureGrant.grant_id, "the egress confirmation must bind the live grant id");
         alphaSubjectRefForFixture = String(payload.input.subject_ref);
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.generate", status: "SUCCEEDED", data: { document: {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "description.generate", status: "SUCCEEDED", data: { document: {
           description_document_id: candidateID,
           workspace_id: "wsp_00000000000000000000000000000000",
           subject_ref: alphaSubjectRefForFixture,
@@ -434,7 +434,7 @@ export async function assertDescriptionAction(ctx) {
         assert.equal(payload?.input?.accepted, true, "the acceptance successor must be the user's accepted revision");
         assert.equal(payload?.input?.kind, "AI_SUMMARY", "the acceptance successor keeps the candidate's kind");
         assert.equal(payload?.input?.body, candidateBody, "the acceptance successor retains the candidate body");
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.restoreweave.result.v1", operation: "description.create", status: "SUCCEEDED", data: { document: {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ schema: "org.cairn.result.v1", operation: "description.create", status: "SUCCEEDED", data: { document: {
           description_document_id: successorID,
           workspace_id: "wsp_00000000000000000000000000000000",
           subject_ref: alphaSubjectRefForFixture,
@@ -485,7 +485,7 @@ export async function assertDescriptionAction(ctx) {
     assert.match(generatedMeta, /版本 1|revision 1/, `the generated note must keep its durable revision: ${generatedMeta}`);
     assert.equal(observed.generateInputs.length, 1, "exactly one confirmed generation request must be dispatched");
     assert.deepEqual(generationRequests(observed.operations), ["description.generate"], `only the confirmed generation may be a write: ${JSON.stringify(observed.operations)}`);
-    await capture("/tmp/rw-describe-generated.png", ".notes-list .note-row.source-note[data-generated-description]");
+    await capture("/tmp/cairn-describe-generated.png", ".notes-list .note-row.source-note[data-generated-description]");
     await assertNoOverflow("generated note at 1512x950");
     // Accept: the user's decision creates the accepted successor; the row then
     // shows the accepted state and the successor revision, and the candidate is

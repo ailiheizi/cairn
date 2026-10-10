@@ -12,16 +12,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 func TestSemanticBundleInstallRequiresInjectedCallback(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	result := dispatcher.Handle(context.Background(), command.Envelope{
 		Operation: command.OpSemanticBundleInstall, Input: []byte(`{}`),
 	})
@@ -44,7 +44,7 @@ func TestSemanticBundleInstallStrictInputAndIndependentCapability(t *testing.T) 
 	}
 	modelsRoot := filepath.Join(t.TempDir(), "models")
 	var callbackCalls int
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithExact(&exact.Service{Store: store, Repo: repo}),
 		WithSemanticBundleInstaller(modelsRoot, func(_ context.Context, root string) (SemanticBundleInstallReceipt, error) {
 			callbackCalls++
@@ -100,9 +100,9 @@ func TestSemanticBundleInstallStrictInputAndIndependentCapability(t *testing.T) 
 func TestSemanticBundleInstallArchiveInputUsesOfflineInstaller(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
 	modelsRoot := filepath.Join(t.TempDir(), "models")
-	const archivePath = "/var/lib/restoreweave/bge.tar.gz"
+	const archivePath = "/var/lib/cairn/bge.tar.gz"
 	var onlineCalls, offlineCalls int
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithSemanticBundleInstaller(modelsRoot, func(context.Context, string) (SemanticBundleInstallReceipt, error) {
 			onlineCalls++
 			return SemanticBundleInstallReceipt{}, errors.New("online installer must not be selected")
@@ -117,7 +117,7 @@ func TestSemanticBundleInstallArchiveInputUsesOfflineInstaller(t *testing.T) {
 	)
 	result := dispatcher.Handle(context.Background(), command.Envelope{
 		Operation: command.OpSemanticBundleInstall,
-		Input:     []byte(`{"archive_path":"/var/lib/restoreweave/bge.tar.gz"}`),
+		Input:     []byte(`{"archive_path":"/var/lib/cairn/bge.tar.gz"}`),
 	})
 	if result.Status != command.StatusSucceeded {
 		t.Fatalf("offline install = %s, reasons=%+v", result.Status, result.Reasons)
@@ -145,7 +145,7 @@ func TestSemanticBundleInstallFailureIsNotPartialSuccess(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+			dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 				WithExact(&exact.Service{Store: store, Repo: repo}),
 				WithSemanticBundleCapability(command.Capability{
 					Kind: "model-bundle", ID: search.SemanticBundleBGEProfileID,
@@ -219,8 +219,8 @@ func controlPlaneTestSemanticBundle(t *testing.T, modelsRoot string) (SemanticBu
 		"zvec.dylib":   []byte("zvec-native-fixture"),
 		"zvec-go.txt":  []byte("zvec-go-fixture"),
 		"LICENSE":      []byte("MIT\nApache-2.0\n"),
-		"NOTICE":       []byte("RestoreWeave semantic bundle notices\n"),
-		"sbom.json":    []byte(`{"name":"restoreweave-semantic-bundle"}`),
+		"NOTICE":       []byte("Cairn semantic bundle notices\n"),
+		"sbom.json":    []byte(`{"name":"cairn-semantic-bundle"}`),
 	}
 	assets := make(map[string]search.SemanticBundleAsset, len(files))
 	sources := make(map[string]string, len(files))

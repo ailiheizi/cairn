@@ -45,7 +45,7 @@ facets such as file type are shown separately.
 From the repository root, start the daemon and its built WebUI with one command:
 
 ```sh
-./scripts/run-local.sh --data-dir /absolute/path/restoreweave-data
+./scripts/run-local.sh --data-dir /absolute/path/cairn-data
 ```
 
 The launcher creates a persisted profile on first use, keeps its catalog,

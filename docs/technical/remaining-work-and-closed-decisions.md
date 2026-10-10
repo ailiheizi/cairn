@@ -211,7 +211,7 @@ recording this note:
    passed into the rebuilt manifest, so the digest now survives a store reopen.
    The frozen digest field set is unchanged. One policy value now has a
    materializer: `handoff-v1:manifest-json` writes exactly one derived
-   `restoreweave-export.json` file beside the frozen subject files,
+   `cairn-export.json` file beside the frozen subject files,
    `export.apply` reports the sidecar files it wrote, and `export.verify`
    recomputes the sidecar from the frozen manifest and compares it
    byte-for-byte, so a missing or altered sidecar is a verification failure and

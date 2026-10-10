@@ -162,9 +162,9 @@ func TestONNXWorkerTransportHelper(t *testing.T) {
 		}
 		descendant := exec.Command(os.Args[0], "-test.run=TestONNXWorkerTransportDescendantResponseHolder", "-test.v=false")
 		descendant.Env = []string{
-			"RESTOREWEAVE_ONNX_DESCENDANT_FD=3",
-			"RESTOREWEAVE_ONNX_DESCENDANT_RESPONSE=" + base64.StdEncoding.EncodeToString(encoded),
-			"RESTOREWEAVE_ONNX_DESCENDANT_PARENT_PID=" + strconv.Itoa(os.Getpid()),
+			"CAIRN_ONNX_DESCENDANT_FD=3",
+			"CAIRN_ONNX_DESCENDANT_RESPONSE=" + base64.StdEncoding.EncodeToString(encoded),
+			"CAIRN_ONNX_DESCENDANT_PARENT_PID=" + strconv.Itoa(os.Getpid()),
 		}
 		descendant.ExtraFiles = []*os.File{connectionFile}
 		if err := descendant.Start(); err != nil {
@@ -179,7 +179,7 @@ func TestONNXWorkerTransportHelper(t *testing.T) {
 }
 
 func TestONNXWorkerTransportDescendantResponseHolder(t *testing.T) {
-	if os.Getenv("RESTOREWEAVE_ONNX_DESCENDANT_FD") != "3" {
+	if os.Getenv("CAIRN_ONNX_DESCENDANT_FD") != "3" {
 		return
 	}
 	connectionFile := os.NewFile(3, "onnx-worker-descendant-connection")
@@ -192,7 +192,7 @@ func TestONNXWorkerTransportDescendantResponseHolder(t *testing.T) {
 		os.Exit(49)
 	}
 	defer conn.Close()
-	parentPID, err := strconv.Atoi(os.Getenv("RESTOREWEAVE_ONNX_DESCENDANT_PARENT_PID"))
+	parentPID, err := strconv.Atoi(os.Getenv("CAIRN_ONNX_DESCENDANT_PARENT_PID"))
 	if err != nil || parentPID <= 0 {
 		os.Exit(49)
 	}
@@ -210,7 +210,7 @@ func TestONNXWorkerTransportDescendantResponseHolder(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	response, err := base64.StdEncoding.DecodeString(os.Getenv("RESTOREWEAVE_ONNX_DESCENDANT_RESPONSE"))
+	response, err := base64.StdEncoding.DecodeString(os.Getenv("CAIRN_ONNX_DESCENDANT_RESPONSE"))
 	if err != nil || len(response) == 0 {
 		os.Exit(49)
 	}

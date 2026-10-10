@@ -184,7 +184,7 @@ func testAccessEntryPoint(category Category, inputs, outputs []PortType, capabil
 		for i, portType := range types {
 			result = append(result, PortDeclaration{
 				Name: prefix + string(rune('a'+i)), Type: portType,
-				SchemaID: "restoreweave.test/" + string(portType) + "/v1", Required: true,
+				SchemaID: "cairn.test/" + string(portType) + "/v1", Required: true,
 			})
 		}
 		return result
@@ -197,12 +197,12 @@ func testAccessEntryPoint(category Category, inputs, outputs []PortType, capabil
 		Outputs:             ports(outputs, "output-"),
 		Capabilities:        capabilities,
 		Runtime: RuntimeDescriptor{
-			Kind: RuntimeBuiltin, Lifecycle: accessRuntimeLifecycle(category), AdapterID: "restoreweave.builtin.v1",
-			Protocol: "restoreweave.internal/v1", Entrypoint: "adapter.test.v1",
+			Kind: RuntimeBuiltin, Lifecycle: accessRuntimeLifecycle(category), AdapterID: "cairn.builtin.v1",
+			Protocol: "cairn.internal/v1", Entrypoint: "adapter.test.v1",
 		},
 		Enablement: EnablementEnabled, Qualification: QualificationExperimental,
-		CanExecuteNewWork: true, ConfigurationSchema: "restoreweave.test.config/v1",
-		ConformanceSuiteID: "restoreweave.test.conformance/v1",
+		CanExecuteNewWork: true, ConfigurationSchema: "cairn.test.config/v1",
+		ConformanceSuiteID: "cairn.test.conformance/v1",
 	}
 }
 

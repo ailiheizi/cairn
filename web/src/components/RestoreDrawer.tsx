@@ -9,7 +9,7 @@ import type { RestoreFlow } from "../app/useRestore";
 // One column: the destination field, the reviewed plan, and the sticky action
 // bar. The card keeps the review evidence; the bar keeps the single next step.
 
-const restoreFormID = "restoreweave-restore-form";
+const restoreFormID = "cairn-restore-form";
 
 // The restore card keeps the review evidence: what will be restored, the item
 // and byte counts, and the exact-byte outcome. Its primary action lives in the

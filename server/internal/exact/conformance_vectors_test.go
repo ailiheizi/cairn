@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 // Conformance vectors are the executable form of "any independent reader can
@@ -26,9 +26,9 @@ import (
 // signature domain, schema rule, or reader-dependency name therefore fails
 // this test instead of drifting silently.
 const (
-	conformanceVectorSchema = "org.restoreweave.conformance-vector.v1"
+	conformanceVectorSchema = "org.cairn.conformance-vector.v1"
 	conformanceVectorDir    = "testdata/conformance"
-	conformanceWriteEnv     = "RESTOREWEAVE_WRITE_CONFORMANCE_VECTORS"
+	conformanceWriteEnv     = "CAIRN_WRITE_CONFORMANCE_VECTORS"
 	conformanceDomain       = "workspace:conformance"
 )
 
@@ -112,7 +112,7 @@ func conformanceAnchor(t *testing.T, identity SigningIdentity) TrustAnchor {
 // field. Vector digests are synthetic on purpose: the vectors prove record
 // semantics, not payload contents.
 func conformanceDigest(label string) string {
-	sum := sha256.Sum256([]byte("restoreweave-conformance-vector\x00" + label))
+	sum := sha256.Sum256([]byte("cairn-conformance-vector\x00" + label))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
@@ -123,7 +123,7 @@ func selectReaderDependencies(readerVersion string, override []string) []string 
 	return []string{
 		"canonicalization:encoding/json-compact-v1",
 		"repository:directory-cas-dev-v1/identity-v1",
-		"restoreweave-reader:portable-fact-" + readerVersion,
+		"cairn-reader:portable-fact-" + readerVersion,
 		"signature:ed25519-v1",
 	}
 }
@@ -186,7 +186,7 @@ func conformanceProcessorAttemptClosure(t *testing.T, identity SigningIdentity, 
 		Schema: schema, SignatureDomain: RecoverySignatureDomainV1, RecordKind: ProcessorAttemptClosureKind,
 		WorkspaceID: "workspace-conformance", PublicationID: "conformance-publication", PublicationDomain: conformanceDomain,
 		SnapshotRef: "snapshot-conformance", ManifestDigest: conformanceDigest("manifest"),
-		ParentCommitDigest: conformanceDigest("parent-commit"), AttemptBundleSchema: "org.restoreweave.processor-attempt-bundle.v1",
+		ParentCommitDigest: conformanceDigest("parent-commit"), AttemptBundleSchema: "org.cairn.processor-attempt-bundle.v1",
 		AttemptBundleDigest: conformanceDigest("attempt-bundle"), AttemptBundleLength: 512, AttemptCount: 1,
 		TargetIdentity: conformanceDigest("target"), WriterIdentity: identity.WriterIdentity, KeyID: identity.KeyID,
 		FenceToken: 7, SignedAt: conformanceSignedAt(),
@@ -398,7 +398,7 @@ func conformanceBlueprints() []conformanceBlueprint {
 			notes:          "validly signed record declaring a reader dependency no decoder in this build answers; the reader refuses and falls through to the next recovery reference",
 			build: func(t *testing.T, identity SigningIdentity) ([]byte, string) {
 				return conformancePortableFactClosure(t, identity, PortableFactClosureSchemaV2, PortableFactBundleSchemaV2, "v2",
-					"restoreweave-reader:semantic-semantics-v1")
+					"cairn-reader:semantic-semantics-v1")
 			},
 		},
 	}
@@ -509,9 +509,9 @@ func applyConformanceMutation(t *testing.T, family, mutation string, record []by
 		decodeConformanceRecord(t, record, &decoded)
 		switch mutation {
 		case conformanceMutationCriticalExtension:
-			decoded.Closure.CriticalExtensions = []string{"org.restoreweave.unknown-critical-extension.v1"}
+			decoded.Closure.CriticalExtensions = []string{"org.cairn.unknown-critical-extension.v1"}
 		case conformanceMutationUndeclaredDependency:
-			decoded.Closure.RequiredReaderDependencies = []string{"restoreweave-reader:semantic-semantics-v1"}
+			decoded.Closure.RequiredReaderDependencies = []string{"cairn-reader:semantic-semantics-v1"}
 		case conformanceMutationSignatureBitFlip:
 			flipConformanceSignature(t, &decoded.Closure.Signature)
 		default:

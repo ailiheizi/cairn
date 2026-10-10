@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 func requireONNXStagingNonRoot(t *testing.T) {
@@ -52,7 +52,7 @@ func onnxStagingTestBundle(t *testing.T) (string, search.SemanticBundleAdmission
 
 func onnxStagingWorkerRoot(t *testing.T) string {
 	t.Helper()
-	root, err := os.MkdirTemp("", "restoreweave-onnx-worker-test-")
+	root, err := os.MkdirTemp("", "cairn-onnx-worker-test-")
 	if err != nil {
 		t.Fatalf("create private worker root: %v", err)
 	}
@@ -74,13 +74,13 @@ func onnxStagingWorkerRoot(t *testing.T) string {
 
 func TestONNXWorkerSessionRootNormalizesInheritedGIDBeforeSocket(t *testing.T) {
 	requireONNXStagingNonRoot(t)
-	if parent := os.Getenv("RESTOREWEAVE_ONNX_WORKER_TEST_TMPDIR"); parent != "" {
+	if parent := os.Getenv("CAIRN_ONNX_WORKER_TEST_TMPDIR"); parent != "" {
 		if info, err := os.Stat(parent); err != nil || !info.IsDir() {
 			t.Fatalf("inherited-group test temp parent is unavailable: info=%v err=%v", info, err)
 		}
 		t.Setenv("TMPDIR", parent)
 	}
-	probe, err := os.MkdirTemp("", "restoreweave-onnx-worker-gid-probe-")
+	probe, err := os.MkdirTemp("", "cairn-onnx-worker-gid-probe-")
 	if err != nil {
 		t.Fatalf("create inherited-group probe: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestONNXWorkerSessionRootNormalizesInheritedGIDBeforeSocket(t *testing.T) {
 		t.Fatalf("remove inherited-group probe: %v", err)
 	}
 	if inheritedGID == uint32(os.Getgid()) {
-		if os.Getenv("RESTOREWEAVE_ONNX_WORKER_TEST_TMPDIR") != "" {
+		if os.Getenv("CAIRN_ONNX_WORKER_TEST_TMPDIR") != "" {
 			t.Fatalf("configured shared-temp parent did not reproduce inherited group: got gid %d, want gid different from current %d", inheritedGID, os.Getgid())
 		}
 		t.Skip("temporary directory does not inherit a differing group on this platform")
@@ -191,7 +191,7 @@ func TestVerifyONNXWorkerProofPermissionsRejectsModesAndSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootLink := filepath.Join(filepath.Dir(root), "restoreweave-onnx-worker-root-link")
+	rootLink := filepath.Join(filepath.Dir(root), "cairn-onnx-worker-root-link")
 	if err := os.Symlink(root, rootLink); err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func isolateONNXStagingTempDir(t *testing.T) {
 
 func onnxStagingTempRoots(t *testing.T) map[string]struct{} {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(os.TempDir(), "restoreweave-onnx-worker-*"))
+	paths, err := filepath.Glob(filepath.Join(os.TempDir(), "cairn-onnx-worker-*"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,7 +476,7 @@ func TestONNXWorkerRootCleanupRefusesUnownedPath(t *testing.T) {
 	if err := os.WriteFile(sentinel, []byte("untouched"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	rootLink := filepath.Join(t.TempDir(), "restoreweave-onnx-worker-symlink")
+	rootLink := filepath.Join(t.TempDir(), "cairn-onnx-worker-symlink")
 	if err := os.Symlink(target, rootLink); err != nil {
 		t.Fatal(err)
 	}

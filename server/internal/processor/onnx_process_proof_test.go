@@ -112,7 +112,7 @@ func TestONNXWorkerProofHelper(t *testing.T) {
 			os.Exit(25)
 		}
 		holder := exec.Command(os.Args[0], "-test.run=TestONNXWorkerProofConnectionHolder", "-test.v=false")
-		holder.Env = []string{"RESTOREWEAVE_ONNX_HOLD_FD=3"}
+		holder.Env = []string{"CAIRN_ONNX_HOLD_FD=3"}
 		holder.ExtraFiles = []*os.File{connectionFile}
 		if err := holder.Start(); err != nil {
 			_ = connectionFile.Close()
@@ -125,7 +125,7 @@ func TestONNXWorkerProofHelper(t *testing.T) {
 }
 
 func TestONNXWorkerProofConnectionHolder(t *testing.T) {
-	if os.Getenv("RESTOREWEAVE_ONNX_HOLD_FD") != "3" {
+	if os.Getenv("CAIRN_ONNX_HOLD_FD") != "3" {
 		return
 	}
 	connectionFile := os.NewFile(3, "onnx-worker-held-connection")

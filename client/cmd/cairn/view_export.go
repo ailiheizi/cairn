@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func newViewCommand(env *clientEnv) *cobra.Command {
 		"Create or revise a dynamic saved view",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) < 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw view save <name> <query>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn view save <name> <query>\n")
 				return 1
 			}
 			input := map[string]any{"name": args[0], "query": args[1]}
@@ -48,7 +48,7 @@ func newViewCommand(env *clientEnv) *cobra.Command {
 		"Read one saved view without evaluating membership",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw view get <name-or-id>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn view get <name-or-id>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpViewGet, map[string]any{"name": args[0]}, func(cmd *cobra.Command, result command.Result) error {
@@ -79,7 +79,7 @@ func newViewCommand(env *clientEnv) *cobra.Command {
 		"Evaluate one saved view against the live search generation",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw view evaluate <name-or-id>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn view evaluate <name-or-id>\n")
 				return 1
 			}
 			input := map[string]any{"name": args[0]}
@@ -127,7 +127,7 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 				input["subjects"] = subjects
 			}
 			if len(input) == 0 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw export plan --view <name-or-id> | --subject <ref>...\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn export plan --view <name-or-id> | --subject <ref>...\n")
 				return 1
 			}
 			if rep, _ := cmd.Flags().GetString("representation"); rep != "" {
@@ -168,7 +168,7 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 		"Materialize a frozen manifest to an explicit destination",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw export apply <manifest-id> <destination>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn export apply <manifest-id> <destination>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpExportApply, map[string]any{
@@ -190,7 +190,7 @@ func newExportCommand(env *clientEnv) *cobra.Command {
 		"Verify materialized output against its frozen manifest",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 2 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw export verify <manifest-id> <destination>\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn export verify <manifest-id> <destination>\n")
 				return 1
 			}
 			return env.request(cmd, command.OpExportVerify, map[string]any{

@@ -10,17 +10,17 @@ import { useState } from "react";
 // The drawer's path field offers the last path planned in this browser as a
 // one-tap suggestion. It is a browser convenience only: the durable source
 // record still comes from the daemon, never from localStorage.
-const lastSourcePathKey = "restoreweave.last_source_path";
+const lastSourcePathKey = "cairn.last_source_path";
 // The restore drawer offers the last few destinations planned in this browser
 // as one-tap chips. They are a browser convenience only: the recorded plan,
 // the empty-directory check, and the restored bytes stay with the daemon.
-const recentRestoreDestinationsKey = "restoreweave.recent_restore_destinations";
+const recentRestoreDestinationsKey = "cairn.recent_restore_destinations";
 const maxRecentRestoreDestinations = 3;
 // The search field keeps a short list of the queries this browser submitted.
 // It is a local convenience only: the durable form of a query is a SavedView
 // (`view.save`), which lives in the daemon catalog with a stable id and
 // revision. This list is never membership, a saved view, or recovery evidence.
-const recentSearchesKey = "restoreweave.recent_searches";
+const recentSearchesKey = "cairn.recent_searches";
 const maxRecentSearches = 8;
 
 // The recent-destination chips reuse the last few destinations planned in this

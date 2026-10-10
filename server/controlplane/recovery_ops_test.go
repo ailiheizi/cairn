@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // recoveryHandlerHarness publishes a signed snapshot through the dispatcher
@@ -29,7 +29,7 @@ func newRecoveryHandlerHarness(t *testing.T) (*Dispatcher, command.RecoveryExpor
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: exact.DefaultPublicationDomain, RequireSignedPublication: true,
 	}))
@@ -199,7 +199,7 @@ func TestDispatcherRecoveryTokenExportMetadataOnlyProjectsEmptySet(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(service))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(service))
 	response := dispatcher.handleRecoveryTokenExport(ctx, mustEnvelope(t, command.OpRecoveryTokenExport, map[string]any{
 		"snapshot_ref": result.SnapshotRef,
 		"subject_path": "metadata.bin",

@@ -1,6 +1,6 @@
 # Foreign App Jobs on the Content Plane
 
-> **Status:** Informative enumeration, 2026-08-16. This is not a requirement document and does not expand `RW-MVP-1`. It does not authorize a sticker manager, anime downloader, reader, note app, or media server inside `restoreweaved`. Authority stays in [Ecosystem and Vertical Applications](../requirements/ecosystem-and-vertical-apps.md). Closed product decisions stay in [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md).
+> **Status:** Informative enumeration, 2026-08-16. This is not a requirement document and does not expand `RW-MVP-1`. It does not authorize a sticker manager, anime downloader, reader, note app, or media server inside `cairnd`. Authority stays in [Ecosystem and Vertical Applications](../requirements/ecosystem-and-vertical-apps.md). Closed product decisions stay in [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md).
 
 The question was: a cross-platform sticker manager, 追番 / 美剧 libraries, novels, and quote / memory vaults all look like separate products. Which of those jobs can sit on Cairn, and which would make us become the app?
 
@@ -25,7 +25,7 @@ A and B are “empower.” C and D are “do not own.”
 
 | Named job | Typical foreign app | Grade |
 | --- | --- | --- |
-| Drop mixed material into one Inbox | Inbox page, `rw` | A |
+| Drop mixed material into one Inbox | Inbox page, `cairn` | A |
 | Import a NAS tree without racing writers | Capture + snapshot | A |
 | Find an arbitrary item later | Inbox search, MCP | A |
 | Open / export / restore with proof | Inbox, `plan.restore` | A |
@@ -185,7 +185,7 @@ Repeated because every seed above has a C/D twin:
 - No Cairn sticker / meme / emoji product.
 - No Cairn 追番 / Sonarr / BitTorrent product.
 - No Cairn Flomo / Obsidian / 语录 editor.
-- No embedded player, reader, or media server in `restoreweaved`.
+- No embedded player, reader, or media server in `cairnd`.
 - No fourth public REST catalog.
 - No FUSE/SMB/WebDAV server so those apps can mount us.
 
@@ -206,12 +206,12 @@ Ordered by how much the plane already does without a new subsystem:
 9. Completed download libraries after the swarm dies.
 10. Cover-art / sidecar bytes bound to the same subject; restore then hand off.
 
-Items 5–8 are the user’s seeds plus the obvious neighbors. They do not move `RW-MVP-1`. They do not need new `rw` subcommands.
+Items 5–8 are the user’s seeds plus the obvious neighbors. They do not move `RW-MVP-1`. They do not need new `cairn` subcommands.
 
 ## 6. How a foreign app should attach
 
 ```text
-keep / find / tag / prove     -> Inbox JSON or rw / MCP
+keep / find / tag / prove     -> Inbox JSON or cairn / MCP
 listen                        -> OpenSubsonic
 read a book                   -> OPDS
 play a video or open a pack   -> restore or content.* then the foreign app
@@ -225,4 +225,4 @@ One tree can be a sticker dump, a 美剧 folder, and a 语录 directory at once.
 - A standard HTTP API for “sticker packs” or “TV libraries” that we could adapt the way we adapted OpenSubsonic — then a thin facade is B, not a new product.
 - A retrieve profile that is separately qualified — then “get the next episode” can be D → later, never identity.
 - Evidence that operators will not use Inbox / restore and will only adopt a native suite — that still does not authorize us to become the suite; it would be a failed attach, not a new core.
-- Operators refuse to ingest a tree unless we also edit or read inside `restoreweaved`. That would be a product-identity change, not a missing text feature.
+- Operators refuse to ingest a tree unless we also edit or read inside `cairnd`. That would be a product-identity change, not a missing text feature.

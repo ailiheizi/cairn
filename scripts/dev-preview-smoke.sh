@@ -32,7 +32,7 @@ mkdir -p "$(dirname "$evidence")"
 [[ ! -e "$evidence" && ! -L "$evidence" ]] || { echo "error: evidence directory already exists; refusing to overwrite it" >&2; exit 2; }
 mkdir -m 700 "$evidence"
 evidence="$(cd "$evidence" && pwd -P)"
-work="$(mktemp -d "${TMPDIR:-/tmp}/restoreweave-preview.XXXXXX")"
+work="$(mktemp -d "${TMPDIR:-/tmp}/cairn-preview.XXXXXX")"
 work="$(cd "$work" && pwd -P)"
 daemon_pid=""; recovery_pid=""
 stop_pid() {
@@ -106,7 +106,7 @@ try:
         if len(roots) != 1:
             raise ValueError("archive must contain exactly one top-level directory")
         root = next(iter(roots))
-        if not root.startswith("restoreweave-"):
+        if not root.startswith("cairn-"):
             raise ValueError("unexpected package root")
         for item, parts, normalized in entries:
             target = dest.joinpath(*parts)
@@ -124,19 +124,19 @@ try:
             os.chmod(target, 0o755 if item.mode & 0o111 else 0o644)
     package = dest / root
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("schema") != "restoreweave.candidate-offline-artifact.v1" or manifest.get("status") != "CANDIDATE_ONLY_NOT_SUPPORTED":
+    if manifest.get("schema") != "cairn.candidate-offline-artifact.v1" or manifest.get("status") != "CANDIDATE_ONLY_NOT_SUPPORTED":
         raise ValueError("manifest is not an explicitly candidate-only offline artifact")
     if manifest.get("platform") != {"os": "darwin", "arch": "arm64"}:
         raise ValueError("candidate manifest is not Darwin arm64")
     expected_layout = {
-        "daemon": "bin/restoreweaved",
-        "cli": "bin/rw",
+        "daemon": "bin/cairnd",
+        "cli": "bin/cairn",
         "web": "web/dist",
         "semantic": "semantic/semantic-bundle.tar.gz",
     }
     if manifest.get("layout") != expected_layout:
         raise ValueError("manifest layout does not match the fixed candidate package paths")
-    if root != f"restoreweave-{manifest.get('version')}-darwin-arm64":
+    if root != f"cairn-{manifest.get('version')}-darwin-arm64":
         raise ValueError("archive root does not match manifest version and platform")
     checks = (package / "checksums.sha256").read_text(encoding="utf-8").splitlines()
     listed = set()
@@ -178,18 +178,18 @@ except Exception as exc:
 PY
  )"
 [[ -d "$package_root" ]] || { echo "error: validated package root could not be resolved" >&2; exit 1; }
-rw="$package_root/bin/rw"; daemon="$package_root/bin/restoreweaved"
-socket="$work/m.sock"; config="$work/config/restoreweave/config.toml"
+rw="$package_root/bin/cairn"; daemon="$package_root/bin/cairnd"
+socket="$work/m.sock"; config="$work/config/cairn/config.toml"
 data_home="$work/data"; xdg_config="$work/config"; logs="$evidence/logs"
 mkdir -m 700 "$logs" "$work/source" "$work/recovered"
 export XDG_DATA_HOME="$data_home" XDG_CONFIG_HOME="$xdg_config"
 
-clean_env_args=(env -u RESTOREWEAVE_CONFIG -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY
-  -u RESTOREWEAVE_VECTORS -u RESTOREWEAVE_MODELS -u RESTOREWEAVE_RECOVERY_RECORDS
-  -u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE
-  -u RESTOREWEAVE_BGE_ONNX_RUNTIME -u RESTOREWEAVE_BGE_ONNX_MODEL
-  -u RESTOREWEAVE_BGE_TOKENIZER -u RESTOREWEAVE_ZVEC_LIBRARY
-  -u RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT -u RESTOREWEAVE_RUN_SUPERVISED_ONNX
+clean_env_args=(env -u CAIRN_CONFIG -u CAIRN_CATALOG -u CAIRN_REPOSITORY
+  -u CAIRN_VECTORS -u CAIRN_MODELS -u CAIRN_RECOVERY_RECORDS
+  -u CAIRN_SEMANTIC_BUNDLE -u CAIRN_IMAGE_BUNDLE
+  -u CAIRN_BGE_ONNX_RUNTIME -u CAIRN_BGE_ONNX_MODEL
+  -u CAIRN_BGE_TOKENIZER -u CAIRN_ZVEC_LIBRARY
+  -u CAIRN_SEMANTIC_BUNDLE_ROOT -u CAIRN_RUN_SUPERVISED_ONNX
   -u ZVEC_LIBRARY_PATH)
 clean_env() {
   "${clean_env_args[@]}" "$@"
@@ -246,7 +246,7 @@ installed_zvec_library="$bundle_root/$zvec_relative"
 start_daemon
 save_command ready-status status
 
-payload_text='RestoreWeave local preview exact-byte recovery marker 20261006: 洪水城市影像档案'
+payload_text='Cairn local preview exact-byte recovery marker 20261006: 洪水城市影像档案'
 printf '%s\n' "$payload_text" >"$work/source/preview.txt"
 expected_bytes="$(wc -c <"$work/source/preview.txt" | tr -d ' ')"
 expected_payload_sha="$(shasum -a 256 "$work/source/preview.txt" | awk '{print $1}')"
@@ -314,6 +314,6 @@ anchor_sha="$(shasum -a 256 "$work/portable/trust-anchor.json" | awk '{print $1}
 jq -n --arg artifact "$artifact_real" --arg artifact_sha "$actual_sha" \
   --arg restored_sha "$restored_sha" --arg reference_sha "$reference_sha" --arg anchor_sha "$anchor_sha" \
   --argjson restored_bytes "$restored_bytes" \
-  '{schema:"restoreweave.local-development-preview-smoke.v1",status:"PASS",scope:"Darwin arm64 local candidate trial; development evidence only",artifact:$artifact,artifact_sha256:$artifact_sha,semantic_query:"PASS",lexical_query:"PASS",independent_anchor_clean_reader_restore:"PASS",restored_bytes:$restored_bytes,restored_sha256:$restored_sha,recovery_reference_sha256:$reference_sha,trust_anchor_sha256:$anchor_sha}' \
+  '{schema:"cairn.local-development-preview-smoke.v1",status:"PASS",scope:"Darwin arm64 local candidate trial; development evidence only",artifact:$artifact,artifact_sha256:$artifact_sha,semantic_query:"PASS",lexical_query:"PASS",independent_anchor_clean_reader_restore:"PASS",restored_bytes:$restored_bytes,restored_sha256:$restored_sha,recovery_reference_sha256:$reference_sha,trust_anchor_sha256:$anchor_sha}' \
   >"$evidence/result.json"
 echo "PASS: local candidate smoke; evidence: $evidence/result.json"

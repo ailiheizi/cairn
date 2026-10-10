@@ -12,18 +12,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/processor/sandbox"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
+	"github.com/ailiheizi/cairn/server/internal/processor/sandbox"
+	"github.com/ailiheizi/cairn/server/internal/search"
 )
 
 // TestRealBGEEmbeddingBuildsAndQueriesNativeZvec is an opt-in component
 // proof. It deliberately exercises the package-local native measurement seam;
 // only the supervised worker may establish production readiness.
 func TestRealBGEEmbeddingBuildsAndQueriesNativeZvec(t *testing.T) {
-	runtimeSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_RUNTIME"))
-	modelSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_ONNX_MODEL"))
-	tokenizerSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_BGE_TOKENIZER"))
-	zvecSource := strings.TrimSpace(os.Getenv("RESTOREWEAVE_ZVEC_LIBRARY"))
+	runtimeSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_RUNTIME"))
+	modelSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_ONNX_MODEL"))
+	tokenizerSource := strings.TrimSpace(os.Getenv("CAIRN_BGE_TOKENIZER"))
+	zvecSource := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
 	if runtimeSource == "" || modelSource == "" || tokenizerSource == "" || zvecSource == "" {
 		t.Skip("real BGE and zvec asset paths are required for the opt-in integration test")
 	}
@@ -31,7 +31,7 @@ func TestRealBGEEmbeddingBuildsAndQueriesNativeZvec(t *testing.T) {
 	bundleRoot, admission := realONNXAdmission(t, runtimeSource, modelSource, tokenizerSource)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	workerBinary := buildRestoreweavedForWorker(t)
+	workerBinary := buildCairndForWorker(t)
 	worker, closeWorker, err := StartONNXWorker(ctx, ONNXWorkerSupervisorOptions{
 		Command: workerBinary, BundleRoot: bundleRoot, ConfigDigest: admission.Manifest.ConfigDigest,
 		GenerationID: "zvec-supervised-generation", FenceToken: 11,

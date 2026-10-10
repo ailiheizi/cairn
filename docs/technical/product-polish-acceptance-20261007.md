@@ -11,7 +11,7 @@ This is bounded existing-client maintenance in parallel with Phase 4. It records
 
 ## Executable evidence
 
-At `dist/product-polish-20261007/validation`: `web-build-v3-result.json` exited 0 in 4.459 s with no drift; `go-result.json` exited 0 in 304.846 s across 535 inputs with no drift; `first-use-result.json` exited 0 in 26.613 s using existing build-v5 daemon `52b87e4d...`, rw `aa87a00c...`, and `web-dist-v3`. The fresh journey’s original download hash and size are recorded above. `browser-layout-checks.json` and `live-audio-details.jpg` retain CUA evidence. `node scripts/web-i18n-check.mjs` passed (1,582 keys, 53 source files); `git diff --check` passed.
+At `dist/product-polish-20261007/validation`: `web-build-v3-result.json` exited 0 in 4.459 s with no drift; `go-result.json` exited 0 in 304.846 s across 535 inputs with no drift; `first-use-result.json` exited 0 in 26.613 s using existing build-v5 daemon `52b87e4d...`, cairn `aa87a00c...`, and `web-dist-v3`. The fresh journey’s original download hash and size are recorded above. `browser-layout-checks.json` and `live-audio-details.jpg` retain CUA evidence. `node scripts/web-i18n-check.mjs` passed (1,582 keys, 53 source files); `git diff --check` passed.
 
 Preview promotion v2 passed locally (PID 99937, `web-dist-v3`) while preserving backend configuration, snapshots, sources, jobs, and subject facts; no index rebuild or model install occurred. The first promotion attempt was rolled back after request timestamps/IDs and source observation time diverged; `preview-first-attempt.json` preserves that limitation and correction.
 

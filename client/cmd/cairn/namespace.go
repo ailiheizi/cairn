@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 func newNamespaceCommand(env *clientEnv) *cobra.Command {
@@ -36,7 +36,7 @@ func newNamespaceListCommand(env *clientEnv) *cobra.Command {
 	command := newExitCommand(env, "list <root-id>", "List namespace entries under a root or parent entry",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw namespace list <root-id> [--parent <entry-id>] [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn namespace list <root-id> [--parent <entry-id>] [--workspace <id>]\n")
 				return 1
 			}
 			workspace := workspaceValue(cmd)
@@ -75,7 +75,7 @@ func newNamespaceResolveCommand(env *clientEnv) *cobra.Command {
 	command := newExitCommand(env, "resolve <path>", "Resolve display-path components to a catalog entry id",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw namespace resolve <path> [--workspace <id>] [--root <id>|--snapshot <ref>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn namespace resolve <path> [--workspace <id>] [--root <id>|--snapshot <ref>]\n")
 				return 1
 			}
 			input := map[string]any{
@@ -115,7 +115,7 @@ func newNamespaceStatCommand(env *clientEnv) *cobra.Command {
 	command := newExitCommand(env, "stat <entry-id>", "Stat one namespace entry",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw namespace stat <entry-id> [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn namespace stat <entry-id> [--workspace <id>]\n")
 				return 1
 			}
 			workspace := workspaceValue(cmd)
@@ -160,7 +160,7 @@ func newNamespaceReadlinkCommand(env *clientEnv) *cobra.Command {
 	command := newExitCommand(env, "readlink <entry-id>", "Read one symlink entry's captured target",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw namespace readlink <entry-id> [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn namespace readlink <entry-id> [--workspace <id>]\n")
 				return 1
 			}
 			workspace := workspaceValue(cmd)

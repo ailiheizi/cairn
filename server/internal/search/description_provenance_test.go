@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/search/pinyin"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 func testVersionedDescriptionDocument(t *testing.T, generationID, title, body string, chunks []string, corrupt func([]*descriptionSourceProvenance)) (*Engine, string) {

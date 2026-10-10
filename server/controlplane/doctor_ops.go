@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/identify"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/identify"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 )
 
 type doctorInput struct {
@@ -29,7 +29,7 @@ func (d *Dispatcher) handleDoctorCheck(ctx context.Context, env command.Envelope
 		checks = append(checks, command.DoctorCheck{ID: id, Scope: scope, OK: ok, Message: message})
 	}
 
-	add("controller", "core", true, "restoreweaved is serving doctor.check")
+	add("controller", "core", true, "cairnd is serving doctor.check")
 
 	if err := d.store.Ping(ctx); err != nil {
 		add("catalog", "core", false, err.Error())

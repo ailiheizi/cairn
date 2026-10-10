@@ -12,9 +12,9 @@ import { join, resolve } from "node:path";
 
 const repo = resolve(new URL("..", import.meta.url).pathname);
 const outDir = join(repo, ".tmp-content-polish-20261005");
-const chrome = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 4547;
-const temp = await mkdtemp(join(tmpdir(), "rw-content-visual-"));
+const temp = await mkdtemp(join(tmpdir(), "cairn-content-visual-"));
 let daemon;
 let browser;
 const settleLayout = (page) => page.evaluate(() => new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame))));
@@ -27,9 +27,9 @@ try {
   });
   await new Promise((resolveProbe, rejectProbe) => portProbe.close((error) => error ? rejectProbe(error) : resolveProbe()));
   await mkdir(outDir, { recursive: true });
-  const daemonBin = join(temp, "restoreweaved");
-  const rwBin = join(temp, "rw");
-  for (const [bin, pkg] of [[daemonBin, "./server/cmd/restoreweaved"], [rwBin, "./client/cmd/rw"]]) {
+  const daemonBin = join(temp, "cairnd");
+  const cairnBin = join(temp, "cairn");
+  for (const [bin, pkg] of [[daemonBin, "./server/cmd/cairnd"], [cairnBin, "./client/cmd/cairn"]]) {
     const built = spawnSync("go", ["build", "-tags", "purego", "-o", bin, pkg], { cwd: repo, stdio: "inherit" });
     assert.equal(built.status, 0, `build ${pkg}`);
   }
@@ -49,9 +49,9 @@ try {
   await writeFile(join(source, "Track.m4a"), Buffer.from("QA audio suffix; intentionally opaque bytes\n"));
   await writeFile(join(source, "Broken.png"), Buffer.from("QA invalid image bytes\n"));
   const config = join(temp, "config.toml");
-  const init = spawnSync(rwBin, ["config", "init", "--path", config], { cwd: repo, stdio: "ignore" });
+  const init = spawnSync(cairnBin, ["config", "init", "--path", config], { cwd: repo, stdio: "ignore" });
   assert.equal(init.status, 0, "initialize temporary config");
-  const env = { ...process.env, RESTOREWEAVE_CATALOG: join(temp, "catalog.sqlite"), RESTOREWEAVE_REPOSITORY: join(temp, "repository"), RESTOREWEAVE_VECTORS: join(temp, "vectors"), RESTOREWEAVE_MODELS: join(temp, "models"), RESTOREWEAVE_RECOVERY_RECORDS: join(temp, "recovery") };
+  const env = { ...process.env, CAIRN_CATALOG: join(temp, "catalog.sqlite"), CAIRN_REPOSITORY: join(temp, "repository"), CAIRN_VECTORS: join(temp, "vectors"), CAIRN_MODELS: join(temp, "models"), CAIRN_RECOVERY_RECORDS: join(temp, "recovery") };
   daemon = spawn(daemonBin, ["--config", config, "--socket", join(temp, "daemon.sock"), "--api-listen", `127.0.0.1:${port}`, "--web-root", join(repo, "web/dist")], { cwd: repo, env, stdio: "ignore" });
   await new Promise((resolveSpawn, rejectSpawn) => { daemon.once("spawn", resolveSpawn); daemon.once("error", rejectSpawn); });
   const base = `http://127.0.0.1:${port}`;

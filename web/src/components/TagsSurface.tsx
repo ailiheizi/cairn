@@ -282,7 +282,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
   }, [addTarget, items]);
 
   async function resolveWorkspace(): Promise<{ workspaceID: string; error: string }> {
-    const stored = window.localStorage.getItem("restoreweave.workspace_id")?.trim() ?? "";
+    const stored = window.localStorage.getItem("cairn.workspace_id")?.trim() ?? "";
     if (stored) return { workspaceID: stored, error: "" };
     // The browser-local id is a convenience the shell records after an explicit
     // publication. When it is absent, the daemon's own status projection names

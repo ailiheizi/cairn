@@ -14,16 +14,16 @@ import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { chromium } from "../web/node_modules/playwright/index.mjs";
 
 const repo = resolve(new URL("..", import.meta.url).pathname);
-const baseURL = (process.env.RESTOREWEAVE_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
+const baseURL = (process.env.CAIRN_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
 const qaDeployment = join(repo, "dist/client-appearance-20261006");
 const qaContext = JSON.parse(await readFile(join(qaDeployment, "qa-context.json"), "utf8"));
 const checkoutHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).stdout.trim();
 const checkoutStatus = spawnSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).stdout.trimEnd();
-const evidenceDir = process.env.RESTOREWEAVE_INTERFACE_EVIDENCE_DIR
-  ? resolve(process.env.RESTOREWEAVE_INTERFACE_EVIDENCE_DIR)
-  : await mkdtemp(join(tmpdir(), "restoreweave-interface-e2e-"));
-const chrome = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const storageKey = "restoreweave.appearance";
+const evidenceDir = process.env.CAIRN_INTERFACE_EVIDENCE_DIR
+  ? resolve(process.env.CAIRN_INTERFACE_EVIDENCE_DIR)
+  : await mkdtemp(join(tmpdir(), "cairn-interface-e2e-"));
+const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const storageKey = "cairn.appearance";
 const apiPath = "/api/v1/command";
 const readOnlyOperations = new Set(["status.get", "search.query"]);
 const mutationOperations = new Set([
@@ -246,7 +246,7 @@ async function runRenderFaultChecks() {
   ];
   let transformed = false;
   const faultPlugin = {
-    name: "restoreweave-disposable-interface-render-fault",
+    name: "cairn-disposable-interface-render-fault",
     enforce: "pre",
     transform(source, id) {
       if (resolve(id.split("?")[0]) !== framePath) return null;
@@ -264,14 +264,14 @@ async function runRenderFaultChecks() {
         code = code.replace(target.anchor, `${target.anchor}
   {
     let mode = "";
-    try { mode = sessionStorage.getItem("restoreweave-e2e-render-fault") || ""; } catch {}
+    try { mode = sessionStorage.getItem("cairn-e2e-render-fault") || ""; } catch {}
     if (${faultCondition}) {
       try {
-        const count = Number(sessionStorage.getItem("restoreweave-e2e-render-fault-count") || "0");
-        sessionStorage.setItem("restoreweave-e2e-render-fault-count", String(count + 1));
+        const count = Number(sessionStorage.getItem("cairn-e2e-render-fault-count") || "0");
+        sessionStorage.setItem("cairn-e2e-render-fault-count", String(count + 1));
         // Keep the one-shot fault armed through React's immediate retry so
         // the error reaches the actual boundary; then let workspace recover.
-        if (mode === "showcase-once" && count >= 1) sessionStorage.removeItem("restoreweave-e2e-render-fault");
+        if (mode === "showcase-once" && count >= 1) sessionStorage.removeItem("cairn-e2e-render-fault");
       } catch {}
       throw new Error("Disposable interface E2E render fault: " + mode);
     }
@@ -343,8 +343,8 @@ async function runShowcaseFault(browser, url) {
       frame: document.querySelector(".interface-frame")?.getAttribute("data-interface") ?? "",
       panel: Boolean(document.querySelector(".interface-recovery[role=alert]")),
       htmlInterface: document.documentElement.getAttribute("data-interface"),
-      faultCount: Number(sessionStorage.getItem("restoreweave-e2e-render-fault-count") || "0"),
-      faultMode: sessionStorage.getItem("restoreweave-e2e-render-fault"),
+      faultCount: Number(sessionStorage.getItem("cairn-e2e-render-fault-count") || "0"),
+      faultMode: sessionStorage.getItem("cairn-e2e-render-fault"),
       settingsOpen: Boolean(document.querySelector('[role="dialog"][aria-labelledby="settings-title"]')),
       visibleMainCount: [...document.querySelectorAll("main")].filter((item) => item.getBoundingClientRect().width > 0).length,
     }));
@@ -398,7 +398,7 @@ async function runSharedFault(browser, url) {
     assert.equal(countOperation(requests, "status.get"), statusCountBeforeRefresh + 1, "one extra App-owned status request is held");
     await openAppearance(page);
     const beforeSwitch = stableFlowCounts(requests);
-    await page.evaluate(() => sessionStorage.setItem("restoreweave-e2e-render-fault", "persistent-shared"));
+    await page.evaluate(() => sessionStorage.setItem("cairn-e2e-render-fault", "persistent-shared"));
     await page.locator('.interface-option input[value="showcase"]').click();
     const recoveryPanel = page.locator(".interface-recovery[role=alert]");
     await page.getByRole("dialog", { name: "Settings" }).getByRole("button", { name: "Close settings" }).click();
@@ -432,7 +432,7 @@ async function runSharedFault(browser, url) {
     await settingsTrigger.click();
     await settings.getByRole("button", { name: "Appearance" }).click();
     await settings.locator(".appearance-preferences").waitFor({ state: "visible", timeout: 10000 });
-    await page.evaluate(() => sessionStorage.removeItem("restoreweave-e2e-render-fault"));
+    await page.evaluate(() => sessionStorage.removeItem("cairn-e2e-render-fault"));
     await settings.locator('.interface-option input[value="showcase"]').check();
     await settings.getByRole("button", { name: "Close settings" }).click();
     await page.locator('.interface-frame[data-interface="showcase"]').waitFor({ state: "visible", timeout: 10000 });
@@ -458,7 +458,7 @@ async function runSharedFault(browser, url) {
 async function runHeldWrite(browser, url, webRoot) {
   // Keep the Unix socket pathname below macOS's sockaddr_un limit; the
   // harness evidence directory can be deeply nested.
-  const daemonRoot = join("/tmp", `rw-interface-e2e-${process.pid}`);
+  const daemonRoot = join("/tmp", `cairn-interface-e2e-${process.pid}`);
   const daemon = await startDisposableDaemon(daemonRoot, webRoot);
   const context = await browser.newContext({ viewport: { width: 1440, height: 980 }, locale: "en-US" });
   const page = await context.newPage();
@@ -591,9 +591,9 @@ async function createFaultContext(browser, url, startupFault) {
   });
   await page.addInitScript(({ key, fault }) => {
     localStorage.setItem(key, JSON.stringify({ appearance: "light", themeId: "slate", interfaceId: "workspace" }));
-    sessionStorage.removeItem("restoreweave-e2e-render-fault-count");
-    if (fault) sessionStorage.setItem("restoreweave-e2e-render-fault", fault);
-    else sessionStorage.removeItem("restoreweave-e2e-render-fault");
+    sessionStorage.removeItem("cairn-e2e-render-fault-count");
+    if (fault) sessionStorage.setItem("cairn-e2e-render-fault", fault);
+    else sessionStorage.removeItem("cairn-e2e-render-fault");
   }, { key: storageKey, fault: startupFault });
   await page.route(`**${apiPath}`, (route) => forwardToDaemon(route));
   await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -641,7 +641,7 @@ async function submitPhotoSearch(page, searchButton) {
 }
 
 async function faultCount(page) {
-  return page.evaluate(() => Number(sessionStorage.getItem("restoreweave-e2e-render-fault-count") || "0"));
+  return page.evaluate(() => Number(sessionStorage.getItem("cairn-e2e-render-fault-count") || "0"));
 }
 
 async function forwardToDaemon(route, daemonURL = baseURL) {
@@ -665,10 +665,10 @@ async function startDisposableDaemon(root, webRoot) {
   await mkdir(source, { recursive: true });
   await writeFile(join(source, "InterfaceHoldWriteFixture.txt"), "Disposable interface E2E content fixture.\n");
   const config = join(root, "config.toml");
-  const daemonBinary = process.env.RESTOREWEAVE_DAEMON_BIN || join(qaDeployment, "bin/restoreweaved");
-  const clientBinary = process.env.RESTOREWEAVE_RW_BIN || join(qaDeployment, "bin/rw");
-  assert.ok(isAbsolute(daemonBinary), "RESTOREWEAVE_DAEMON_BIN override must be absolute");
-  assert.ok(isAbsolute(clientBinary), "RESTOREWEAVE_RW_BIN override must be absolute");
+  const daemonBinary = process.env.CAIRN_DAEMON_BIN || join(qaDeployment, "bin/cairnd");
+  const clientBinary = process.env.CAIRN_BIN || join(qaDeployment, "bin/cairn");
+  assert.ok(isAbsolute(daemonBinary), "CAIRN_DAEMON_BIN override must be absolute");
+  assert.ok(isAbsolute(clientBinary), "CAIRN_BIN override must be absolute");
   const binaries = {
     daemon: { path: daemonBinary, sha256: createHash("sha256").update(await readFile(daemonBinary)).digest("hex") },
     rw: { path: clientBinary, sha256: createHash("sha256").update(await readFile(clientBinary)).digest("hex") },
@@ -677,11 +677,11 @@ async function startDisposableDaemon(root, webRoot) {
   const port = await freeLoopbackPort();
   const env = {
     ...isolatedDaemonEnvironment(root),
-    RESTOREWEAVE_CATALOG: join(root, "catalog.sqlite"),
-    RESTOREWEAVE_REPOSITORY: join(root, "repository"),
-    RESTOREWEAVE_VECTORS: join(root, "vectors"),
-    RESTOREWEAVE_MODELS: join(root, "models"),
-    RESTOREWEAVE_RECOVERY_RECORDS: join(root, "recovery"),
+    CAIRN_CATALOG: join(root, "catalog.sqlite"),
+    CAIRN_REPOSITORY: join(root, "repository"),
+    CAIRN_VECTORS: join(root, "vectors"),
+    CAIRN_MODELS: join(root, "models"),
+    CAIRN_RECOVERY_RECORDS: join(root, "recovery"),
   };
   const daemon = spawn(daemonBinary, ["--config", config, "--socket", join(root, "daemon.sock"), "--api-listen", `127.0.0.1:${port}`, "--web-root", webRoot], { cwd: repo, env, stdio: ["ignore", "pipe", "pipe"] });
   const daemonOutput = [];
@@ -746,7 +746,7 @@ async function apiCommand(daemonURL, operation, input) {
 }
 
 function isolatedDaemonEnvironment(root) {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("RESTOREWEAVE_")));
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("CAIRN_")));
   return {
     ...inherited,
     XDG_CONFIG_HOME: join(root, "xdg/config"),

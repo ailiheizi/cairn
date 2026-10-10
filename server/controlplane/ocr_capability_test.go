@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
-	"github.com/ailiheizi/restoreweave/server/internal/processor"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/processor"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // ocrCapabilityFor returns the reported capability for one bundle root.
@@ -31,7 +31,7 @@ func ocrTestDispatcher(t *testing.T) (*Dispatcher, command.CapabilityListData, r
 	// The persisted profile resolves paths.models below XDG_DATA_HOME, so the
 	// test owns every directory the OCR capability inspects.
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	configPath := filepath.Join(t.TempDir(), "restoreweave.toml")
+	configPath := filepath.Join(t.TempDir(), "cairn.toml")
 	resolved, err := rwconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("init config: %v", err)
@@ -41,7 +41,7 @@ func ocrTestDispatcher(t *testing.T) (*Dispatcher, command.CapabilityListData, r
 	if err != nil {
 		t.Fatalf("exact dir: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-ocr.sock", WithOperatorConfig(resolved), exactOption)
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-ocr.sock", WithOperatorConfig(resolved), exactOption)
 	result := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpCapabilityList, map[string]any{}))
 	if result.Status != command.StatusSucceeded {
 		t.Fatalf("capability.list = %q: %+v", result.Status, result.Reasons)
@@ -82,7 +82,7 @@ func TestOCRCapabilityReportsNotBuiltWithTheExpectedPath(t *testing.T) {
 func TestOCRCapabilityReportsUnavailableForABrokenBundle(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	// Pre-create the exact bundle location with an unreadable manifest.
-	configPath := filepath.Join(t.TempDir(), "restoreweave.toml")
+	configPath := filepath.Join(t.TempDir(), "cairn.toml")
 	resolved, err := rwconfig.Init(configPath)
 	if err != nil {
 		t.Fatalf("init config: %v", err)
@@ -95,7 +95,7 @@ func TestOCRCapabilityReportsUnavailableForABrokenBundle(t *testing.T) {
 		t.Fatalf("write manifest: %v", err)
 	}
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw-ocr-broken.sock", WithOperatorConfig(resolved))
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-ocr-broken.sock", WithOperatorConfig(resolved))
 	result := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpCapabilityList, map[string]any{}))
 	var data command.CapabilityListData
 	if err := json.Unmarshal(result.Data, &data); err != nil {

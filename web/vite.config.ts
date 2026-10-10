@@ -9,7 +9,7 @@ export default defineConfig({
     // the development server convenient without adding a second backend.
     proxy: {
       "/api": {
-        target: process.env.RESTOREWEAVE_API_TARGET ?? "http://127.0.0.1:4534",
+        target: process.env.CAIRN_API_TARGET ?? "http://127.0.0.1:4534",
         changeOrigin: true,
       },
     },

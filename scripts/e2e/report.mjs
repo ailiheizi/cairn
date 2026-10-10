@@ -27,7 +27,7 @@ import fs from "node:fs";
 const REPORT_BUTTON = '.selection-bar [data-action="selection-report"]';
 const REPORT_NOTE = ".selection-report-note";
 const REPORT_STATE = ".selection-report-state";
-const MD_FILENAME = /^restoreweave-selection-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.md$/;
+const MD_FILENAME = /^cairn-selection-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.md$/;
 /** The admitted protection outcomes, in the claim order the report uses. */
 const PROTECTION_OUTCOMES = [
   "EXACT_PROTECTED",
@@ -210,7 +210,7 @@ export async function assertSelectionReport(ctx) {
   const protectionBefore = daemon.protectionAnswers.length;
   const requestsBefore = daemon.requests.length;
   const first = await downloadReport(page);
-  assert.match(first.filename, MD_FILENAME, `the filename must be restoreweave-selection-<UTC timestamp>.md: ${first.filename}`);
+  assert.match(first.filename, MD_FILENAME, `the filename must be cairn-selection-<UTC timestamp>.md: ${first.filename}`);
   assertDocumentShape(first.text, "library report");
   const alphaSection = sectionOf(first.text, "alpha.txt");
   const betaSection = sectionOf(first.text, "beta.txt");

@@ -105,7 +105,7 @@ const (
 
 func (repo *Dir) DescribeCapabilities() CapabilityProfile {
 	return CapabilityProfile{
-		Driver:             "restoreweave.directory-cas",
+		Driver:             "cairn.directory-cas",
 		RepositoryFormat:   RepositoryProfileDirectoryCASDev,
 		Consistency:        ConsistencySingleHost,
 		Reader:             ReaderCleanInstall,
@@ -121,7 +121,7 @@ func (repo *Dir) DescribeCapabilities() CapabilityProfile {
 
 func (repo *ZstdDir) DescribeCapabilities() CapabilityProfile {
 	capability := CapabilityProfile{
-		Driver:             "restoreweave.local-zstd",
+		Driver:             "cairn.local-zstd",
 		RepositoryFormat:   RepositoryProfileLocalZstdV1,
 		Consistency:        ConsistencySingleHost,
 		Reader:             ReaderCleanInstall,
@@ -134,7 +134,7 @@ func (repo *ZstdDir) DescribeCapabilities() CapabilityProfile {
 		SupportsRepair:     true,
 	}
 	if repo != nil && repo.encryption != nil {
-		capability.Driver = "restoreweave.local-zstd-encrypted"
+		capability.Driver = "cairn.local-zstd-encrypted"
 		capability.RepositoryFormat = RepositoryProfileLocalZstdEncryptedV1
 		capability.Encryption = EncryptionAES256GCM
 		// The encrypted profile reads a distinct envelope, so it must not claim
@@ -149,7 +149,7 @@ func (repo *ZstdDir) DescribeCapabilities() CapabilityProfile {
 
 func (repo *Memory) DescribeCapabilities() CapabilityProfile {
 	return CapabilityProfile{
-		Driver:           "restoreweave.memory-test",
+		Driver:           "cairn.memory-test",
 		RepositoryFormat: "memory-test-v1",
 		Consistency:      "PROCESS_LOCAL",
 		Reader:           ReaderEmbedded,

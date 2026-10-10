@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 const maxPlanDecisionsBytes = 1 << 20
@@ -32,7 +32,7 @@ func newPlanGetCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "get <plan-id>", "Read one immutable plan",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw plan get <plan-id> [--workspace <id>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn plan get <plan-id> [--workspace <id>]\n")
 				return 1
 			}
 			return env.request(cmd, command.OpPlanGet, map[string]any{
@@ -68,7 +68,7 @@ func newPlanApplyCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "apply <plan-id>", "Apply one immutable plan digest",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: rw plan apply <plan-id> [--workspace <id>] [--digest <sha256>]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn plan apply <plan-id> [--workspace <id>] [--digest <sha256>]\n")
 				return 1
 			}
 			return env.request(cmd, command.OpPlanApply, map[string]any{
@@ -96,7 +96,7 @@ func newPlanReviseCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "revise <plan-id>", "Create an immutable successor from typed decisions",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw plan revise <plan-id> --workspace <id> --digest <sha256> [--decisions <json-file>]")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn plan revise <plan-id> --workspace <id> --digest <sha256> [--decisions <json-file>]")
 				return 1
 			}
 			decisions, err := loadPlanRevisionDecisions(decisionsPath)
@@ -159,7 +159,7 @@ func renderPlanRevision(out io.Writer, data command.PlanReviseData) {
 	fmt.Fprintf(out, "base plan:        %s\n", data.BasePlanID)
 	fmt.Fprintf(out, "base digest:      %s\n", data.BaseDigest)
 	if data.Executable && data.PlanID != "" && data.PlanDigest != "" && data.WorkspaceID != "" {
-		fmt.Fprintf(out, "next:              rw plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
+		fmt.Fprintf(out, "next:              cairn plan apply %s --workspace %s --digest %s\n", data.PlanID, data.WorkspaceID, data.PlanDigest)
 	}
 }
 
@@ -167,7 +167,7 @@ func newPlanAbandonCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "abandon <plan-id>", "Mark one unapplied plan abandoned",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw plan abandon <plan-id> --workspace <id> [--digest <sha256>]")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn plan abandon <plan-id> --workspace <id> [--digest <sha256>]")
 				return 1
 			}
 			input := map[string]any{

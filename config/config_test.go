@@ -8,7 +8,7 @@ import (
 )
 
 func TestDecodeRejectsUnknownFields(t *testing.T) {
-	_, err := Decode(strings.NewReader(`schema: restoreweave.config.v1
+	_, err := Decode(strings.NewReader(`schema: cairn.config.v1
 paths:
   catalog: catalog.sqlite
   repository: repository
@@ -223,7 +223,7 @@ func TestInitRefusesOverwriteAndUsesOwnerPermissions(t *testing.T) {
 
 func TestEffectiveJSONKeepsCredentialReferenceWithoutSecret(t *testing.T) {
 	cfg := Default()
-	cfg.Semantic.OnlineCredentialRef = "keychain://restoreweave/provider"
+	cfg.Semantic.OnlineCredentialRef = "keychain://cairn/provider"
 	cfg.Semantic.EmbeddingMode = "online"
 	cfg.Semantic.OnlineProfile = "example"
 	resolved, err := Resolve(cfg, ResolveOptions{BaseDir: t.TempDir()})
@@ -235,7 +235,7 @@ func TestEffectiveJSONKeepsCredentialReferenceWithoutSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(payload)
-	if !strings.Contains(text, "keychain://restoreweave/provider") || strings.Contains(text, "api_key") {
+	if !strings.Contains(text, "keychain://cairn/provider") || strings.Contains(text, "api_key") {
 		t.Fatalf("effective JSON = %s", text)
 	}
 }
@@ -262,7 +262,7 @@ func TestOnlineEmbeddingRequiresSchemeQualifiedCredentialReference(t *testing.T)
 	if err := resolveValidate(t, online("env://RW_ONLINE_KEY")); err != nil {
 		t.Fatalf("env credential reference rejected: %v", err)
 	}
-	if err := resolveValidate(t, online("keychain://restoreweave/online")); err != nil {
+	if err := resolveValidate(t, online("keychain://cairn/online")); err != nil {
 		t.Fatalf("keychain credential reference rejected: %v", err)
 	}
 	for _, ref := range []string{"", "RW_ONLINE_KEY", "vault://secret/online", "api_key=plaintext-secret"} {

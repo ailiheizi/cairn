@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/capture"
+	"github.com/ailiheizi/cairn/server/internal/capture"
 )
 
 const (
-	SnapshotSchemaV1       = "org.restoreweave.snapshot.v1"
-	SnapshotSchemaV2       = "org.restoreweave.snapshot.v2"
+	SnapshotSchemaV1       = "org.cairn.snapshot.v1"
+	SnapshotSchemaV2       = "org.cairn.snapshot.v2"
 	CurrentSnapshotSchema  = SnapshotSchemaV2
-	PortableFactsSchemaV1  = "org.restoreweave.portable-file-facts.v1"
-	portableFactsSetSchema = "org.restoreweave.portable-file-facts-set.v1"
+	PortableFactsSchemaV1  = "org.cairn.portable-file-facts.v1"
+	portableFactsSetSchema = "org.cairn.portable-file-facts-set.v1"
 	snapshotDirName        = "snapshots"
 )
 

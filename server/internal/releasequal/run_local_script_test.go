@@ -32,7 +32,7 @@ func TestRunLocalScriptRejectsUnsafeStartup(t *testing.T) {
 		"listen address is occupied",
 		"no process was stopped",
 		"-tags purego",
-		"-u RESTOREWEAVE_CATALOG",
+		"-u CAIRN_CATALOG",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("run-local.sh missing required gate %q", required)
@@ -80,7 +80,7 @@ func TestRunLocalScriptRejectsUnsafeStartup(t *testing.T) {
 	if time.Since(started) > 8*time.Second {
 		t.Fatalf("occupied-port rejection rebuilt or blocked too long: %s", time.Since(started))
 	}
-	if _, err := os.Lstat(filepath.Join(absolute, "bin", "restoreweaved")); !os.IsNotExist(err) {
+	if _, err := os.Lstat(filepath.Join(absolute, "bin", "cairnd")); !os.IsNotExist(err) {
 		t.Fatalf("occupied-port rejection started a build: %v", err)
 	}
 	conn, err := net.DialTimeout("tcp", listen, time.Second)

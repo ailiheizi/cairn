@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/scanner"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 )
 
 func TestLocalTreeDriverEmitsDurableBindingWithoutDescriptor(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 const descriptionCLIInputLimit = 16 << 20
@@ -27,7 +27,7 @@ func newDescriptionListCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "list [subject-ref]", "List bounded description revision summaries",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) > 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw description list [subject-ref] --workspace <id> [--limit <n>]")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn description list [subject-ref] --workspace <id> [--limit <n>]")
 				return 1
 			}
 			input := map[string]any{
@@ -49,7 +49,7 @@ func newDescriptionGetCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "get <description-id>", "Read one full description revision and its segments",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw description get <description-id> --workspace <id>")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn description get <description-id> --workspace <id>")
 				return 1
 			}
 			return env.request(cmd, command.OpDescriptionGet, map[string]any{
@@ -66,7 +66,7 @@ func newDescriptionCreateCommand(env *clientEnv) *cobra.Command {
 	commandNode := newExitCommand(env, "create <subject-ref>", "Create a description or an immutable successor revision",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "usage: rw description create <subject-ref> --workspace <id> --kind <kind> (--body <text> | --body-file <path|->)")
+				fmt.Fprintln(cmd.ErrOrStderr(), "usage: cairn description create <subject-ref> --workspace <id> --kind <kind> (--body <text> | --body-file <path|->)")
 				return 1
 			}
 			body, err := readDescriptionBody(cmd)

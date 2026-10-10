@@ -123,7 +123,7 @@ func PackageSemanticBundle(destination string, descriptor SemanticBundleDescript
 	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 		return SemanticBundleAdmission{}, fmt.Errorf("%w: create destination parent: %v", ErrInvalidSemanticBundle, err)
 	}
-	stage, err := os.MkdirTemp(filepath.Dir(destination), ".restoreweave-semantic-bundle-")
+	stage, err := os.MkdirTemp(filepath.Dir(destination), ".cairn-semantic-bundle-")
 	if err != nil {
 		return SemanticBundleAdmission{}, fmt.Errorf("%w: stage package: %v", ErrInvalidSemanticBundle, err)
 	}
@@ -337,7 +337,7 @@ func isAllowedPlatformPathAlias(path, resolved string) bool {
 }
 
 const (
-	SemanticBundleSchemaV1     = "restoreweave.semantic-bundle.v1"
+	SemanticBundleSchemaV1     = "cairn.semantic-bundle.v1"
 	SemanticBundleBGEProfileID = "bge-small-zh-v1.5"
 	// These are the output-affecting facts of the official BGE v1.5
 	// sentence-transformers profile. Keep them in the bundle admission layer
@@ -785,7 +785,7 @@ func semanticBundleProfileDigest(descriptor SemanticBundleDescriptor, digests ma
 	if err != nil {
 		return "", fmt.Errorf("%w: canonical descriptor: %v", ErrInvalidSemanticBundle, err)
 	}
-	digest := sha256.Sum256(append([]byte("restoreweave.semantic-bundle.v1\n"), payload...))
+	digest := sha256.Sum256(append([]byte("cairn.semantic-bundle.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(digest[:]), nil
 }
 

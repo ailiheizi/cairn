@@ -4,7 +4,7 @@ How the content viewer and its thumbnails sit inside the inspector and the
 result tiles. The viewer component itself keeps its own stylesheet next to it. */
 
 .details > .preview-section { order: 2; }
-.preview-section .rw-content-preview { margin-top: 2px; }
+.preview-section .cairn-content-preview { margin-top: 2px; }
 .details .media-section .media-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
 .details .media-section .media-facts dd { font-variant-numeric: tabular-nums; }
 .details .media-fact-group { margin-top: 14px; }
@@ -13,24 +13,24 @@ result tiles. The viewer component itself keeps its own stylesheet next to it. *
 @media (max-width: 620px) {
   .details .media-section .media-facts { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
-.result-list .file-icon:has(.rw-content-preview__thumb-image) > svg { position: absolute; opacity: 0; }
-.result-list .file-icon .rw-content-preview__thumb-image {
+.result-list .file-icon:has(.cairn-content-preview__thumb-image) > svg { position: absolute; opacity: 0; }
+.result-list .file-icon .cairn-content-preview__thumb-image {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
 }
-.result-list .file-icon .rw-content-preview__thumb-note {
+.result-list .file-icon .cairn-content-preview__thumb-note {
   position: absolute; right: auto; bottom: 8px; left: 8px;
   width: max-content; max-width: calc(100% - 16px); padding: 4px 6px; border-radius: 999px;
   border-color: rgba(208, 161, 82, 0.34); color: var(--gold); background: rgba(208, 161, 82, 0.1);
 }
-.result-list .file-icon .rw-content-preview__thumb-note > span {
+.result-list .file-icon .cairn-content-preview__thumb-note > span {
   display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 /* A tiny source image is an accurate rendering, not a broken asset. */
-.result-list .file-icon .rw-content-preview__thumb-size {
+.result-list .file-icon .cairn-content-preview__thumb-size {
   position: absolute; right: 6px; bottom: 6px;
   border-color: var(--hairline-strong); background: rgb(16 18 20 / 84%); color: var(--muted);
 }
-.result-list .file-icon .rw-content-preview__thumb-image--tiny {
+.result-list .file-icon .cairn-content-preview__thumb-image--tiny {
   /* Small source images keep their pixel look but grow with the tile so a
      sparse library does not read as a broken image. */
   inset: auto; top: 50%; left: 50%; width: 40%; height: 40%; max-width: 104px; max-height: 104px;
@@ -42,14 +42,14 @@ result tiles. The viewer component itself keeps its own stylesheet next to it. *
   }
 /* The tiny-image badge and the unavailable-reason note keep the same
      contrast contract in both themes. */
-:root[data-appearance="light"] .result-list .file-icon .rw-content-preview__thumb-size { border-color: var(--hairline-strong); background: var(--surface-raised); color: var(--muted); }
-:root[data-appearance="light"] .result-list .file-icon .rw-content-preview__thumb-note { border-color: color-mix(in srgb, var(--gold) 40%, transparent); background: color-mix(in srgb, var(--gold) 8%, var(--surface)); }
-.result-list.list-mode .file-icon .rw-content-preview__thumb-image--tiny { width: 28px; height: 28px; }
-.result-list.list-mode .file-icon .rw-content-preview__thumb-size { display: none; }
+:root[data-appearance="light"] .result-list .file-icon .cairn-content-preview__thumb-size { border-color: var(--hairline-strong); background: var(--surface-raised); color: var(--muted); }
+:root[data-appearance="light"] .result-list .file-icon .cairn-content-preview__thumb-note { border-color: color-mix(in srgb, var(--gold) 40%, transparent); background: color-mix(in srgb, var(--gold) 8%, var(--surface)); }
+.result-list.list-mode .file-icon .cairn-content-preview__thumb-image--tiny { width: 28px; height: 28px; }
+.result-list.list-mode .file-icon .cairn-content-preview__thumb-size { display: none; }
 
 /* The compact card marker names the limitation directly; its complete reason
    remains available on the preview and in the details surface. */
-.result-list .file-icon .rw-content-preview__thumb-note {
+.result-list .file-icon .cairn-content-preview__thumb-note {
   min-height: 24px;
   align-items: center;
   gap: 4px;
@@ -60,4 +60,4 @@ result tiles. The viewer component itself keeps its own stylesheet next to it. *
   font-weight: 700;
   line-height: 1.25;
 }
-.result-list .file-icon .rw-content-preview__thumb-note > span { max-width: 100%; }
+.result-list .file-icon .cairn-content-preview__thumb-note > span { max-width: 100%; }

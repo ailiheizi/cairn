@@ -15,7 +15,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
+	"github.com/ailiheizi/cairn/server/internal/search/pinyin"
 
 	_ "modernc.org/sqlite"
 )

@@ -185,7 +185,7 @@ func publishOnlineEmbeddingProfile(ctx context.Context, modelsRoot, destination 
 			return false, true, nil
 		}
 	}
-	stage, err := os.MkdirTemp(base, ".restoreweave-online-profile-")
+	stage, err := os.MkdirTemp(base, ".cairn-online-profile-")
 	if err != nil {
 		return false, false, fmt.Errorf("%w: stage profile: %v", ErrInvalidOnlineEmbeddingProfile, err)
 	}

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/controlplane"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/controlplane"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // startDaemon runs the real control-plane server for the duration of the
@@ -62,7 +62,7 @@ func TestCLIStatus(t *testing.T) {
 		t.Fatalf("exit code = %d (stderr: %s)", code, stderr)
 	}
 	for _, fragment := range []string{
-		"controller:    restoreweaved",
+		"controller:    cairnd",
 		"catalog ok:    true",
 		"identify id:   identify:builtin",
 		"rules digest:  sha256:",
@@ -75,7 +75,7 @@ func TestCLIStatus(t *testing.T) {
 }
 
 func TestCLIConfigLifecycleWithoutDaemon(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "restoreweave", "config.yaml")
+	path := filepath.Join(t.TempDir(), "cairn", "config.yaml")
 	code, stdout, stderr := runCLI(t, "config", "init", "--path", path)
 	if code != 0 {
 		t.Fatalf("config init code = %d, stderr=%s", code, stderr)
@@ -218,7 +218,7 @@ func TestRenderPlanIngestShowsReadyPlanAndApplyCommand(t *testing.T) {
 		"nested/link.bin: LINK_ONLY -> LINK_ONLY_UNPROTECTED (EXTERNAL_LOCATOR_UNVALIDATED)",
 		"estimated files: 3",
 		"estimated bytes: 42",
-		"next:        rw plan apply pln_test --workspace wsp_test --digest sha256:plan_test",
+		"next:        cairn plan apply pln_test --workspace wsp_test --digest sha256:plan_test",
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("plan ingest output missing %q:\n%s", fragment, text)
@@ -259,7 +259,7 @@ func TestRenderPlanIngestExplainsBlockedEntries(t *testing.T) {
 			t.Fatalf("blocked plan output missing %q:\n%s", fragment, text)
 		}
 	}
-	if strings.Contains(text, "rw plan apply") {
+	if strings.Contains(text, "cairn plan apply") {
 		t.Fatalf("blocked plan printed an apply command:\n%s", text)
 	}
 }
@@ -299,7 +299,7 @@ func TestPlanRevisionDecisionsFileAndRendering(t *testing.T) {
 	for _, fragment := range []string{
 		"plan_id:          pln_successor",
 		"base plan:        pln_base",
-		"next:              rw plan apply pln_successor --workspace wsp_test --digest sha256:successor",
+		"next:              cairn plan apply pln_successor --workspace wsp_test --digest sha256:successor",
 	} {
 		if !strings.Contains(out.String(), fragment) {
 			t.Fatalf("revision output missing %q:\n%s", fragment, out.String())
@@ -344,7 +344,7 @@ func TestRenderPlanRestoreIsPlanOnly(t *testing.T) {
 		"executable:   true",
 		"wrote:        false (plan only; apply separately)",
 		"workspace:    wsp_restore",
-		"next:         rw plan apply pln_restore --workspace wsp_restore --digest sha256:restore_plan",
+		"next:         cairn plan apply pln_restore --workspace wsp_restore --digest sha256:restore_plan",
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("restore plan output missing %q:\n%s", fragment, text)
@@ -398,10 +398,10 @@ func TestCLIStatusJSON(t *testing.T) {
 		t.Fatalf("exit code = %d", code)
 	}
 	for _, fragment := range []string{
-		`"schema": "org.restoreweave.result.v1"`,
+		`"schema": "org.cairn.result.v1"`,
 		`"status": "SUCCEEDED"`,
 		`"operation": "status.get"`,
-		`"controller": "restoreweaved"`,
+		`"controller": "cairnd"`,
 	} {
 		if !strings.Contains(stdout, fragment) {
 			t.Fatalf("status --json output missing %q:\n%s", fragment, stdout)
@@ -542,7 +542,7 @@ func TestCLICannotReachDaemon(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr, "cannot reach restoreweaved at") {
+	if !strings.Contains(stderr, "cannot reach cairnd at") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 }

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // sourceFeedProvider deliberately gives filename and extracted text separate

@@ -30,14 +30,14 @@ The package recorded by [Core Preview Acceptance](core-preview-acceptance-202610
 is historical evidence:
 
 ```text
-dist/completion-20261005-dD98vk/restoreweave-20261005-candidate-darwin-arm64.tar.gz
+dist/completion-20261005-dD98vk/cairn-20261005-candidate-darwin-arm64.tar.gz
 SHA-256: 1b1c238835c43e08c6817a67cbef9819d474f7595261bafb434ec02b677cf111
 ```
 
 The earlier local continuation candidate is historical evidence:
 
 ```text
-dist/local-continuation-20261006-QsR18A/restoreweave-20261006-local-final-darwin-arm64.tar.gz
+dist/local-continuation-20261006-QsR18A/cairn-20261006-local-final-darwin-arm64.tar.gz
 SHA-256: 953716d9c0273b0bb7ffa6865615fdbb615c75e7b53b945c8b681de929fe20d4
 ```
 
@@ -46,7 +46,7 @@ evidence directory:
 
 ```sh
 bash scripts/dev-preview-smoke.sh \
-  --artifact "$PWD/dist/local-continuation-20261006-QsR18A/restoreweave-20261006-local-final-darwin-arm64.tar.gz" \
+  --artifact "$PWD/dist/local-continuation-20261006-QsR18A/cairn-20261006-local-final-darwin-arm64.tar.gz" \
   --sha256 953716d9c0273b0bb7ffa6865615fdbb615c75e7b53b945c8b681de929fe20d4 \
   --artifacts "$PWD/dist/local-preview-smoke-$(date +%Y%m%d-%H%M%S)"
 ```
@@ -93,7 +93,7 @@ older candidate and smoke above remain historical evidence.
 
 ```sh
 bash scripts/dev-preview-smoke.sh \
-  --artifact "$PWD/dist/all-completion-20261006/integration/restoreweave-20261006-local-fd-fixed-darwin-arm64.tar.gz" \
+  --artifact "$PWD/dist/all-completion-20261006/integration/cairn-20261006-local-fd-fixed-darwin-arm64.tar.gz" \
   --sha256 c277dc8184cff4e1e71bde84b9b6b3f95e4a38d99cd6394f8415d7e04427a41f \
   --artifacts "$PWD/dist/local-fd-fixed-smoke-$(date +%Y%m%d-%H%M%S)"
 ```
@@ -113,7 +113,7 @@ candidate remains historical evidence.
 
 ```sh
 bash scripts/dev-preview-smoke.sh \
-  --artifact "$PWD/dist/retrieval-accounting-20261006/restoreweave-20261006-retrieval-accounting-darwin-arm64.tar.gz" \
+  --artifact "$PWD/dist/retrieval-accounting-20261006/cairn-20261006-retrieval-accounting-darwin-arm64.tar.gz" \
   --sha256 e150d7f8b391d23ccbe7bee1a8f469b7b27bbdd219a52fcf284f227ef1d4570c \
   --artifacts "$PWD/dist/local-retrieval-smoke-$(date +%Y%m%d-%H%M%S)"
 ```
@@ -133,9 +133,9 @@ the trial must bind to a specific candidate artifact and hash.
 
 ```sh
 mkdir -p "$HOME/Cairn-Preview/data"
-env -u RESTOREWEAVE_CONFIG -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY \
-  -u RESTOREWEAVE_VECTORS -u RESTOREWEAVE_MODELS -u RESTOREWEAVE_RECOVERY_RECORDS \
-  -u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE -u ZVEC_LIBRARY_PATH \
+env -u CAIRN_CONFIG -u CAIRN_CATALOG -u CAIRN_REPOSITORY \
+  -u CAIRN_VECTORS -u CAIRN_MODELS -u CAIRN_RECOVERY_RECORDS \
+  -u CAIRN_SEMANTIC_BUNDLE -u CAIRN_IMAGE_BUNDLE -u ZVEC_LIBRARY_PATH \
   sh scripts/run-local.sh \
   --data-dir "$HOME/Cairn-Preview/data" \
   --listen 127.0.0.1:4538
@@ -153,15 +153,15 @@ and `DATA` to a new persistent absolute directory, then launch its supplied
 binaries and WebUI:
 
 ```sh
-PACKAGE="$PWD/dist/extracted/restoreweave-candidate-darwin-arm64"
+PACKAGE="$PWD/dist/extracted/cairn-candidate-darwin-arm64"
 DATA="$HOME/Cairn-Candidate/data"
 mkdir -p "$DATA"
-XDG_DATA_HOME="$DATA" "$PACKAGE/bin/rw" config init --path "$DATA/config.toml"
-env -u RESTOREWEAVE_CONFIG -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY \
-  -u RESTOREWEAVE_VECTORS -u RESTOREWEAVE_MODELS -u RESTOREWEAVE_RECOVERY_RECORDS \
-  -u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE -u ZVEC_LIBRARY_PATH \
-  "$PACKAGE/bin/restoreweaved" --config "$DATA/config.toml" \
-  --socket "$DATA/restoreweaved.sock" --api-listen 127.0.0.1:4538 \
+XDG_DATA_HOME="$DATA" "$PACKAGE/bin/cairn" config init --path "$DATA/config.toml"
+env -u CAIRN_CONFIG -u CAIRN_CATALOG -u CAIRN_REPOSITORY \
+  -u CAIRN_VECTORS -u CAIRN_MODELS -u CAIRN_RECOVERY_RECORDS \
+  -u CAIRN_SEMANTIC_BUNDLE -u CAIRN_IMAGE_BUNDLE -u ZVEC_LIBRARY_PATH \
+  "$PACKAGE/bin/cairnd" --config "$DATA/config.toml" \
+  --socket "$DATA/cairnd.sock" --api-listen 127.0.0.1:4538 \
   --web-root "$PACKAGE/web/dist"
 ```
 
@@ -169,7 +169,7 @@ In another terminal, install the retained bundle through the packaged CLI, then
 stop and restart the foreground daemon before searching semantically:
 
 ```sh
-"$PACKAGE/bin/rw" --socket "$DATA/restoreweaved.sock" semantic bundle install \
+"$PACKAGE/bin/cairn" --socket "$DATA/cairnd.sock" semantic bundle install \
   --archive "$PACKAGE/semantic/semantic-bundle.tar.gz"
 ```
 

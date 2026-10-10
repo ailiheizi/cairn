@@ -32,10 +32,10 @@ const (
 	// ExportSidecarFileName is the fixed destination-relative name of the one
 	// derived sidecar file. It is a derived output, never a frozen subject
 	// name: a frozen output that would occupy this name fails closed.
-	ExportSidecarFileName = "restoreweave-export.json"
+	ExportSidecarFileName = "cairn-export.json"
 	// ExportSidecarSchemaV1 names the derived sidecar document. It is a
 	// handoff aid, not a recovery or identity record.
-	ExportSidecarSchemaV1 = "org.restoreweave.export-handoff.v1"
+	ExportSidecarSchemaV1 = "org.cairn.export-handoff.v1"
 )
 
 // ExportSidecarNote is embedded in every generated sidecar so the file states
@@ -45,14 +45,14 @@ const (
 // not perform.
 const ExportSidecarNote = "Derived export handoff sidecar, recomputed from the frozen ExportManifest at write and verify time. It is not content identity: exact bytes are identified by each item's SHA-256 content id and by the frozen manifest digest. Editing this file cannot change what the manifest froze; re-plan the export instead."
 
-// The frozen org.restoreweave.export-manifest.v1 field set carries content
+// The frozen org.cairn.export-manifest.v1 field set carries content
 // identity, logical size, and exactness per item, and no protection outcome.
 // The sidecar therefore states that outcome as unavailable with the reason
 // instead of fabricating one; a protection outcome also must never be re-read
 // from live catalog state, which would make the sidecar non-deterministic.
 const (
 	exportSidecarProtectionOutcome       = "UNAVAILABLE"
-	exportSidecarProtectionOutcomeReason = "the frozen org.restoreweave.export-manifest.v1 field set records content identity, logical size, and exactness per item and carries no protection outcome, so none is asserted here"
+	exportSidecarProtectionOutcomeReason = "the frozen org.cairn.export-manifest.v1 field set records content identity, logical size, and exactness per item and carries no protection outcome, so none is asserted here"
 )
 
 // UnsupportedSidecarPolicyError reports a sidecar policy that this build does

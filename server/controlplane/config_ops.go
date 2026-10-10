@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	rwconfig "github.com/ailiheizi/restoreweave/config"
+	"github.com/ailiheizi/cairn/client/command"
+	rwconfig "github.com/ailiheizi/cairn/config"
 )
 
 type operatorConfigState struct {

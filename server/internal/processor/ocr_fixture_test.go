@@ -83,7 +83,7 @@ func ocrFixtureRegistryDigest() string {
 		glyphs = append(glyphs, string(name)+"="+strings.Join(rows, "/"))
 	}
 	sort.Strings(glyphs)
-	sum := sha256.Sum256([]byte("restoreweave.ocr-fixture-font.v1:" + strings.Join(glyphs, "|")))
+	sum := sha256.Sum256([]byte("cairn.ocr-fixture-font.v1:" + strings.Join(glyphs, "|")))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 

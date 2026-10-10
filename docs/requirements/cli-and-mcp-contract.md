@@ -71,7 +71,7 @@ Every operation uses this semantic envelope:
 
 ~~~json
 {
-  "schema": "org.restoreweave.command.v1",
+  "schema": "org.cairn.command.v1",
   "request_id": "01K2AB3CD4EF5GH6JK7M8NP9QR",
   "operation": "snapshot.list",
   "workspace_ref": "workspace:default",
@@ -97,7 +97,7 @@ The adapter authenticates transport credentials and forwards immutable claims. T
 
 ~~~json
 {
-  "schema": "org.restoreweave.result.v1",
+  "schema": "org.cairn.result.v1",
   "request_id": "01K2AB3CD4EF5GH6JK7M8NP9QR",
   "operation": "snapshot.list",
   "status": "SUCCEEDED",
@@ -210,7 +210,7 @@ Long-running operations emit ordered events:
 
 ~~~json
 {
-  "schema": "org.restoreweave.event.v1",
+  "schema": "org.cairn.event.v1",
   "request_id": "01K2AB3CD4EF5GH6JK7M8NP9QR",
   "job_ref": "job:01K2AB8FG9HJ1KM2NP3QRST4VW",
   "sequence": "17",
@@ -379,7 +379,7 @@ Each external binding contains one or more ordered locator inputs:
   "kind": "HTTPS",
   "locator": "https://example.invalid/path.ext",
   "display_locator": "example release mirror",
-  "credential_ref": "keychain://restoreweave/example",
+  "credential_ref": "keychain://cairn/example",
   "rights_evidence_ref": "entitlement:example"
 }
 ~~~
@@ -406,7 +406,7 @@ The current development harness accepts a tree default plus explicit per-file ov
 }
 ~~~
 
-The matching CLI is `rw ingest <root> --protection LINK_ONLY --file-protection 'keep-local.bin=STORE_EXACT' --file-protection 'facts-only.txt=METADATA_ONLY' --confirm-link-only --locator 'relative/path.ext=https://example.invalid/path.ext'`. Repeating `--locator` records alternatives. An unscoped locator is accepted only when the captured tree contains one regular file. The current harness performs read-only capture inspection and records a `READY` immutable plan with estimates, config digest, source basis, and per-file planned outcome/reason/identity; it does not publish repository data. The reviewed plan is executed separately with `rw plan apply <plan-id> --workspace <workspace-id> --digest <plan-digest>` after the plan, protection, configuration, and source checks pass.
+The matching CLI is `cairn ingest <root> --protection LINK_ONLY --file-protection 'keep-local.bin=STORE_EXACT' --file-protection 'facts-only.txt=METADATA_ONLY' --confirm-link-only --locator 'relative/path.ext=https://example.invalid/path.ext'`. Repeating `--locator` records alternatives. An unscoped locator is accepted only when the captured tree contains one regular file. The current harness performs read-only capture inspection and records a `READY` immutable plan with estimates, config digest, source basis, and per-file planned outcome/reason/identity; it does not publish repository data. The reviewed plan is executed separately with `cairn plan apply <plan-id> --workspace <workspace-id> --digest <plan-digest>` after the plan, protection, configuration, and source checks pass.
 
 Planning MAY retain a qualified capture and invoke explicitly selected read-only processors. It MUST NOT publish repository data, mutate source content, delete a source, or contact a network destination outside the selected targets and granted processor profiles.
 
@@ -853,51 +853,51 @@ It may perform bounded reconciliation and cleanup of already expired local handl
 The reference CLI SHOULD provide:
 
 ~~~text
-restoreweave doctor [<source-or-path>] [--to <repository>] [--credential <credential-ref>]
-restoreweave capabilities
+cairn doctor [<source-or-path>] [--to <repository>] [--credential <credential-ref>]
+cairn capabilities
 
-restoreweave plan <source-or-path> --to <repository> [--credential <credential-ref>] [--base <snapshot-ref>] [--processors <profile>] [--save-profile <name>]
-restoreweave plan revise <base-plan-ref> --digest <base-plan-digest> [--decisions <json-file>]
-restoreweave plan abandon <plan-ref>
-restoreweave plan show <plan-ref>
-restoreweave apply <plan-ref> --digest <plan-digest>
-restoreweave profile run <name>
+cairn plan <source-or-path> --to <repository> [--credential <credential-ref>] [--base <snapshot-ref>] [--processors <profile>] [--save-profile <name>]
+cairn plan revise <base-plan-ref> --digest <base-plan-digest> [--decisions <json-file>]
+cairn plan abandon <plan-ref>
+cairn plan show <plan-ref>
+cairn apply <plan-ref> --digest <plan-digest>
+cairn profile run <name>
 
-restoreweave status [<resource-ref>] [--events] [--after <sequence>] [--limit <count>]
-restoreweave cancel <job-ref>
-restoreweave snapshots [--source <source-ref>]
-restoreweave diff <older-snapshot-ref> <newer-snapshot-ref>
-restoreweave verify <snapshot-ref> [--mode authenticated-metadata|sampled-content|full-bytes|restore-drill|clean-recovery]
+cairn status [<resource-ref>] [--events] [--after <sequence>] [--limit <count>]
+cairn cancel <job-ref>
+cairn snapshots [--source <source-ref>]
+cairn diff <older-snapshot-ref> <newer-snapshot-ref>
+cairn verify <snapshot-ref> [--mode authenticated-metadata|sampled-content|full-bytes|restore-drill|clean-recovery]
 
-restoreweave browse [<snapshot-ref>[:<path>]]
-restoreweave stat <snapshot-ref>:<path>
-restoreweave representations <snapshot-ref>:<path>
-restoreweave cat <snapshot-ref>:<path> [--representation <representation-ref>] [--to-file <new-file>]
-restoreweave search <query> [--provider <query-provider-ref>] [--generation <index-generation-ref>] [--snapshot <snapshot-ref>] [--allow-stale]
-restoreweave view save <name> --query <query>
-restoreweave view show <view-ref>
-restoreweave export plan (--view <view-ref> | --subject <subject-ref>...) --target <profile>
-restoreweave export apply <export-manifest-ref> --destination <path-or-uri>
-restoreweave export verify <export-manifest-ref> --destination <path-or-uri>
-restoreweave tag list <subject-ref>
-restoreweave tag add <subject-ref> <tag> [--expected-revision <revision>]
-restoreweave tag remove <subject-ref> <tag> [--expected-revision <revision>]
-restoreweave note list <subject-ref>
-restoreweave note set <subject-ref> --from-file <file> [--expected-revision <revision>]
-restoreweave note remove <subject-ref> [--expected-revision <revision>]
-restoreweave annotations export [--subject <subject-ref>] --to-file <new-file>
-restoreweave annotations import <file> [--conflict fail|keep-local|keep-imported]
-restoreweave description list [<subject-ref>] --workspace <workspace-ref> [--limit <count>]
-restoreweave description get <description-ref> --workspace <workspace-ref>
-restoreweave description create <subject-ref> --workspace <workspace-ref> --kind <kind> (--body <text> | --body-file <path|->) [--predecessor <description-ref>]
+cairn browse [<snapshot-ref>[:<path>]]
+cairn stat <snapshot-ref>:<path>
+cairn representations <snapshot-ref>:<path>
+cairn cat <snapshot-ref>:<path> [--representation <representation-ref>] [--to-file <new-file>]
+cairn search <query> [--provider <query-provider-ref>] [--generation <index-generation-ref>] [--snapshot <snapshot-ref>] [--allow-stale]
+cairn view save <name> --query <query>
+cairn view show <view-ref>
+cairn export plan (--view <view-ref> | --subject <subject-ref>...) --target <profile>
+cairn export apply <export-manifest-ref> --destination <path-or-uri>
+cairn export verify <export-manifest-ref> --destination <path-or-uri>
+cairn tag list <subject-ref>
+cairn tag add <subject-ref> <tag> [--expected-revision <revision>]
+cairn tag remove <subject-ref> <tag> [--expected-revision <revision>]
+cairn note list <subject-ref>
+cairn note set <subject-ref> --from-file <file> [--expected-revision <revision>]
+cairn note remove <subject-ref> [--expected-revision <revision>]
+cairn annotations export [--subject <subject-ref>] --to-file <new-file>
+cairn annotations import <file> [--conflict fail|keep-local|keep-imported]
+cairn description list [<subject-ref>] --workspace <workspace-ref> [--limit <count>]
+cairn description get <description-ref> --workspace <workspace-ref>
+cairn description create <subject-ref> --workspace <workspace-ref> --kind <kind> (--body <text> | --body-file <path|->) [--predecessor <description-ref>]
 
-restoreweave recovery export <snapshot-ref> --to-file <new-file>
-restoreweave recovery anchor export <new-file>
-restoreweave restore <snapshot-ref>:<path> <destination-path>
-restoreweave restore --from <repository> --recovery-reference <file> --to <destination-path> --credential <credential-ref>
-restoreweave restore --from <repository> --latest --trust <trust-anchor-ref> --to <destination-path>
+cairn recovery export <snapshot-ref> --to-file <new-file>
+cairn recovery anchor export <new-file>
+cairn restore <snapshot-ref>:<path> <destination-path>
+cairn restore --from <repository> --recovery-reference <file> --to <destination-path> --credential <credential-ref>
+cairn restore --from <repository> --latest --trust <trust-anchor-ref> --to <destination-path>
 
-restoreweave mcp serve --stdio
+cairn mcp serve --stdio
 ~~~
 
 The concise `plan`, `apply`, `profile run`, `browse`, `search`, `view`, `export`, `tag`, `note`, `verify`, and `restore` commands are product porcelain over canonical operations. They do not add hidden semantics. Mounting is intentionally outside the command ABI. A saved ingest profile creates a fresh plan against current source and capability state; it never reapplies an old mutable plan.
@@ -985,7 +985,7 @@ The stable CLI exit classes are:
 The initial adapter runs only as:
 
 ~~~text
-restoreweave mcp serve --stdio
+cairn mcp serve --stdio
 ~~~
 
 It opens no TCP listener and inherits the local process identity plus an explicit workspace configuration. It uses the same dispatcher, schemas, authorization, and reason codes as CLI JSON.
@@ -996,22 +996,22 @@ The server contains no model provider, prompt store, memory, agent loop, schedul
 
 | MCP tool | Core operation |
 | --- | --- |
-| `restoreweave_status_get` | `status.get` |
-| `restoreweave_plan_get` | `plan.get` |
-| `restoreweave_job_events` | `job.events` |
-| `restoreweave_snapshot_list` | `snapshot.list` |
-| `restoreweave_snapshot_diff` | `snapshot.diff` |
-| `restoreweave_namespace_list` | `namespace.list` |
-| `restoreweave_namespace_resolve` | `namespace.resolve` |
-| `restoreweave_namespace_stat` | `namespace.stat` |
-| `restoreweave_namespace_readlink` | `namespace.readlink` |
-| `restoreweave_representation_list` | `representation.list` |
-| `restoreweave_content_open` | `content.open` |
-| `restoreweave_content_read` | `content.read` |
-| `restoreweave_content_close` | `content.close` |
-| `restoreweave_annotation_list` | `annotation.list` |
-| `restoreweave_capability_list` | `capability.list` |
-| `restoreweave_search_query` | `search.query` |
+| `cairn_status_get` | `status.get` |
+| `cairn_plan_get` | `plan.get` |
+| `cairn_job_events` | `job.events` |
+| `cairn_snapshot_list` | `snapshot.list` |
+| `cairn_snapshot_diff` | `snapshot.diff` |
+| `cairn_namespace_list` | `namespace.list` |
+| `cairn_namespace_resolve` | `namespace.resolve` |
+| `cairn_namespace_stat` | `namespace.stat` |
+| `cairn_namespace_readlink` | `namespace.readlink` |
+| `cairn_representation_list` | `representation.list` |
+| `cairn_content_open` | `content.open` |
+| `cairn_content_read` | `content.read` |
+| `cairn_content_close` | `content.close` |
+| `cairn_annotation_list` | `annotation.list` |
+| `cairn_capability_list` | `capability.list` |
+| `cairn_search_query` | `search.query` |
 
 The initial server does not expose:
 

@@ -23,7 +23,7 @@ import (
 // all is INAPPLICABLE with a typed reason, so a malformed video degrades
 // visibly and never blocks exact preservation.
 //
-// Artifact body (schema restoreweave.domain.video.meta/v1, application/json):
+// Artifact body (schema cairn.domain.video.meta/v1, application/json):
 // container, duration_ms, width, height, video_codec, audio_codec, bytes.
 type VideoMeta struct{}
 

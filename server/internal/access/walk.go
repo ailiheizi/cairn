@@ -3,7 +3,7 @@ package access
 import (
 	"context"
 
-	"github.com/ailiheizi/restoreweave/server/internal/readsvc"
+	"github.com/ailiheizi/cairn/server/internal/readsvc"
 )
 
 // ReadAll reads the entire exact file for one authorized entry.

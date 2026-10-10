@@ -8,7 +8,7 @@
 # into the two towers the bundle admits and writes the descriptor, the notice,
 # and an honest SBOM with every digest computed from the bytes it just produced.
 # It never touches a running daemon and never installs anything: install with
-#   rw image bundle install --archive <PATH>
+#   cairn image bundle install --archive <PATH>
 #
 # Requires: python3, tar, and (for --archive) a Go toolchain. The ONNX toolchain
 # is installed into a private virtual environment under the output directory.
@@ -141,14 +141,14 @@ are redistributed under the upstream MIT license; this is a development install
 and not a completed redistribution review. The text tower declares no token type
 ids, and the admitted tokenizer declares do_lower_case=true.
 """
-sbom = {"schema": "restoreweave.image-bundle.sbom.v1", "incomplete": True,
+sbom = {"schema": "cairn.image-bundle.sbom.v1", "incomplete": True,
         "incomplete_reason": "redistribution review and clean-host exercise remain open",
         "components": [{"name": model_id, "revision": revision,
                         "license": "MIT (asserted from the upstream project)"}]}
 open(os.path.join(bundle, "NOTICE"), "w").write(notice)
 open(os.path.join(bundle, "sbom.json"), "w").write(json.dumps(sbom, indent=2) + "\n")
 descriptor = {
-  "schema": "restoreweave.image-bundle.v1", "profile_id": profile,
+  "schema": "cairn.image-bundle.v1", "profile_id": profile,
   "platform_os": os_name, "platform_arch": arch,
   "runtime_version": runtime,
   "runtime_build": f"onnxruntime-cpu-{os_name}-{arch}-{runtime}",
@@ -158,7 +158,7 @@ descriptor = {
   "tokenizer_version": tokenizer_version, "model_version": model_version,
   "image_input": "pixel_values", "text_input": "input_ids+attention_mask",
   "query_instruction": "", "pooling": "graph-projected-embedding", "normalization": "l2",
-  "preprocessing_digest": "sha256:" + hashlib.sha256(("restoreweave.image-preprocess.v1\n" + preprocess).encode()).hexdigest(),
+  "preprocessing_digest": "sha256:" + hashlib.sha256(("cairn.image-preprocess.v1\n" + preprocess).encode()).hexdigest(),
   "element_type": "float32", "dimension": int(dimension), "vector_schema": "float32:" + dimension,
   "distance": "cosine", "index_config": "hnsw:m=16", "query_config": "ef=64",
   "image_size": int(image_size), "max_tokens": int(max_tokens),
@@ -175,4 +175,4 @@ if [ -n "$archive" ]; then
   go run ./server/internal/releasequal/cmd/image-bundle-archive --source "$bundle" --output "$archive"
 fi
 echo "bundle:  $bundle"
-echo "install: rw image bundle install --archive <PATH>"
+echo "install: cairn image bundle install --archive <PATH>"

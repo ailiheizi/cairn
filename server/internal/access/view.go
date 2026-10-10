@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/readsvc"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/readsvc"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const defaultPageLimit uint32 = 256

@@ -174,8 +174,8 @@ selection bar, and the details inspector column. */
 .result-row.selected { color: #f4f1ff; background: #19152a; box-shadow: inset 4px 0 var(--primary), inset 0 1px rgba(255, 255, 255, 0.06), 0 0 24px rgba(139, 92, 246, 0.08); }
 .result-row.selected .file-icon { color: #110d1f; background: var(--primary); }
 .file-icon { position: relative; width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid rgba(167, 139, 250, 0.26); border-radius: 8px; color: var(--primary); background: #171326; box-shadow: inset 0 1px rgba(255, 255, 255, 0.06); overflow: hidden; }
-.file-icon:has(.rw-content-preview__thumb-image) > svg { position: absolute; opacity: 0; }
-.file-icon .rw-content-preview__thumb-image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.file-icon:has(.cairn-content-preview__thumb-image) > svg { position: absolute; opacity: 0; }
+.file-icon .cairn-content-preview__thumb-image { position: absolute; inset: 0; width: 100%; height: 100%; }
 .file-icon.large { width: 58px; height: 58px; color: #110d1f; background: var(--primary); box-shadow: 0 0 0 6px rgba(167, 139, 250, 0.08), 0 14px 30px rgba(139, 92, 246, 0.24); }
 .result-open-copy { min-width: 0; width: 100%; display: grid; gap: 4px; border: 0; padding: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .result-open-copy:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.72); outline-offset: 3px; border-radius: 4px; }

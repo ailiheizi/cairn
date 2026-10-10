@@ -12,7 +12,7 @@ import (
 // header parse answers the ordinary "what is this picture" question without
 // reading the whole image and without a codec dependency.
 //
-// The artifact body (schema restoreweave.domain.image.meta/v1,
+// The artifact body (schema cairn.domain.image.meta/v1,
 // application/json) carries exactly the fields the file itself declares:
 // `format` and the pixel `width`/`height`, plus the logical length this attempt
 // read. A field the header does not declare is absent from the body and never

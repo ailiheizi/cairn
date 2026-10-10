@@ -89,7 +89,7 @@ func ValidEgressSubjectClass(value string) bool {
 // OnlineEmbeddingOutputSchema is the schema reference recorded in every egress
 // receipt: the exact OpenAI-compatible embeddings response shape this provider
 // admits (a data array of embeddings plus an optional echoed model id).
-const OnlineEmbeddingOutputSchema = "restoreweave.online-embedding-output.v1"
+const OnlineEmbeddingOutputSchema = "cairn.online-embedding-output.v1"
 
 // EgressBudget is one strictly positive per-run egress budget. Zero or
 // negative values are never an "unbounded" default; they are refused.

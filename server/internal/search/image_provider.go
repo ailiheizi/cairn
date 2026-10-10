@@ -65,7 +65,7 @@ type ImageSpaceFingerprint struct {
 }
 
 // ImageSpaceFingerprintSchemaV1 is the only admitted fingerprint schema.
-const ImageSpaceFingerprintSchemaV1 = "restoreweave.image-space.v1"
+const ImageSpaceFingerprintSchemaV1 = "cairn.image-space.v1"
 
 var ErrInvalidImageSpaceFingerprint = errors.New("invalid image space fingerprint")
 
@@ -110,7 +110,7 @@ func (f ImageSpaceFingerprint) CanonicalDigest() string {
 		return ""
 	}
 	payload, _ := json.Marshal(f)
-	h := sha256.Sum256(append([]byte("restoreweave.image-space.v1\n"), payload...))
+	h := sha256.Sum256(append([]byte("cairn.image-space.v1\n"), payload...))
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 

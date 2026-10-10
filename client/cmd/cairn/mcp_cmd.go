@@ -9,8 +9,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ailiheizi/restoreweave/client/mcp"
-	"github.com/ailiheizi/restoreweave/client/transport"
+	"github.com/ailiheizi/cairn/client/mcp"
+	"github.com/ailiheizi/cairn/client/transport"
 )
 
 func newMCPCommand(env *clientEnv) *cobra.Command {
@@ -36,7 +36,7 @@ func newMCPCommand(env *clientEnv) *cobra.Command {
 			conn, err := transport.DialContext(dialCtx, env.socket)
 			cancelDial()
 			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach restoreweaved at %s: %v\n", env.socket, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach cairnd at %s: %v\n", env.socket, err)
 				return 1
 			}
 			defer conn.Close()
@@ -84,7 +84,7 @@ func runReadOnlyMCP(cmd *cobra.Command, env *clientEnv, readTokenEnv string) int
 	conn, err := transport.DialContext(dialCtx, env.socket)
 	cancelDial()
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach restoreweaved at %s: %v\n", env.socket, err)
+		fmt.Fprintf(cmd.ErrOrStderr(), "cannot reach cairnd at %s: %v\n", env.socket, err)
 		return 1
 	}
 	defer conn.Close()

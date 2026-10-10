@@ -9,19 +9,19 @@
 //   node scripts/web-screens.mjs [url] [outDir]
 //
 // Environment:
-//   RESTOREWEAVE_PLAYWRIGHT_MODULE            default "playwright"
-//   RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
-//   RESTOREWEAVE_WEB_URL                      default http://127.0.0.1:4538/
-//   RESTOREWEAVE_SCREEN_DIR                   default /private/tmp/rw-shots
-//   RESTOREWEAVE_SCREEN_THEME                 "dark" to ask for the dark theme
+//   CAIRN_PLAYWRIGHT_MODULE            default "playwright"
+//   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
+//   CAIRN_WEB_URL                      default http://127.0.0.1:4538/
+//   CAIRN_SCREEN_DIR                   default /private/tmp/cairn-shots
+//   CAIRN_SCREEN_THEME                 "dark" to ask for the dark theme
 
-const url = process.argv[2] || process.env.RESTOREWEAVE_WEB_URL || "http://127.0.0.1:4538/";
-const outDir = process.argv[3] || process.env.RESTOREWEAVE_SCREEN_DIR || "/private/tmp/rw-shots";
-const theme = (process.env.RESTOREWEAVE_SCREEN_THEME || "").trim();
+const url = process.argv[2] || process.env.CAIRN_WEB_URL || "http://127.0.0.1:4538/";
+const outDir = process.argv[3] || process.env.CAIRN_SCREEN_DIR || "/private/tmp/cairn-shots";
+const theme = (process.env.CAIRN_SCREEN_THEME || "").trim();
 
-const playwrightModule = process.env.RESTOREWEAVE_PLAYWRIGHT_MODULE || "playwright";
+const playwrightModule = process.env.CAIRN_PLAYWRIGHT_MODULE || "playwright";
 const { chromium } = await import(playwrightModule);
-const executablePath = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
+const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH?.trim();
 
 const fs = await import("node:fs/promises");
 await fs.mkdir(outDir, { recursive: true });
@@ -83,7 +83,7 @@ for (const vp of VIEWPORTS) {
   const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
   if (theme) {
     await page.addInitScript((value) => {
-      try { window.localStorage.setItem("restoreweave.theme", value); } catch { /* ignore */ }
+      try { window.localStorage.setItem("cairn.theme", value); } catch { /* ignore */ }
     }, theme);
   }
 
@@ -120,7 +120,7 @@ for (const vp of VIEWPORTS) {
     await page.goto(url, { waitUntil: "domcontentloaded" });
     // The domain switch moved from the old `.library-view-switch` markup to the
     // domain-grouped presentation navigation, and its ids are namespaced
-    // (`restoreweave:photos`), so resolve them at runtime instead of hardcoding
+    // (`cairn:photos`), so resolve them at runtime instead of hardcoding
     // a class or a bare id. Waiting on the stale selector used to time out and
     // silently drop every Photos/Music capture.
     await page.locator(".library-presentation-navigation__domain").first().waitFor({ state: "visible", timeout: 20000 });

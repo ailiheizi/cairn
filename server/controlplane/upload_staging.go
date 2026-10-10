@@ -15,7 +15,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/ailiheizi/restoreweave/client/command"
+	"github.com/ailiheizi/cairn/client/command"
 )
 
 // Bounds of the bounded upload channel into the reviewable staging inbox.

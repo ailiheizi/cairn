@@ -118,7 +118,7 @@ type SemanticBundleArchive struct {
 }
 
 const (
-	semanticInstallerArchivePrefix = ".restoreweave-semantic-archive-"
+	semanticInstallerArchivePrefix = ".cairn-semantic-archive-"
 	semanticInstallerArchiveMax    = uint64(512 << 20)
 	// The v1 package has exactly one manifest and the eleven fixed bundle
 	// assets. Rejecting more entries before extraction bounds zero-byte entry
@@ -261,7 +261,7 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	if err := validateSemanticBundlePath(modelsRoot, false); err != nil {
 		return semanticBundleInstallResult{}, fmt.Errorf("%w: models root: %v", ErrInvalidSemanticBundle, err)
 	}
-	stage, err := os.MkdirTemp(modelsRoot, ".restoreweave-semantic-install-")
+	stage, err := os.MkdirTemp(modelsRoot, ".cairn-semantic-install-")
 	if err != nil {
 		return semanticBundleInstallResult{}, fmt.Errorf("%w: stage install: %v", ErrInvalidSemanticBundle, err)
 	}
@@ -362,7 +362,7 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	if err := writeSemanticInstallerJSON(generated["profile.json"], profile); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
-	license := "RestoreWeave semantic bundle license and attribution\n\n" +
+	license := "Cairn semantic bundle license and attribution\n\n" +
 		"BAAI/bge-small-zh-v1.5 model-card revision " + semanticInstallerBaseRevision + " declares MIT and links FlagEmbedding/LICENSE.\n" +
 		"The delivered ONNX model and tokenizer are from Xenova/bge-small-zh-v1.5 revision " + semanticInstallerModelRevision + "; applicability of the BAAI terms to the conversion remains OPEN_FOR_REVIEW.\n" +
 		"Exact BAAI source weights revision consumed and conversion recipe are NOT_VERIFIED.\n" +
@@ -425,7 +425,7 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 		return semanticBundleInstallResult{}, err
 	}
 	sbom := map[string]any{
-		"schema":          "restoreweave.semantic-bundle.sbom.v1",
+		"schema":          "cairn.semantic-bundle.sbom.v1",
 		"profile":         SemanticBundleBGEProfileID,
 		"base_model":      "BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision,
 		"base_model_role": "pinned model-card declaration; exact consumed source weights NOT_VERIFIED",
@@ -597,10 +597,10 @@ func semanticInstallerExistingMatches(existing SemanticBundleAdmission, platform
 }
 
 const (
-	semanticInstallerOldPrefix       = ".restoreweave-semantic-old-"
-	semanticInstallerActiveSuffix    = ".restoreweave-semantic-active-old"
-	semanticInstallerRejectedPrefix  = ".restoreweave-semantic-rejected-"
-	semanticInstallerCandidatePrefix = ".restoreweave-semantic-candidate-"
+	semanticInstallerOldPrefix       = ".cairn-semantic-old-"
+	semanticInstallerActiveSuffix    = ".cairn-semantic-active-old"
+	semanticInstallerRejectedPrefix  = ".cairn-semantic-rejected-"
+	semanticInstallerCandidatePrefix = ".cairn-semantic-candidate-"
 )
 
 // semanticInstallerSiblingPath reserves a name without leaving a directory
@@ -1486,7 +1486,7 @@ func installSemanticBundleFromArchive(ctx context.Context, modelsRoot, archivePa
 	if !openedInfo.Mode().IsRegular() || openedInfo.Size() != info.Size() {
 		return SemanticBundleAdmission{}, fmt.Errorf("%w: archive changed while opening", ErrInvalidSemanticBundle)
 	}
-	stage, err := os.MkdirTemp("", ".restoreweave-semantic-archive-install-")
+	stage, err := os.MkdirTemp("", ".cairn-semantic-archive-install-")
 	if err != nil {
 		return SemanticBundleAdmission{}, fmt.Errorf("%w: stage archive: %v", ErrInvalidSemanticBundle, err)
 	}

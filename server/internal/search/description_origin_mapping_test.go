@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/search/pinyin"
+	"github.com/ailiheizi/cairn/server/internal/search/pinyin"
 )
 
 func TestMatchedDescriptionSourceRangesUsesHalfOpenOverlapsAndMerges(t *testing.T) {

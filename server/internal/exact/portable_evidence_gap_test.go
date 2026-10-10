@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 type portableEvidenceFixture struct {
@@ -1194,7 +1194,7 @@ func TestPortableEvidenceCleanInstallRejectsUnavailableReaderDependency(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	reference.RequiredReaderDependencies = []string{"restoreweave-reader:unavailable-v1"}
+	reference.RequiredReaderDependencies = []string{"cairn-reader:unavailable-v1"}
 	mutatedPath := filepath.Join(t.TempDir(), "mutated-reference.json")
 	payload, err := MarshalRecoveryReference(reference)
 	if err != nil {

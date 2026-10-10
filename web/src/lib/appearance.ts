@@ -1,6 +1,6 @@
 import { normalizeInterfaceId } from "./interfaceCatalog";
 
-export const APPEARANCE_STORAGE_KEY = "restoreweave.appearance";
+export const APPEARANCE_STORAGE_KEY = "cairn.appearance";
 
 export type AppearanceMode = "system" | "light" | "dark";
 export type EffectiveAppearance = Exclude<AppearanceMode, "system">;

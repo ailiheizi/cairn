@@ -120,7 +120,7 @@ export const settings: Record<string, string> = {
   "Not created": "尚未创建",
   "Service socket": "服务套接字",
   "Loopback": "本机回环",
-  "API tokens are supplied with RESTOREWEAVE_API_TOKEN or --api-token; the WebUI never stores plaintext credentials.": "API 令牌通过 RESTOREWEAVE_API_TOKEN 或 --api-token 提供；网页不会保存明文凭据。",
+  "API tokens are supplied with CAIRN_API_TOKEN or --api-token; the WebUI never stores plaintext credentials.": "API 令牌通过 CAIRN_API_TOKEN 或 --api-token 提供；网页不会保存明文凭据。",
   "Saved configuration differs from the running daemon.": "已保存配置与当前运行服务不同。",
   "Review and save your changes.": "请检查并保存更改。",
   "Configuration is synchronized.": "配置已同步。",

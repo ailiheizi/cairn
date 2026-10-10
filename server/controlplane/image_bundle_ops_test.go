@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/search"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/search"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // TestImageBundleInstallArchiveInputUsesTheArchiveInstaller pins the routing and
@@ -19,9 +19,9 @@ import (
 func TestImageBundleInstallArchiveInputUsesTheArchiveInstaller(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
 	modelsRoot := filepath.Join(t.TempDir(), "models")
-	const archivePath = "/var/lib/restoreweave/chinese-clip.tar.gz"
+	const archivePath = "/var/lib/cairn/chinese-clip.tar.gz"
 	var calls int
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock",
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock",
 		WithImageBundleArchiveInstaller(modelsRoot, func(_ context.Context, root, path string) (ImageBundleInstallReceipt, error) {
 			calls++
 			if root != modelsRoot || path != archivePath {
@@ -67,10 +67,10 @@ func TestImageBundleInstallArchiveInputUsesTheArchiveInstaller(t *testing.T) {
 // visible but unimplemented, never silently successful.
 func TestImageBundleInstallRequiresAnInjectedInstaller(t *testing.T) {
 	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock")
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock")
 	result := dispatcher.Handle(context.Background(), command.Envelope{
 		Operation: command.OpImageBundleInstall,
-		Input:     []byte(`{"archive_path":"/var/lib/restoreweave/chinese-clip.tar.gz"}`),
+		Input:     []byte(`{"archive_path":"/var/lib/cairn/chinese-clip.tar.gz"}`),
 	})
 	if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeUnimplemented) {
 		t.Fatalf("unconfigured installer = %s, want FAILED/unimplemented: %+v", result.Status, result.Reasons)

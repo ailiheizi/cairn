@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // RecoveryTokenSchemaV1 is the deterministic proof envelope over one admitted
@@ -20,14 +20,14 @@ import (
 // never a substitute for the repository: losing the token does not destroy
 // repository data, and losing the independent trust anchor prevents the token
 // from being trusted.
-const RecoveryTokenSchemaV1 = "org.restoreweave.recovery-token.v1"
+const RecoveryTokenSchemaV1 = "org.cairn.recovery-token.v1"
 
 // RecoveryTokenSetSchemaV1 is the deterministic subject-scope wrapper for
 // recovery tokens. The wrapper is derived on demand from the authenticated
 // publication; it is not a new durable repository record.
-const RecoveryTokenSetSchemaV1 = "org.restoreweave.recovery-token-set.v1"
+const RecoveryTokenSetSchemaV1 = "org.cairn.recovery-token-set.v1"
 
-const RecoveryUnprotectedRecordSchemaV1 = "org.restoreweave.recovery-unprotected.v1"
+const RecoveryUnprotectedRecordSchemaV1 = "org.cairn.recovery-unprotected.v1"
 
 var (
 	// ErrRecoveryTokenInvalid is returned when a token envelope is malformed,

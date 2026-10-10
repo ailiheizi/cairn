@@ -73,9 +73,9 @@ path uses mock provider responses; this does not prove real AI generation.
 The full browser command was:
 
 ```sh
-RESTOREWEAVE_WEB_E2E=1 \
-RESTOREWEAVE_WEB_E2E_API_LISTEN=127.0.0.1:4644 \
-RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+CAIRN_WEB_E2E=1 \
+CAIRN_WEB_E2E_API_LISTEN=127.0.0.1:4644 \
+CAIRN_PLAYWRIGHT_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
 sh scripts/web-e2e.sh
 ```
 
@@ -113,7 +113,7 @@ complete redistribution clearance. Generated storage is still
 `directory-cas-dev-v1`, not a selected production repository.
 
 The final local artifact is
-`dist/completion-20261005-dD98vk/restoreweave-20261005-candidate-darwin-arm64.tar.gz`,
+`dist/completion-20261005-dD98vk/cairn-20261005-candidate-darwin-arm64.tar.gz`,
 SHA-256 `1b1c238835c43e08c6817a67cbef9819d474f7595261bafb434ec02b677cf111`.
 The isolated live preview is `http://127.0.0.1:4648/`; its local README explains
 restart and persisted data paths. In-app browser review exposed hard-coded dark

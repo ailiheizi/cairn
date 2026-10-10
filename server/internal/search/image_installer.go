@@ -88,7 +88,7 @@ func InstallImageBundleFromArchive(ctx context.Context, modelsRoot, archivePath 
 	if info.Size() <= 0 || uint64(info.Size()) > ImageBundleArchiveMaxBytes {
 		return ImageBundleAdmission{}, "", false, fmt.Errorf("%w: archive size %d is outside bounds", ErrInvalidImageBundle, info.Size())
 	}
-	stage, err := os.MkdirTemp("", ".restoreweave-image-archive-")
+	stage, err := os.MkdirTemp("", ".cairn-image-archive-")
 	if err != nil {
 		return ImageBundleAdmission{}, "", false, fmt.Errorf("%w: stage archive: %v", ErrInvalidImageBundle, err)
 	}

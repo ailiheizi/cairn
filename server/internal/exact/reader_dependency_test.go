@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 // dishonestRecordDriver models a backend whose VerifyRecord implementation
@@ -245,7 +245,7 @@ func TestPortableFactClosureRejectsUnknownBundleSchemaAtSigning(t *testing.T) {
 	if err := decodeStrictRecord(payload, &envelope); err != nil {
 		t.Fatal(err)
 	}
-	envelope.Closure.BundleSchema = "org.restoreweave.portable-fact-bundle.v3"
+	envelope.Closure.BundleSchema = "org.cairn.portable-fact-bundle.v3"
 	envelope.Closure.Signature = nil
 	if _, err := SignPortableFactClosure(*fixture.service.SigningIdentity, envelope.Closure); err == nil {
 		t.Fatal("unknown portable fact bundle schema was signed")
@@ -293,7 +293,7 @@ func TestRecoveryReferenceCriticalReaderDependencyFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reference.RequiredReaderDependencies = []string{"restoreweave-reader:semantic-semantics-v1"}
+	reference.RequiredReaderDependencies = []string{"cairn-reader:semantic-semantics-v1"}
 	if err := reference.ValidateAgainstRepository(context.Background(), fixture.repo, *fixture.service.TrustAnchor); err == nil {
 		t.Fatal("critical reader dependency that the repository cannot satisfy was accepted")
 	}
@@ -348,7 +348,7 @@ func TestSignedReaderDependencyTuplesAreAdmittedByThisBuild(t *testing.T) {
 			}
 		}
 	}
-	if _, err := repository.AdmitReaderDependency("restoreweave-reader:semantic-semantics-v1"); err == nil {
+	if _, err := repository.AdmitReaderDependency("cairn-reader:semantic-semantics-v1"); err == nil {
 		t.Fatal("an undeclared reader dependency was admitted")
 	}
 	// A reader must not assume the record's own listing is trustworthy: an

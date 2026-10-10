@@ -88,7 +88,7 @@ export async function assertSearchRecents(ctx) {
   assert.match(searchedHeading, /alpha/, `the executed query must be stated in the heading: ${searchedHeading}`);
   const searchedCount = await resultCount();
   assert.match(searchedCount, /[1-9][0-9]*/, `the heading must state the result count: ${searchedCount}`);
-  const storedRecents = await page.evaluate(() => localStorage.getItem("restoreweave.recent_searches"));
+  const storedRecents = await page.evaluate(() => localStorage.getItem("cairn.recent_searches"));
   assert.ok(storedRecents && JSON.parse(storedRecents).includes("alpha"), `the submitted query must persist locally: ${storedRecents}`);
 
   // 3. The clear control empties the field without touching the executed query
@@ -142,12 +142,12 @@ export async function assertSearchRecents(ctx) {
   const removeTarget = (await recents.locator(".search-recent-entry").first().innerText()).trim();
   await recents.locator(".search-recent-remove").first().click();
   assert.equal(await recents.locator(".search-recent-entry", { hasText: new RegExp(`^${escapeRegExp(removeTarget)}$`) }).count(), 0, `removing one entry must drop only that entry: ${removeTarget}`);
-  const persistedAfterRemove = JSON.parse(await page.evaluate(() => localStorage.getItem("restoreweave.recent_searches") ?? "[]"));
+  const persistedAfterRemove = JSON.parse(await page.evaluate(() => localStorage.getItem("cairn.recent_searches") ?? "[]"));
   assert.equal(persistedAfterRemove.includes(removeTarget), false, "the removed entry must leave the persisted local list");
   assert.ok(persistedAfterRemove.length > 0, `the other entries must stay in the local list: ${JSON.stringify(persistedAfterRemove)}`);
   await recents.getByRole("button", { name: /清除最近搜索|Clear recent searches/ }).click();
   await recents.waitFor({ state: "hidden", timeout: 10000 });
-  assert.equal(await page.evaluate(() => localStorage.getItem("restoreweave.recent_searches")), null, "clearing the local list must clear the persisted list");
+  assert.equal(await page.evaluate(() => localStorage.getItem("cairn.recent_searches")), null, "clearing the local list must clear the persisted list");
   assert.equal(await page.evaluate(async () => {
     const response = await fetch("/api/v1/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "view.list", input: {} }) });
     const body = await response.json();
@@ -172,7 +172,7 @@ export async function assertSearchRecents(ctx) {
   const shortcutDrawer = page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await shortcutDrawer.waitFor({ state: "visible", timeout: 10000 });
   await shortcutDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
-  const drawerPath = shortcutDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
+  const drawerPath = shortcutDrawer.getByRole("textbox", { name: /Cairn 主机上的路径|Path on Cairn host/ });
   await drawerPath.waitFor({ state: "visible", timeout: 10000 });
   await drawerPath.press("/");
   await page.keyboard.press("Control+k");
@@ -183,15 +183,15 @@ export async function assertSearchRecents(ctx) {
   await shortcutDrawer.waitFor({ state: "hidden", timeout: 10000 });
 
   await libraryTile(/tiny\.png/).click();
-  const previewPanel = page.locator(".rw-content-preview__panel");
-  await previewPanel.locator(".rw-content-preview__image").waitFor({ state: "visible", timeout: 10000 });
+  const previewPanel = page.locator(".cairn-content-preview__panel");
+  await previewPanel.locator(".cairn-content-preview__image").waitFor({ state: "visible", timeout: 10000 });
   await previewPanel.getByRole("button", { name: /查看原图|View full size/ }).first().click();
   const viewer = page.getByRole("dialog", { name: /图片查看器|Image viewer/ });
   await viewer.waitFor({ state: "visible", timeout: 10000 });
   await page.keyboard.press("Control+k");
   await page.keyboard.press("/");
   await page.waitForTimeout(100);
-  assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest(".rw-image-viewer"))), true, "the search shortcuts must not steal focus from the image viewer");
+  assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest(".cairn-image-viewer"))), true, "the search shortcuts must not steal focus from the image viewer");
   await page.keyboard.press("Escape");
   await viewer.waitFor({ state: "hidden", timeout: 10000 });
   assert.equal(await viewer.count(), 0, "Escape must still close the image viewer");

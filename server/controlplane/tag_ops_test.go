@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ailiheizi/restoreweave/client/command"
-	"github.com/ailiheizi/restoreweave/server/internal/exact"
-	"github.com/ailiheizi/restoreweave/server/internal/repository"
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
-	"github.com/ailiheizi/restoreweave/server/testutil"
+	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/testutil"
 )
 
 // tagFixture publishes one workspace with two distinct file subjects so the
@@ -34,7 +34,7 @@ func newTagFixture(t *testing.T) tagFixture {
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/rw.sock", WithExact(&exact.Service{
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
 		Store: store,
 		Repo:  repo,
 	}))
@@ -201,7 +201,7 @@ func TestAnnotationTagPlanIsReadOnlyAndApplyIsDigestBound(t *testing.T) {
 	fixture := newTagFixture(t)
 	alpha, beta := fixture.byName["alpha.txt"], fixture.byName["beta.txt"]
 
-	const from, to = "rw-tag-plan-src", "rw-tag-plan-dst"
+	const from, to = "cairn-tag-plan-src", "cairn-tag-plan-dst"
 	alphaSource := fixture.putTag(t, alpha, from)
 	betaSource := fixture.putTag(t, beta, from)
 	alphaTarget := fixture.putTag(t, alpha, to)
@@ -362,7 +362,7 @@ func TestAnnotationTagApplyInterruptionLeavesBothNames(t *testing.T) {
 	fixture := newTagFixture(t)
 	alpha, beta := fixture.byName["alpha.txt"], fixture.byName["beta.txt"]
 
-	const from, to = "rw-tag-interrupt-src", "rw-tag-interrupt-dst"
+	const from, to = "cairn-tag-interrupt-src", "cairn-tag-interrupt-dst"
 	fixture.putTag(t, alpha, from)
 	fixture.putTag(t, beta, from)
 	plan := fixture.plan(t, from, to)
@@ -472,7 +472,7 @@ func TestAnnotationTagPlanValidation(t *testing.T) {
 	}
 	// The byte-exact names are the durable names: a padded name is a different
 	// plan that matches no record, never a normalized lookup.
-	plan := fixture.plan(t, " rw-tag-plan-src", "rw-tag-plan-dst")
+	plan := fixture.plan(t, " cairn-tag-plan-src", "cairn-tag-plan-dst")
 	if plan.RemainingSubjects != 0 {
 		t.Fatalf("padded name plan = %+v, want an empty plan", plan)
 	}

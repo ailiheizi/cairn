@@ -31,7 +31,7 @@ const (
 	// native index/query configuration.
 	ZvecIndexConfigV1  = "hnsw:m=16"
 	ZvecQueryConfigV1  = "ef=64"
-	zvecGenerationMeta = "restoreweave-zvec-generation.json"
+	zvecGenerationMeta = "cairn-zvec-generation.json"
 )
 
 // ZvecGenerationSpec identifies one immutable, disposable semantic generation.
@@ -121,7 +121,7 @@ type zvecGenerationMetadata struct {
 	Identities    []ZvecCoverageIdentity      `json:"identities,omitempty"`
 }
 
-const zvecGenerationMetadataSchema = "restoreweave.zvec-generation.v1"
+const zvecGenerationMetadataSchema = "cairn.zvec-generation.v1"
 
 func validateZvecGenerationSpec(spec ZvecGenerationSpec) error {
 	if err := spec.Manifest.Validate(); err != nil {
@@ -195,7 +195,7 @@ func stageZvecLibrary(spec ZvecGenerationSpec) (string, error) {
 	if spec.Path == "" || !filepath.IsAbs(spec.Path) || filepath.Clean(spec.Path) != spec.Path {
 		return "", fmt.Errorf("%w: generation path is not canonical", ErrInvalidZvecGeneration)
 	}
-	staged := spec.Path + ".restoreweave-zvec-library"
+	staged := spec.Path + ".cairn-zvec-library"
 	if staged == spec.LibraryPath {
 		return "", fmt.Errorf("%w: library path cannot be its own staging path", ErrInvalidZvecGeneration)
 	}
@@ -237,7 +237,7 @@ func stageZvecLibrary(spec ZvecGenerationSpec) (string, error) {
 		return "", fmt.Errorf("%w: reopen source library: %v", ErrZvecUnavailable, err)
 	}
 	defer source.Close()
-	tmp, err := os.CreateTemp(parent, ".restoreweave-zvec-library-*")
+	tmp, err := os.CreateTemp(parent, ".cairn-zvec-library-*")
 	if err != nil {
 		return "", fmt.Errorf("%w: create staged temporary file: %v", ErrZvecUnavailable, err)
 	}

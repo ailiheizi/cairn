@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ailiheizi/restoreweave/server/internal/store/sqlite"
+	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
 const (
 	processorRetryJobKind  = "PROCESSOR_RETRY"
-	processorRetrySchemaV1 = "org.restoreweave.processor-retry-job.v1"
+	processorRetrySchemaV1 = "org.cairn.processor-retry-job.v1"
 )
 
 type ProcessorRetryTarget struct {

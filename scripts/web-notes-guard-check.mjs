@@ -21,16 +21,16 @@
 //   node scripts/web-notes-guard-check.mjs [url]
 //
 // Environment:
-//   RESTOREWEAVE_BASE_URL                     default http://127.0.0.1:4648/
-//   RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
+//   CAIRN_BASE_URL                     default http://127.0.0.1:4648/
+//   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH   optional browser binary
 //
 // A failure exits nonzero with the concrete observation that failed.
 
 import assert from "node:assert/strict";
 import { chromium } from "../web/node_modules/playwright/index.mjs";
 
-const base = (process.argv[2] || process.env.RESTOREWEAVE_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
-const chrome = process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const base = (process.argv[2] || process.env.CAIRN_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
+const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const observed = { dialogs: [] };
 let failure;
 let browser;
