@@ -1,14 +1,41 @@
-import type { AppearanceMode, AppearancePreference, InterfaceId, ThemeID } from "../lib/appearance";
+import { useSyncExternalStore } from "react";
+import type { AppearanceMode, AppearancePreference, BuiltInThemeID, InterfaceId, ThemeID } from "../lib/appearance";
+import type { PresentationPackageRefusal } from "../lib/presentationPackages";
+import { getPresentationPackageState, PRESENTATION_APP_VERSION, subscribePresentationPackages } from "../lib/presentationPackages";
 import type { Translator } from "../i18n";
 import { interfaceCatalog } from "../lib/interfaceCatalog";
 import "../styles/appearance.css";
 
 const appearanceModes: AppearanceMode[] = ["system", "light", "dark"];
-const themes: Array<{ id: ThemeID; swatches: string[] }> = [
-  { id: "slate", swatches: ["#edf1f3", "#687d8a", "#263744"] },
-  { id: "paper", swatches: ["#f3ecdf", "#9a7040", "#493a28"] },
-  { id: "indigo", swatches: ["#efedfa", "#776bb7", "#302d4c"] },
+
+// The three compiled palettes. Their labels and descriptions stay catalog keys;
+// an installed package supplies its own name as data.
+const builtInThemes: Array<{ id: BuiltInThemeID; swatches: string[]; label: string; description: string }> = [
+  { id: "slate", swatches: ["#edf1f3", "#687d8a", "#263744"], label: "Slate", description: "Neutral and clear" },
+  { id: "paper", swatches: ["#f3ecdf", "#9a7040", "#493a28"], label: "Warm paper", description: "Warm and soft" },
+  { id: "indigo", swatches: ["#efedfa", "#776bb7", "#302d4c"], label: "Deep indigo", description: "Deep and calm" },
 ];
+
+/**
+ * One refusal code to one honest sentence plus its data. A refusal is never
+ * silent: every code an admitted-or-refused decision can produce is rendered
+ * here, in the interface, in both locales.
+ */
+function describeRefusal(refusal: PresentationPackageRefusal, t: Translator): string {
+  switch (refusal.code) {
+    case "index-schema": return t("The presentation package index has an unsupported schema: {{detail}}", { detail: refusal.detail });
+    case "index-entry": return t("The package index lists an entry that is not a plain JSON file name: {{detail}}", { detail: refusal.detail });
+    case "schema": return t("Unsupported presentation package schema: {{detail}}", { detail: refusal.detail });
+    case "manifest": return t("The presentation package manifest is invalid: {{detail}}", { detail: refusal.detail });
+    case "id": return t("Invalid presentation package id: {{detail}}", { detail: refusal.detail });
+    case "collision": return t("This presentation package id is already in use: {{detail}}", { detail: refusal.detail });
+    case "host-range": return t("The application version {{version}} is outside this package's declared host range {{detail}}", { version: PRESENTATION_APP_VERSION, detail: refusal.detail });
+    case "host-range-syntax": return t("The declared host range is not a supported range: {{detail}}", { detail: refusal.detail });
+    case "token-key": return t("Token is not an admitted design token: {{detail}}", { detail: refusal.detail });
+    case "token-value": return t("Token value could escape a CSS declaration and is refused: {{detail}}", { detail: refusal.detail });
+    case "read": return t("The listed presentation package could not be read: {{detail}}", { detail: refusal.detail });
+  }
+}
 
 export function AppearancePreferences({ preference, onChange, onReset, t }: {
   preference: AppearancePreference;
@@ -16,6 +43,20 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
   onReset: () => void;
   t: Translator;
 }) {
+  // The one admission result the client already holds. This surface lists and
+  // reports packages; it never reads, parses or applies a package document
+  // itself, and it cannot admit anything the pure admission function refused.
+  const packages = useSyncExternalStore(subscribePresentationPackages, getPresentationPackageState, getPresentationPackageState);
+  const themeOptions: Array<{ id: ThemeID; swatches: readonly string[]; name: string; note: string }> = [
+    ...builtInThemes.map((theme) => ({ id: theme.id, swatches: theme.swatches, name: t(theme.label), note: t(theme.description) })),
+    ...packages.admitted.map((presentationPackage) => ({
+      id: presentationPackage.id,
+      swatches: presentationPackage.swatches,
+      name: presentationPackage.name,
+      note: t("Installed theme package"),
+    })),
+  ];
+
   const changeAppearance = (appearance: AppearanceMode) => onChange({ ...preference, appearance });
   const changeTheme = (themeId: ThemeID) => onChange({ ...preference, themeId });
   const changeInterface = (interfaceId: InterfaceId) => onChange({ ...preference, interfaceId });
@@ -83,7 +124,7 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
     <details className="appearance-colors">
       <summary>{t("Colors")}</summary>
       <div className="appearance-theme-options">
-        {themes.map((theme) => <label className="appearance-theme-option" key={theme.id}>
+        {themeOptions.map((theme) => <label className="appearance-theme-option" key={theme.id}>
           <input
             type="radio"
             name="cairn-theme-palette"
@@ -93,14 +134,27 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
           />
           <span className="appearance-theme-card">
             <span className="appearance-swatches" aria-hidden="true">
-              {theme.swatches.map((color) => <i key={color} style={{ backgroundColor: color }} />)}
+              {theme.swatches.map((color, index) => <i key={`${index}-${color}`} style={{ backgroundColor: color }} />)}
             </span>
-            <strong>{t(theme.id === "slate" ? "Slate" : theme.id === "paper" ? "Warm paper" : "Deep indigo")}</strong>
-            <small>{t(theme.id === "slate" ? "Neutral and clear" : theme.id === "paper" ? "Warm and soft" : "Deep and calm")}</small>
+            <strong>{theme.name}</strong>
+            <small>{theme.note}</small>
           </span>
         </label>)}
       </div>
+      {packages.admitted.length === 0 && <p className="appearance-storage-note">
+        {packages.loaded
+          ? t("No presentation package is installed. Optional theme packages are JSON design-token documents placed under the served web root.")
+          : t("Checking for installed presentation packages...")}
+      </p>}
     </details>
+
+    {packages.refusals.length > 0 && <div className="appearance-package-refusals" role="status">
+      <h4>{t("Refused presentation packages")}</h4>
+      {packages.refusals.map((refusal, index) => <p className="appearance-storage-note" key={`${index}-${refusal.source}`}>
+        <strong>{refusal.id || refusal.source}</strong>
+        <span> · {refusal.id ? `${refusal.source} · ` : ""}{describeRefusal(refusal, t)}</span>
+      </p>)}
+    </div>}
 
     <p className="appearance-storage-note">{t("This preference is stored in this browser only. It does not change Cairn service settings or your content.")}</p>
   </section>;

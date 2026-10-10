@@ -28,4 +28,21 @@ export const appearance: Record<string, string> = {
   "The selected interface failed. Cairn switched to the standard interface; review your settings before trying another layout.": "所选界面发生错误。Cairn 已切换到标准界面；尝试其他布局前请检查设置。",
   "Retry selected interface": "重试所选界面",
   "Dismiss": "关闭",
+  // Installed presentation packages (ADR-032, Stage 2a). These strings report
+  // the outcome of whole-document admission; a refusal is never silent.
+  "Installed theme package": "已安装主题包",
+  "Refused presentation packages": "被拒绝的展示包",
+  "No presentation package is installed. Optional theme packages are JSON design-token documents placed under the served web root.": "未安装展示包。可选主题包是放置在已服务 Web 根目录下的设计令牌 JSON 文档。",
+  "Checking for installed presentation packages...": "正在检查已安装的展示包…",
+  "The presentation package index has an unsupported schema: {{detail}}": "展示包索引的 schema 不受支持：{{detail}}",
+  "The package index lists an entry that is not a plain JSON file name: {{detail}}": "包索引列出的条目不是纯 JSON 文件名：{{detail}}",
+  "Unsupported presentation package schema: {{detail}}": "展示包的 schema 不受支持：{{detail}}",
+  "The presentation package manifest is invalid: {{detail}}": "展示包清单无效：{{detail}}",
+  "Invalid presentation package id: {{detail}}": "展示包 id 无效：{{detail}}",
+  "This presentation package id is already in use: {{detail}}": "该展示包 id 已被占用：{{detail}}",
+  "The application version {{version}} is outside this package's declared host range {{detail}}": "应用版本 {{version}} 不在该包声明的宿主范围 {{detail}} 内",
+  "The declared host range is not a supported range: {{detail}}": "声明的宿主范围不是受支持的范围：{{detail}}",
+  "Token is not an admitted design token: {{detail}}": "令牌不是受承认的设计令牌：{{detail}}",
+  "Token value could escape a CSS declaration and is refused: {{detail}}": "令牌值可能逃逸 CSS 声明，已整体拒绝：{{detail}}",
+  "The listed presentation package could not be read: {{detail}}": "无法读取索引中列出的展示包：{{detail}}",
 };

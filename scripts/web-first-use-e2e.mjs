@@ -184,7 +184,11 @@ try {
     try { await readFile(candidate); playwrightPath = candidate; } catch { playwrightPath = "playwright"; }
   }
   const playwright = await import(playwrightPath.startsWith(".") || isAbsolute(playwrightPath) ? pathToFileURL(resolve(playwrightPath)).href : playwrightPath);
-  const browser = await playwright.chromium.launch({ headless: true, ...(process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
+  // The installed browser is the fallback, matching the sibling harnesses: a
+  // checkout without Playwright's own downloaded browser must still be able to
+  // run this journey instead of failing at launch.
+  const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  const browser = await playwright.chromium.launch({ headless: true, executablePath });
   browserContext = browser;
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   const fixtureName = `first-use-${process.pid}.txt`;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   applyAppearancePreference,
   bootstrapAppearance,
@@ -9,6 +9,11 @@ import {
   writeAppearancePreference,
 } from "../lib/appearance";
 import type { AppearancePreference } from "../lib/appearance";
+import {
+  getPresentationPackageState,
+  startPresentationPackageLoad,
+  subscribePresentationPackages,
+} from "../lib/presentationPackages";
 
 function prefersDark(): boolean {
   try {
@@ -19,11 +24,33 @@ function prefersDark(): boolean {
 }
 
 export function useAppearance() {
+  // Installed presentation packages are pure data (ADR-032, Stage 2a). They are
+  // read exactly once, at startup, and the admitted set is the only thing the
+  // appearance plane may use: a package that was refused contributes nothing.
+  const packages = useSyncExternalStore(subscribePresentationPackages, getPresentationPackageState, getPresentationPackageState);
+  const installedThemes = useMemo(
+    () => packages.admitted.map((presentationPackage) => ({ id: presentationPackage.id, tokens: presentationPackage.tokens })),
+    [packages],
+  );
+  const installedKey = installedThemes.map((theme) => theme.id).join("\u0000");
+
   const [preference, setPreference] = useState<AppearancePreference>(() => readAppearancePreference());
+
+  useEffect(() => { startPresentationPackageLoad(); }, []);
+
+  // Admission completes after the first paint. Re-read the stored preference
+  // then: storage may hold an installed id that only became valid now, while
+  // the first synchronous read could only resolve a built-in.
+  const resolvedKey = useRef(installedKey);
+  useEffect(() => {
+    if (resolvedKey.current === installedKey) return;
+    resolvedKey.current = installedKey;
+    setPreference(readAppearancePreference(undefined, installedThemes.map((theme) => theme.id)));
+  }, [installedKey, installedThemes]);
 
   useEffect(() => {
     const root = document.documentElement;
-    const apply = () => applyAppearancePreference(root, preference, prefersDark());
+    const apply = () => applyAppearancePreference(root, preference, prefersDark(), installedThemes);
     apply();
 
     if (preference.appearance !== "system") return;
@@ -36,21 +63,23 @@ export function useAppearance() {
       media = undefined;
     }
     return () => media?.removeEventListener("change", apply);
-  }, [preference]);
+  }, [preference, installedThemes]);
+
+  const installedThemeIds = useMemo(() => installedThemes.map((theme) => theme.id), [installedThemes]);
 
   const updatePreference = useCallback((next: AppearancePreference) => {
-    const normalized = normalizeAppearancePreference(next);
-    writeAppearancePreference(normalized);
-    applyAppearancePreference(document.documentElement, normalized, prefersDark());
+    const normalized = normalizeAppearancePreference(next, installedThemeIds);
+    writeAppearancePreference(normalized, undefined, installedThemeIds);
+    applyAppearancePreference(document.documentElement, normalized, prefersDark(), installedThemes);
     setPreference(normalized);
-  }, []);
+  }, [installedThemeIds, installedThemes]);
 
   const resetPreference = useCallback(() => {
     resetAppearancePreference();
     const defaultPreference = { ...DEFAULT_APPEARANCE };
-    applyAppearancePreference(document.documentElement, defaultPreference, prefersDark());
+    applyAppearancePreference(document.documentElement, defaultPreference, prefersDark(), installedThemes);
     setPreference(defaultPreference);
-  }, []);
+  }, [installedThemes]);
 
   return { preference, updatePreference, resetPreference };
 }
