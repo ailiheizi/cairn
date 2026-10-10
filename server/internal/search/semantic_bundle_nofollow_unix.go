@@ -38,6 +38,7 @@ func openBundleFileNoFollow(root, relative string) (*os.File, error) {
 		}
 		if closeDir {
 			_ = unix.Close(dirFD)
+			closeDir = false
 		}
 		if i == len(parts)-1 {
 			file := os.NewFile(uintptr(fd), filepath.Join(root, filepath.FromSlash(relative)))

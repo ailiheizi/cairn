@@ -42,6 +42,9 @@ func TestMigrateProfileCopiesVerifiedPayloadsAndRecordsWithoutMutatingSource(t *
 	if report.PayloadObjects != 1 || report.PortableRecords != 1 || report.LogicalBytes != int64(len(payload)) || report.SourceRoot != sourceRoot || report.TargetRoot != targetRoot {
 		t.Fatalf("migration report = %+v", report)
 	}
+	if report.VerifiedTargetBytesState != StoredBytesMeasured || report.VerifiedTargetBytes <= 0 {
+		t.Fatalf("verified target byte measurement = %s/%d, want MEASURED positive total", report.VerifiedTargetBytesState, report.VerifiedTargetBytes)
+	}
 	after, err := os.ReadFile(blobPath(sourceRoot, receipt.ContentID))
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +92,35 @@ func TestMigrateProfileCopiesVerifiedPayloadsAndRecordsWithoutMutatingSource(t *
 	}
 	if err := source.Verify(ctx, receipt.ContentID); err != nil {
 		t.Fatalf("source rollback copy was affected by target tamper: %v", err)
+	}
+}
+
+func TestRecordMigrationStoredBytesRequiresCompleteMeasuredAggregate(t *testing.T) {
+	tests := []struct {
+		name     string
+		receipts []Receipt
+		state    StoredBytesState
+		bytes    int64
+	}{
+		{name: "measured sum", receipts: []Receipt{{Bytes: 4, StoredBytes: 3, StoredBytesState: StoredBytesMeasured}, {Bytes: 5, StoredBytes: 7, StoredBytesState: StoredBytesMeasured}}, state: StoredBytesMeasured, bytes: 10},
+		{name: "empty measured zero", state: StoredBytesMeasured, bytes: 0},
+		{name: "omitted state", receipts: []Receipt{{Bytes: 4, StoredBytes: 3}}, state: StoredBytesUnavailable},
+		{name: "unavailable state", receipts: []Receipt{{Bytes: 4, StoredBytes: 3, StoredBytesState: StoredBytesUnavailable}}, state: StoredBytesUnavailable},
+		{name: "negative measurement", receipts: []Receipt{{Bytes: 4, StoredBytes: -1, StoredBytesState: StoredBytesMeasured}}, state: StoredBytesUnavailable},
+		{name: "zero for nonempty payload", receipts: []Receipt{{Bytes: 4, StoredBytes: 0, StoredBytesState: StoredBytesMeasured}}, state: StoredBytesUnavailable},
+		{name: "overflow", receipts: []Receipt{{Bytes: 1, StoredBytes: int64(^uint64(0) >> 1), StoredBytesState: StoredBytesMeasured}, {Bytes: 1, StoredBytes: 1, StoredBytesState: StoredBytesMeasured}}, state: StoredBytesUnavailable},
+		{name: "unavailable remains unavailable", receipts: []Receipt{{Bytes: 4, StoredBytes: 0}, {Bytes: 5, StoredBytes: 7, StoredBytesState: StoredBytesMeasured}}, state: StoredBytesUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report := MigrationReport{VerifiedTargetBytesState: StoredBytesMeasured}
+			for _, receipt := range tt.receipts {
+				recordMigrationStoredBytes(&report, receipt)
+			}
+			if report.VerifiedTargetBytesState != tt.state || report.VerifiedTargetBytes != tt.bytes {
+				t.Fatalf("aggregate = %s/%d, want %s/%d", report.VerifiedTargetBytesState, report.VerifiedTargetBytes, tt.state, tt.bytes)
+			}
+		})
 	}
 }
 

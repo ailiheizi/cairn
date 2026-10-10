@@ -41,9 +41,7 @@ func openRepositoryFile(root, path string) (*os.File, error) {
 		if openErr != nil {
 			return nil, os.NewSyscallError("open repository directory", openErr)
 		}
-		if current != rootFD {
-			_ = unix.Close(current)
-		}
+		_ = unix.Close(current)
 		current = next
 	}
 

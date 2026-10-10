@@ -201,7 +201,7 @@ func (repo *ZstdDir) Repair(ctx context.Context, contentID string, body io.Reade
 			if sizeErr != nil {
 				return Receipt{}, sizeErr
 			}
-			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, Existed: true}, nil
+			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 		}
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return Receipt{}, statErr
@@ -219,7 +219,7 @@ func (repo *ZstdDir) Repair(ctx context.Context, contentID string, body io.Reade
 	if err != nil {
 		return Receipt{}, err
 	}
-	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, Existed: true}, nil
+	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 }
 
 func (repo *ZstdDir) place(ctx context.Context, expectedID string, body io.Reader) (Receipt, error) {
@@ -282,7 +282,7 @@ func (repo *ZstdDir) place(ctx context.Context, expectedID string, body io.Reade
 	if err != nil {
 		return Receipt{}, err
 	}
-	receipt := Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored}
+	receipt := Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured}
 	if _, err := os.Lstat(dest); err == nil {
 		receipt.Existed = true
 		if err := repo.Verify(ctx, contentID); err != nil {
@@ -358,7 +358,7 @@ func (repo *ZstdDir) reuseExact(ctx context.Context, contentID string, body io.R
 	if err := ctx.Err(); err != nil {
 		return Receipt{}, err
 	}
-	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: info.Size(), Existed: true}, nil
+	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: info.Size(), StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 }
 
 func (repo *ZstdDir) Open(ctx context.Context, contentID string) (io.ReadCloser, error) {

@@ -152,6 +152,7 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 		for _, hit := range hits {
 			if at, ok := seen[hit.SubjectID]; ok {
 				result.Hits[at].Dimensions = appendUnique(result.Hits[at].Dimensions, id)
+				mergeHitProvenance(&result.Hits[at].Hit, hit)
 				continue
 			}
 			seen[hit.SubjectID] = len(result.Hits)
@@ -159,6 +160,38 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 		}
 	}
 	return result, nil
+}
+
+// mergeHitProvenance keeps each component's source explanation when subjects
+// overlap. Namespace/display fields retain the first authorized projection;
+// no component gains authority to reinterpret another source's text or spans.
+func mergeHitProvenance(target *Hit, candidate Hit) {
+	for _, axis := range candidate.ConstructAxes {
+		target.ConstructAxes = appendUnique(target.ConstructAxes, axis)
+	}
+	for _, incoming := range candidate.Segments {
+		found := false
+		for i, existing := range target.Segments {
+			if existing.SourceType != incoming.SourceType || existing.SourceID != incoming.SourceID ||
+				existing.DescriptionDocumentID != incoming.DescriptionDocumentID ||
+				existing.SegmentID != incoming.SegmentID || existing.Ordinal != incoming.Ordinal ||
+				existing.MatchedText != incoming.MatchedText || existing.Kind != incoming.Kind ||
+				existing.Producer != incoming.Producer || existing.Accepted != incoming.Accepted ||
+				existing.Language != incoming.Language {
+				continue
+			}
+			if len(incoming.MatchSpans) > 0 {
+				spans := append([]MatchSpan(nil), existing.MatchSpans...)
+				spans = append(spans, incoming.MatchSpans...)
+				target.Segments[i].MatchSpans = mergeMatchSpans(spans)
+			}
+			found = true
+			break
+		}
+		if !found {
+			target.Segments = append(target.Segments, incoming)
+		}
+	}
 }
 
 func FuseSucceeded(result FuseResult) bool {

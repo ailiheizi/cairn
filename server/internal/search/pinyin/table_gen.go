@@ -13,8 +13,8 @@
 // Input SHA-256: sha256:4c93ea9c1f636451729a840978f1667a53886af37ba854fdcce109721c63d43e
 // Generated (UTC): 2026-09-19
 // Characters covered: 44355
-// License: Unicode Character Database terms of use (public domain);
-// see https://www.unicode.org/license.txt
+// License: Unicode License V3; see LICENSE.txt for the required copyright
+// and permission notice (https://www.unicode.org/license.txt).
 
 package pinyin
 

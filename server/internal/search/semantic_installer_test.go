@@ -58,9 +58,18 @@ func TestSemanticBundleInstallerInstallsAndRepeatsWithoutDownload(t *testing.T) 
 	if first.Admission.Descriptor.ModelID != "BAAI/bge-small-zh-v1.5" || first.Admission.Descriptor.ModelRevision != semanticInstallerModelRevision {
 		t.Fatalf("model provenance = %+v", first.Admission.Descriptor)
 	}
-	for _, name := range []string{"model.onnx", "tokenizer.json", "runtime.bin", "zvec.dylib", "profile.json", "NOTICE", "sbom.json"} {
+	for _, name := range []string{"model.onnx", "tokenizer.json", "runtime.bin", "zvec.dylib", "profile.json", "LICENSE", "NOTICE", "sbom.json"} {
 		if _, err := os.Stat(filepath.Join(first.Destination, name)); err != nil {
 			t.Fatalf("installed asset %s: %v", name, err)
+		}
+	}
+	modelURL, tokenizerURL := "", ""
+	for _, spec := range specs {
+		switch spec.Name {
+		case "model.onnx":
+			modelURL = spec.URL
+		case "tokenizer.json":
+			tokenizerURL = spec.URL
 		}
 	}
 	for _, name := range []string{"profile.json", "NOTICE", "sbom.json"} {
@@ -72,6 +81,60 @@ func TestSemanticBundleInstallerInstallsAndRepeatsWithoutDownload(t *testing.T) 
 		if !strings.Contains(text, "BAAI/bge-small-zh-v1.5@"+semanticInstallerBaseRevision) || !strings.Contains(text, "Xenova/bge-small-zh-v1.5@"+semanticInstallerModelRevision) {
 			t.Fatalf("%s lacks model/converter provenance: %s", name, text)
 		}
+		if !strings.Contains(text, modelURL) || !strings.Contains(text, first.Admission.AssetDigests["model"]) ||
+			!strings.Contains(text, tokenizerURL) || !strings.Contains(text, first.Admission.AssetDigests["tokenizer"]) {
+			t.Fatalf("%s lacks delivered model/tokenizer URL and digest provenance: %s", name, text)
+		}
+		if !strings.Contains(text, "NOT_VERIFIED") || !strings.Contains(text, "OPEN_FOR_REVIEW") {
+			t.Fatalf("%s overstates original-weight provenance or conversion license applicability: %s", name, text)
+		}
+	}
+	licenseBytes, err := os.ReadFile(filepath.Join(first.Destination, "LICENSE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	licenseDigest := sha256.Sum256([]byte(semanticInstallerFlagEmbeddingMIT))
+	if hex.EncodeToString(licenseDigest[:]) != semanticInstallerMITSHA256 || !bytes.Contains(licenseBytes, []byte(semanticInstallerFlagEmbeddingMIT)) {
+		t.Fatalf("LICENSE does not retain the exact pinned MIT text: digest=%x bytes=%d", licenseDigest, len(licenseBytes))
+	}
+	if !bytes.Contains(licenseBytes, []byte("FlagEmbedding/LICENSE source commit "+semanticInstallerMITCommit)) {
+		t.Fatalf("LICENSE lacks immutable license source attribution: %s", licenseBytes)
+	}
+	if len(semanticInstallerFlagEmbeddingMIT) != 1065 {
+		t.Fatalf("embedded full MIT text length = %d, want 1065", len(semanticInstallerFlagEmbeddingMIT))
+	}
+	if !bytes.Contains(licenseBytes, []byte(semanticInstallerZvecLicense)) || !bytes.Contains(licenseBytes, []byte("synthetic ONNX Runtime license")) {
+		t.Fatalf("LICENSE is missing full native license text")
+	}
+	if len(semanticInstallerZvecLicense) != 11356 || semanticInstallerDigest([]byte(semanticInstallerZvecLicense)) != "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1" {
+		t.Fatalf("embedded native zvec LICENSE does not match audited v0.6.0 text")
+	}
+	bundleLicenseDigest, licenseSize, err := semanticFileDigest(filepath.Join(first.Destination, "LICENSE"))
+	if err != nil || licenseSize != uint64(len(licenseBytes)) || bundleLicenseDigest == "" {
+		t.Fatalf("generated LICENSE digest/size = %q/%d, err %v", bundleLicenseDigest, licenseSize, err)
+	}
+	noticeBytes, err := os.ReadFile(filepath.Join(first.Destination, "NOTICE"))
+	if err != nil || !bytes.Contains(noticeBytes, []byte(semanticInstallerZvecNotice)) || !bytes.Contains(noticeBytes, []byte("synthetic ONNX Runtime third-party notices")) {
+		t.Fatalf("NOTICE is missing full native notice text: err=%v", err)
+	}
+	if len(semanticInstallerZvecNotice) != 5020 || semanticInstallerDigest([]byte(semanticInstallerZvecNotice)) != "332b1a498b446fab1232b671c2ba74102fc563c198dc6f53980d1282075958ad" {
+		t.Fatalf("embedded native zvec NOTICE does not match audited v0.6.0 text")
+	}
+	var originProfile map[string]any
+	profileBytes, err := os.ReadFile(filepath.Join(first.Destination, "profile.json"))
+	if err != nil || json.Unmarshal(profileBytes, &originProfile) != nil {
+		t.Fatalf("decode origin profile: err=%v", err)
+	}
+	if originProfile["model_family"] != "BAAI/bge-small-zh-v1.5" || originProfile["base_weights_revision_used"] != "NOT_VERIFIED" {
+		t.Fatalf("origin profile does not distinguish family from unverified source weights: %s", profileBytes)
+	}
+	modelArtifact, ok := originProfile["delivered_model_artifact"].(map[string]any)
+	if !ok || modelArtifact["repository"] != "Xenova/bge-small-zh-v1.5" || modelArtifact["revision"] != semanticInstallerModelRevision || modelArtifact["url"] != modelURL || modelArtifact["sha256"] != first.Admission.AssetDigests["model"] || modelArtifact["size"] != float64(first.Admission.Descriptor.Model.Size) {
+		t.Fatalf("delivered model origin = %#v", originProfile["delivered_model_artifact"])
+	}
+	tokenizerArtifact, ok := originProfile["tokenizer_artifact"].(map[string]any)
+	if !ok || tokenizerArtifact["url"] != tokenizerURL || tokenizerArtifact["sha256"] != first.Admission.AssetDigests["tokenizer"] || tokenizerArtifact["size"] != float64(first.Admission.Descriptor.Tokenizer.Size) {
+		t.Fatalf("delivered tokenizer origin = %#v", originProfile["tokenizer_artifact"])
 	}
 	zvecGo, err := os.ReadFile(filepath.Join(first.Destination, "zvec-go.txt"))
 	if err != nil || !strings.Contains(string(zvecGo), semanticInstallerZvecCommit) || !strings.Contains(string(zvecGo), semanticInstallerZvecGoModuleVersion) {
@@ -109,6 +172,56 @@ func TestSemanticBundleInstallerInstallsAndRepeatsWithoutDownload(t *testing.T) 
 	}
 	if sbom.Schema != "restoreweave.semantic-bundle.sbom.v1" {
 		t.Fatalf("SBOM schema = %q", sbom.Schema)
+	}
+	var sbomFacts map[string]any
+	if err := json.Unmarshal(sbomJSON, &sbomFacts); err != nil {
+		t.Fatal(err)
+	}
+	if sbomFacts["base_weights_revision_used"] != "NOT_VERIFIED" || sbomFacts["delivered_model_artifact"] == nil || sbomFacts["tokenizer_artifact"] == nil {
+		t.Fatalf("SBOM lacks explicit model-origin uncertainty and delivered artifact mapping: %s", sbomJSON)
+	}
+	assetFacts := sbomFacts["assets"].(map[string]any)
+	if assetFacts["license"].(map[string]any)["sha256"] != first.Admission.AssetDigests["license"] || assetFacts["license"].(map[string]any)["size"] != float64(licenseSize) ||
+		assetFacts["notice"].(map[string]any)["sha256"] != first.Admission.AssetDigests["notice"] {
+		t.Fatalf("SBOM whole-file license/notice facts do not match packaged assets")
+	}
+	nativeTextSources := sbomFacts["native_text_sources"].(map[string]any)
+	var runtimeSpec semanticBundleInstallDownload
+	for _, spec := range specs {
+		if spec.Name == "runtime.archive" {
+			runtimeSpec = spec
+			break
+		}
+	}
+	for _, key := range []string{"onnxruntime_license_text", "onnxruntime_third_party_notices_text", "zvec_native_license_text", "zvec_native_notice_text"} {
+		fact, ok := nativeTextSources[key].(map[string]any)
+		if !ok || fact["text_sha256"] == nil || fact["text_size"] == nil || fact["embedded_in_asset"] == nil {
+			t.Fatalf("SBOM native text source fact %q is incomplete: %#v", key, nativeTextSources[key])
+		}
+	}
+	if nativeTextSources["onnxruntime_license_text"].(map[string]any)["text_sha256"] != semanticInstallerDigest([]byte("synthetic ONNX Runtime license")) ||
+		nativeTextSources["onnxruntime_third_party_notices_text"].(map[string]any)["text_sha256"] != semanticInstallerDigest([]byte("synthetic ONNX Runtime third-party notices")) ||
+		nativeTextSources["zvec_native_license_text"].(map[string]any)["text_sha256"] != semanticInstallerDigest([]byte(semanticInstallerZvecLicense)) ||
+		nativeTextSources["zvec_native_notice_text"].(map[string]any)["text_sha256"] != semanticInstallerDigest([]byte(semanticInstallerZvecNotice)) {
+		t.Fatalf("SBOM native text hashes are not bound to extracted fixture text")
+	}
+	if nativeTextSources["onnxruntime_license_text"].(map[string]any)["text_size"] != float64(len("synthetic ONNX Runtime license")) ||
+		nativeTextSources["onnxruntime_third_party_notices_text"].(map[string]any)["text_size"] != float64(len("synthetic ONNX Runtime third-party notices")) ||
+		nativeTextSources["onnxruntime_license_text"].(map[string]any)["archive_sha256"] != runtimeSpec.SHA256 ||
+		nativeTextSources["onnxruntime_license_text"].(map[string]any)["archive_url"] != runtimeSpec.URL ||
+		assetFacts["onnxruntime_archive"].(map[string]any)["sha256"] != runtimeSpec.SHA256 ||
+		assetFacts["onnxruntime_archive"].(map[string]any)["url"] != runtimeSpec.URL {
+		t.Fatalf("SBOM does not bind text lengths/source identity to the actual fixture input")
+	}
+	if nativeTextSources["onnxruntime_license_text"].(map[string]any)["tar_member"] != "onnxruntime-test/LICENSE" ||
+		nativeTextSources["onnxruntime_third_party_notices_text"].(map[string]any)["tar_member"] != "onnxruntime-test/ThirdPartyNotices.txt" {
+		t.Fatalf("SBOM rewrote native archive member provenance: %#v", nativeTextSources)
+	}
+	assets, ok := sbomFacts["assets"].(map[string]any)
+	modelAsset, modelOK := assets["model"].(map[string]any)
+	tokenizerAsset, tokenizerOK := assets["tokenizer"].(map[string]any)
+	if !ok || !modelOK || !tokenizerOK || modelAsset["sha256"] != first.Admission.AssetDigests["model"] || modelAsset["size"] != float64(first.Admission.Descriptor.Model.Size) || modelAsset["url"] != modelURL || tokenizerAsset["sha256"] != first.Admission.AssetDigests["tokenizer"] || tokenizerAsset["size"] != float64(first.Admission.Descriptor.Tokenizer.Size) || tokenizerAsset["url"] != tokenizerURL {
+		t.Fatalf("SBOM asset origin does not match admitted descriptor: %s", sbomJSON)
 	}
 	dependency, ok := sbom.Dependencies["zvec_go"]
 	if !ok {
@@ -165,6 +278,91 @@ func TestSemanticBundleInstallerFailureLeavesNoPublishedDirectory(t *testing.T) 
 			destination := filepath.Join(root, SemanticBundleBGEProfileID, platform.OS+"-"+platform.Arch)
 			if _, statErr := os.Lstat(destination); !errors.Is(statErr, os.ErrNotExist) {
 				t.Fatalf("failed install published %q: %v", destination, statErr)
+			}
+		})
+	}
+}
+
+func TestSemanticBundleInstallerNativeNoticeFailurePreservesPublishedBundle(t *testing.T) {
+	platform, err := semanticBundleInstallPlatformFor(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name    string
+		entries []semanticInstallerTarNamedEntry
+	}{
+		{name: "missing license", entries: []semanticInstallerTarNamedEntry{
+			{name: "ort/lib/libonnxruntime.dylib", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("runtime")}},
+			{name: "ort/ThirdPartyNotices.txt", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("notice")}},
+		}},
+		{name: "duplicate license", entries: []semanticInstallerTarNamedEntry{
+			{name: "ort/lib/libonnxruntime.dylib", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("runtime")}},
+			{name: "ort/LICENSE", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("license one")}},
+			{name: "ort/LICENSE", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("license two")}},
+			{name: "ort/ThirdPartyNotices.txt", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("notice")}},
+		}},
+		{name: "oversized notices", entries: []semanticInstallerTarNamedEntry{
+			{name: "ort/lib/libonnxruntime.dylib", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("runtime")}},
+			{name: "ort/LICENSE", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("license")}},
+			{name: "ort/ThirdPartyNotices.txt", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: bytes.Repeat([]byte("x"), int(semanticInstallerNativeTextMax+1))}},
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			specs, payloads := semanticInstallerTestSpecs(t, platform)
+			root := filepath.Join(t.TempDir(), "models")
+			first, err := installDefaultSemanticBundleForPlatformWithSpecs(context.Background(), root, platform, &semanticInstallerTestClient{assets: payloads}, specs)
+			if err != nil {
+				t.Fatalf("initial install: %v", err)
+			}
+			oldModel, err := os.ReadFile(filepath.Join(first.Destination, "model.onnx"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldLicense, err := os.ReadFile(filepath.Join(first.Destination, "LICENSE"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			newSpecs := append([]semanticBundleInstallDownload(nil), specs...)
+			newPayloads := make(map[string][]byte, len(payloads))
+			for key, value := range payloads {
+				newPayloads[key] = value
+			}
+			for i := range newSpecs {
+				switch newSpecs[i].Name {
+				case "runtime.archive":
+					data := semanticInstallerTarGzSequence(t, tc.entries)
+					newPayloads[newSpecs[i].URL] = data
+					newSpecs[i].SHA256, newSpecs[i].Size = semanticInstallerDigest(data), uint64(len(data))
+				case "model.onnx":
+					data := []byte("replacement model")
+					newPayloads[newSpecs[i].URL] = data
+					newSpecs[i].SHA256, newSpecs[i].Size = semanticInstallerDigest(data), uint64(len(data))
+				}
+			}
+			if _, err := installDefaultSemanticBundleForPlatformWithSpecs(context.Background(), root, platform, &semanticInstallerTestClient{assets: newPayloads}, newSpecs); err == nil {
+				t.Fatal("install unexpectedly accepted invalid native license members")
+			}
+			currentModel, err := os.ReadFile(filepath.Join(first.Destination, "model.onnx"))
+			if err != nil || !bytes.Equal(currentModel, oldModel) {
+				t.Fatalf("failed notice replacement changed old model: err=%v", err)
+			}
+			currentLicense, err := os.ReadFile(filepath.Join(first.Destination, "LICENSE"))
+			if err != nil || !bytes.Equal(currentLicense, oldLicense) {
+				t.Fatalf("failed notice replacement changed old LICENSE: err=%v", err)
+			}
+			current, err := LoadSemanticBundle(first.Destination)
+			if err != nil {
+				t.Fatalf("failed notice replacement damaged old bundle admission: %v", err)
+			}
+			if current.ProfileDigest != first.Admission.ProfileDigest || len(current.AssetDigests) != len(first.Admission.AssetDigests) {
+				t.Fatalf("failed notice replacement changed old bundle identity or asset closure: old=%d current=%d", len(first.Admission.AssetDigests), len(current.AssetDigests))
+			}
+			for name, digest := range first.Admission.AssetDigests {
+				if current.AssetDigests[name] != digest {
+					t.Fatalf("failed notice replacement changed old asset %q", name)
+				}
 			}
 		})
 	}
@@ -571,6 +769,43 @@ func TestSemanticInstallerAcceptsOfficialORTArchiveAliases(t *testing.T) {
 	}
 }
 
+func TestSemanticInstallerORTNoticePreservesRawTarMemberNames(t *testing.T) {
+	for _, prefix := range []string{"./ort-root/", "ort-root/"} {
+		t.Run(strings.TrimSuffix(strings.ReplaceAll(prefix, "/", "_"), "_"), func(t *testing.T) {
+			entries := []semanticInstallerTarNamedEntry{
+				{name: prefix, entry: semanticInstallerTarEntry{kind: tar.TypeDir}},
+				{name: prefix + "lib/", entry: semanticInstallerTarEntry{kind: tar.TypeDir}},
+				{name: prefix + "lib/libonnxruntime.so", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("runtime")}},
+				{name: prefix + "LICENSE", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("license text")}},
+				{name: prefix + "ThirdPartyNotices.txt", entry: semanticInstallerTarEntry{kind: tar.TypeReg, data: []byte("notice text")}},
+			}
+			archivePath := filepath.Join(t.TempDir(), "runtime.tar.gz")
+			if err := os.WriteFile(archivePath, semanticInstallerTarGzSequence(t, entries), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root := filepath.Join(t.TempDir(), "unpacked")
+			members, err := extractSemanticTarGzWithInventory(archivePath, root)
+			if err != nil {
+				t.Fatalf("extract archive: %v", err)
+			}
+			runtimePath := filepath.Join(root, "ort-root", "lib", "libonnxruntime.so")
+			notices, err := semanticInstallerReadORTNoticeFiles(root, runtimePath, "https://example.invalid/runtime.tgz", semanticInstallerDigest([]byte("archive")), members)
+			if err != nil {
+				t.Fatalf("read extracted notices: %v", err)
+			}
+			if notices.LicenseMember != prefix+"LICENSE" || notices.NoticeMember != prefix+"ThirdPartyNotices.txt" {
+				t.Fatalf("reported members = %q/%q, want exact archive names %q/%q", notices.LicenseMember, notices.NoticeMember, prefix+"LICENSE", prefix+"ThirdPartyNotices.txt")
+			}
+			if string(notices.LicenseText) != "license text" || notices.LicenseSHA256 != semanticInstallerDigest([]byte("license text")) || notices.LicenseSize != uint64(len("license text")) {
+				t.Fatalf("license facts changed: %+v", notices)
+			}
+			if string(notices.NoticeText) != "notice text" || notices.NoticeSHA256 != semanticInstallerDigest([]byte("notice text")) || notices.NoticeSize != uint64(len("notice text")) {
+				t.Fatalf("notice facts changed: %+v", notices)
+			}
+		})
+	}
+}
+
 func TestSemanticInstallerSkipsArchiveLinksAndRejectsDuplicatePaths(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -742,8 +977,10 @@ func semanticInstallerTarGzSequence(t *testing.T, entries []semanticInstallerTar
 func semanticInstallerTestSpecs(t *testing.T, platform semanticBundleInstallPlatform) ([]semanticBundleInstallDownload, map[string][]byte) {
 	t.Helper()
 	runtimeArchive := semanticInstallerTarGz(t, map[string]semanticInstallerTarEntry{
-		"libonnxruntime.dylib":                  {kind: tar.TypeReg, data: []byte("runtime")},
-		"libonnxruntime_providers_shared.dylib": {kind: tar.TypeReg, data: []byte("provider")},
+		"onnxruntime-test/lib/libonnxruntime.dylib":                  {kind: tar.TypeReg, data: []byte("runtime")},
+		"onnxruntime-test/lib/libonnxruntime_providers_shared.dylib": {kind: tar.TypeReg, data: []byte("provider")},
+		"onnxruntime-test/LICENSE":                                   {kind: tar.TypeReg, data: []byte("synthetic ONNX Runtime license")},
+		"onnxruntime-test/ThirdPartyNotices.txt":                     {kind: tar.TypeReg, data: []byte("synthetic ONNX Runtime third-party notices")},
 	})
 	zvecArchive := semanticInstallerTarGz(t, map[string]semanticInstallerTarEntry{"libzvec_c_api.dylib": {kind: tar.TypeReg, data: []byte("zvec")}})
 	values := map[string][]byte{"runtime": runtimeArchive, "zvec": zvecArchive, "model": []byte("model"), "tokenizer": []byte("tokenizer"), "header": []byte("header")}

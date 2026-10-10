@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -25,10 +26,13 @@ import (
 )
 
 const (
-	semanticInstallerModelRevision = "75c43b069aac4d136ba6bc1122f995fedcfd2781"
-	semanticInstallerBaseRevision  = "7999e1d3359715c523056ef9478215996d62a620"
-	semanticInstallerZvecCommit    = "9199195b29dac4bf369bb16954464ddf2d73e932"
-	semanticInstallerZvecGoModule  = "github.com/zvec-ai/zvec-go"
+	semanticInstallerModelRevision  = "75c43b069aac4d136ba6bc1122f995fedcfd2781"
+	semanticInstallerBaseRevision   = "7999e1d3359715c523056ef9478215996d62a620"
+	semanticInstallerBaseCardSHA256 = "c48a4eeea77f6b1d38b48ec1c5b8d4f86d5550cc43fa345a0db1b2ca1d082369"
+	semanticInstallerMITCommit      = "c086741f5e117b7b8ce1745ea00b6c262f281a01"
+	semanticInstallerMITSHA256      = "587a673933425dbc36ec61268d3b954051b2d3ef3c9b322ede357976055ffdd5"
+	semanticInstallerZvecCommit     = "9199195b29dac4bf369bb16954464ddf2d73e932"
+	semanticInstallerZvecGoModule   = "github.com/zvec-ai/zvec-go"
 	// The upstream v0.6.0 tag moved; retain this 0.6.x pseudo-version as the
 	// immutable public proxy+sumdb-authenticated dependency. Do not re-resolve
 	// it with go get @commit or GOPROXY=direct.
@@ -54,6 +58,26 @@ const (
 
 	semanticInstallerMaxDownload = uint64(512 << 20)
 	semanticInstallerMaxExtract  = uint64(512 << 20)
+)
+
+const (
+	semanticInstallerModelURL     = "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/" + semanticInstallerModelRevision + "/onnx/model.onnx"
+	semanticInstallerTokenizerURL = "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/" + semanticInstallerModelRevision + "/tokenizer.json"
+)
+
+//go:embed model-license-flagembedding-mit.txt
+var semanticInstallerFlagEmbeddingMIT string
+
+//go:embed native-zvec-v0.6.0-LICENSE.txt
+var semanticInstallerZvecLicense string
+
+//go:embed native-zvec-v0.6.0-NOTICE.txt
+var semanticInstallerZvecNotice string
+
+const (
+	semanticInstallerZvecLicenseURL = "https://raw.githubusercontent.com/alibaba/zvec/v0.6.0/LICENSE"
+	semanticInstallerZvecNoticeURL  = "https://raw.githubusercontent.com/alibaba/zvec/v0.6.0/NOTICE"
+	semanticInstallerNativeTextMax  = uint64(2 << 20)
 )
 
 type semanticBundleHTTPClient interface {
@@ -179,8 +203,8 @@ func semanticDefaultInstallDownloads(platform semanticBundleInstallPlatform) []s
 	return []semanticBundleInstallDownload{
 		{Name: "runtime.archive", URL: platform.ORTURL, SHA256: platform.ORTSHA, Max: semanticInstallerMaxDownload},
 		{Name: "zvec.archive", URL: platform.ZvecURL, SHA256: platform.ZvecSHA, Max: semanticInstallerMaxDownload},
-		{Name: "model.onnx", URL: "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/" + semanticInstallerModelRevision + "/onnx/model.onnx", SHA256: semanticInstallerModelDigest, Size: semanticInstallerModelSize, Max: SemanticBundleMaxAssetBytes},
-		{Name: "tokenizer.json", URL: "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/" + semanticInstallerModelRevision + "/tokenizer.json", SHA256: semanticInstallerTokenizerDigest, Size: semanticInstallerTokenizerSize, Max: SemanticBundleMaxAssetBytes},
+		{Name: "model.onnx", URL: semanticInstallerModelURL, SHA256: semanticInstallerModelDigest, Size: semanticInstallerModelSize, Max: SemanticBundleMaxAssetBytes},
+		{Name: "tokenizer.json", URL: semanticInstallerTokenizerURL, SHA256: semanticInstallerTokenizerDigest, Size: semanticInstallerTokenizerSize, Max: SemanticBundleMaxAssetBytes},
 		{Name: "onnx-c-api.h", URL: "https://raw.githubusercontent.com/yalue/onnxruntime_go/" + semanticInstallerBindingCommit + "/onnxruntime_c_api.h", SHA256: semanticInstallerHeaderDigest, Size: semanticInstallerHeaderSize, Max: SemanticBundleMaxAssetBytes},
 	}
 }
@@ -244,6 +268,8 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	defer os.RemoveAll(stage)
 
 	paths := make(map[string]string, len(downloads))
+	downloadURLs := make(map[string]string, len(downloads))
+	downloadDigests := make(map[string]string, len(downloads))
 	for _, spec := range downloads {
 		if err := ctx.Err(); err != nil {
 			return semanticBundleInstallResult{}, fmt.Errorf("%w: installation canceled: %v", ErrInvalidSemanticBundle, err)
@@ -253,6 +279,21 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 			return semanticBundleInstallResult{}, err
 		}
 		paths[spec.Name] = path
+		downloadURLs[spec.Name] = spec.URL
+		downloadDigests[spec.Name] = spec.SHA256
+	}
+	modelDigest, modelSize, err := semanticFileDigest(paths["model.onnx"])
+	if err != nil {
+		return semanticBundleInstallResult{}, fmt.Errorf("%w: hash staged model: %v", ErrInvalidSemanticBundle, err)
+	}
+	tokenizerDigest, tokenizerSize, err := semanticFileDigest(paths["tokenizer.json"])
+	if err != nil {
+		return semanticBundleInstallResult{}, fmt.Errorf("%w: hash staged tokenizer: %v", ErrInvalidSemanticBundle, err)
+	}
+	modelURL, modelURLOK := downloadURLs["model.onnx"]
+	tokenizerURL, tokenizerURLOK := downloadURLs["tokenizer.json"]
+	if !modelURLOK || !tokenizerURLOK || strings.TrimSpace(modelURL) == "" || strings.TrimSpace(tokenizerURL) == "" {
+		return semanticBundleInstallResult{}, fmt.Errorf("%w: model and tokenizer source URLs are required", ErrInvalidSemanticBundle)
 	}
 	archiveRoot := filepath.Join(stage, "unpacked")
 	if err := os.MkdirAll(archiveRoot, 0o700); err != nil {
@@ -260,7 +301,8 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	}
 	ortRoot := filepath.Join(archiveRoot, "ort")
 	zvecRoot := filepath.Join(archiveRoot, "zvec")
-	if err := extractSemanticTarGz(paths["runtime.archive"], ortRoot); err != nil {
+	ortMembers, err := extractSemanticTarGzWithInventory(paths["runtime.archive"], ortRoot)
+	if err != nil {
 		return semanticBundleInstallResult{}, fmt.Errorf("%w: ONNX Runtime archive: %v", ErrInvalidSemanticBundle, err)
 	}
 	if err := extractSemanticTarGz(paths["zvec.archive"], zvecRoot); err != nil {
@@ -274,6 +316,12 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	if err != nil {
 		return semanticBundleInstallResult{}, fmt.Errorf("%w: zvec archive: %v", ErrInvalidSemanticBundle, err)
 	}
+	ortLicense, err := semanticInstallerReadORTNoticeFiles(ortRoot, runtimePath, downloadURLs["runtime.archive"], downloadDigests["runtime.archive"], ortMembers)
+	if err != nil {
+		return semanticBundleInstallResult{}, fmt.Errorf("%w: ONNX Runtime license/notice: %v", ErrInvalidSemanticBundle, err)
+	}
+	zvecLicenseDigest := semanticInstallerDigestString([]byte(semanticInstallerZvecLicense))
+	zvecNoticeDigest := semanticInstallerDigestString([]byte(semanticInstallerZvecNotice))
 	generated := map[string]string{}
 	generated["onnx-binding.txt"] = filepath.Join(stage, "onnx-binding.txt")
 	generated["profile.json"] = filepath.Join(stage, "profile.json")
@@ -283,20 +331,62 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 	if err := writeSemanticInstallerAsset(generated["onnx-binding.txt"], []byte("github.com/yalue/onnxruntime_go@v1.33.0\n"+semanticInstallerBindingCommit+"\n")); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
-	profile := map[string]any{"profile": SemanticBundleBGEProfileID, "model_id": "BAAI/bge-small-zh-v1.5", "base_model": "BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision, "onnx_converter_source": "Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision, "model_export": "onnx-single-file;converter=Xenova", "preprocessing_digest": semanticInstallerPreprocessingDigest}
+	profile := map[string]any{
+		"profile":         SemanticBundleBGEProfileID,
+		"model_id":        "BAAI/bge-small-zh-v1.5",
+		"model_family":    "BAAI/bge-small-zh-v1.5",
+		"base_model":      "BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision,
+		"base_model_role": "pinned BAAI model-card declaration; not proof of the exact source weights consumed by conversion",
+		"base_model_card": map[string]any{
+			"revision":            semanticInstallerBaseRevision,
+			"sha256":              semanticInstallerBaseCardSHA256,
+			"license_declared":    "MIT",
+			"license_text_source": "FlagEmbedding/LICENSE@" + semanticInstallerMITCommit,
+			"license_text_sha256": semanticInstallerMITSHA256,
+		},
+		"base_weights_revision_used": "NOT_VERIFIED",
+		"onnx_converter_source":      "Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision,
+		"model_export":               "onnx-single-file;converter=Xenova",
+		"delivered_model_artifact": map[string]any{
+			"repository": "Xenova/bge-small-zh-v1.5", "revision": semanticInstallerModelRevision,
+			"url": modelURL, "sha256": modelDigest, "size": modelSize,
+			"source_weights_revision_used": "NOT_VERIFIED", "conversion_recipe": "NOT_VERIFIED",
+			"license_applicability": "OPEN_FOR_REVIEW",
+		},
+		"tokenizer_artifact": map[string]any{
+			"repository": "Xenova/bge-small-zh-v1.5", "revision": semanticInstallerModelRevision,
+			"url": tokenizerURL, "sha256": tokenizerDigest, "size": tokenizerSize,
+		},
+		"preprocessing_digest": semanticInstallerPreprocessingDigest,
+	}
 	if err := writeSemanticInstallerJSON(generated["profile.json"], profile); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
-	license := "RestoreWeave semantic bundle license inventory\n\n" +
-		"BAAI/bge-small-zh-v1.5 and its Xenova ONNX conversion: MIT (base model).\n" +
-		"ONNX Runtime: MIT. github.com/microsoft/onnxruntime\n" +
+	license := "RestoreWeave semantic bundle license and attribution\n\n" +
+		"BAAI/bge-small-zh-v1.5 model-card revision " + semanticInstallerBaseRevision + " declares MIT and links FlagEmbedding/LICENSE.\n" +
+		"The delivered ONNX model and tokenizer are from Xenova/bge-small-zh-v1.5 revision " + semanticInstallerModelRevision + "; applicability of the BAAI terms to the conversion remains OPEN_FOR_REVIEW.\n" +
+		"Exact BAAI source weights revision consumed and conversion recipe are NOT_VERIFIED.\n" +
+		"FlagEmbedding/LICENSE source commit " + semanticInstallerMITCommit + "; full text SHA-256 " + semanticInstallerMITSHA256 + ".\n\n" +
+		semanticInstallerFlagEmbeddingMIT + "\n" +
+		"ONNX Runtime 1.29.0 license text from " + downloadURLs["runtime.archive"] + " (archive SHA-256 " + downloadDigests["runtime.archive"] + "; member " + ortLicense.LicenseMember + "; text SHA-256 " + ortLicense.LicenseSHA256 + ").\n\n" +
+		string(ortLicense.LicenseText) + "\n\n" +
 		"onnxruntime_go: MIT. github.com/yalue/onnxruntime_go\n" +
-		"zvec-go and native zvec libraries: Apache-2.0. github.com/zvec-ai/zvec-go\n"
+		"zvec native v0.6.0 LICENSE from " + semanticInstallerZvecLicenseURL + " (source version v0.6.0; text SHA-256 " + zvecLicenseDigest + ").\n\n" +
+		semanticInstallerZvecLicense + "\n\n" +
+		"zvec-go: Apache-2.0. github.com/zvec-ai/zvec-go\n" +
+		"Native transitive notice closure and complete package redistribution review remain open.\n"
 	if err := writeSemanticInstallerAsset(generated["LICENSE"], []byte(license)); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
-	notice := "This bundle uses the MIT BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision + " model via the pinned Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision + " ONNX conversion; it is not a BAAI-published ONNX artifact.\n" +
-		"Runtime: ONNX Runtime 1.29.0. Vector index: zvec 0.6.0. See LICENSE and SBOM for provenance.\n"
+	notice := "Model family/card declaration: BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision + " (MIT declared in the pinned card).\n" +
+		"Delivered ONNX artifact and tokenizer: Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision + ". The descriptor model_revision identifies this Xenova artifact revision.\n" +
+		"Original BAAI weight revision consumed and exact conversion recipe: NOT_VERIFIED; applicability of BAAI MIT terms to the delivered conversion remains OPEN_FOR_REVIEW.\n" +
+		"model.onnx URL: " + modelURL + "\nmodel.onnx SHA-256: " + modelDigest + "\ntokenizer.json URL: " + tokenizerURL + "\ntokenizer.json SHA-256: " + tokenizerDigest + "\n" +
+		"ONNX Runtime 1.29.0 ThirdPartyNotices from " + downloadURLs["runtime.archive"] + " (archive SHA-256 " + downloadDigests["runtime.archive"] + "; member " + ortLicense.NoticeMember + "; text SHA-256 " + ortLicense.NoticeSHA256 + ").\n\n" +
+		string(ortLicense.NoticeText) + "\n\n" +
+		"zvec native v0.6.0 NOTICE from " + semanticInstallerZvecNoticeURL + " (source version v0.6.0; text SHA-256 " + zvecNoticeDigest + ").\n\n" +
+		semanticInstallerZvecNotice + "\n\n" +
+		"The ONNX Runtime notice is for this platform's selected runtime archive only. Native transitive and complete package redistribution review remain open. See LICENSE and SBOM.\n"
 	if err := writeSemanticInstallerAsset(generated["NOTICE"], []byte(notice)); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
@@ -326,17 +416,52 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 		return semanticBundleInstallResult{}, err
 	}
 	zvecGoAsset := map[string]any{"path": "zvec-go.txt", "sha256": zvecGoDigest, "size": zvecGoSize}
+	licenseDigest, licenseSize, err := semanticFileDigest(generated["LICENSE"])
+	if err != nil {
+		return semanticBundleInstallResult{}, err
+	}
+	noticeDigest, noticeSize, err := semanticFileDigest(generated["NOTICE"])
+	if err != nil {
+		return semanticBundleInstallResult{}, err
+	}
 	sbom := map[string]any{
-		"schema":                "restoreweave.semantic-bundle.sbom.v1",
-		"profile":               SemanticBundleBGEProfileID,
-		"base_model":            "BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision,
-		"onnx_converter_source": "Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision,
+		"schema":          "restoreweave.semantic-bundle.sbom.v1",
+		"profile":         SemanticBundleBGEProfileID,
+		"base_model":      "BAAI/bge-small-zh-v1.5@" + semanticInstallerBaseRevision,
+		"base_model_role": "pinned model-card declaration; exact consumed source weights NOT_VERIFIED",
+		"base_model_card": map[string]any{
+			"revision": semanticInstallerBaseRevision, "sha256": semanticInstallerBaseCardSHA256,
+			"license_declared": "MIT", "license_text_source": "FlagEmbedding/LICENSE@" + semanticInstallerMITCommit,
+			"license_text_sha256": semanticInstallerMITSHA256,
+		},
+		"base_weights_revision_used": "NOT_VERIFIED",
+		"onnx_converter_source":      "Xenova/bge-small-zh-v1.5@" + semanticInstallerModelRevision,
+		"delivered_model_artifact": map[string]any{
+			"repository": "Xenova/bge-small-zh-v1.5", "revision": semanticInstallerModelRevision,
+			"url": modelURL, "sha256": modelDigest, "size": modelSize,
+			"source_weights_revision_used": "NOT_VERIFIED", "conversion_recipe": "NOT_VERIFIED",
+			"license_applicability": "OPEN_FOR_REVIEW",
+		},
+		"tokenizer_artifact": map[string]any{
+			"repository": "Xenova/bge-small-zh-v1.5", "revision": semanticInstallerModelRevision,
+			"url": tokenizerURL, "sha256": tokenizerDigest, "size": tokenizerSize,
+		},
+		"native_text_sources": map[string]any{
+			"onnxruntime_license_text":             map[string]any{"embedded_in_asset": "LICENSE", "text_sha256": ortLicense.LicenseSHA256, "text_size": ortLicense.LicenseSize, "archive_url": downloadURLs["runtime.archive"], "archive_sha256": downloadDigests["runtime.archive"], "tar_member": ortLicense.LicenseMember},
+			"onnxruntime_third_party_notices_text": map[string]any{"embedded_in_asset": "NOTICE", "text_sha256": ortLicense.NoticeSHA256, "text_size": ortLicense.NoticeSize, "archive_url": downloadURLs["runtime.archive"], "archive_sha256": downloadDigests["runtime.archive"], "tar_member": ortLicense.NoticeMember},
+			"zvec_native_license_text":             map[string]any{"embedded_in_asset": "LICENSE", "text_sha256": zvecLicenseDigest, "text_size": len(semanticInstallerZvecLicense), "source_url": semanticInstallerZvecLicenseURL, "source_version": semanticInstallerZvecVersion},
+			"zvec_native_notice_text":              map[string]any{"embedded_in_asset": "NOTICE", "text_sha256": zvecNoticeDigest, "text_size": len(semanticInstallerZvecNotice), "source_url": semanticInstallerZvecNoticeURL, "source_version": semanticInstallerZvecVersion},
+		},
 		"assets": map[string]any{
-			"onnxruntime_archive": map[string]any{"url": platform.ORTURL, "sha256": platform.ORTSHA},
-			"zvec_archive":        map[string]any{"url": platform.ZvecURL, "sha256": platform.ZvecSHA},
+			"onnxruntime_archive": map[string]any{"url": downloadURLs["runtime.archive"], "sha256": downloadDigests["runtime.archive"]},
+			"zvec_archive":        map[string]any{"url": downloadURLs["zvec.archive"], "sha256": downloadDigests["zvec.archive"]},
 			"runtime":             map[string]any{"sha256": runtimeDigest, "size": runtimeSize},
 			"zvec":                map[string]any{"sha256": zvecDigest, "size": zvecSize},
 			"zvec_go":             zvecGoAsset,
+			"model":               map[string]any{"path": "model.onnx", "url": modelURL, "sha256": modelDigest, "size": modelSize},
+			"tokenizer":           map[string]any{"path": "tokenizer.json", "url": tokenizerURL, "sha256": tokenizerDigest, "size": tokenizerSize},
+			"license":             map[string]any{"path": "LICENSE", "sha256": licenseDigest, "size": licenseSize},
+			"notice":              map[string]any{"path": "NOTICE", "sha256": noticeDigest, "size": noticeSize},
 		},
 		"dependencies": map[string]any{
 			"zvec_go": map[string]any{
@@ -850,21 +975,31 @@ func downloadSemanticInstallerAsset(ctx context.Context, client semanticBundleHT
 }
 
 func extractSemanticTarGz(archivePath, destination string) error {
+	_, err := extractSemanticTarGzWithInventory(archivePath, destination)
+	return err
+}
+
+// extractSemanticTarGzWithInventory returns the original tar member names for
+// successfully materialized regular files, keyed by their safe normalized
+// extraction paths. The inventory is ephemeral provenance from this verified
+// extraction, not a second archive parser or durable store.
+func extractSemanticTarGzWithInventory(archivePath, destination string) (map[string]string, error) {
 	input, err := os.Open(archivePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer input.Close()
 	gz, err := gzip.NewReader(input)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer gz.Close()
 	if err := os.MkdirAll(destination, 0o700); err != nil {
-		return err
+		return nil, err
 	}
 	tr := tar.NewReader(gz)
 	seen := map[string]bool{}
+	regularMembers := map[string]string{}
 	var total uint64
 	for {
 		hdr, err := tr.Next()
@@ -872,42 +1007,43 @@ func extractSemanticTarGz(archivePath, destination string) error {
 			break
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 		clean, err := semanticArchivePath(hdr.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		target := filepath.Join(destination, filepath.FromSlash(clean))
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			if seen[clean] {
-				return fmt.Errorf("duplicate archive path %q", clean)
+				return nil, fmt.Errorf("duplicate archive path %q", clean)
 			}
 			if err := os.MkdirAll(target, 0o700); err != nil {
-				return err
+				return nil, err
 			}
 			seen[clean] = true
 		case tar.TypeReg, tar.TypeRegA:
 			if seen[clean] {
-				return fmt.Errorf("duplicate archive path %q", clean)
+				return nil, fmt.Errorf("duplicate archive path %q", clean)
 			}
 			if hdr.Size < 0 || uint64(hdr.Size) > semanticInstallerMaxExtract-total {
-				return fmt.Errorf("archive exceeds extraction limit")
+				return nil, fmt.Errorf("archive exceeds extraction limit")
 			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-				return err
+				return nil, err
 			}
 			f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			_, copyErr := io.CopyN(f, tr, hdr.Size)
 			closeErr := f.Close()
 			if copyErr != nil || closeErr != nil {
-				return fmt.Errorf("extract %q: %v %v", clean, copyErr, closeErr)
+				return nil, fmt.Errorf("extract %q: %v %v", clean, copyErr, closeErr)
 			}
 			seen[clean] = true
+			regularMembers[clean] = hdr.Name
 			total += uint64(hdr.Size)
 		case tar.TypeSymlink, tar.TypeLink:
 			// Release archives use links for library aliases. Never materialize
@@ -915,14 +1051,14 @@ func extractSemanticTarGz(archivePath, destination string) error {
 			// the entry in the path set so a later file cannot silently replace
 			// an archive member with the same normalized name.
 			if seen[clean] {
-				return fmt.Errorf("duplicate archive path %q", clean)
+				return nil, fmt.Errorf("duplicate archive path %q", clean)
 			}
 			seen[clean] = true
 		default:
-			return fmt.Errorf("unsupported archive entry %q type %d", clean, hdr.Typeflag)
+			return nil, fmt.Errorf("unsupported archive entry %q type %d", clean, hdr.Typeflag)
 		}
 	}
-	return nil
+	return regularMembers, nil
 }
 
 func semanticArchivePath(name string) (string, error) {
@@ -1037,6 +1173,77 @@ func semanticNumericVersion(value string) bool {
 		}
 	}
 	return true
+}
+
+type semanticInstallerORTNotices struct {
+	LicenseText   []byte
+	LicenseMember string
+	LicenseSHA256 string
+	LicenseSize   uint64
+	NoticeText    []byte
+	NoticeMember  string
+	NoticeSHA256  string
+	NoticeSize    uint64
+}
+
+// semanticInstallerReadORTNoticeFiles reads only regular license members from
+// the same one-component upstream root that contains the selected canonical
+// runtime library. The archive itself has already passed its pinned digest and
+// safe extraction checks; these additional checks keep notices platform-bound
+// and reject ambiguous or unexpectedly large inputs before publication.
+func semanticInstallerReadORTNoticeFiles(extractRoot, runtimePath, archiveURL, archiveSHA256 string, memberNames map[string]string) (semanticInstallerORTNotices, error) {
+	rel, err := filepath.Rel(extractRoot, runtimePath)
+	if err != nil || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return semanticInstallerORTNotices{}, fmt.Errorf("selected runtime is outside extracted archive root")
+	}
+	parts := strings.Split(filepath.Clean(rel), string(filepath.Separator))
+	if len(parts) != 3 || parts[1] != "lib" || parts[0] == "" || parts[0] == "." {
+		return semanticInstallerORTNotices{}, fmt.Errorf("selected runtime does not have the expected upstream-root/lib layout")
+	}
+	readMember := func(name string) ([]byte, string, string, uint64, error) {
+		relative := filepath.ToSlash(filepath.Join(parts[0], name))
+		memberName, ok := memberNames[relative]
+		if !ok || memberName == "" {
+			return nil, "", "", 0, fmt.Errorf("%s is not a materialized regular archive member", name)
+		}
+		file, err := openBundleFileNoFollow(extractRoot, relative)
+		if err != nil {
+			return nil, "", "", 0, err
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil {
+			return nil, "", "", 0, err
+		}
+		if info.Size() <= 0 || uint64(info.Size()) > semanticInstallerNativeTextMax {
+			return nil, "", "", 0, fmt.Errorf("%s must be a non-empty regular file no larger than %d bytes", name, semanticInstallerNativeTextMax)
+		}
+		data, err := io.ReadAll(io.LimitReader(file, int64(semanticInstallerNativeTextMax)+1))
+		if err != nil {
+			return nil, "", "", 0, err
+		}
+		if uint64(len(data)) != uint64(info.Size()) || uint64(len(data)) > semanticInstallerNativeTextMax {
+			return nil, "", "", 0, fmt.Errorf("%s changed or exceeded its size bound while reading", name)
+		}
+		return data, memberName, semanticInstallerDigestString(data), uint64(len(data)), nil
+	}
+	license, licenseMember, licenseSHA, licenseSize, err := readMember("LICENSE")
+	if err != nil {
+		return semanticInstallerORTNotices{}, fmt.Errorf("read LICENSE from %s (%s): %w", archiveURL, archiveSHA256, err)
+	}
+	notice, noticeMember, noticeSHA, noticeSize, err := readMember("ThirdPartyNotices.txt")
+	if err != nil {
+		return semanticInstallerORTNotices{}, fmt.Errorf("read ThirdPartyNotices.txt from %s (%s): %w", archiveURL, archiveSHA256, err)
+	}
+	return semanticInstallerORTNotices{
+		LicenseText: license, LicenseMember: licenseMember, LicenseSHA256: licenseSHA, LicenseSize: licenseSize,
+		NoticeText: notice, NoticeMember: noticeMember, NoticeSHA256: noticeSHA, NoticeSize: noticeSize,
+	}, nil
+}
+
+func semanticInstallerDigestString(data []byte) string {
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
 
 func writeSemanticInstallerAsset(path string, data []byte) error {

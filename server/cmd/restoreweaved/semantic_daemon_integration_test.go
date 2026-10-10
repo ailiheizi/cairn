@@ -47,6 +47,25 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "xdg-data")
+	workerTempBase := os.TempDir()
+	if runtime.GOOS == "darwin" {
+		workerTempBase = "/tmp"
+	}
+	workerTempBase, err := filepath.EvalSymlinks(workerTempBase)
+	if err != nil {
+		t.Fatalf("resolve worker temp base: %v", err)
+	}
+	workerTemp, err := os.MkdirTemp(workerTempBase, "rw-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(workerTemp) })
+	if err := os.Chown(workerTemp, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatalf("set worker temp ownership: %v", err)
+	}
+	if err := os.Chmod(workerTemp, 0o700); err != nil {
+		t.Fatalf("protect worker temp directory: %v", err)
+	}
 	source := filepath.Join(root, "source")
 	if err := os.MkdirAll(source, 0o700); err != nil {
 		t.Fatal(err)
@@ -55,7 +74,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(root, "config", "config.yaml")
-	env := append(os.Environ(), "XDG_DATA_HOME="+dataHome)
+	env := append(os.Environ(), "XDG_DATA_HOME="+dataHome, "TMPDIR="+workerTemp)
 	initConfig := exec.Command(rwBin, "config", "init", "--path", configPath)
 	initConfig.Env = env
 	if output, err := initConfig.CombinedOutput(); err != nil {
@@ -128,7 +147,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	var description command.DescriptionCreateData
 	decodeProcessResult(t, created, &description)
 
-	semanticQuery := runRealRWProcess(t, rwBin, socketPath, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
+	semanticQuery := runRealRWProcessWithDaemonLog(t, rwBin, socketPath, daemonLog, "search", "洪水城市", "--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionSemantic)
 	var semanticData command.SearchQueryData
 	decodeProcessResult(t, semanticQuery, &semanticData)
 	if semanticData.Dimension != search.DimensionSemantic || semanticData.Provider != search.ProviderSemanticONNX || len(semanticData.Hits) != 1 {
@@ -228,7 +247,7 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	if degraded.Status != command.StatusDegraded {
 		t.Fatalf("deleted semantic generation status = %s, reasons=%+v", degraded.Status, degraded.Reasons)
 	}
-	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), command.CapabilityUnavailable)
+	assertSemanticCapability(t, runRealRWProcess(t, rwBin, socketPath, "capability", "list"), search.IndexStateNotBuilt)
 	createdAgain := runRealRWProcess(t, rwBin, socketPath, "description", "create", resolvedData.PathRef, "--workspace", appliedData.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "语义恢复 2", "--body", "洪水城市档案恢复说明", "--accepted")
 	if createdAgain.Status != command.StatusSucceeded {
 		t.Fatalf("semantic rebuild description status = %s, reasons=%+v", createdAgain.Status, createdAgain.Reasons)
@@ -303,6 +322,23 @@ func runRealRWProcess(t *testing.T, rwBin, socketPath string, args ...string) co
 	}
 	if result.Status != command.StatusSucceeded {
 		t.Fatalf("rw %s status = %s, reasons=%+v", strings.Join(args, " "), result.Status, result.Reasons)
+	}
+	return result
+}
+
+func runRealRWProcessWithDaemonLog(t *testing.T, rwBin, socketPath string, daemonLog *bytes.Buffer, args ...string) command.Result {
+	t.Helper()
+	fullArgs := append([]string{"--socket", socketPath, "--timeout", "90s", "--json"}, args...)
+	output, err := exec.Command(rwBin, fullArgs...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("rw %s: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
+	}
+	var result command.Result
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("decode rw %s result: %v\n%s\ndaemon log:\n%s", strings.Join(args, " "), err, output, daemonLog.String())
+	}
+	if result.Status != command.StatusSucceeded {
+		t.Fatalf("rw %s status = %s, reasons=%+v\ndaemon log:\n%s", strings.Join(args, " "), result.Status, result.Reasons, daemonLog.String())
 	}
 	return result
 }

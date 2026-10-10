@@ -205,6 +205,82 @@ func TestMeasureSavingsRawProfilePhysicalEqualsLogical(t *testing.T) {
 	}
 }
 
+// TestMeasureSavingsRemeasuresPhysicalBytesInsteadOfTrustingReceiptTelemetry
+// distinguishes the independently measured in-tree report from unsigned
+// placement telemetry. Missing, unknown, and unavailable receipt states cannot
+// fabricate physical or compression totals; the report uses the actual object
+// length on disk after logical readback.
+func TestMeasureSavingsRemeasuresPhysicalBytesInsteadOfTrustingReceiptTelemetry(t *testing.T) {
+	ctx := context.Background()
+	type receiptOverride struct {
+		name  string
+		state StoredBytesState
+		bytes int64
+	}
+	overrides := []receiptOverride{
+		{name: "unavailable zero", state: StoredBytesUnavailable, bytes: 0},
+		{name: "unavailable shared-count", state: StoredBytesUnavailable, bytes: 4 * 1024 * 1024},
+		{name: "omitted state", state: "", bytes: 1},
+		{name: "unrecognized state", state: "PARTIALLY_MEASURED", bytes: 1},
+		{name: "measured negative", state: StoredBytesMeasured, bytes: -1},
+		{name: "measured zero for nonempty object", state: StoredBytesMeasured, bytes: 0},
+	}
+	profiles := []struct {
+		name string
+		open func(string) (Driver, error)
+	}{
+		{name: "raw", open: func(root string) (Driver, error) { return OpenDir(root) }},
+		{name: "zstd", open: func(root string) (Driver, error) { return OpenZstdDir(root) }},
+	}
+	for _, profile := range profiles {
+		t.Run(profile.name, func(t *testing.T) {
+			repo, err := profile.open(filepath.Join(t.TempDir(), "repo"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := bytes.Repeat([]byte("compressible source bytes with a repeated exact pattern\n"), 2048)
+			actual, err := repo.Place(ctx, bytes.NewReader(payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualPhysical, err := fileSize(blobPath(repo.Root(), actual.ContentID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantCompression := int64(len(payload)) - actualPhysical
+			if wantCompression < 0 {
+				wantCompression = 0
+			}
+			for _, override := range overrides {
+				t.Run(override.name, func(t *testing.T) {
+					receipt := actual
+					receipt.StoredBytesState = override.state
+					receipt.StoredBytes = override.bytes
+					if receipt.HasMeasuredStoredBytes() {
+						t.Fatalf("invalid telemetry %+v passed structural measurement validation", override)
+					}
+					report, err := MeasureSavings(ctx, repo, []Receipt{receipt})
+					if err != nil {
+						t.Fatalf("independent on-disk report failed with unavailable receipt telemetry: %v", err)
+					}
+					if report.LogicalBytes != int64(len(payload)) {
+						t.Fatalf("LogicalBytes = %d, want %d", report.LogicalBytes, len(payload))
+					}
+					if report.PhysicalStoredBytes != actualPhysical {
+						t.Fatalf("PhysicalStoredBytes = %d, want disk-measured %d (receipt telemetry %+v)", report.PhysicalStoredBytes, actualPhysical, override)
+					}
+					if report.CompressionSavedBytes != wantCompression {
+						t.Fatalf("CompressionSavedBytes = %d, want disk-measured %d (receipt telemetry %+v)", report.CompressionSavedBytes, wantCompression, override)
+					}
+					if profile.name == "raw" && report.CompressionSavedBytes != 0 {
+						t.Fatalf("unknown telemetry fabricated raw compression savings: %d", report.CompressionSavedBytes)
+					}
+				})
+			}
+		})
+	}
+}
+
 // TestMeasureSavingsAcceptsEmptyObject preserves the valid zero-length member
 // of the SHA-256-plus-length identity tuple. Empty files must be measurable in
 // both in-tree profiles rather than being mistaken for malformed receipts.

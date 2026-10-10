@@ -18,21 +18,24 @@ import (
 // deployment rather than by the repository driver. Empty paths remain
 // UNMEASURED; they are not silently treated as zero.
 type DeploymentOverhead struct {
-	Catalog   repository.SavingsOverheadCategory `json:"catalog"`
-	Index     repository.SavingsOverheadCategory `json:"index"`
-	Model     repository.SavingsOverheadCategory `json:"model"`
-	Temporary repository.SavingsOverheadCategory `json:"temporary"`
+	Catalog                    repository.SavingsOverheadCategory `json:"catalog"`
+	Index                      repository.SavingsOverheadCategory `json:"index"`
+	Model                      repository.SavingsOverheadCategory `json:"model"`
+	Temporary                  repository.SavingsOverheadCategory `json:"temporary"`
+	ReportedTemporaryPeakBytes *int64                             `json:"reported_temporary_peak_bytes,omitempty"`
 }
 
 // DeploymentSavings extends the repository report without changing the
-// repository package's accounting contract. Net is valid only when every
-// deployment category was measured.
+// repository package's accounting contract. Deployment net remains
+// UNMEASURED until external overhead and the repository run have a genuine
+// binding, even when each supplied category has a measured size.
 type DeploymentSavings struct {
 	Overhead           repository.SavingsOverhead         `json:"repository_overhead"`
 	External           DeploymentOverhead                 `json:"external_overhead"`
 	Net                repository.SavingsOverheadCategory `json:"net_savings"`
 	RepositoryManifest CorpusManifest                     `json:"repository_manifest"`
 	Correlation        string                             `json:"correlation"`
+	NetReason          string                             `json:"net_savings_reason,omitempty"`
 }
 
 type deploymentPath struct {
@@ -81,7 +84,10 @@ func MeasureDeploymentOverhead(catalogPath, indexPath, modelPath string, tempora
 		}
 	}
 	if temporaryPeakBytes >= 0 {
-		result.Temporary = measuredCategory(temporaryPeakBytes)
+		// This value is a caller claim, not an observed peak. Preserve it for
+		// review without allowing it to participate in measured net savings.
+		claimed := temporaryPeakBytes
+		result.ReportedTemporaryPeakBytes = &claimed
 	} else if temporaryPeakBytes != -1 {
 		return DeploymentOverhead{}, fmt.Errorf("temporary peak bytes must be non-negative or omitted, got %d", temporaryPeakBytes)
 	}
@@ -202,10 +208,33 @@ func deploymentSavings(report repository.SavingsReport, external DeploymentOverh
 			complete = false
 			continue
 		}
+		if item.category.Bytes < 0 || externalBytes > int64(^uint64(0)>>1)-item.category.Bytes {
+			result.NetReason = "deployment overhead total overflows int64 or contains a negative category"
+			return result
+		}
 		externalBytes += item.category.Bytes
 	}
 	if complete {
-		result.Net = measuredCategory(report.LogicalBytes - report.RepositoryGrowthBytes - externalBytes)
+		if _, err := checkedDeploymentNet(report.LogicalBytes, report.RepositoryGrowthBytes, externalBytes); err != nil {
+			result.NetReason = err.Error()
+			return result
+		}
+		result.NetReason = "deployment overhead is not bound to the repository measurement"
+	} else {
+		result.NetReason = "one or more deployment overhead categories are unmeasured and deployment binding is unavailable"
 	}
 	return result
+}
+
+func checkedDeploymentNet(logicalBytes, repositoryGrowthBytes, externalBytes int64) (int64, error) {
+	maxInt := int64(^uint64(0) >> 1)
+	minInt := -maxInt - 1
+	if logicalBytes < 0 || repositoryGrowthBytes < 0 || externalBytes < 0 || logicalBytes < minInt+repositoryGrowthBytes {
+		return 0, errors.New("deployment net savings arithmetic overflows int64 or contains a negative input")
+	}
+	net := logicalBytes - repositoryGrowthBytes
+	if externalBytes > 0 && net < minInt+externalBytes {
+		return 0, errors.New("deployment net savings arithmetic overflows int64")
+	}
+	return net - externalBytes, nil
 }

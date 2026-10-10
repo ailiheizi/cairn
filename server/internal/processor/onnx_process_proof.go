@@ -52,12 +52,91 @@ const (
 
 	onnxWorkerNonceBytes   = 32
 	onnxWorkerMaxHandshake = 30 * time.Second
+	onnxWorkerStderrLimit  = 8 << 10
+	onnxWorkerWaitDelay    = 250 * time.Millisecond
 )
 
 var (
 	errONNXWorkerProofUnavailable = errors.New("ONNX worker process proof is unavailable")
 	errONNXWorkerProofInvalid     = errors.New("ONNX worker process proof is invalid")
 )
+
+// onnxWorkerStderr keeps startup diagnostics useful without allowing a child
+// to grow the host process's memory without bound. It always drains the pipe;
+// bytes beyond the limit are discarded and reported as truncated.
+type onnxWorkerStderr struct {
+	mu        sync.Mutex
+	data      []byte
+	truncated bool
+}
+
+func (w *onnxWorkerStderr) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	remaining := onnxWorkerStderrLimit - len(w.data)
+	if remaining > 0 {
+		if remaining > len(p) {
+			remaining = len(p)
+		}
+		w.data = append(w.data, p[:remaining]...)
+	}
+	if remaining < len(p) {
+		w.truncated = true
+	}
+	// Report all input consumed so os/exec keeps draining even after the
+	// diagnostic cap has been reached.
+	return len(p), nil
+}
+
+func (w *onnxWorkerStderr) diagnostic() string {
+	if w == nil {
+		return ""
+	}
+	w.mu.Lock()
+	data := append([]byte(nil), w.data...)
+	truncated := w.truncated
+	w.mu.Unlock()
+	text := strings.ToValidUTF8(string(data), "�")
+	text = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' || r >= 0x20 && r != 0x7f {
+			return r
+		}
+		return ' '
+	}, text)
+	text = strings.TrimSpace(text)
+	if truncated {
+		if text != "" {
+			text += " "
+		}
+		text += "[stderr truncated after 8192 bytes]"
+	}
+	return text
+}
+
+func onnxWorkerEarlyExitError(cmd *exec.Cmd, waitErr error, stderr *onnxWorkerStderr) error {
+	exit := "exit status unavailable"
+	if cmd != nil && cmd.ProcessState != nil {
+		exit = fmt.Sprintf("exit code %d", cmd.ProcessState.ExitCode())
+	} else if waitErr != nil {
+		exit = waitErr.Error()
+	}
+	if errors.Is(waitErr, exec.ErrWaitDelay) {
+		exit += " (stderr pipe exceeded bounded wait delay)"
+	} else if waitErr != nil && cmd != nil && cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == 0 {
+		exit += ": " + waitErr.Error()
+	}
+	if diagnostic := stderr.diagnostic(); diagnostic != "" {
+		exit += "; stderr: " + diagnostic
+	}
+	if waitErr != nil {
+		return fmt.Errorf("%w: child exited before control connection (%s): %w", errONNXWorkerProofUnavailable, exit, waitErr)
+	}
+	return fmt.Errorf("%w: child exited before control connection (%s)", errONNXWorkerProofUnavailable, exit)
+}
+
+func onnxWorkerStartupCanceledError(ctx context.Context) error {
+	return fmt.Errorf("%w: control handshake canceled: %w", errONNXWorkerProofUnavailable, ctx.Err())
+}
 
 // onnxWorkerProofConfig is private launcher input. The parent never inherits
 // its ambient environment, and this proof currently admits no caller-supplied
@@ -346,13 +425,18 @@ func (s *onnxWorkerSession) close() error {
 			if cmd != nil && cmd.Process != nil {
 				_ = cmd.Process.Kill()
 			}
-			<-done
+			// The waiter remains the sole cmd.Wait authority. A process that
+			// cannot be reaped promptly must not make cleanup block forever.
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+			}
 		}
 	}
 	if process != nil {
 		_ = process.closeHandle()
 	}
-	return os.RemoveAll(root)
+	return removeONNXWorkerRoot(root)
 }
 
 func openONNXExecutableNoFollow(path string) (*os.File, error) {
@@ -426,7 +510,10 @@ func stageONNXBundle(ctx context.Context, root, source, expectedProfile string) 
 		return err
 	}
 	bundleRoot := filepath.Join(root, "bundle")
-	if err := os.Mkdir(bundleRoot, 0o500); err != nil {
+	// Keep the host-owned construction tree private but writable until every
+	// admitted asset has been copied. It is sealed read-only before the worker
+	// starts and the sandbox receives the whole staging root read-only.
+	if err := os.Mkdir(bundleRoot, 0o700); err != nil {
 		return fmt.Errorf("create staged bundle: %w", err)
 	}
 	descriptor, err := json.Marshal(bundle.Descriptor)
@@ -453,7 +540,7 @@ func stageONNXBundle(ctx context.Context, root, source, expectedProfile string) 
 			return fmt.Errorf("stage bundle asset %s: %w", asset.name, err)
 		}
 		destination := filepath.Join(bundleRoot, filepath.FromSlash(asset.path))
-		if err := os.MkdirAll(filepath.Dir(destination), 0o500); err != nil {
+		if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 			return fmt.Errorf("stage bundle asset directory %s: %w", asset.name, err)
 		}
 		file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
@@ -470,7 +557,141 @@ func stageONNXBundle(ctx context.Context, root, source, expectedProfile string) 
 			return fmt.Errorf("stage bundle asset %s: %w", asset.name, closeErr)
 		}
 	}
+	if err := sealONNXBundleDirectory(bundleRoot); err != nil {
+		return fmt.Errorf("seal staged bundle read-only: %w", err)
+	}
 	return nil
+}
+
+// sealONNXBundleDirectory makes the completed admitted tree readable but not
+// writable by its owner. It rejects links and special files and seals nested
+// directories from the leaves upward so staging never needs a writable parent
+// after this function succeeds.
+func sealONNXBundleDirectory(path string) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		child := filepath.Join(path, entry.Name())
+		info, err := os.Lstat(child)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("staged bundle contains a symlink: %s", entry.Name())
+		}
+		if info.IsDir() {
+			if err := sealONNXBundleDirectory(child); err != nil {
+				return err
+			}
+		} else if !info.Mode().IsRegular() {
+			return fmt.Errorf("staged bundle contains a non-regular file: %s", entry.Name())
+		}
+	}
+	return os.Chmod(path, 0o500)
+}
+
+// removeONNXWorkerRoot only accepts a root minted by this supervisor. Before
+// RemoveAll, restore owner access on directories inside that private tree;
+// otherwise sealed 0500 bundle directories cannot be emptied by an ordinary
+// owner. Lstat and ReadDir do not follow child symlinks, which RemoveAll then
+// unlinks as entries rather than traversing into their targets.
+func removeONNXWorkerRoot(root string) error {
+	if root == "" {
+		return nil
+	}
+	if !filepath.IsAbs(root) || filepath.Clean(root) != root ||
+		!strings.HasPrefix(filepath.Base(root), "restoreweave-onnx-worker-") {
+		return fmt.Errorf("refuse to clean an unowned ONNX worker root")
+	}
+	info, err := os.Lstat(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refuse to clean a non-directory or symlink ONNX worker root")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || int(stat.Uid) != os.Geteuid() || info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("refuse to clean a worker root not owned and private to this user")
+	}
+	if err := makeONNXWorkerDirectoriesRemovable(root); err != nil {
+		return err
+	}
+	return os.RemoveAll(root)
+}
+
+func makeONNXWorkerDirectoriesRemovable(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil
+	}
+	if err := os.Chmod(path, info.Mode().Perm()|0o700); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		child := filepath.Join(path, entry.Name())
+		childInfo, err := os.Lstat(child)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if childInfo.IsDir() && childInfo.Mode()&os.ModeSymlink == 0 {
+			if err := makeONNXWorkerDirectoriesRemovable(child); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// createONNXWorkerRoot gives the supervisor's private directory the current
+// user's primary group before any socket or child-visible path is created.
+// Some Unix systems inherit a temporary parent directory's group even when
+// MkdirTemp creates the child with mode 0700. The ownership proof intentionally
+// requires an exact uid/gid match, so normalize only this newly minted root and
+// fail closed if that cannot be done.
+func createONNXWorkerRoot() (string, error) {
+	root, err := os.MkdirTemp("", "restoreweave-onnx-worker-")
+	if err != nil {
+		return "", err
+	}
+	fail := func(cause error) (string, error) {
+		return "", errors.Join(cause, removeONNXWorkerRoot(root))
+	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 || rootInfo.Mode().Perm() != 0o700 {
+		return fail(fmt.Errorf("new private worker root is not a real 0700 directory"))
+	}
+	rootStat, ok := rootInfo.Sys().(*syscall.Stat_t)
+	if !ok || uint64(rootStat.Uid) != uint64(os.Getuid()) {
+		return fail(fmt.Errorf("new private worker root is not owned by the current uid"))
+	}
+	if uint64(rootStat.Gid) != uint64(os.Getgid()) {
+		if err := os.Lchown(root, -1, os.Getgid()); err != nil {
+			return fail(fmt.Errorf("set private worker root group ownership: %w", err))
+		}
+	}
+	if err := os.Chmod(root, 0o700); err != nil {
+		return fail(fmt.Errorf("protect private worker root: %w", err))
+	}
+	if err := verifyONNXWorkerRootPermissions(root); err != nil {
+		return fail(err)
+	}
+	return root, nil
 }
 
 func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*onnxWorkerSession, error) {
@@ -497,7 +718,7 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 		clear(nonce)
 		return nil, fmt.Errorf("%w: generate session ID: %v", errONNXWorkerProofUnavailable, err)
 	}
-	root, err := os.MkdirTemp("", "restoreweave-onnx-worker-")
+	root, err := createONNXWorkerRoot()
 	if err != nil {
 		clear(nonce)
 		return nil, fmt.Errorf("%w: create private directory: %v", errONNXWorkerProofUnavailable, err)
@@ -513,6 +734,16 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 			select {
 			case <-done:
 			case <-time.After(2 * time.Second):
+				if cmd != nil && cmd.Process != nil {
+					_ = cmd.Process.Kill()
+				}
+				// cmd.Wait is owned by the single waiter goroutine. WaitDelay
+				// bounds inherited stderr pipes; retain a bounded cleanup wait
+				// while that goroutine remains responsible for eventual reaping.
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+				}
 			}
 		} else if cmd != nil && cmd.Process != nil {
 			_ = cmd.Wait()
@@ -521,11 +752,10 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 			_ = process.closeHandle()
 		}
 		clear(nonce)
-		_ = os.RemoveAll(root)
+		if cleanupErr := removeONNXWorkerRoot(root); cleanupErr != nil {
+			return errors.Join(cause, fmt.Errorf("clean private ONNX worker root: %w", cleanupErr))
+		}
 		return cause
-	}
-	if err := os.Chmod(root, 0o700); err != nil {
-		return nil, fail(fmt.Errorf("%w: protect private directory: %v", errONNXWorkerProofUnavailable, err), nil, nil, nil, nil)
 	}
 	socketPath := filepath.Join(root, "control.sock")
 	lis, err := net.ListenUnix("unix", &net.UnixAddr{Name: socketPath, Net: "unix"})
@@ -634,6 +864,9 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 	cmd.Dir = workerWorkingDir
 	cmd.Env = workerEnv
 	cmd.ExtraFiles = []*os.File{nonceRead}
+	stderr := &onnxWorkerStderr{}
+	cmd.Stderr = stderr
+	cmd.WaitDelay = onnxWorkerWaitDelay
 	if err := cmd.Start(); err != nil {
 		_ = nonceRead.Close()
 		_ = nonceWrite.Close()
@@ -648,8 +881,9 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 		return nil, fail(fmt.Errorf("%w: process liveness: %v", errONNXWorkerProofUnavailable, err), nil, cmd, nil, nil)
 	}
 	done := make(chan struct{})
+	var waitErr error
 	go func() {
-		_ = cmd.Wait()
+		waitErr = cmd.Wait()
 		process.markExited()
 		close(done)
 	}()
@@ -667,10 +901,56 @@ func startONNXWorkerSession(ctx context.Context, cfg onnxWorkerProofConfig) (*on
 		_ = lis.Close()
 		return nil, fail(fmt.Errorf("%w: listener deadline: %v", errONNXWorkerProofUnavailable, err), nil, cmd, process, done)
 	}
-	conn, err := lis.Accept()
-	_ = lis.Close()
+	type acceptResult struct {
+		conn *net.UnixConn
+		err  error
+	}
+	acceptedCh := make(chan acceptResult, 1)
+	go func() {
+		conn, acceptErr := lis.AcceptUnix()
+		acceptedCh <- acceptResult{conn: conn, err: acceptErr}
+	}()
+	var accepted acceptResult
+	select {
+	case accepted = <-acceptedCh:
+		_ = lis.Close()
+	case <-done:
+		_ = lis.Close()
+		accepted = <-acceptedCh
+		if ctx.Err() != nil {
+			if accepted.conn != nil {
+				_ = accepted.conn.Close()
+			}
+			return nil, fail(onnxWorkerStartupCanceledError(ctx), nil, cmd, process, done)
+		}
+		// A connection may have arrived at the same time as process exit.
+		// Preserve the existing challenge/readiness validation errors for that
+		// peer instead of replacing them with the generic early-exit diagnosis.
+		if accepted.conn == nil {
+			return nil, fail(onnxWorkerEarlyExitError(cmd, waitErr, stderr), nil, cmd, process, done)
+		}
+	case <-ctx.Done():
+		_ = lis.Close()
+		accepted = <-acceptedCh
+		if accepted.conn != nil {
+			_ = accepted.conn.Close()
+		}
+		return nil, fail(onnxWorkerStartupCanceledError(ctx), nil, cmd, process, done)
+	}
+	conn, err := accepted.conn, accepted.err
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fail(onnxWorkerStartupCanceledError(ctx), nil, cmd, process, done)
+		}
+		select {
+		case <-done:
+			return nil, fail(onnxWorkerEarlyExitError(cmd, waitErr, stderr), nil, cmd, process, done)
+		default:
+		}
 		return nil, fail(fmt.Errorf("%w: accept child: %v", errONNXWorkerProofUnavailable, err), nil, cmd, process, done)
+	}
+	if ctx.Err() != nil {
+		return nil, fail(onnxWorkerStartupCanceledError(ctx), conn, cmd, process, done)
 	}
 	if err := conn.SetDeadline(deadline); err != nil {
 		return nil, fail(fmt.Errorf("%w: connection deadline: %v", errONNXWorkerProofUnavailable, err), conn, cmd, process, done)
@@ -772,13 +1052,20 @@ func monitorONNXWorkerLease(parent context.Context, session *onnxWorkerSession, 
 }
 
 func verifyONNXWorkerProofPermissions(root, socket string) error {
-	rootInfo, err := os.Lstat(root)
-	if err != nil || !rootInfo.IsDir() || rootInfo.Mode().Perm() != 0o700 || rootInfo.Mode()&os.ModeSymlink != 0 || !onnxWorkerOwnedByCurrentUser(rootInfo) {
-		return fmt.Errorf("%w: worker directory permissions are not 0700", errONNXWorkerProofInvalid)
+	if err := verifyONNXWorkerRootPermissions(root); err != nil {
+		return err
 	}
 	socketInfo, err := os.Lstat(socket)
 	if err != nil || socketInfo.Mode()&os.ModeSocket == 0 || socketInfo.Mode().Perm() != 0o600 || socketInfo.Mode()&os.ModeSymlink != 0 || !onnxWorkerOwnedByCurrentUser(socketInfo) {
 		return fmt.Errorf("%w: worker socket permissions are not 0600", errONNXWorkerProofInvalid)
+	}
+	return nil
+}
+
+func verifyONNXWorkerRootPermissions(root string) error {
+	rootInfo, err := os.Lstat(root)
+	if err != nil || !rootInfo.IsDir() || rootInfo.Mode().Perm() != 0o700 || rootInfo.Mode()&os.ModeSymlink != 0 || !onnxWorkerOwnedByCurrentUser(rootInfo) {
+		return fmt.Errorf("%w: worker directory permissions are not 0700", errONNXWorkerProofInvalid)
 	}
 	return nil
 }

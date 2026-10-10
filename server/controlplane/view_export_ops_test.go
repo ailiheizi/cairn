@@ -1109,3 +1109,117 @@ func TestExportPlanOutputNamingIsOrderIndependent(t *testing.T) {
 		t.Fatalf("digest over the reversed-order item set = %s, want %s", digest, first.ManifestDigest)
 	}
 }
+
+// TestSavedViewUnsupportedConditionFailsClosed covers RW-PERSONAL-UX-1 rows
+// R1.2/R1.4 at the kernel boundary: a saved retrieval must refuse an
+// unsupported condition instead of silently broadening the saved query. A
+// stored condition this build cannot evaluate must fail the retrieval closed,
+// and view.save must refuse to persist one in the first place. Every supported
+// key keeps its behaviour: suffix=wav still narrows the same query.
+func TestSavedViewUnsupportedConditionFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	for name, body := range map[string]string{
+		"diary-alpha.wav": "alpha bytes",
+		"diary-bravo.wav": "bravo bytes",
+		"diary-notes.txt": "charlie bytes",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	h, _ := openViewExportHarness(t, root)
+
+	evaluate := func(t *testing.T, viewID string) command.Result {
+		t.Helper()
+		return handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewEvaluate, map[string]any{"view_id": viewID}))
+	}
+	save := func(t *testing.T, name string, fields []string) command.Result {
+		t.Helper()
+		return handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+			"name": name, "query": "diary", "scope": h.ingest.WorkspaceID, "fields": fields,
+		}))
+	}
+	savedViewID := func(t *testing.T, result command.Result) string {
+		t.Helper()
+		if result.Status != command.StatusSucceeded {
+			t.Fatalf("view.save = %q: %+v", result.Status, result.Reasons)
+		}
+		var view command.ViewData
+		if err := json.Unmarshal(result.Data, &view); err != nil {
+			t.Fatalf("decode view.save: %v", err)
+		}
+		return view.ViewID
+	}
+	hitsOf := func(t *testing.T, result command.Result) []command.SearchHitData {
+		t.Helper()
+		if result.Status != command.StatusSucceeded {
+			t.Fatalf("view.evaluate = %q: %+v", result.Status, result.Reasons)
+		}
+		var data command.ViewEvaluateData
+		if err := json.Unmarshal(result.Data, &data); err != nil {
+			t.Fatalf("decode view.evaluate: %v", err)
+		}
+		return data.Hits
+	}
+
+	bareID := savedViewID(t, save(t, "bare query", nil))
+	suffixID := savedViewID(t, save(t, "suffix wav", []string{"suffix=wav"}))
+
+	// Seed a record that already carries a condition this build does not
+	// implement, as a pre-fix view.save or a non-browser caller could create.
+	legacyViewID, err := sqlite.NewStableID("view")
+	if err != nil {
+		t.Fatalf("new stable view id: %v", err)
+	}
+	legacy, err := h.dispatcher.store.InsertSavedView(ctx, sqlite.SavedView{
+		ViewID: legacyViewID, Name: "legacy unsupported", Query: "diary",
+		Fields: []string{"type=audio"}, Scope: h.ingest.WorkspaceID,
+	})
+	if err != nil {
+		t.Fatalf("insert legacy view: %v", err)
+	}
+
+	t.Run("bare query matches the full fixture set", func(t *testing.T) {
+		if hits := hitsOf(t, evaluate(t, bareID)); len(hits) != 3 {
+			t.Fatalf("unfiltered hits = %d, want 3", len(hits))
+		}
+	})
+	t.Run("supported suffix still narrows the same query", func(t *testing.T) {
+		if hits := hitsOf(t, evaluate(t, suffixID)); len(hits) != 2 {
+			t.Fatalf("suffix=wav hits = %d, want 2", len(hits))
+		}
+	})
+	t.Run("view.save refuses an unsupported or malformed condition", func(t *testing.T) {
+		for _, fields := range [][]string{{"type=audio"}, {"wav"}, {"entry_type=REGULAR_FILE", "type=audio"}} {
+			result := save(t, "unsupported", fields)
+			if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeInvalidInput) {
+				t.Fatalf("view.save %v = %q: %+v, want failed invalid_input", fields, result.Status, result.Reasons)
+			}
+		}
+		stored := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"name": "unsupported"}))
+		if stored.Status != command.StatusFailed || !hasReasonCode(stored, ReasonCodeNotFound) {
+			t.Fatalf("view.get refused name = %q: %+v, want not_found", stored.Status, stored.Reasons)
+		}
+	})
+	t.Run("a stored unsupported condition fails evaluation closed", func(t *testing.T) {
+		result := evaluate(t, legacy.ViewID)
+		var data command.ViewEvaluateData
+		if err := json.Unmarshal(result.Data, &data); err != nil {
+			t.Fatalf("decode view.evaluate: %v", err)
+		}
+		if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeInvalidInput) {
+			t.Fatalf("view.evaluate stored unsupported = %q with %d hits: %+v, want failed invalid_input",
+				result.Status, len(data.Hits), result.Reasons)
+		}
+		if len(data.Hits) != 0 {
+			t.Fatalf("refused view.evaluate returned %d hits", len(data.Hits))
+		}
+	})
+	t.Run("export.plan refuses the same stored condition", func(t *testing.T) {
+		planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"view_id": legacy.ViewID}))
+		if planned.Status != command.StatusFailed || !hasReasonCode(planned, ReasonCodeInvalidInput) {
+			t.Fatalf("export.plan stored unsupported = %q: %+v, want failed invalid_input", planned.Status, planned.Reasons)
+		}
+	})
+}

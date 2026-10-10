@@ -2,7 +2,6 @@ package search
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -487,6 +486,8 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 	processingBySubject := map[string][]string{}
 	representationsByContent := map[string][]string{}
 	descriptionsBySubject := map[string][]string{}
+	descriptionFieldBytesBySubject := map[string]int{}
+	descriptionFieldPartsBySubject := map[string]int{}
 	// segmentsBySubject is the lexical provenance projection and intentionally
 	// retains every durable description revision. Semantic segments are a
 	// narrower active-leaf projection built in parallel below.
@@ -573,8 +574,19 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		if _, ok := currentSubjects[subjectRef]; !ok {
 			continue
 		}
-		descriptionsBySubject[subjectRef] = append(descriptionsBySubject[subjectRef],
-			description.Title, description.Language, description.Body, string(description.Kind), description.SourceRef)
+		parts := []string{description.Title, description.Language, description.Body, string(description.Kind), description.SourceRef}
+		bodyFieldStart := descriptionFieldBytesBySubject[subjectRef]
+		for partIndex, part := range parts {
+			if descriptionFieldPartsBySubject[subjectRef] > 0 {
+				descriptionFieldBytesBySubject[subjectRef]++ // strings.Join separator
+			}
+			if partIndex == 2 {
+				bodyFieldStart = descriptionFieldBytesBySubject[subjectRef]
+			}
+			descriptionFieldBytesBySubject[subjectRef] += len(part)
+			descriptionFieldPartsBySubject[subjectRef]++
+		}
+		descriptionsBySubject[subjectRef] = append(descriptionsBySubject[subjectRef], parts...)
 		if description.ID == "" {
 			continue
 		}
@@ -582,7 +594,8 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		if listErr != nil {
 			return generation, listErr
 		}
-		for _, segment := range segments {
+		sourceProvenance := verifiedDescriptionSourceProvenance(description, subjectRef, bodyFieldStart, segments)
+		for segmentIndex, segment := range segments {
 			ref := SegmentRef{
 				DescriptionDocumentID: description.ID,
 				SourceType:            "DESCRIPTION",
@@ -594,6 +607,9 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 				Producer:              description.ProducerProfile,
 				Accepted:              description.Accepted,
 				Language:              description.Language,
+			}
+			if segmentIndex < len(sourceProvenance) {
+				ref.DescriptionSource = sourceProvenance[segmentIndex]
 			}
 			segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], ref)
 			// Durable segments from rejected/superseded revisions remain lexical
@@ -672,17 +688,13 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		if len(segments) == 0 {
 			segments = nil
 		}
-		segmentsJSON := ""
-		if len(segments) > 0 {
-			encoded, marshalErr := json.Marshal(segments)
-			if marshalErr != nil {
-				return generation, marshalErr
-			}
-			segmentsJSON = string(encoded)
-		}
 		entryPath := displayPath(byID, entry)
 		notes := strings.Join(notesBySubject[entry.SubjectRef], " ")
 		descriptions := strings.Join(descriptionsBySubject[entry.SubjectRef], " ")
+		segmentsJSON, marshalErr := marshalLexicalSegmentProjection(segments, descriptions)
+		if marshalErr != nil {
+			return generation, marshalErr
+		}
 		extracted := strings.Join(extractedBySubject[entry.SubjectRef], " ")
 		doc := Document{
 			SubjectID: entry.SubjectRef,

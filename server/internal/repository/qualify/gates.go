@@ -34,8 +34,11 @@ func DriverGates(ctx context.Context, repo repository.Driver, payload []byte) er
 	if first.ContentID != want {
 		return fmt.Errorf("place content id = %s, want %s", first.ContentID, want)
 	}
-	if first.Bytes != int64(len(payload)) || first.StoredBytes <= 0 {
-		return fmt.Errorf("place receipt lengths = logical %d stored %d", first.Bytes, first.StoredBytes)
+	if first.Bytes != int64(len(payload)) {
+		return fmt.Errorf("place receipt logical length = %d, want %d", first.Bytes, len(payload))
+	}
+	if !first.HasMeasuredStoredBytes() {
+		return fmt.Errorf("place receipt lacks a valid measured whole-object length: logical %d stored %d state %q", first.Bytes, first.StoredBytes, first.StoredBytesState)
 	}
 	if err := repo.Verify(ctx, want); err != nil {
 		return fmt.Errorf("verify after place: %w", err)
@@ -62,8 +65,11 @@ func DriverGates(ctx context.Context, repo repository.Driver, payload []byte) er
 	if err != nil {
 		return fmt.Errorf("idempotent place: %w", err)
 	}
-	if !second.Existed || second.ContentID != want {
+	if !second.Existed || second.ContentID != want || second.Bytes != first.Bytes {
 		return fmt.Errorf("idempotent receipt = %+v", second)
+	}
+	if !second.HasMeasuredStoredBytes() {
+		return fmt.Errorf("idempotent receipt lacks a valid measured whole-object length: stored %d state %q", second.StoredBytes, second.StoredBytesState)
 	}
 	if second.StoredBytes != first.StoredBytes {
 		return fmt.Errorf("idempotent stored bytes = %d, want %d", second.StoredBytes, first.StoredBytes)

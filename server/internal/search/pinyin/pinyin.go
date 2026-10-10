@@ -2,12 +2,12 @@
 // used by the lexical search feed. It is an additive token enrichment for the
 // name and path fields: the original characters always stay in the feed, and
 // the pinyin forms only add queryable tokens. The reading table is generated
-// from the public-domain Unicode Unihan database (kMandarin field) by
-// scripts/generate-pinyin-table and records its source, version, and input
-// digest in the header of table_gen.go. Like every other provider input, the
-// table's content is part of the lexical profile; refreshing the table is
-// therefore a feed-shape change that requires a new profile generation, never
-// a reinterpretation of an old one.
+// from the Unicode Unihan database (kMandarin field) under Unicode License V3;
+// the required notice is included in this package's LICENSE.txt. The generated
+// header records its source, version, and input digest. Like every other
+// provider input, the table's content is part of the lexical profile; refreshing
+// the table is therefore a feed-shape change that requires a new profile
+// generation, never a reinterpretation of an old one.
 //
 // Tone marks are stripped and the umlaut is written as ASCII 'v' (the letter
 // 'v' never occurs in pinyin), so "lü" is stored and queried as "lv". The
@@ -325,6 +325,104 @@ func EnrichmentAppendix(text string) string {
 		parts = append(parts, appendix)
 	}
 	return strings.Join(parts, " ")
+}
+
+// TokenOrigin maps one whitespace-delimited token in EnrichmentAppendix back
+// to the exact source byte interval that generated it. Offsets are UTF-8 byte
+// positions; token generation remains owned by EnrichmentAppendix.
+type TokenOrigin struct {
+	StartByte       int
+	EndByte         int
+	SourceStartByte int
+	SourceEndByte   int
+}
+
+// EnrichmentAppendixWithOrigins returns the existing appendix unchanged and
+// an origin interval for every emitted token. The mapping is accepted only
+// when its generated token stream exactly matches EnrichmentAppendix, so any
+// future enrichment change safely disables attribution until this mapper is
+// updated.
+func EnrichmentAppendixWithOrigins(text string) (string, []TokenOrigin) {
+	appendix := EnrichmentAppendix(text)
+	runs := Runs(text)
+	if len(runs) == 0 {
+		return appendix, nil
+	}
+	runBoundaries := make([][]int, len(runs))
+	for runIndex, run := range runs {
+		boundaries := make([]int, 1, len(run.Readings)+1)
+		boundaries[0] = run.Start
+		for offset := 0; offset < len(run.Text); {
+			_, size := utf8.DecodeRuneInString(run.Text[offset:])
+			offset += size
+			boundaries = append(boundaries, run.Start+offset)
+		}
+		if len(boundaries) != len(run.Readings)+1 {
+			return appendix, nil
+		}
+		runBoundaries[runIndex] = boundaries
+	}
+	var tokens []string
+	var origins []TokenOrigin
+	appendToken := func(token string, sourceStart, sourceEnd int) {
+		if token == "" {
+			return
+		}
+		start := 0
+		if len(tokens) > 0 {
+			start = origins[len(origins)-1].EndByte + 1
+		}
+		end := start + len(token)
+		tokens = append(tokens, token)
+		origins = append(origins, TokenOrigin{StartByte: start, EndByte: end, SourceStartByte: sourceStart, SourceEndByte: sourceEnd})
+	}
+	for runIndex, run := range runs {
+		boundaries := runBoundaries[runIndex]
+		characters := []rune(run.Text)
+		if len(characters) != len(run.Readings) {
+			return appendix, nil
+		}
+		for index := 0; index+1 < len(characters); index++ {
+			appendToken(string(characters[index:index+2]), boundaries[index], boundaries[index+2])
+		}
+		for index, character := range characters {
+			appendToken(string(character), boundaries[index], boundaries[index+1])
+		}
+		for index := 0; index+1 < len(run.Readings); index++ {
+			appendToken(run.Readings[index][0]+run.Readings[index+1][0], boundaries[index], boundaries[index+2])
+		}
+	}
+	for runIndex, run := range runs {
+		boundaries := runBoundaries[runIndex]
+		for index, reading := range run.Readings {
+			appendToken(reading[0], boundaries[index], boundaries[index+1])
+		}
+	}
+	for _, run := range runs {
+		var joined strings.Builder
+		for _, reading := range run.Readings {
+			joined.WriteString(reading[0])
+		}
+		appendToken(joined.String(), run.Start, run.Start+len(run.Text))
+	}
+	for _, run := range runs {
+		var joined strings.Builder
+		for _, reading := range run.Readings {
+			joined.WriteString(reading[0])
+		}
+		appendToken(UmlautForm(joined.String()), run.Start, run.Start+len(run.Text))
+	}
+	for _, run := range runs {
+		var initials strings.Builder
+		for _, reading := range run.Readings {
+			initials.WriteString(reading[0][:1])
+		}
+		appendToken(initials.String(), run.Start, run.Start+len(run.Text))
+	}
+	if strings.Join(tokens, " ") != appendix {
+		return appendix, nil
+	}
+	return appendix, origins
 }
 
 // UmlautForm rewrites the ASCII 'v' umlaut spelling to 'ü'. Only table

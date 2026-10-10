@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,15 +16,16 @@ import (
 // The source is never mutated and the target is never treated as authoritative
 // until every copied payload and portable record has been verified.
 type MigrationReport struct {
-	SourceProfile       ProfileDescription
-	TargetProfile       ProfileDescription
-	SourceRoot          string
-	TargetRoot          string
-	PayloadObjects      int
-	PortableRecords     int
-	SnapshotFiles       int
-	LogicalBytes        int64
-	VerifiedTargetBytes int64
+	SourceProfile            ProfileDescription
+	TargetProfile            ProfileDescription
+	SourceRoot               string
+	TargetRoot               string
+	PayloadObjects           int
+	PortableRecords          int
+	SnapshotFiles            int
+	LogicalBytes             int64
+	VerifiedTargetBytes      int64
+	VerifiedTargetBytesState StoredBytesState
 }
 
 // migrationHooks are test-only fault-injection points for crash-boundary
@@ -139,6 +141,7 @@ func migrateProfileWithHooks(ctx context.Context, sourceProfile, sourcePath, tar
 	report.TargetProfile = DescribeProfile(target)
 	report.SourceRoot = sourceRoot
 	report.TargetRoot = targetRoot
+	report.VerifiedTargetBytesState = StoredBytesMeasured
 
 	payloads, err := listRepositoryPayloadIDs(sourceRoot)
 	if err != nil {
@@ -170,7 +173,7 @@ func migrateProfileWithHooks(ctx context.Context, sourceProfile, sourcePath, tar
 		}
 		report.PayloadObjects++
 		report.LogicalBytes += receipt.Bytes
-		report.VerifiedTargetBytes += receipt.StoredBytes
+		recordMigrationStoredBytes(&report, receipt)
 	}
 
 	for _, role := range []RecordRole{RecordPreparedClosure, RecordPublicationCommit, RecordProcessorAttemptClosure, RecordPortableFactClosure} {
@@ -222,6 +225,26 @@ func migrateProfileWithHooks(ctx context.Context, sourceProfile, sourcePath, tar
 		return report, fmt.Errorf("publish migrated repository: %w", err)
 	}
 	return report, nil
+}
+
+// recordMigrationStoredBytes keeps optional placement telemetry separate from
+// payload verification. Once any receipt is unavailable or invalid, the
+// aggregate stays unavailable and cannot be mistaken for a partial total.
+func recordMigrationStoredBytes(report *MigrationReport, receipt Receipt) {
+	if report.VerifiedTargetBytesState != StoredBytesMeasured {
+		return
+	}
+	if !receipt.HasMeasuredStoredBytes() {
+		report.VerifiedTargetBytesState = StoredBytesUnavailable
+		report.VerifiedTargetBytes = 0
+		return
+	}
+	if receipt.StoredBytes > math.MaxInt64-report.VerifiedTargetBytes {
+		report.VerifiedTargetBytesState = StoredBytesUnavailable
+		report.VerifiedTargetBytes = 0
+		return
+	}
+	report.VerifiedTargetBytes += receipt.StoredBytes
 }
 
 func migrationPathsOverlap(sourceRoot, targetRoot string) bool {

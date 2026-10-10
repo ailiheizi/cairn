@@ -130,7 +130,7 @@ func placeExactWithReadback(ctx context.Context, driver repository.Driver, conte
 		}
 	}
 	if verifyErr := verifyExactObjectReadback(context.WithoutCancel(ctx), driver, contentID, logicalBytes); verifyErr == nil {
-		return repository.Receipt{ContentID: contentID, Bytes: logicalBytes, StoredBytes: logicalBytes, Existed: true}, nil
+		return repository.Receipt{ContentID: contentID, Bytes: logicalBytes, StoredBytes: 0, StoredBytesState: repository.StoredBytesUnavailable, Existed: true}, nil
 	} else {
 		placeErr = fmt.Errorf("observe exact payload %s: %w; original placement: %v", contentID, verifyErr, placeErr)
 	}

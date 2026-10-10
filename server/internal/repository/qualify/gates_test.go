@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,31 @@ import (
 
 	"github.com/ailiheizi/restoreweave/server/internal/repository"
 )
+
+type storedBytesOverrideDriver struct {
+	repository.Driver
+	state          repository.StoredBytesState
+	bytes          int64
+	secondState    repository.StoredBytesState
+	secondBytes    int64
+	overrideSecond bool
+	calls          int
+}
+
+func (d *storedBytesOverrideDriver) PlaceExact(ctx context.Context, contentID string, body io.Reader) (repository.Receipt, error) {
+	receipt, err := d.Driver.PlaceExact(ctx, contentID, body)
+	if err != nil {
+		return repository.Receipt{}, err
+	}
+	state, storedBytes := d.state, d.bytes
+	if d.calls > 0 && d.overrideSecond {
+		state, storedBytes = d.secondState, d.secondBytes
+	}
+	d.calls++
+	receipt.StoredBytesState = state
+	receipt.StoredBytes = storedBytes
+	return receipt, nil
+}
 
 func TestFakeCASPassesDriverGates(t *testing.T) {
 	ctx := context.Background()
@@ -44,6 +70,52 @@ func TestLocalZstdPassesDriverGates(t *testing.T) {
 	}
 	if err := DriverGates(ctx, repo, []byte("zstd qualification payload")); err != nil {
 		t.Fatalf("zstd driver gates: %v", err)
+	}
+}
+
+func TestDriverGatesRejectUnmeasuredOrInvalidStoredByteTelemetry(t *testing.T) {
+	type telemetryCase struct {
+		name  string
+		state repository.StoredBytesState
+		bytes int64
+	}
+	cases := []telemetryCase{
+		{name: "unavailable zero", state: repository.StoredBytesUnavailable, bytes: 0},
+		{name: "unavailable shared-count", state: repository.StoredBytesUnavailable, bytes: 4096},
+		{name: "omitted state with positive number", state: "", bytes: 24},
+		{name: "unknown state with positive number", state: "UNKNOWN", bytes: 24},
+		{name: "measured negative", state: repository.StoredBytesMeasured, bytes: -1},
+		{name: "measured zero for nonempty logical object", state: repository.StoredBytesMeasured, bytes: 0},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			base, err := repository.OpenDir(filepath.Join(t.TempDir(), "repo"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := []byte("physical measurement qualification requires typed evidence")
+			driver := &storedBytesOverrideDriver{Driver: base, state: test.state, bytes: test.bytes}
+			if err := DriverGates(ctx, driver, payload); err == nil {
+				t.Fatal("physical measurement qualification accepted invalid stored-byte telemetry")
+			}
+		})
+	}
+}
+
+func TestDriverGatesRevalidateSecondReceiptMeasurement(t *testing.T) {
+	ctx := context.Background()
+	base, err := repository.OpenDir(filepath.Join(t.TempDir(), "repo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("idempotent measurement state must remain explicit")
+	driver := &storedBytesOverrideDriver{
+		Driver: base, state: repository.StoredBytesMeasured, bytes: int64(len(payload)),
+		secondState: repository.StoredBytesUnavailable, secondBytes: int64(len(payload)), overrideSecond: true,
+	}
+	if err := DriverGates(ctx, driver, payload); err == nil {
+		t.Fatal("physical measurement qualification accepted unavailable telemetry on idempotent placement")
 	}
 }
 

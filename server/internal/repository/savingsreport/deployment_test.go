@@ -41,7 +41,12 @@ func TestMeasureDeploymentOverheadScansFilesAndDirectories(t *testing.T) {
 	assertMeasuredBytes(t, "catalog", overhead.Catalog, int64(len("catalog")))
 	assertMeasuredBytes(t, "index", overhead.Index, int64(len("1234")+len("567890")))
 	assertMeasuredBytes(t, "model", overhead.Model, int64(len("model-bytes")))
-	assertMeasuredBytes(t, "temporary", overhead.Temporary, 77)
+	if overhead.Temporary.Status != repository.SavingsCategoryUnmeasured {
+		t.Fatalf("caller-reported temporary peak status = %q, want UNMEASURED", overhead.Temporary.Status)
+	}
+	if overhead.ReportedTemporaryPeakBytes == nil || *overhead.ReportedTemporaryPeakBytes != 77 {
+		t.Fatalf("reported temporary peak = %v, want preserved caller claim 77", overhead.ReportedTemporaryPeakBytes)
+	}
 }
 
 func TestMeasureDeploymentOverheadLeavesOmittedCategoriesUnmeasured(t *testing.T) {
@@ -125,17 +130,67 @@ func TestDeploymentSavingsRequiresEveryCategory(t *testing.T) {
 	}
 	full := DeploymentOverhead{Catalog: measuredCategory(10), Index: measuredCategory(20), Model: measuredCategory(30), Temporary: measuredCategory(40)}
 	result := deploymentSavings(report, full)
-	if result.Net.Status != repository.SavingsCategoryMeasured || result.Net.Bytes != 600 {
-		t.Fatalf("full deployment net = %+v, want measured 600", result.Net)
+	if result.Net.Status != repository.SavingsCategoryUnmeasured || result.NetReason == "" {
+		t.Fatalf("full but unbound deployment net = %+v (reason %q), want reasoned UNMEASURED", result.Net, result.NetReason)
 	}
 }
 
-func TestCandidateEvidenceCarriesSingleRunCorrelation(t *testing.T) {
+func TestDeploymentSavingsRejectsOverflowAndNegativeInputs(t *testing.T) {
+	report := repository.SavingsReport{LogicalBytes: 100, RepositoryGrowthBytes: 10}
+	allMeasured := DeploymentOverhead{Catalog: measuredCategory(int64(^uint64(0) >> 1)), Index: measuredCategory(1), Model: measuredCategory(0), Temporary: measuredCategory(0)}
+	result := deploymentSavings(report, allMeasured)
+	if result.Net.Status != repository.SavingsCategoryUnmeasured || result.NetReason == "" {
+		t.Fatalf("overflow result = %+v, want reasoned UNMEASURED net", result)
+	}
+	negative := DeploymentOverhead{Catalog: measuredCategory(-1), Index: measuredCategory(0), Model: measuredCategory(0), Temporary: measuredCategory(0)}
+	result = deploymentSavings(report, negative)
+	if result.Net.Status != repository.SavingsCategoryUnmeasured || result.NetReason == "" {
+		t.Fatalf("negative category result = %+v, want reasoned UNMEASURED net", result)
+	}
+	zeroOverhead := DeploymentOverhead{Catalog: measuredCategory(0), Index: measuredCategory(0), Model: measuredCategory(0), Temporary: measuredCategory(0)}
+	result = deploymentSavings(repository.SavingsReport{LogicalBytes: -1, RepositoryGrowthBytes: 0}, zeroOverhead)
+	if result.Net.Status != repository.SavingsCategoryUnmeasured || result.NetReason == "" {
+		t.Fatalf("negative logical bytes result = %+v, want reasoned UNMEASURED net", result)
+	}
+	underflow := DeploymentOverhead{Catalog: measuredCategory(int64(^uint64(0) >> 1)), Index: measuredCategory(0), Model: measuredCategory(0), Temporary: measuredCategory(0)}
+	result = deploymentSavings(repository.SavingsReport{LogicalBytes: 0, RepositoryGrowthBytes: 2}, underflow)
+	if result.Net.Status != repository.SavingsCategoryUnmeasured || result.NetReason == "" {
+		t.Fatalf("net underflow result = %+v, want reasoned UNMEASURED net", result)
+	}
+}
+
+func TestCheckedDeploymentNet(t *testing.T) {
+	if got, err := checkedDeploymentNet(1000, 300, 100); err != nil || got != 600 {
+		t.Fatalf("checkedDeploymentNet = %d, %v; want 600, nil", got, err)
+	}
+	if _, err := checkedDeploymentNet(0, 2, int64(^uint64(0)>>1)); err == nil {
+		t.Fatal("overflowing hypothetical deployment net was accepted")
+	}
+	if _, err := checkedDeploymentNet(-1, 0, 0); err == nil {
+		t.Fatal("negative logical bytes were accepted")
+	}
+}
+
+func TestCallerPeakClaimCannotMeasureDeploymentNet(t *testing.T) {
+	overhead, err := MeasureDeploymentOverhead("", "", "", 123)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := deploymentSavings(repository.SavingsReport{LogicalBytes: 1000, RepositoryGrowthBytes: 100}, overhead)
+	if overhead.Temporary.Status != repository.SavingsCategoryUnmeasured || result.Net.Status != repository.SavingsCategoryUnmeasured {
+		t.Fatalf("caller claim produced measured result: overhead=%+v net=%+v", overhead, result.Net)
+	}
+	if result.Correlation != "UNBOUND" {
+		t.Fatalf("correlation = %q, want UNBOUND", result.Correlation)
+	}
+}
+
+func TestCandidateEvidencePreservesUnboundCorrelation(t *testing.T) {
 	manifest := CorpusManifest{Schema: corpusManifestSchema, Digest: "corpus-digest"}
 	repositoryManifest := CorpusManifest{Schema: corpusManifestSchema, Digest: "repository-digest"}
-	deployment := DeploymentSavings{External: DeploymentOverhead{Catalog: unmeasuredCategory(), Index: unmeasuredCategory(), Model: unmeasuredCategory(), Temporary: unmeasuredCategory()}, Net: unmeasuredCategory(), RepositoryManifest: repositoryManifest, Correlation: "CORRELATED_SINGLE_RUN"}
+	deployment := DeploymentSavings{External: DeploymentOverhead{Catalog: unmeasuredCategory(), Index: unmeasuredCategory(), Model: unmeasuredCategory(), Temporary: unmeasuredCategory()}, Net: unmeasuredCategory(), RepositoryManifest: repositoryManifest, Correlation: "UNBOUND"}
 	evidence := candidateEvidence(manifest, nil, repository.ProfileDescription{}, repository.SavingsReport{}, time.Now(), deployment)
-	if evidence.Correlation != "CORRELATED_SINGLE_RUN" || evidence.Repository.Digest != repositoryManifest.Digest {
+	if evidence.Correlation != "UNBOUND" || evidence.Repository.Digest != repositoryManifest.Digest {
 		t.Fatalf("correlation = %q repository = %+v", evidence.Correlation, evidence.Repository)
 	}
 }

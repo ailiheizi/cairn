@@ -38,7 +38,7 @@ func main() {
 	catalogPath := flag.String("catalog-path", "", "optional catalog file or directory to measure read-only")
 	indexPath := flag.String("index-path", "", "optional search index file or directory to measure read-only")
 	modelPath := flag.String("model-path", "", "optional model file or directory to measure read-only")
-	temporaryPeakBytes := flag.Int64("temporary-peak-bytes", -1, "caller-supplied temporary peak bytes (-1 means UNMEASURED)")
+	temporaryPeakBytes := flag.Int64("temporary-peak-bytes", -1, "caller-reported temporary peak bytes (recorded as a claim; category stays UNMEASURED; -1 omits)")
 	flag.Parse()
 	if *generateCorpus != "" {
 		if *corpus != "" || *profile != "" || *repoPath != "" || *manifestOnly || *manifestIn != "" || *evidenceOut != "" ||
@@ -198,9 +198,9 @@ func main() {
 		os.Exit(1)
 	}
 	deployment.RepositoryManifest = repositoryManifest
-	if manifest.Digest != "" && repositoryManifest.Digest != "" {
-		deployment.Correlation = "CORRELATED_SINGLE_RUN"
-	}
+	// Corpus/repository manifests bind those two measurements. External paths
+	// are independent observations, so they do not establish deployment-level
+	// correlation.
 	desc := repository.DescribeProfile(driver)
 	if err := writeJSONFile(*manifestOut, manifest); err != nil {
 		fmt.Fprintf(os.Stderr, "write corpus manifest: %v\n", err)
@@ -228,7 +228,13 @@ func main() {
 	printOverheadCategory("deployment.index", deployment.External.Index)
 	printOverheadCategory("deployment.model", deployment.External.Model)
 	printOverheadCategory("deployment.temporary", deployment.External.Temporary)
+	if deployment.External.ReportedTemporaryPeakBytes != nil {
+		fmt.Printf("deployment.temporary_peak_claim: CALLER_REPORTED %d\n", *deployment.External.ReportedTemporaryPeakBytes)
+	}
 	printOverheadCategory("deployment.net_savings", deployment.Net)
+	if deployment.NetReason != "" {
+		fmt.Printf("deployment.net_savings_reason: %s\n", deployment.NetReason)
+	}
 	fmt.Printf("physical/logical ratio:    %.3f\n", ratio(report.PhysicalStoredBytes, report.LogicalBytes))
 	fmt.Printf("mechanisms:                %v\n", report.Mechanisms)
 }

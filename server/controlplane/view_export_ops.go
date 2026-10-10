@@ -28,6 +28,9 @@ type viewGetInput struct {
 // handleViewSave creates the first revision of a named view or writes a
 // successor revision when the name already exists. UpdateSavedView never edits
 // a historical revision; view.save is therefore always an insert-or-advance.
+// A condition this build cannot evaluate is refused as invalid_input instead of
+// being persisted, so a caller cannot create a record whose conditions would
+// later have to be silently dropped.
 func (d *Dispatcher) handleViewSave(ctx context.Context, env command.Envelope, started time.Time) command.Result {
 	var input command.ViewSaveInput
 	if err := decodeInput(env.Input, &input); err != nil {
@@ -39,10 +42,14 @@ func (d *Dispatcher) handleViewSave(ctx context.Context, env command.Envelope, s
 	if strings.TrimSpace(input.Query) == "" {
 		return invalidInputResult(env, started, errString("query is required"))
 	}
+	fields := normalizeStringList(input.Fields)
+	if err := validateViewConditions(fields); err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	record := sqlite.SavedView{
 		Name:        strings.TrimSpace(input.Name),
 		Query:       strings.TrimSpace(input.Query),
-		Fields:      normalizeStringList(input.Fields),
+		Fields:      fields,
 		Scope:       strings.TrimSpace(input.Scope),
 		Sort:        strings.TrimSpace(input.Sort),
 		OutputNames: strings.TrimSpace(input.OutputNames),
@@ -172,6 +179,13 @@ func (d *Dispatcher) handleViewEvaluate(ctx context.Context, env command.Envelop
 				Coverage: []string{search.DimensionLexical},
 			}, reason.Error())
 		}
+		// A stored condition this build cannot evaluate is a caller-visible
+		// input problem, not a catalog failure: evaluating the view anyway
+		// would drop the condition and return a wider, unfiltered set as if it
+		// were the view's membership.
+		if isUnsupportedViewCondition(reason) {
+			return invalidInputResult(env, started, reason)
+		}
 		if isStableIDError(reason) {
 			return invalidInputResult(env, started, reason)
 		}
@@ -234,13 +248,17 @@ func (d *Dispatcher) viewEvaluationWorkspace(ctx context.Context, scope string) 
 
 // viewFiltersFromFields maps saved structured field constraints onto typed
 // search filters. Fields use the same snake_case keys as search.filters;
-// an empty field list means no structured constraint.
+// an empty field list means no structured constraint. A condition this build
+// cannot evaluate is refused with an unsupportedViewConditionError instead of
+// being dropped: silently skipping it would evaluate the saved view as a
+// wider, unfiltered result set that is not its membership.
 func viewFiltersFromFields(fields []string) (search.Filters, error) {
 	var filters search.Filters
 	for _, field := range fields {
 		key, value, ok := strings.Cut(field, "=")
 		if !ok {
-			continue
+			return search.Filters{}, unsupportedViewConditionError(fmt.Sprintf(
+				"saved view condition %q is not a key=value condition", strings.TrimSpace(field)))
 		}
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
@@ -282,10 +300,42 @@ func viewFiltersFromFields(fields []string) (search.Filters, error) {
 			}
 			filters.MtimeBefore = &parsed
 		default:
-			continue
+			return search.Filters{}, unsupportedViewConditionError(fmt.Sprintf(
+				"saved view condition %q is not supported by view.evaluate", strings.TrimSpace(field)))
 		}
 	}
 	return search.NormalizeFilters(filters)
+}
+
+// unsupportedViewConditionError marks a saved-view condition this build cannot
+// evaluate: an unrecognized filter key or an entry that is not a key=value
+// condition. It is a caller-visible input problem, not a catalog failure, so
+// both view.evaluate and export.plan report it as invalid_input rather than
+// catalog_error; view.save refuses to persist one in the first place.
+type unsupportedViewConditionError string
+
+func (err unsupportedViewConditionError) Error() string { return string(err) }
+
+// isUnsupportedViewCondition reports whether err is a saved-view condition this
+// build cannot evaluate.
+func isUnsupportedViewCondition(err error) bool {
+	var unsupported unsupportedViewConditionError
+	return errors.As(err, &unsupported)
+}
+
+// validateViewConditions refuses to persist a condition this build cannot
+// evaluate, so a non-browser caller cannot create a saved retrieval that would
+// later fail or silently broaden. It reuses viewFiltersFromFields as the single
+// source of the recognized key set and only surfaces the unsupported/malformed
+// condition error: a value this build rejects at evaluation time (an unparsable
+// integer, a contradictory size range) keeps its existing outcome instead of
+// being reclassified at save time.
+func validateViewConditions(fields []string) error {
+	_, err := viewFiltersFromFields(fields)
+	if isUnsupportedViewCondition(err) {
+		return err
+	}
+	return nil
 }
 
 func parseInt64Field(value string) (int64, error) {
@@ -887,7 +937,7 @@ func isStableIDError(err error) bool {
 
 func exportPlanErrorResult(env command.Envelope, started time.Time, err error) command.Result {
 	var naming exportNamingError
-	if errors.As(err, &naming) || isStableIDError(err) || errors.Is(err, errString("view_id and subjects cannot both be set")) ||
+	if errors.As(err, &naming) || isUnsupportedViewCondition(err) || isStableIDError(err) || errors.Is(err, errString("view_id and subjects cannot both be set")) ||
 		errors.Is(err, errString("view_id or subjects is required")) {
 		return invalidInputResult(env, started, err)
 	}

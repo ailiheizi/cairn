@@ -899,20 +899,29 @@ type SearchHitData struct {
 	IndexStatus   *ContentIndexStatus `json:"index_status,omitempty"`
 }
 
-// SearchSegmentData preserves the description segment and provenance that
-// produced a search hit. Segment text is a matched source span, not a new
-// description or an exact-identity claim.
+// SearchSegmentData preserves the complete source segment and provenance that
+// produced a search hit. MatchedExcerpt and MatchSpans are query-derived and
+// remain absent when derived text cannot map to exact source bytes.
 type SearchSegmentData struct {
-	DescriptionDocumentID string `json:"description_document_id,omitempty"`
-	SourceType            string `json:"source_type,omitempty"`
-	SourceID              string `json:"source_id,omitempty"`
-	SegmentID             string `json:"semantic_segment_id"`
-	Ordinal               int64  `json:"ordinal"`
-	MatchedText           string `json:"matched_text"`
-	Kind                  string `json:"kind"`
-	Producer              string `json:"producer"`
-	Accepted              bool   `json:"accepted"`
-	Language              string `json:"language"`
+	DescriptionDocumentID string                `json:"description_document_id,omitempty"`
+	SourceType            string                `json:"source_type,omitempty"`
+	SourceID              string                `json:"source_id,omitempty"`
+	SegmentID             string                `json:"semantic_segment_id"`
+	Ordinal               int64                 `json:"ordinal"`
+	MatchedText           string                `json:"matched_text"`
+	Kind                  string                `json:"kind"`
+	Producer              string                `json:"producer"`
+	Accepted              bool                  `json:"accepted"`
+	Language              string                `json:"language"`
+	MatchedExcerpt        string                `json:"matched_excerpt,omitempty"`
+	MatchSpans            []SearchMatchSpanData `json:"match_spans,omitempty"`
+}
+
+// SearchMatchSpanData contains query-derived byte offsets within matched_text.
+// Derived-token matches omit spans when they cannot be mapped exactly.
+type SearchMatchSpanData struct {
+	StartByte int `json:"start_byte"`
+	EndByte   int `json:"end_byte"`
 }
 
 type SearchComponentData struct {

@@ -42,18 +42,22 @@ type contentSession struct {
 	contentID   string
 	logicalSize int64
 	expiresAt   time.Time
+	readMu      sync.Mutex
+	reader      io.ReadCloser
+	cursor      int64
+	closed      bool
 }
 
 type contentSessions struct {
 	mu       sync.Mutex
 	repo     repository.Driver
-	byHandle map[string]contentSession
+	byHandle map[string]*contentSession
 }
 
 func newContentSessions(repo repository.Driver) *contentSessions {
 	return &contentSessions{
 		repo:     repo,
-		byHandle: map[string]contentSession{},
+		byHandle: map[string]*contentSession{},
 	}
 }
 
@@ -93,15 +97,21 @@ func (d *Dispatcher) handleContentOpen(ctx context.Context, env command.Envelope
 	if entry.ContentID == "" {
 		return invalidInputResult(env, started, errString("entry has no exact content id"))
 	}
-	size := int64(0)
-	if entry.LogicalSize != nil {
-		size = *entry.LogicalSize
+	if entry.LogicalSize == nil || *entry.LogicalSize < 0 {
+		return invalidInputResult(env, started, errString("entry has no valid exact logical length"))
+	}
+	size := *entry.LogicalSize
+	if err := d.sessions.repo.Verify(ctx, entry.ContentID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return notFoundResult(env, started, "exact content object not found")
+		}
+		return catalogErrorResult(env, started, err)
 	}
 	handle, err := newContentHandle()
 	if err != nil {
 		return catalogErrorResult(env, started, err)
 	}
-	d.sessions.put(contentSession{
+	d.sessions.put(&contentSession{
 		handle:      handle,
 		workspaceID: input.WorkspaceID,
 		entryID:     entry.ID,
@@ -184,7 +194,7 @@ func (d *Dispatcher) handleContentClose(_ context.Context, env command.Envelope,
 	return succeeded(env, started, command.ContentCloseData{Handle: input.Handle, Closed: true})
 }
 
-func (s *contentSessions) put(session contentSession) {
+func (s *contentSessions) put(session *contentSession) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked(time.Now())
@@ -194,24 +204,27 @@ func (s *contentSessions) put(session contentSession) {
 	s.byHandle[session.handle] = session
 }
 
-func (s *contentSessions) get(handle string) (contentSession, bool) {
+func (s *contentSessions) get(handle string) (*contentSession, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
 	s.sweepLocked(now)
 	session, ok := s.byHandle[handle]
 	if !ok {
-		return contentSession{}, false
+		return nil, false
 	}
 	session.expiresAt = now.Add(contentSessionTTL)
-	s.byHandle[handle] = session
 	return session, true
 }
 
 func (s *contentSessions) close(handle string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	session := s.byHandle[handle]
 	delete(s.byHandle, handle)
+	s.mu.Unlock()
+	if session != nil {
+		session.close()
+	}
 }
 
 func (s *contentSessions) sweep(now time.Time) int {
@@ -225,6 +238,7 @@ func (s *contentSessions) sweepLocked(now time.Time) int {
 	for handle, session := range s.byHandle {
 		if !session.expiresAt.IsZero() && !now.Before(session.expiresAt) {
 			delete(s.byHandle, handle)
+			session.close()
 			reaped++
 		}
 	}
@@ -248,28 +262,62 @@ func (s *contentSessions) expireHandle(handle string, at time.Time) {
 	s.byHandle[handle] = session
 }
 
-func (s *contentSessions) read(ctx context.Context, session contentSession, offset, length int64) ([]byte, bool, error) {
+func (session *contentSession) close() {
+	session.readMu.Lock()
+	defer session.readMu.Unlock()
+	session.closeReaderLocked()
+	session.closed = true
+}
+
+func (session *contentSession) closeReaderLocked() {
+	if session.reader != nil {
+		_ = session.reader.Close()
+		session.reader = nil
+	}
+	session.cursor = 0
+}
+
+func (s *contentSessions) read(ctx context.Context, session *contentSession, offset, length int64) ([]byte, bool, error) {
+	session.readMu.Lock()
+	defer session.readMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	if session.closed {
+		return nil, false, errors.New("content session is closed")
+	}
 	if offset >= session.logicalSize {
 		return []byte{}, true, nil
 	}
-	body, err := s.repo.Open(ctx, session.contentID)
-	if err != nil {
-		return nil, false, err
-	}
-	defer body.Close()
-	if offset > 0 {
-		if seeker, ok := body.(io.Seeker); ok {
-			if _, err := seeker.Seek(offset, io.SeekStart); err != nil {
-				return nil, false, err
-			}
-		} else if _, err := io.CopyN(io.Discard, body, offset); err != nil && !errors.Is(err, io.EOF) {
+	seeker, seekable := session.reader.(io.Seeker)
+	if session.reader == nil || (offset != session.cursor && !seekable) {
+		session.closeReaderLocked()
+		body, err := s.repo.Open(ctx, session.contentID)
+		if err != nil {
 			return nil, false, err
 		}
+		session.reader = body
+		session.cursor = 0
+		seeker, seekable = body.(io.Seeker)
 	}
-	payload, err := io.ReadAll(io.LimitReader(body, length))
+	if offset != session.cursor {
+		if seekable {
+			if _, err := seeker.Seek(offset, io.SeekStart); err != nil {
+				session.closeReaderLocked()
+				return nil, false, err
+			}
+		} else if _, err := io.CopyN(io.Discard, session.reader, offset-session.cursor); err != nil {
+			session.closeReaderLocked()
+			return nil, false, err
+		}
+		session.cursor = offset
+	}
+	payload, err := io.ReadAll(io.LimitReader(session.reader, length))
 	if err != nil {
+		session.closeReaderLocked()
 		return nil, false, err
 	}
+	session.cursor += int64(len(payload))
 	eof := offset+int64(len(payload)) >= session.logicalSize
 	return payload, eof, nil
 }

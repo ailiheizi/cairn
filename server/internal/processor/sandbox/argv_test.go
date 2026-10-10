@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -105,14 +105,19 @@ func TestBuildArgvSupportsNonceFileFallback(t *testing.T) {
 func TestRunRespectsPlatform(t *testing.T) {
 	staging := t.TempDir()
 	spec := Spec{Binary: filepath.Join(staging, "worker"), StagingDir: staging}
-	if !Supported() {
+	if runtime.GOOS != "linux" {
 		err := Run(context.Background(), spec)
 		if !errors.Is(err, ErrUnsupportedPlatform) {
 			t.Fatalf("non-linux run = %v, want unsupported platform", err)
 		}
 		return
 	}
-	if _, err := exec.LookPath("bwrap"); err != nil {
+	// The production launcher only admits fixed host-owned paths. An ambient
+	// PATH executable does not establish support for that profile.
+	if _, err := BubblewrapPath(); err != nil {
+		if Supported() {
+			t.Fatal("sandbox reported support without a host-owned bwrap")
+		}
 		if err := Run(context.Background(), spec); !errors.Is(err, ErrBubblewrapMissing) {
 			t.Fatalf("linux without bwrap = %v, want ErrBubblewrapMissing", err)
 		}

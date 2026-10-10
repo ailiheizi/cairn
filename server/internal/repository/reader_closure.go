@@ -593,19 +593,45 @@ func ObservedReaderDecoderAttempts(declaration ReaderClosureDeclaration) []Reade
 }
 
 func observeArtifact(declaration ReaderClosureDeclaration, artifact ReaderRetainedArtifact) ReaderDecoderAttempt {
+	return observeArtifactWithBuildInfo(declaration, artifact, readBuildInfo())
+}
+
+func observeArtifactWithBuildInfo(declaration ReaderClosureDeclaration, artifact ReaderRetainedArtifact, buildInfo *debug.BuildInfo) ReaderDecoderAttempt {
 	attempt := ReaderDecoderAttempt{Stage: artifact.Stage, ID: artifact.Ref}
 	switch artifact.Kind {
 	case ReaderArtifactInTreeSource:
-		digest, ok, reason := SourceSetDigest(artifact.Ref)
+		refs := strings.Split(artifact.Ref, ",")
+		for _, ref := range refs {
+			if ref == "" {
+				attempt.Reason = "retained source reference contains an empty path"
+				return attempt
+			}
+		}
+		digest, ok, reason := SourceSetDigest(refs...)
 		attempt.Digest = digest
 		attempt.Available = ok
 		attempt.Reason = reason
 	case ReaderArtifactPinnedModule:
-		digest, ok, reason := RetainedModuleDigest(declaration.PinnedModulePath, declaration.PinnedModuleVersion)
-		attempt.Digest = digest
-		attempt.Available = ok
-		attempt.Reason = reason
+		if artifact.Stage == ReaderDecoderStageNativeInProcess {
+			digest, ok, reason := linkedModuleObservationFromBuildInfo(buildInfo, declaration.PinnedModulePath, declaration.PinnedModuleVersion, artifact.Digest)
+			attempt.Digest = digest
+			attempt.Available = ok
+			attempt.Reason = reason
+		} else {
+			digest, ok, reason := RetainedModuleDigest(declaration.PinnedModulePath, declaration.PinnedModuleVersion)
+			attempt.Digest = digest
+			attempt.Available = ok
+			attempt.Reason = reason
+		}
 	case ReaderArtifactExecutable:
+		if declaration.PinnedModulePath != "" {
+			_, linkedOK, linkedReason := linkedModuleObservationFromBuildInfo(buildInfo, declaration.PinnedModulePath,
+				declaration.PinnedModuleVersion, zstdModuleDigest)
+			if !linkedOK {
+				attempt.Reason = "the running executable cannot stand in for the pinned codec: " + linkedReason
+				break
+			}
+		}
 		digest, ok, reason := RunningExecutableDigest()
 		attempt.Digest = digest
 		attempt.Available = ok
@@ -656,7 +682,7 @@ func driverDeclaration(codec readerCodec) ReaderClosureDeclaration {
 	if codec.pinnedModule {
 		declaration.PinnedModulePath = zstdModulePath
 		declaration.PinnedModuleVersion = zstdModuleVersion
-		declaration.Artifacts = append(declaration.Artifacts, pinnedModuleArtifact())
+		declaration.Artifacts = append(declaration.Artifacts, codecExecutableArtifact())
 	} else {
 		declaration.Artifacts = append(declaration.Artifacts, executableArtifact())
 	}
@@ -730,11 +756,11 @@ func moduleDeclaration() ReaderClosureDeclaration {
 		Schema:              ReaderClosureSchemaV1,
 		Dependency:          zstdDependency,
 		Role:                ReaderRoleCompressionCodec,
-		Description:         "pinned third-party zstd implementation that decodes every stored zstd frame; retained as Go module bytes recorded by go.sum",
+		Description:         "pinned third-party zstd implementation that decodes every stored zstd frame; the linked module is checked first, then retained Go module bytes recorded by go.sum",
 		Retention:           ReaderRetentionRetainedReproducible,
 		PinnedModulePath:    zstdModulePath,
 		PinnedModuleVersion: zstdModuleVersion,
-		Artifacts:           []ReaderRetainedArtifact{pinnedModuleArtifact()},
+		Artifacts:           []ReaderRetainedArtifact{linkedModuleArtifact(), pinnedModuleArtifact()},
 		Rebuild:             readerClosureRebuildProcedure,
 		Verify:              readerClosureVerifyProcedure,
 		DecoderSupportWindow: "frames written by this pinned decoder stay readable while the module bytes recorded by go.sum remain retained; " +
@@ -782,10 +808,20 @@ func sourceSetArtifact(refs ...string) ReaderRetainedArtifact {
 func pinnedModuleArtifact() ReaderRetainedArtifact {
 	artifact := ReaderRetainedArtifact{
 		Stage: ReaderDecoderStageRetainedPinned, Kind: ReaderArtifactPinnedModule,
-		Ref: zstdModulePath + "@" + zstdModuleVersion, DigestKind: ReaderDigestModuleH1,
+		Ref: zstdModulePath + "@" + zstdModuleVersion, Digest: zstdModuleDigest, DigestKind: ReaderDigestModuleH1,
 	}
-	digest, ok, reason := RetainedModuleDigest(zstdModulePath, zstdModuleVersion)
-	artifact.Digest = digest
+	_, ok, reason := RetainedModuleDigest(zstdModulePath, zstdModuleVersion)
+	artifact.Available = ok
+	artifact.Reason = reason
+	return artifact
+}
+
+func linkedModuleArtifact() ReaderRetainedArtifact {
+	artifact := ReaderRetainedArtifact{
+		Stage: ReaderDecoderStageNativeInProcess, Kind: ReaderArtifactPinnedModule,
+		Ref: zstdModulePath + "@" + zstdModuleVersion, Digest: zstdModuleDigest, DigestKind: ReaderDigestModuleH1,
+	}
+	_, ok, reason := linkedModuleObservationFromBuildInfo(readBuildInfo(), zstdModulePath, zstdModuleVersion, zstdModuleDigest)
 	artifact.Available = ok
 	artifact.Reason = reason
 	return artifact
@@ -804,6 +840,35 @@ func executableArtifact() ReaderRetainedArtifact {
 	artifact.Digest = digest
 	artifact.Available = ok
 	artifact.Reason = reason
+	return artifact
+}
+
+func codecExecutableArtifact() ReaderRetainedArtifact {
+	artifact := ReaderRetainedArtifact{Stage: ReaderDecoderStageRetainedPinned, Kind: ReaderArtifactExecutable,
+		DigestKind: ReaderDigestExecutable}
+	path, err := os.Executable()
+	if err != nil {
+		artifact.Ref = "running executable"
+		artifact.Reason = fmt.Sprintf("cannot identify the running executable: %v", err)
+		return artifact
+	}
+	artifact.Ref = path
+	digest, executableOK, executableReason := RunningExecutableDigest()
+	return codecExecutableArtifactFromBuildInfo(readBuildInfo(), artifact, zstdModulePath, zstdModuleVersion,
+		zstdModuleDigest, digest, executableOK, executableReason)
+}
+
+func codecExecutableArtifactFromBuildInfo(info *debug.BuildInfo, artifact ReaderRetainedArtifact,
+	modulePath, moduleVersion, expectedModuleDigest, executableDigest string, executableOK bool, executableReason string) ReaderRetainedArtifact {
+	_, linkedOK, linkedReason := linkedModuleObservationFromBuildInfo(info, modulePath, moduleVersion, expectedModuleDigest)
+	if !linkedOK {
+		artifact.Available = false
+		artifact.Reason = "the running executable cannot stand in for the pinned codec: " + linkedReason
+		return artifact
+	}
+	artifact.Digest = executableDigest
+	artifact.Available = executableOK
+	artifact.Reason = executableReason
 	return artifact
 }
 
@@ -910,49 +975,71 @@ func RetainedModuleDigest(path, version string) (string, bool, string) {
 		// as the declared decoder.
 		return digest, false, fmt.Sprintf("checkout checksum %s no longer matches the recorded decoder digest %s for %s@%s", digest, zstdModuleDigest, path, version)
 	}
-	if linked, ok := linkedModuleVersion(path); ok && linked != version {
-		return digest, false, fmt.Sprintf("linked module %s@%s differs from the pinned %s", path, linked, version)
+	if info := readBuildInfo(); info != nil {
+		linkedDigest, linkedOK, linkedReason := linkedModuleObservationFromBuildInfo(info, path, version, digest)
+		if linkedOK {
+			return digest, true, ""
+		}
+		if !strings.Contains(linkedReason, "no linked module dependency") {
+			return linkedDigest, false, linkedReason
+		}
 	}
 	return digest, true, ""
 }
 
 // LinkedModuleDigest reports the digest recorded for the module version this
-// build actually linked. It is the retention claim only when build information
-// names the pinned version; a build without dependency information (test
-// binaries, for instance) reports nothing here instead of guessing.
+// build actually linked. Replacements and mismatched versions/checksums are
+// rejected. A build without dependency information reports nothing here
+// instead of guessing.
 func LinkedModuleDigest(path, version string) (string, bool, string) {
-	linked, ok := linkedModuleVersion(path)
-	if !ok {
-		return "", false, "this build does not report linked module information"
+	expected := ""
+	if path == zstdModulePath && version == zstdModuleVersion {
+		expected = zstdModuleDigest
 	}
-	if linked != version {
-		return linked, false, fmt.Sprintf("linked module %s@%s differs from the pinned %s", path, linked, version)
-	}
-	if payload, ok := debug.ReadBuildInfo(); ok {
-		for _, dependency := range payload.Deps {
-			if dependency != nil && dependency.Path == path && dependency.Sum != "" {
-				return dependency.Sum, true, ""
-			}
-		}
-	}
-	return "", false, fmt.Sprintf("no linked digest is recorded for module %s", path)
+	return linkedModuleObservationFromBuildInfo(readBuildInfo(), path, version, expected)
 }
 
-func linkedModuleVersion(path string) (string, bool) {
+func readBuildInfo() *debug.BuildInfo {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return "", false
+		return nil
 	}
+	return info
+}
+
+// linkedModuleObservationFromBuildInfo is the pure check for the exact module
+// selected by the Go linker. The expected checksum comes from the frozen
+// dependency declaration, never from the BuildInfo being inspected.
+func linkedModuleObservationFromBuildInfo(info *debug.BuildInfo, path, version, expectedDigest string) (string, bool, string) {
+	if info == nil {
+		return "", false, "this build does not report linked module information"
+	}
+	var match *debug.Module
 	for _, dependency := range info.Deps {
 		if dependency == nil || dependency.Path != path {
 			continue
 		}
-		if dependency.Replace != nil {
-			return dependency.Replace.Version, true
+		if match != nil {
+			return "", false, fmt.Sprintf("build information contains multiple linked entries for module %s", path)
 		}
-		return dependency.Version, true
+		match = dependency
 	}
-	return "", false
+	if match == nil {
+		return "", false, fmt.Sprintf("no linked module dependency is recorded for %s", path)
+	}
+	if match.Replace != nil {
+		return match.Sum, false, fmt.Sprintf("linked module %s@%s is replaced by %s@%s", path, match.Version, match.Replace.Path, match.Replace.Version)
+	}
+	if match.Version != version {
+		return match.Sum, false, fmt.Sprintf("linked module %s@%s differs from the pinned %s@%s", path, match.Version, path, version)
+	}
+	if match.Sum == "" {
+		return "", false, fmt.Sprintf("linked module %s@%s has no checksum", path, version)
+	}
+	if expectedDigest != "" && match.Sum != expectedDigest {
+		return match.Sum, false, fmt.Sprintf("linked checksum %s does not match the declared decoder digest %s for %s@%s", match.Sum, expectedDigest, path, version)
+	}
+	return match.Sum, true, ""
 }
 
 // RunningExecutableDigest hashes the executable that is answering, which is the

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ailiheizi/restoreweave/client/command"
 	"github.com/ailiheizi/restoreweave/server/internal/search"
@@ -827,9 +828,61 @@ func projectSearchSegments(segments []search.SegmentRef) []command.SearchSegment
 			Producer:              segment.Producer,
 			Accepted:              segment.Accepted,
 			Language:              segment.Language,
+			MatchedExcerpt:        matchedExcerpt(segment.MatchedText, segment.MatchSpans),
+			MatchSpans:            projectMatchSpans(segment.MatchSpans),
 		})
 	}
 	return projected
+}
+
+func projectMatchSpans(spans []search.MatchSpan) []command.SearchMatchSpanData {
+	if len(spans) == 0 {
+		return nil
+	}
+	result := make([]command.SearchMatchSpanData, 0, len(spans))
+	for _, span := range spans {
+		result = append(result, command.SearchMatchSpanData{StartByte: span.StartByte, EndByte: span.EndByte})
+	}
+	return result
+}
+
+func matchedExcerpt(text string, spans []search.MatchSpan) string {
+	if len(spans) == 0 {
+		return ""
+	}
+	first := spans[0]
+	for _, span := range spans {
+		if span.StartByte < 0 || span.EndByte <= span.StartByte || span.EndByte > len(text) || !utf8.ValidString(text[:span.StartByte]) || !utf8.ValidString(text[:span.EndByte]) {
+			return ""
+		}
+		if span.StartByte < first.StartByte {
+			first = span
+		}
+	}
+	start := first.StartByte
+	for n := 0; n < 24 && start > 0; n++ {
+		_, size := utf8.DecodeLastRuneInString(text[:start])
+		start -= size
+	}
+	// A highlighted token may itself be a very long Han/Latin run. Keep the
+	// query-derived excerpt bounded while retaining the complete source above.
+	end := first.StartByte
+	for n := 0; n < 64 && end < first.EndByte; n++ {
+		_, size := utf8.DecodeRuneInString(text[end:])
+		end += size
+	}
+	for n := 0; n < 24 && end < len(text); n++ {
+		_, size := utf8.DecodeRuneInString(text[end:])
+		end += size
+	}
+	excerpt := text[start:end]
+	if start > 0 {
+		excerpt = "…" + excerpt
+	}
+	if end < len(text) {
+		excerpt += "…"
+	}
+	return excerpt
 }
 
 func (d *Dispatcher) upsertTag(ctx context.Context, input annotationUpsertInput) (sqlite.Annotation, error) {

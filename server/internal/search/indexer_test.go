@@ -188,6 +188,7 @@ func TestIndexerFeedsDurableFactsProtectionAndDescriptions(t *testing.T) {
 	}
 	descriptionID := mustSearchID(t, sqlite.IDPrefixDescription)
 	segmentID := mustSearchID(t, sqlite.IDPrefixSemanticSegment)
+	descriptionBody := "A melancholy adventure about rebuilding a flooded city"
 	if err := store.InsertDescriptionDocument(ctx, &sqlite.DescriptionDocument{
 		ID:              descriptionID,
 		WorkspaceID:     seed.WorkspaceID,
@@ -195,7 +196,7 @@ func TestIndexerFeedsDurableFactsProtectionAndDescriptions(t *testing.T) {
 		Kind:            sqlite.DescriptionUser,
 		Title:           "Personal review",
 		Language:        "en",
-		Body:            "A melancholy adventure about rebuilding a flooded city",
+		Body:            descriptionBody,
 		SourceRef:       "user:test",
 		ProducerProfile: "human",
 		Accepted:        true,
@@ -208,9 +209,10 @@ func TestIndexerFeedsDurableFactsProtectionAndDescriptions(t *testing.T) {
 		DocumentID:  descriptionID,
 		SubjectRef:  seed.FileEntryID,
 		Ordinal:     0,
-		Text:        "A melancholy adventure about rebuilding a flooded city",
+		Text:        descriptionBody,
 		Language:    "en",
 		Section:     "body",
+		SourceSpan:  json.RawMessage(fmt.Sprintf(`{"start_byte":0,"end_byte":%d}`, len([]byte(descriptionBody)))),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -277,6 +279,9 @@ func TestIndexerFeedsDurableFactsProtectionAndDescriptions(t *testing.T) {
 	if ref := hits[0].Segments[0]; ref.DescriptionDocumentID != descriptionID || ref.SegmentID != segmentID ||
 		ref.Kind != "USER" || !ref.Accepted {
 		t.Fatalf("segment ref = %+v", ref)
+	} else if ref.DescriptionSource == nil || ref.DescriptionSource.BodyDigest != sha256Text(descriptionBody) ||
+		ref.DescriptionSource.SourceStartByte != 0 || ref.DescriptionSource.SourceEndByte != len(descriptionBody) {
+		t.Fatalf("new lexical generation omitted verified source projection: %+v", ref.DescriptionSource)
 	}
 
 	// A protection-mode filter against the STORE_EXACT record must keep the

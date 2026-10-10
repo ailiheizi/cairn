@@ -107,6 +107,7 @@ func (r *invalidSavingsReceiptRepo) PlaceExact(ctx context.Context, contentID st
 	receipt, err := r.Dir.PlaceExact(ctx, contentID, body)
 	if err == nil {
 		receipt.StoredBytes = -1
+		receipt.StoredBytesState = repository.StoredBytesUnavailable
 	}
 	return receipt, err
 }

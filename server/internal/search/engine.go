@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -74,6 +75,19 @@ type SegmentRef struct {
 	Producer              string
 	Accepted              bool
 	Language              string
+	// DescriptionSource is a verified, disposable lexical projection. It is
+	// absent in older generations and for segments whose durable spans fail
+	// validation; it never changes semantic inputs or source authority.
+	DescriptionSource *descriptionSourceProvenance `json:"description_source_provenance,omitempty"`
+	// MatchSpans are query-derived byte ranges within MatchedText. They are
+	// absent when the match came only from derived text or cannot be mapped
+	// exactly to this source segment.
+	MatchSpans []MatchSpan `json:"-"`
+}
+
+type MatchSpan struct {
+	StartByte int `json:"start_byte"`
+	EndByte   int `json:"end_byte"`
 }
 
 type Hit struct {
@@ -200,6 +214,11 @@ func (engine *Engine) QueryFiltered(ctx context.Context, dbPath, text string, ax
 		return nil, err
 	}
 	defer db.Close()
+	matcher, err := newProvenanceMatcher(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("initialize provenance matcher: %w", err)
+	}
+	defer matcher.Close()
 	tokens := queryTokens(text)
 	// FTS5 MATCH requires at least one term. With no free text the structured
 	// filters still run, so fall back to a plain full-table scan; typed
@@ -212,7 +231,7 @@ func (engine *Engine) QueryFiltered(ctx context.Context, dbPath, text string, ax
 	}
 	query := `
 SELECT subject_id, path, name, suffix, entry_type, content_id, metadata,
-       duplicates, protection, locators, tags, notes, descriptions, extracted,
+       duplicates, protection, locators, tags, notes, descriptions, descriptions_pinyin, extracted,
        detection, processing, representations, language,
        size_facet, mtime_facet, duplicate_group, segments
 FROM documents ` + where
@@ -238,14 +257,14 @@ FROM documents ` + where
 		for rows.Next() {
 			pageRows++
 			var hit Hit
-			var suffix, metadata, duplicates, protection, locators, tags, notes, descriptions, extracted string
+			var suffix, metadata, duplicates, protection, locators, tags, notes, descriptions, descriptionsPinyin, extracted string
 			var detection, processing, representations, language string
 			var sizeFacet, mtimeFacet sql.NullInt64
 			var duplicateGroup, segments string
 			if err := rows.Scan(
 				&hit.SubjectID, &hit.Path, &hit.Name, &suffix, &hit.EntryType,
 				&hit.ContentID, &metadata, &duplicates, &protection, &locators,
-				&tags, &notes, &descriptions, &extracted, &detection, &processing,
+				&tags, &notes, &descriptions, &descriptionsPinyin, &extracted, &detection, &processing,
 				&representations, &language, &sizeFacet, &mtimeFacet, &duplicateGroup,
 				&segments,
 			); err != nil {
@@ -255,10 +274,18 @@ FROM documents ` + where
 			if !matchesFilters(hit, filters, sizeFacet, mtimeFacet, duplicateGroup, suffix, protection, language) {
 				continue
 			}
-			hit.ConstructAxes = matchedConstructAxes(hit, suffix, metadata, duplicates,
+			hit.ConstructAxes, queryErr = matchedConstructAxes(ctx, matcher, hit, suffix, metadata, duplicates,
 				protection, locators, tags, notes, descriptions, extracted,
-				detection, processing, representations, language, duplicateGroup, tokens)
-			hit.Segments = matchedDescriptionSegments(segments, tokens)
+				detection, processing, representations, language, duplicateGroup, tokens, axes)
+			if queryErr != nil {
+				_ = rows.Close()
+				return nil, fmt.Errorf("project construct match: %w", queryErr)
+			}
+			hit.Segments, queryErr = matchedDescriptionSegments(ctx, matcher, segments, tokens, axes, descriptions, descriptionsPinyin, extracted, hit.SubjectID)
+			if queryErr != nil {
+				_ = rows.Close()
+				return nil, fmt.Errorf("project source match spans: %w", queryErr)
+			}
 			hits = append(hits, hit)
 			if len(hits) >= resultLimit {
 				break
@@ -473,14 +500,40 @@ func queryTokens(text string) []string {
 	return tokens
 }
 
+// provenanceTokens keeps combining marks inside a source token when checking
+// whether a lexical match can be attributed to that source. It is deliberately
+// separate from queryTokens so provenance projection never changes the query
+// text handed to FTS5.
+func provenanceTokens(text string) []string {
+	text = strings.ToLower(text)
+	var tokens []string
+	var current strings.Builder
+	flush := func() {
+		token := strings.TrimSpace(current.String())
+		current.Reset()
+		if token != "" {
+			tokens = append(tokens, token)
+		}
+	}
+	for _, r := range text {
+		if !unicode.IsLetter(r) && !unicode.IsNumber(r) && !unicode.IsMark(r) && !unicode.Is(unicode.Co, r) {
+			flush()
+			continue
+		}
+		current.WriteRune(r)
+	}
+	flush()
+	return tokens
+}
+
 func restrictToAxes(axes []string) bool {
 	return len(axes) > 0 && len(axes) < len(LexicalConstructAxes)
 }
 
-func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, locators, tags, notes, descriptions, extracted string,
-	detection, processing, representations, language, duplicateGroup string, tokens []string) []string {
+func matchedConstructAxes(ctx context.Context, matcher *provenanceMatcher, hit Hit, suffix, metadata, duplicates, protection, locators, tags, notes, descriptions, extracted string,
+	detection, processing, representations, language, duplicateGroup string, tokens, axes []string) ([]string, error) {
 	if len(tokens) == 0 {
-		return nil
+		return nil, nil
 	}
 	fields := []struct {
 		axis string
@@ -514,32 +567,40 @@ func matchedConstructAxes(hit Hit, suffix, metadata, duplicates, protection, loc
 	}
 	var matched []string
 	for _, field := range fields {
-		lower := strings.ToLower(field.text)
-		enriched := ""
-		enrichedComputed := false
-		for _, token := range tokens {
-			if token == "" {
-				continue
+		if !axisAllowed(field.axis, axes) {
+			continue
+		}
+		_, rawMatch, err := matcher.matches(ctx, field.text, tokens, true)
+		if err != nil {
+			return nil, err
+		}
+		if rawMatch {
+			matched = append(matched, field.axis)
+			continue
+		}
+		if field.enrichment != nil {
+			_, derivedMatch, err := matcher.matches(ctx, field.enrichment(field.text), tokens, false)
+			if err != nil {
+				return nil, err
 			}
-			wanted := strings.ToLower(token)
-			if strings.Contains(lower, wanted) {
+			if derivedMatch {
 				matched = append(matched, field.axis)
-				break
-			}
-			if field.enrichment == nil {
-				continue
-			}
-			if !enrichedComputed {
-				enriched = strings.ToLower(field.enrichment(field.text))
-				enrichedComputed = true
-			}
-			if enriched != "" && strings.Contains(enriched, wanted) {
-				matched = append(matched, field.axis)
-				break
 			}
 		}
 	}
-	return matched
+	return matched, nil
+}
+
+func axisAllowed(axis string, axes []string) bool {
+	if len(axes) == 0 {
+		return true
+	}
+	for _, requested := range axes {
+		if requested == axis {
+			return true
+		}
+	}
+	return false
 }
 
 // extractedPinyinEnrichmentBound bounds the derived token enrichment of the
@@ -577,37 +638,317 @@ func boundForPinyinEnrichment(text string) string {
 	return text[:cut]
 }
 
-// matchedDescriptionSegments returns provenance for description matches. The
-// segments UNINDEXED column carries the durable segment text digests; a hit
-// reports exactly the segments whose text matched a query token. No token
-// match means no segment is claimed, even when the whole-body axis matched.
-func matchedDescriptionSegments(segmentsJSON string, tokens []string) []SegmentRef {
-	if len(tokens) == 0 || strings.TrimSpace(segmentsJSON) == "" {
-		return nil
+// matchedDescriptionSegments projects lexical segment provenance from the
+// durable source text. The FTS generation indexes annotations, descriptions,
+// and extracted artifacts on separate axes, so attribution must honor the
+// requested axes. Derived extracted tokens are bounded over the joined field;
+// only when the segment list reconstructs that field exactly can their source
+// offsets be inferred safely.
+type provenanceMatcher struct {
+	db *sql.DB
+}
+
+func newProvenanceMatcher(ctx context.Context) (*provenanceMatcher, error) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		return nil, err
 	}
-	var segments []SegmentRef
-	if err := json.Unmarshal([]byte(segmentsJSON), &segments); err != nil {
-		return nil
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(ctx, `CREATE VIRTUAL TABLE provenance USING fts5(raw, derived, tokenize='unicode61')`); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
-	var refs []SegmentRef
-	for _, segment := range segments {
-		lower := strings.ToLower(segment.MatchedText)
-		for _, token := range tokens {
-			if token != "" && strings.Contains(lower, strings.ToLower(token)) {
-				refs = append(refs, segment)
-				break
+	return &provenanceMatcher{db: db}, nil
+}
+
+func (m *provenanceMatcher) Close() error { return m.db.Close() }
+
+func (m *provenanceMatcher) matches(ctx context.Context, text string, tokens []string, raw bool) ([]MatchSpan, bool, error) {
+	if _, err := m.db.ExecContext(ctx, `DELETE FROM provenance`); err != nil {
+		return nil, false, err
+	}
+	columnName := "derived"
+	if raw {
+		columnName = "raw"
+	}
+	if _, err := m.db.ExecContext(ctx, `INSERT INTO provenance(rowid, `+columnName+`) VALUES(1, ?)`, text); err != nil {
+		return nil, false, err
+	}
+	var spans []MatchSpan
+	matched := false
+	column := 1
+	columnName = "derived"
+	if raw {
+		column = 0
+		columnName = "raw"
+	}
+	terms := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		terms = append(terms, `"`+token+`"*`)
+	}
+	query := columnName + ` : (` + strings.Join(terms, " OR ") + `)`
+	openMark, closeMark := "\x01RW_OPEN\x02", "\x02RW_CLOSE\x01"
+	for strings.Contains(text, openMark) {
+		openMark += "_"
+	}
+	for strings.Contains(text, closeMark) || closeMark == openMark {
+		closeMark += "_"
+	}
+	var marked string
+	err := m.db.QueryRowContext(ctx, `SELECT highlight(provenance, ?, ?, ?) FROM provenance WHERE provenance MATCH ?`, column, openMark, closeMark, query).Scan(&marked)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	matched = true
+	original := marked
+	for {
+		start := strings.Index(marked, openMark)
+		if start < 0 {
+			break
+		}
+		marked = marked[:start] + marked[start+len(openMark):]
+		end := strings.Index(marked[start:], closeMark)
+		if end < 0 {
+			return nil, false, errors.New("FTS5 highlight returned an incomplete span")
+		}
+		spans = append(spans, MatchSpan{StartByte: start, EndByte: start + end})
+		marked = marked[:start+end] + marked[start+end+len(closeMark):]
+	}
+	if strings.ReplaceAll(strings.ReplaceAll(original, openMark, ""), closeMark, "") != text {
+		return nil, false, errors.New("FTS5 highlight did not preserve source bytes")
+	}
+	return mergeMatchSpans(spans), matched, nil
+}
+
+func mergeMatchSpans(spans []MatchSpan) []MatchSpan {
+	if len(spans) < 2 {
+		return spans
+	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].StartByte < spans[j].StartByte })
+	merged := spans[:1]
+	for _, span := range spans[1:] {
+		last := &merged[len(merged)-1]
+		if span.StartByte <= last.EndByte {
+			if span.EndByte > last.EndByte {
+				last.EndByte = span.EndByte
+			}
+			continue
+		}
+		merged = append(merged, span)
+	}
+	return merged
+}
+
+// matchedDescriptionSourceRanges maps FTS highlights in the derived appendix
+// back to source-byte intervals. Origins are ordered by appendix position,
+// while their source intervals may be out of order (for example, the appendix
+// emits all CJK bigrams before its single-character tokens).
+func matchedDescriptionSourceRanges(spans []MatchSpan, origins []pinyin.TokenOrigin) []sourceByteRange {
+	var sources []sourceByteRange
+	originIndex := 0
+	for _, span := range spans {
+		for originIndex < len(origins) && origins[originIndex].EndByte <= span.StartByte {
+			originIndex++
+		}
+		for i := originIndex; i < len(origins) && origins[i].StartByte < span.EndByte; i++ {
+			origin := origins[i]
+			if origin.EndByte > span.StartByte && origin.StartByte < span.EndByte {
+				sources = append(sources, sourceByteRange{start: origin.SourceStartByte, end: origin.SourceEndByte})
 			}
 		}
 	}
-	return refs
+	if len(sources) < 2 {
+		return sources
+	}
+	sort.Slice(sources, func(i, j int) bool {
+		if sources[i].start == sources[j].start {
+			return sources[i].end < sources[j].end
+		}
+		return sources[i].start < sources[j].start
+	})
+	merged := sources[:1]
+	for _, source := range sources[1:] {
+		last := &merged[len(merged)-1]
+		if source.start <= last.end {
+			if source.end > last.end {
+				last.end = source.end
+			}
+			continue
+		}
+		merged = append(merged, source)
+	}
+	return merged
 }
 
+func sourceRangeOverlapsAny(segment sourceByteRange, sources []sourceByteRange) bool {
+	index := sort.Search(len(sources), func(i int) bool { return sources[i].end > segment.start })
+	return index < len(sources) && sources[index].start < segment.end
+}
+
+func matchedDescriptionSegments(ctx context.Context, matcher *provenanceMatcher, segmentsJSON string, tokens, axes []string, descriptions, descriptionsPinyin, extracted, subjectID string) ([]SegmentRef, error) {
+	if len(tokens) == 0 || strings.TrimSpace(segmentsJSON) == "" {
+		return nil, nil
+	}
+	var segments []SegmentRef
+	var projection lexicalSegmentProjection
+	versionedProjection := false
+	if err := json.Unmarshal([]byte(segmentsJSON), &projection); err == nil && projection.SchemaVersion != 0 {
+		segments = projection.Segments
+		versionedProjection = true
+	} else if err := json.Unmarshal([]byte(segmentsJSON), &segments); err != nil {
+		return nil, nil
+	}
+	var verifiedRanges map[string]sourceByteRange
+	var derivedOrigins []pinyin.TokenOrigin
+	if versionedProjection && projection.SchemaVersion == lexicalSegmentProjectionSchemaV1 {
+		verifiedRanges = verifiedDescriptionFieldRanges(descriptions, projection.DescriptionsFieldHash, segments, subjectID)
+		appendix, origins := pinyin.EnrichmentAppendixWithOrigins(descriptions)
+		if verifiedRanges != nil && appendix == descriptionsPinyin {
+			derivedOrigins = origins
+		}
+	}
+	var refs []SegmentRef
+	artifactTexts := make([]string, 0)
+	descriptionSegmentCounts := make(map[string]int)
+	for _, segment := range segments {
+		if segment.SourceType == "ARTIFACT" {
+			artifactTexts = append(artifactTexts, segment.MatchedText)
+		}
+		if segment.SourceType == "DESCRIPTION" ||
+			(segment.SourceType == "" && strings.TrimSpace(segment.DescriptionDocumentID) != "") {
+			if documentID := strings.TrimSpace(segment.DescriptionDocumentID); documentID != "" {
+				descriptionSegmentCounts[documentID]++
+			}
+		}
+	}
+	joinedArtifacts := strings.Join(artifactTexts, " ")
+	extractedOffsetsKnown := len(artifactTexts) > 0 && joinedArtifacts == extracted
+	var extractedCursor int
+	extractedBound := len(boundForPinyinEnrichment(extracted))
+	var derivedDescriptionSources []sourceByteRange
+	if versionedProjection && len(derivedOrigins) > 0 && axisAllowed(AxisDescriptions, axes) {
+		derivedSpans, _, err := matcher.matches(ctx, descriptionsPinyin, tokens, false)
+		if err != nil {
+			return nil, err
+		}
+		derivedDescriptionSources = matchedDescriptionSourceRanges(derivedSpans, derivedOrigins)
+	}
+	for _, segment := range segments {
+		axis := ""
+		switch segment.SourceType {
+		case "ANNOTATION":
+			axis = AxisNotes
+		case "DESCRIPTION":
+			axis = AxisDescriptions
+		case "ARTIFACT":
+			axis = AxisExtracted
+		case "FILENAME":
+			axis = AxisName
+		default:
+			// Older lexical generations serialized description provenance
+			// before SourceType existed. The stable description document ID is
+			// sufficient to retain that existing projection without guessing
+			// for other unknown source shapes.
+			if strings.TrimSpace(segment.DescriptionDocumentID) != "" {
+				axis = AxisDescriptions
+			} else {
+				continue
+			}
+		}
+		if !axisAllowed(axis, axes) {
+			continue
+		}
+		text := segment.MatchedText
+		derivedText := text
+		derivedMatch := false
+		if axis == AxisDescriptions {
+			if versionedProjection {
+				segmentRange, ok := verifiedRanges[segment.SegmentID]
+				if !ok {
+					// Invalid or incomplete provenance omits this explanation only.
+					continue
+				}
+				derivedMatch = sourceRangeOverlapsAny(segmentRange, derivedDescriptionSources)
+			} else {
+				// Legacy generations lack source offsets. Keep their conservative
+				// one-segment attribution rule without inventing provenance.
+				documentID := strings.TrimSpace(segment.DescriptionDocumentID)
+				if documentID == "" || segment.Ordinal != 0 || descriptionSegmentCounts[documentID] != 1 {
+					derivedText = ""
+				}
+			}
+		}
+		if axis == AxisExtracted {
+			if extractedOffsetsKnown {
+				at := strings.Index(extracted[extractedCursor:], text)
+				if at < 0 {
+					continue
+				}
+				start := extractedCursor + at
+				end := start + len(text)
+				extractedCursor = end
+				if start >= extractedBound {
+					derivedText = ""
+				} else if end > extractedBound {
+					derivedText = boundForPinyinEnrichment(text[:extractedBound-start])
+				}
+			} else {
+				// Without an exact source-to-field reconstruction, raw text can
+				// still be explained, but no derived token is assigned to an
+				// individual artifact because its joined-field offset is unknown.
+				derivedText = ""
+			}
+		}
+		rawSpans, rawMatch, rawErr := matcher.matches(ctx, text, tokens, true)
+		if rawErr != nil {
+			return nil, rawErr
+		}
+		if !(versionedProjection && axis == AxisDescriptions) && !rawMatch && derivedText != "" {
+			var derivedErr error
+			_, derivedMatch, derivedErr = matcher.matches(ctx, pinyin.EnrichmentAppendix(derivedText), tokens, false)
+			if derivedErr != nil {
+				return nil, derivedErr
+			}
+		}
+		if rawMatch || derivedMatch {
+			segment.MatchSpans = rawSpans
+			refs = append(refs, segment)
+		}
+	}
+	return refs, nil
+}
+
+// segmentMatchesTokens mirrors the lexical token-prefix behavior needed for
+// source attribution. FTS5 matches prefixes at token starts; substring checks
+// would falsely attribute a Latin interior such as "avel" to "travel".
+// provenanceTokens approximates the bundled unicode61 token boundaries,
+// including combining marks and private-use characters, without duplicating
+// unicode61's diacritic folding. That can suppress some valid provenance for
+// folded accents, but avoids claiming an interior substring as a token match.
 func containsWord(word, text string) bool {
 	word = strings.ToLower(word)
 	text = strings.ToLower(text)
 	for _, field := range strings.Fields(text) {
 		if field == word || strings.HasPrefix(field, word+"_") {
 			return true
+		}
+	}
+	return false
+}
+
+// segmentMatchesTokens is retained for the legacy construct-axis projection.
+// Source segment attribution and spans use the actual FTS5 matcher below.
+func segmentMatchesTokens(text string, tokens []string) bool {
+	fieldTokens := provenanceTokens(text)
+	for _, queryToken := range tokens {
+		wanted := strings.ToLower(queryToken)
+		for _, fieldToken := range fieldTokens {
+			if strings.HasPrefix(fieldToken, wanted) {
+				return true
+			}
 		}
 	}
 	return false

@@ -112,6 +112,80 @@ func TestNewStaticHandlerRejectsUnsafeRootsAndAssets(t *testing.T) {
 	}
 }
 
+// A rebuilt WebUI must reach the browser without restarting the daemon. The
+// startup snapshot used to stay in place forever, so a new build was invisible
+// while the retired hashed asset kept answering 200.
+func TestStaticHandlerServesRebuiltRootWithoutRestart(t *testing.T) {
+	root := t.TempDir()
+	writeFile := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile("index.html", "INDEX-1")
+	writeFile("app.js", "ASSET-1")
+	handler, err := NewStaticHandler(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(target string) *httptest.ResponseRecorder {
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "http://loopback"+target, nil))
+		return res
+	}
+	if body := get("/app.js").Body.String(); body != "ASSET-1" {
+		t.Fatalf("initial asset = %q, want ASSET-1", body)
+	}
+	// A production rebuild retires the old hashed asset and writes a new one.
+	if err := os.Remove(filepath.Join(root, "app.js")); err != nil {
+		t.Fatal(err)
+	}
+	writeFile("index.html", "INDEX-2")
+	writeFile("app-2.js", "ASSET-2")
+	if res := get("/app-2.js"); res.Code != http.StatusOK || res.Body.String() != "ASSET-2" {
+		t.Fatalf("rebuilt asset = %d %q, want 200 ASSET-2", res.Code, res.Body.String())
+	}
+	if body := get("/").Body.String(); body != "INDEX-2" {
+		t.Fatalf("rebuilt index = %q, want INDEX-2", body)
+	}
+	if res := get("/app.js"); res.Code != http.StatusNotFound {
+		t.Fatalf("retired asset = %d, want 404", res.Code)
+	}
+}
+
+// A replacement that fails validation is never served: the last validated
+// snapshot stays in place rather than unverified bytes.
+func TestStaticHandlerKeepsLastValidatedSnapshotOnInvalidRebuild(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("INDEX"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "app.js"), []byte("ASSET"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewStaticHandler(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(target string) *httptest.ResponseRecorder {
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "http://loopback"+target, nil))
+		return res
+	}
+	if body := get("/app.js").Body.String(); body != "ASSET" {
+		t.Fatalf("initial asset = %q, want ASSET", body)
+	}
+	if err := os.Symlink(filepath.Join(root, "index.html"), filepath.Join(root, "evil.js")); err != nil {
+		t.Fatal(err)
+	}
+	if res := get("/evil.js"); res.Code != http.StatusNotFound {
+		t.Fatalf("symlink asset = %d, want 404 from the last validated snapshot", res.Code)
+	}
+	if body := get("/app.js").Body.String(); body != "ASSET" {
+		t.Fatalf("validated asset after an invalid rebuild = %q, want ASSET", body)
+	}
+}
+
 func TestHandlerWithStaticDisabledMatchesAPI(t *testing.T) {
 	handler, err := HandlerWithStatic(nil, Options{}, "")
 	if err != nil {

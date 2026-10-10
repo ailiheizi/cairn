@@ -586,6 +586,24 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		segment.Producer == "" || !strings.EqualFold(segment.Language, "en") || !segment.Accepted {
 		t.Fatalf("real CLI segment provenance = %+v", segment)
 	}
+	if len(segment.MatchSpans) != 1 || segment.MatchSpans[0].StartByte < 0 ||
+		segment.MatchSpans[0].EndByte > len(segment.MatchedText) ||
+		segment.MatchedText[segment.MatchSpans[0].StartByte:segment.MatchSpans[0].EndByte] != "flooded" ||
+		!strings.Contains(segment.MatchedExcerpt, "flooded") ||
+		segment.MatchedText != "A flooded city archive is ready for recovery." {
+		t.Fatalf("real CLI lexical match span = %+v", segment)
+	}
+	lexicalGeneration := searchData.Components[0].GenerationID
+	repeatedSearch := runRWProcessAllowDegraded(t, rwBin, socketPath, "search", "flooded",
+		"--workspace", appliedData.WorkspaceID, "--filter", "language=EN", "--filter", "suffix=bin")
+	var repeatedSearchData command.SearchQueryData
+	decodeProcessResult(t, repeatedSearch, &repeatedSearchData)
+	if len(repeatedSearchData.Components) == 0 || repeatedSearchData.Components[0].GenerationID != lexicalGeneration ||
+		len(repeatedSearchData.Hits) != 1 || len(repeatedSearchData.Hits[0].Segments) == 0 ||
+		repeatedSearchData.Hits[0].Segments[0].MatchedExcerpt != segment.MatchedExcerpt ||
+		repeatedSearchData.Hits[0].Segments[0].MatchedText != segment.MatchedText {
+		t.Fatalf("same-generation real daemon requery changed provenance: first=%+v repeat=%+v", searchData, repeatedSearchData)
+	}
 	wrongLanguage := runRWProcess(t, rwBin, socketPath, "search", "flooded",
 		"--workspace", appliedData.WorkspaceID, "--dimension", search.DimensionLexical,
 		"--filter", "language=fr", "--filter", "suffix=bin")

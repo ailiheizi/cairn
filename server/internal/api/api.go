@@ -46,6 +46,10 @@ func Handler(dispatch DispatchFunc, options Options) http.Handler {
 			writeError(w, http.StatusUnauthorized, "authorization required")
 			return
 		}
+		if r.URL.Path == "/api/v1/download" {
+			serveContentDownload(w, r, dispatch)
+			return
+		}
 		if r.URL.Path == "/api/v1/upload" {
 			if options.Upload == nil {
 				writeUploadError(w, http.StatusServiceUnavailable, command.UploadReasonUnavailable, "upload staging is not enabled on this listener")

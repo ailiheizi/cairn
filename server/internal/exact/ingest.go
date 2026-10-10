@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"sort"
 	"strings"
@@ -387,9 +388,9 @@ func (s *Service) placeFiles(
 		if err != nil {
 			return placed, fmt.Errorf("place %s: %w", entry.RelativePath, err)
 		}
-		if !validExactContentID(receipt.ContentID) || receipt.ContentID != entry.Content.ContentID || receipt.Bytes < 0 || receipt.Bytes != entry.Content.BytesRead || receipt.StoredBytes < 0 {
+		if !validExactContentID(receipt.ContentID) || receipt.ContentID != entry.Content.ContentID || receipt.Bytes < 0 || receipt.Bytes != entry.Content.BytesRead || !receipt.HasMeasuredStoredBytes() {
 			placed.savingsMeasured = false
-			placed.savingsWarning = "savings measurement unavailable: placement receipt is invalid"
+			placed.savingsWarning = "savings measurement unavailable: placement receipt has no valid whole-object measurement"
 		}
 		// The exact lane already independently read back the expected identity
 		// and length. Normalize those fields for publication so a malformed
@@ -415,15 +416,26 @@ func (s *Service) placeFiles(
 		}
 	}
 	for _, receipt := range placed.payloadReceipts {
-		if !validExactContentID(receipt.ContentID) || receipt.Bytes < 0 || receipt.StoredBytes < 0 {
+		if !validExactContentID(receipt.ContentID) || receipt.Bytes < 0 || !receipt.HasMeasuredStoredBytes() {
 			placed.savingsMeasured = false
-			placed.savingsWarning = "savings measurement unavailable: placement receipt is invalid"
+			placed.savingsWarning = "savings measurement unavailable: placement receipt has no valid whole-object measurement"
 			break
 		}
 		if !receipt.Existed {
-			placed.newPhysicalBytes += receipt.StoredBytes
+			var ok bool
+			placed.newPhysicalBytes, ok = addMeasuredBytes(placed.newPhysicalBytes, receipt.StoredBytes)
+			if !ok {
+				placed.savingsMeasured = false
+				placed.savingsWarning = "savings measurement unavailable: measured whole-object total overflows"
+				break
+			}
 			if receipt.Bytes > receipt.StoredBytes {
-				placed.compressionSavedBytes += receipt.Bytes - receipt.StoredBytes
+				placed.compressionSavedBytes, ok = addMeasuredBytes(placed.compressionSavedBytes, receipt.Bytes-receipt.StoredBytes)
+				if !ok {
+					placed.savingsMeasured = false
+					placed.savingsWarning = "savings measurement unavailable: compression total overflows"
+					break
+				}
 			}
 		}
 	}
@@ -435,6 +447,13 @@ func (s *Service) placeFiles(
 		placed.compressionSavedBytes = 0
 	}
 	return placed, nil
+}
+
+func addMeasuredBytes(total, value int64) (int64, bool) {
+	if total < 0 || value < 0 || total > math.MaxInt64-value {
+		return 0, false
+	}
+	return total + value, true
 }
 
 type adopted struct {

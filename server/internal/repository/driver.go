@@ -30,14 +30,35 @@ var (
 	ErrDigestMismatch   = errors.New("placed bytes do not match the expected content id")
 )
 
+// StoredBytesState classifies optional placement-byte telemetry.
+type StoredBytesState string
+
+const (
+	// StoredBytesMeasured means StoredBytes is the measured length of the
+	// exclusively owned complete object for this placement.
+	StoredBytesMeasured StoredBytesState = "MEASURED"
+	// StoredBytesUnavailable means the provider cannot attribute an exclusive
+	// complete-object length to this placement.
+	StoredBytesUnavailable StoredBytesState = "UNAVAILABLE"
+)
+
 // Receipt is returned after an idempotent placement.
 type Receipt struct {
 	ContentID string
 	Bytes     int64
-	// StoredBytes is the number of bytes occupied by the repository object.
-	// Bytes always describes the logical, uncompressed payload.
-	StoredBytes int64
-	Existed     bool
+	// StoredBytes is optional unsigned telemetry. It is a measured complete
+	// object length only when StoredBytesState is MEASURED; otherwise it must
+	// not be used to infer a physical placement or savings value. Bytes always
+	// describes the logical, uncompressed payload.
+	StoredBytes      int64
+	StoredBytesState StoredBytesState
+	Existed          bool
+}
+
+// HasMeasuredStoredBytes accepts only an explicit, structurally plausible
+// whole-object measurement. Shared-chunk providers must report unavailable.
+func (r Receipt) HasMeasuredStoredBytes() bool {
+	return r.StoredBytesState == StoredBytesMeasured && r.Bytes >= 0 && r.StoredBytes >= 0 && (r.Bytes == 0 || r.StoredBytes > 0)
 }
 
 // Driver stores and reads exact byte objects addressed by sha256 content IDs.
@@ -150,7 +171,7 @@ func (repo *Dir) Repair(ctx context.Context, contentID string, body io.Reader) (
 			if sizeErr != nil {
 				return Receipt{}, sizeErr
 			}
-			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, Existed: true}, nil
+			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 		}
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return Receipt{}, statErr
@@ -164,7 +185,7 @@ func (repo *Dir) Repair(ctx context.Context, contentID string, body io.Reader) (
 	if err := repo.Verify(ctx, contentID); err != nil {
 		return Receipt{}, err
 	}
-	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: written, Existed: true}, nil
+	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: written, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 }
 
 func (repo *Dir) place(ctx context.Context, expectedID string, body io.Reader) (Receipt, error) {
@@ -212,7 +233,7 @@ func (repo *Dir) place(ctx context.Context, expectedID string, body io.Reader) (
 		if err != nil {
 			return Receipt{}, err
 		}
-		return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, Existed: true}, nil
+		return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Receipt{}, err
 	}
@@ -225,11 +246,11 @@ func (repo *Dir) place(ctx context.Context, expectedID string, body io.Reader) (
 			if sizeErr != nil {
 				return Receipt{}, sizeErr
 			}
-			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, Existed: true}, nil
+			return Receipt{ContentID: contentID, Bytes: written, StoredBytes: stored, StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 		}
 		return Receipt{}, fmt.Errorf("commit blob: %w", err)
 	}
-	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: written, Existed: false}, nil
+	return Receipt{ContentID: contentID, Bytes: written, StoredBytes: written, StoredBytesState: StoredBytesMeasured, Existed: false}, nil
 }
 
 func (repo *Dir) Open(ctx context.Context, contentID string) (io.ReadCloser, error) {
@@ -337,7 +358,7 @@ func (repo *Memory) PlaceExact(ctx context.Context, contentID string, body io.Re
 	if !existed {
 		repo.blobs[got] = append([]byte(nil), payload...)
 	}
-	return Receipt{ContentID: got, Bytes: int64(len(payload)), StoredBytes: int64(len(payload)), Existed: existed}, nil
+	return Receipt{ContentID: got, Bytes: int64(len(payload)), StoredBytes: int64(len(payload)), StoredBytesState: StoredBytesMeasured, Existed: existed}, nil
 }
 
 func (repo *Memory) Repair(ctx context.Context, contentID string, body io.Reader) (Receipt, error) {
@@ -364,7 +385,7 @@ func (repo *Memory) Repair(ctx context.Context, contentID string, body io.Reader
 	}
 	repo.blobs[contentID] = append([]byte(nil), payload...)
 	repo.mu.Unlock()
-	return Receipt{ContentID: contentID, Bytes: int64(len(payload)), StoredBytes: int64(len(payload)), Existed: true}, nil
+	return Receipt{ContentID: contentID, Bytes: int64(len(payload)), StoredBytes: int64(len(payload)), StoredBytesState: StoredBytesMeasured, Existed: true}, nil
 }
 
 func (repo *Memory) Open(ctx context.Context, contentID string) (io.ReadCloser, error) {

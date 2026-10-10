@@ -28,7 +28,7 @@ func TestOfflinePackageScriptSyntaxAndCandidateGates(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(payload)
-	for _, required := range []string{"CANDIDATE_ONLY_NOT_SUPPORTED", "semantic-bundle.tar.gz", "checksums.sha256", "SBOM.json", "semantic-bundle.sbom.json", "INCOMPLETE_NOT_RELEASE_SBOM", "LICENSE", "NOTICE", "COPYFILE_DISABLE", "gzip -n", "tags=purego", "github.com/zvec-ai/zvec-go", "zvec_expected_version", "daemon_build", "cli_build", "does not match daemon"} {
+	for _, required := range []string{"CANDIDATE_ONLY_NOT_SUPPORTED", "semantic-bundle.tar.gz", "checksums.sha256", "SBOM.json", "semantic-bundle.sbom.json", "INCOMPLETE_NOT_RELEASE_SBOM", "LICENSE", "NOTICE", "COPYFILE_DISABLE", "gzip -n", "tags=purego", "github.com/zvec-ai/zvec-go", "zvec_expected_version", "daemon_build", "cli_build", "does not match daemon", "--redistribution-evidence", "package-redistribution-evidence.py", "PARTIAL_CANDIDATE_EVIDENCE"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("script missing required candidate gate %q", required)
 		}
