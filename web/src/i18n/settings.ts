@@ -13,7 +13,6 @@ export const settings: Record<string, string> = {
   "Settings saved.": "设置已保存。",
   "Settings saved. Restart Cairn to apply them.": "设置已保存，重启 Cairn 后生效。",
   "Settings": "设置",
-  "CAIRN ADMIN": "CAIRN 管理",
   "Restart required": "需要重启",
   "Unsaved changes": "有未保存更改",
   "Unsaved changes by category": "按分类查看未保存更改",
