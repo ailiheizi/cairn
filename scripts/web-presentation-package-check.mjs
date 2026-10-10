@@ -22,7 +22,22 @@
 //   scenario "shell"      a package declaring CSS/script-bearing fields is
 //                         refused whole rather than partially ignored;
 //   scenario "absent"     with no index at all nothing is installed, no refusal
-//                         is reported, and the built-in palettes stay in charge.
+//                         is reported, and the built-in palettes stay in charge;
+//   scenario "shipped"    the example package shipped in the source tree
+//                         (`web/public/presentation-packages/`) is served with
+//                         its own bytes and is admitted and applied, so the
+//                         reference theme is a real selectable theme and not
+//                         only a fixture;
+//   the shipped bytes in the source tree and the bytes in the built client are
+//   compared and must be identical, which is the proof that a rebuild carries
+//   the source packages into the served output instead of relying on a file
+//   someone dropped into the build directory.
+//
+// Build-time refusal (`web/vite.config.ts` fails the build for a package in the
+// source directory that fails admission) is deliberately NOT run from here: a
+// nested `npm run build` would rewrite `web/dist` while every browser scenario
+// is reading it. It is reported below as a manual step with the command and the
+// expected failure, so the omission is visible rather than implied.
 //
 // Every scenario also re-selects all three built-in palettes and checks the
 // compiled token each one applies, so a presentation-package failure can never
@@ -52,7 +67,7 @@
 
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
@@ -60,6 +75,9 @@ import { fileURLToPath } from "node:url";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = resolve(process.env.CAIRN_PRESENTATION_WEB_ROOT || join(repo, "web", "dist"));
+// The source of truth for shipped packages. The build copies this directory
+// into the served output, so the same bytes must appear in both places.
+const sourcePackageRoot = join(repo, "web", "public", "presentation-packages");
 const chrome = (
   process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH
   || process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH
@@ -91,7 +109,7 @@ const MIME_TYPES = {
   ".woff2": "font/woff2",
 };
 
-const observed = { scenarios: {}, builtInChecks: [] };
+const observed = { scenarios: {}, builtInChecks: [], shippedBytes: [] };
 let failure;
 let browser;
 let server;
@@ -189,6 +207,11 @@ async function readAppearance(page) {
       cardRadius: computed.getPropertyValue("--card-radius").trim(),
       paintedText: computed.color,
       paintedRadius: settingsPage ? getComputedStyle(settingsPage).borderTopLeftRadius : "",
+      paintedSurface: document.querySelector(".app-shell") ? getComputedStyle(document.querySelector(".app-shell")).backgroundColor : "",
+      paintedInk: document.querySelector(".app-shell") ? getComputedStyle(document.querySelector(".app-shell")).color : "",
+      paintedThemeCardRadius: document.querySelector(".appearance-theme-option .appearance-theme-card")
+        ? getComputedStyle(document.querySelector(".appearance-theme-option .appearance-theme-card")).borderTopLeftRadius
+        : "",
       palette: [...document.querySelectorAll(".appearance-theme-option")].map((label) => ({
         id: label.querySelector("input")?.value ?? "",
         name: label.querySelector("strong")?.textContent?.trim() ?? "",
@@ -496,6 +519,88 @@ async function scenarioNothingInstalled(packagesDirectory) {
   }
 }
 
+/** Every `*.json` file this script compares between the source tree and the
+ *  built client. The constants are read-only; nothing here touches the tree. */
+async function checkShippedBytes() {
+  const builtPackageRoot = join(webRoot, "presentation-packages");
+  require(existsSync(sourcePackageRoot), `the source package directory is missing at ${sourcePackageRoot}`);
+  const want = ["index.json", ...readdirSync(sourcePackageRoot).filter((name) => name.endsWith(".json") && name !== "index.json").sort()];
+  require(want.length > 1, `the source package directory ships no package: ${JSON.stringify(want)}`);
+  if (!existsSync(join(builtPackageRoot, "index.json"))) {
+    observed.shippedBytes.push(`not checked: the built client at ${builtPackageRoot} has no presentation-packages/index.json; build it with: cd web && npm run build`);
+    return;
+  }
+  const mismatches = [];
+  for (const name of want) {
+    const source = join(sourcePackageRoot, name);
+    const built = join(builtPackageRoot, name);
+    require(existsSync(built), `the built client does not carry the source package ${name} (${built} is missing); a rebuild must copy web/public/presentation-packages into the served output`);
+    const [a, b] = [await readFile(source), await readFile(built)];
+    if (!a.equals(b)) mismatches.push(name);
+  }
+  assert.deepEqual(mismatches, [], `the built client must carry the source bytes unchanged; these differ: ${JSON.stringify(mismatches)}`);
+  observed.shippedBytes.push(...want.map((name) => `byte-identical: presentation-packages/${name}`));
+}
+
+/** The example package shipped in the source tree, served with its own bytes
+ *  (only the index is rewritten). A theme that is only a fixture is not a
+ *  theme; this proves the one a self-hoster selects is real and applies. */
+async function scenarioShippedExample(packagesDirectory) {
+  const exampleIndex = JSON.parse(await readFile(join(sourcePackageRoot, "index.json"), "utf8"));
+  const exampleFile = exampleIndex.packages[0];
+  require(typeof exampleFile === "string", `the source package index lists no package file: ${JSON.stringify(exampleIndex.packages)}`);
+  const exampleName = exampleFile.replace(/\.json$/, "");
+  const example = JSON.parse(await readFile(join(sourcePackageRoot, exampleFile), "utf8"));
+  await writeFixture(packagesDirectory, {
+    schema: INDEX_SCHEMA,
+    packages: [exampleFile],
+  }, {
+    [exampleFile]: example,
+  });
+  const { context, page, external } = await openClient();
+  try {
+    await openAppearance(page);
+    await waitForPaletteOption(page, example.id);
+    const offered = await readAppearance(page);
+    const option = offered.palette.find((entry) => entry.id === example.id);
+    assert.ok(option, `shipped: the example package is offered in the palette picker, observed ${JSON.stringify(offered.palette.map((entry) => entry.id))}`);
+    assert.equal(option.name, example.name, `shipped: the picker shows the example's own name, observed ${JSON.stringify(option.name)}`);
+    assert.equal(option.swatches.length, example.swatches.length, `shipped: the picker draws every declared swatch, observed ${JSON.stringify(option.swatches)}`);
+    assert.deepEqual(offered.refusals, [], `shipped: the example package is admitted with no refusal, observed ${JSON.stringify(offered.refusals)}`);
+    assert.ok(offered.palette.some((entry) => entry.id === BUILT_IN_PALETTES[0].id), `shipped: the built-in palettes remain beside it, observed ${JSON.stringify(offered.palette.map((entry) => entry.id))}`);
+
+    await selectTheme(page, example.id);
+    const read = await readAppearance(page);
+    assert.equal(read.theme, example.id, `shipped: the example id becomes data-theme, observed ${JSON.stringify(read.theme)}`);
+    // The example declares one palette of fixed values, applied on top of
+    // whatever built-in appearance is in charge, so these are the declared
+    // values rather than a light variant of them.
+    assert.equal(read.canvas, example.tokens["--canvas"], `shipped: the declared --canvas reaches the document, observed ${JSON.stringify(read.canvas)}`);
+    assert.equal(read.ink, example.tokens["--ink"], `shipped: the declared --ink reaches the document, observed ${JSON.stringify(read.ink)}`);
+    assert.equal(read.cardRadius, example.tokens["--card-radius"], `shipped: the declared --card-radius reaches the document, observed ${JSON.stringify(read.cardRadius)}`);
+    // `.app-shell` paints `var(--surface)` and inherits `color` from `var(--ink)`,
+    // so these two are the proof that the package is not merely stored: the
+    // interface actually renders with the declared values.
+    assert.equal(read.paintedSurface, "rgb(27, 26, 41)", `shipped: the declared --surface is what the application shell actually paints, observed ${JSON.stringify(read.paintedSurface)}`);
+    assert.equal(read.paintedInk, "rgb(236, 235, 255)", `shipped: the declared --ink is what the shell paints text with, observed ${JSON.stringify(read.paintedInk)}`);
+    assert.equal(read.paintedRadius, example.tokens["--card-radius"], `shipped: the declared --card-radius is what the settings surface renders, observed ${JSON.stringify(read.paintedRadius)}`);
+    assert.equal(read.paintedThemeCardRadius, "10px", `shipped: a compiled component radius still renders beside it, observed ${JSON.stringify(read.paintedThemeCardRadius)}`);
+    observed.scenarios[`shipped:${exampleName}`] = {
+      id: example.id,
+      name: example.name,
+      file: exampleFile,
+      hostRange: example.hostRange,
+      declaredTokens: Object.keys(example.tokens).length,
+      painted: { theme: read.theme, canvas: read.canvas, paintedSurface: read.paintedSurface, paintedInk: read.paintedInk, cardRadius: read.cardRadius },
+    };
+
+    await checkBuiltInPalettes(page, "shipped");
+    assert.deepEqual(external, [], "shipped: serving and applying the example requests nothing outside the document origin");
+  } finally {
+    await context.close();
+  }
+}
+
 try {
   require(existsSync(join(webRoot, "index.html")), `the built client is missing at ${webRoot}.\n      Build it first:  cd web && npm ci && npm run build\n      or set CAIRN_PRESENTATION_WEB_ROOT to an absolute built client root.`);
   require(existsSync(chrome), `Chrome/Chromium was not found at ${chrome}.\n      Set RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH to a Chrome/Chromium binary.`);
@@ -514,12 +619,14 @@ try {
   baseURL = `http://127.0.0.1:${port}`;
   browser = await playwright.chromium.launch({ headless: true, executablePath: chrome });
 
+  await checkShippedBytes();
   await scenarioValidPackage(packagesDirectory, declaredVersion);
   await scenarioHostRangeRefused(packagesDirectory, declaredVersion);
   await scenarioTokenKeyRefused(packagesDirectory, declaredVersion);
   await scenarioTokenValueRefused(packagesDirectory, declaredVersion);
   await scenarioCollisionRefused(packagesDirectory, declaredVersion);
   await scenarioCodeFieldsRefused(packagesDirectory, declaredVersion);
+  await scenarioShippedExample(packagesDirectory);
   await scenarioNothingInstalled(packagesDirectory);
 } catch (error) {
   failure = error;
@@ -535,6 +642,7 @@ console.log(`chrome                      : ${chrome}`);
 console.log(`base                        : ${baseURL || "not started"}`);
 console.log(`built-in palette checks     : ${observed.builtInChecks.length}`);
 for (const check of observed.builtInChecks) console.log(`  ${check}`);
+for (const check of observed.shippedBytes) console.log(`shipped bytes               : ${check}`);
 for (const [name, scenario] of Object.entries(observed.scenarios)) {
   console.log(`scenario ${name}`);
   for (const [key, value] of Object.entries(scenario)) {
@@ -546,5 +654,6 @@ if (failure) {
   console.error(`FAIL: ${failure.message}`);
   process.exitCode = 1;
 } else {
-  console.log("PASS: a valid presentation package was admitted and its tokens reached the rendered document; a host-range mismatch, an unadmitted token, a declaration-escaping value, a built-in id collision and a code-bearing field were each refused whole with a visible reason and no partial application; and the three built-in palettes kept working in every case.");
+  console.log("PASS: a valid presentation package was admitted and its tokens reached the rendered document; a host-range mismatch, an unadmitted token, a declaration-escaping value, a built-in id collision and a code-bearing field were each refused whole with a visible reason and no partial application; the shipped source-tree example theme was admitted and visibly applied using its own bytes; the built client carries those source bytes unchanged; and the three built-in palettes kept working in every case.");
+  console.log("NOTE: build-time refusal (web/vite.config.ts rejecting a package in web/public/presentation-packages) is not run by this script because a nested build would rewrite web/dist while these scenarios read it. Verify it manually: add a broken package to the source directory, run `cd web && npm run build`, observe the nonzero exit and the named file and reason, then remove the file and rebuild.");
 }

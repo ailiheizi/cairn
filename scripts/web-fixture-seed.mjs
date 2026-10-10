@@ -1,10 +1,11 @@
 // Reproducible content fixture for the promoted browser acceptance harnesses
 // (RW-PERSONAL-UX-1 verification assets).
 //
-// The eleven promoted `scripts/web-*-check.mjs` browser harnesses each assert a
-// behaviour of the built client, and each one reads the content it needs out of
-// whatever daemon it is pointed at. Their passing direction therefore needs a
-// daemon whose content matches their stated fixture assumptions (at least two
+// The promoted `scripts/web-*-check.mjs` browser harnesses that need fixture
+// content each assert a behaviour of the built client, and each one reads the
+// content it needs out of whatever daemon it is pointed at. Their passing
+// direction therefore needs a daemon whose content matches their stated fixture
+// assumptions (at least two
 // photos, one starred photo and one starred track and nothing else starred, one
 // stored view with a supported condition that returns rows, at least two audio
 // tracks, one ordinary file that carries bytes, at least one real JPEG). Until

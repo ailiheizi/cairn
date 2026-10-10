@@ -32,7 +32,7 @@ export const appearance: Record<string, string> = {
   // the outcome of whole-document admission; a refusal is never silent.
   "Installed theme package": "已安装主题包",
   "Refused presentation packages": "被拒绝的展示包",
-  "No presentation package is installed. Optional theme packages are JSON design-token documents placed under the served web root.": "未安装展示包。可选主题包是放置在已服务 Web 根目录下的设计令牌 JSON 文档。",
+  "No presentation package is installed. Optional theme packages are JSON design-token documents that the build carries from the source tree, or that can be placed under the served web root.": "未安装展示包。可选主题包是构建期从源码树带入的设计令牌 JSON 文档，也可以直接放在已服务的 Web 根目录下。",
   "Checking for installed presentation packages...": "正在检查已安装的展示包…",
   "The presentation package index has an unsupported schema: {{detail}}": "展示包索引的 schema 不受支持：{{detail}}",
   "The package index lists an entry that is not a plain JSON file name: {{detail}}": "包索引列出的条目不是纯 JSON 文件名：{{detail}}",

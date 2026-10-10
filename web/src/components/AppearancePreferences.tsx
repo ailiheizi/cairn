@@ -143,7 +143,7 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
       </div>
       {packages.admitted.length === 0 && <p className="appearance-storage-note">
         {packages.loaded
-          ? t("No presentation package is installed. Optional theme packages are JSON design-token documents placed under the served web root.")
+          ? t("No presentation package is installed. Optional theme packages are JSON design-token documents that the build carries from the source tree, or that can be placed under the served web root.")
           : t("Checking for installed presentation packages...")}
       </p>}
     </details>

@@ -1,0 +1,6 @@
+{
+  "schema": "cairn.presentation-package-index.v1",
+  "packages": [
+    "inkstone-indigo.json"
+  ]
+}

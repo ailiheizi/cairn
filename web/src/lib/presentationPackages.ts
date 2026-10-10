@@ -23,20 +23,33 @@
 // document that declares `"css"`, `"script"` or `"components"` must be refused
 // whole, never admitted with the executable-looking part silently dropped.
 //
-// WHERE PACKAGES ARE READ FROM
-// The operator places one index and its package files under the served web root:
+// WHERE PACKAGES COME FROM
+// The source of truth is the source tree, not the served output:
+//
+//   web/public/presentation-packages/index.json
+//     { "schema": "cairn.presentation-package-index.v1",
+//       "packages": ["inkstone-indigo.json"] }
+//   web/public/presentation-packages/<id>.json
+//
+// `web/public/` is Vite's public directory, so every build copies it verbatim
+// into the served root (`web/dist/presentation-packages/`) and the operator's
+// packages survive a client rebuild. `web/vite.config.ts` admits every package
+// in that source directory during the build and refuses the build when one
+// fails, so a bad package cannot ship.
+//
+// The client still reads packages from the *served* root:
 //
 //   <web root>/presentation-packages/index.json
-//     { "schema": "cairn.presentation-package-index.v1",
-//       "packages": ["aurora.json"] }
 //   <web root>/presentation-packages/aurora.json
 //
 // The index lists plain file names in its own directory. A name that is not a
 // plain `*.json` name is refused, so an index cannot point the client at another
 // origin, another route or a parent directory. The documents are fetched at
-// runtime as *data*. An absent index is normal — the built-in palettes stay in
-// charge — and produces no refusal, so nothing spams the interface when no
-// package is installed.
+// runtime as *data* — a file dropped straight into the served root is still
+// admitted or refused here, which is the defence in depth behind the build
+// check. An absent index is normal — the built-in palettes stay in charge — and
+// produces no refusal, so nothing spams the interface when no package is
+// installed.
 //
 // ADMISSION IS PURE
 // `admitPresentationPackage` is a pure function over the decoded document plus
