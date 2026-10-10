@@ -992,7 +992,8 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   Consider repository-local workspace packages and locally trusted build-time
   additions before separately reviewing runtime iframe isolation or external
   processor packages. Do not adopt Cordis solely to manage the current small
-  compiled registry set.
+  compiled registry set. A proposed successor that keeps this ladder but extends
+  its first step is recorded in ADR-032 below.
 - **Music and queue boundary:** Artist and album browsing may use only real
   facts already returned by the existing `audio.list` projection; absent facts
   retain filename presentation. The client may play the currently loaded
@@ -1228,6 +1229,87 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   displayed tracks without hidden-selection leakage, preserve playback through
   navigation, and visibly refuse overflow/omissions without queue mutation.
   The acceptance record must identify passed and still-open browser cases.
+
+### ADR-032: Presentation-plane extensions with a closed recovery plane
+
+- **Status:** Proposed 2026-10-10 as an informative architecture decision. It adds
+  no code, schema, phase credit or acceptance. Adopting it would narrow two
+  earlier statements (ADR-026's Cordis note and the Convergence Phase sentence in
+  `AGENTS.md`), so it waits for explicit operator sign-off and authorizes nothing
+  until then.
+- **Problem:** The operator wants interface appearance to be extensible, so that
+  presentation work — a theme, a whole-shell arrangement, a new way to browse
+  already-loaded content — can improve without waiting for a first-party release
+  each time. ADR-026 kept the seam compile-time and deferred runtime extension,
+  which leaves the ceiling at one first-party release per interface.
+- **Reference studied:** the working plugin system in the DeepSeek Harness
+  installation on this machine, read from the live install rather than from any
+  description of it. Its mechanisms: plugins are ordinary version-pinned packages;
+  the extension "ABI" is declarative manifest metadata rather than a code
+  contract; composition is layered declarative patches with the root entry list
+  empty; the host and client halves are separate declared entries; the marketplace
+  is itself a plugin and consults a compatibility file before offering anything;
+  and policy plugins exist to guard other plugins. Its safety comes from bounded,
+  declarative composition — a package adds a row to a composition tree — not from
+  trusting plugin authors.
+- **Decision (proposed):** Extend the presentation plane only, borrowing that
+  shape but not its framework:
+  1. A presentation extension is a **versioned package** that declares itself in a
+     manifest — an id, the host range it supports, and which render slots or
+     palettes it fills — and ships its own declarative composition file. It does
+     not ship a free-form script that registers itself at runtime.
+  2. The host **admits or refuses it whole**: host-version range, declared slots,
+     and duplicate-id rejection against the existing registry rules. A refusal
+     applies nothing; there is no partial composition.
+  3. Composition stays **layered and declarative**: built-in interfaces, then
+     installed presentation packages, then the operator's own overrides.
+  4. An extension reaches **only** the presentation seam that already exists — the
+     `shell.cairn.*` slots, the interface catalog, palettes, and read-only access
+     to already-loaded content.
+  5. **Stage 2 composes at build or install time, not at runtime.** The package
+     contributes a declaration and its assets, and the local build incorporates
+     them. The running application executes no third-party code, which is exactly
+     why this stage needs no iframe isolation: there is nothing to isolate. A
+     runtime loader is a Stage 3 concern, not this one.
+- **Hard boundary — the recovery plane stays closed.** A presentation extension
+  must never be able to influence exact identity or any digest, register a
+  processor or representation, read or write the repository, catalog, recovery
+  records or trust anchors, alter an export manifest or a materialized output,
+  open network access, or change what a verification reports. This is not a policy
+  preference: verifiable recovery is the product's reason to exist, and the
+  operator has declared this line non-negotiable. Enforce it **structurally** — a
+  client-side seam with no host authority — rather than by review discipline
+  alone.
+- **Why not untrusted runtime code yet:** ADR-026 explicitly claims no protection
+  from malicious JavaScript. A runtime loader for untrusted code without iframe
+  isolation would *lower* the present trust posture rather than extend it. That
+  step stays separately reviewed, and this ADR does not authorize it.
+- **Explicitly not adopted:** Cordis, or any general dependency-injection
+  container, as the host framework. ADR-026's reasoning still holds — the registry
+  set is small and the composition problem here is a list of presentation slots,
+  not a service graph. The *shape* is borrowed: pinned package, declarative
+  manifest, layered patch, compatibility gate. The framework and the runtime are
+  not.
+- **Staged ladder and exits:**
+  - **Stage 1 — in-repo compiled.** Today's state. Exit: several first-party
+    interfaces and palettes exist and they prove the seam.
+  - **Stage 2 — locally trusted presentation packages.** The subject of this ADR.
+    Exit: install a presentation package and see it applied; change its declared
+    host range and see it refused whole, with no partial application; then run the
+    recovery and export acceptance unchanged and show no behavioural difference.
+  - **Stage 3 — untrusted third-party code.** Requires iframe isolation, an
+    admission and signing story, and its own reviewed decision. Not authorized.
+- **Consequences:** Presentation extensions can change only how already-loaded
+  content is presented. They cannot improve or alter discovery, recovery or
+  export. Community aesthetics become possible without anything entering the
+  digest path. The client gains an admission step and a compatibility check that
+  it does not have today.
+- **Required edits if this is approved:** ADR-026's "do not adopt Cordis" note
+  gains a pointer here, and the Convergence Phase sentence in `AGENTS.md` is
+  narrowed so that a runtime third-party marketplace stays out of scope while the
+  presentation-plane, locally trusted, declaratively composed case becomes
+  reviewable. That sentence is a guardrail; editing it needs the operator's
+  explicit sign-off and is deliberately not done by this ADR.
 
 ## 9. Open gates before the release binary
 
