@@ -1,0 +1,387 @@
+{
+  "date": "2026-10-09",
+  "evidence_scope": "Official product documentation; no competitor UI, demand or performance validation",
+  "sources": [
+    {
+      "source_url": "https://docs.immich.app/features/mobile-backup/",
+      "product": "Immich",
+      "documented_facts": [
+        "Automatic photo/video upload from selected device albums when the app opens/resumes and periodically in background.",
+        "Default Wi-Fi-only upload can be changed; iOS background refresh and Android battery optimization affect scheduling.",
+        "Can mirror mobile albums as server albums one-way; has a reorganize action to backfill existing uploads.",
+        "Calculates a checksum to skip content already on the server."
+      ],
+      "does_not_support": [
+        "The documentation does not establish cross-product backup compatibility or guarantee background execution timing on mobile operating systems.",
+        "A checksum skip is not evidence of RestoreWeave's complete SHA-256 plus logical-length identity contract."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo",
+      "verified_by": "root_primary_open"
+    },
+    {
+      "source_url": "https://docs.immich.app/features/searching/",
+      "product": "Immich",
+      "documented_facts": [
+        "Documents contextual CLIP search using VectorChord and Postgres.",
+        "Advanced filters cover location, one or more faces, albums, people, contextual content, filename/extension, full path/folder, and display states such as favorites/archive/not in album.",
+        "The current Search types table explicitly includes OCR (text in images), camera make/model/lens, time frame, descriptions and tags. Verified in the root full primary-document open, not inferred from an earlier search excerpt."
+      ],
+      "does_not_support": [
+        "Does not demonstrate that RestoreWeave's text BGE profile provides image-context search.",
+        "Does not establish accuracy, demand, or usability for any particular household library."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo",
+      "verified_by": "root_primary_open"
+    },
+    {
+      "source_url": "https://docs.immich.app/features/facial-recognition/",
+      "product": "Immich",
+      "documented_facts": [
+        "Detects and groups faces into people that may be named and searched; people appear in Explore and asset details show detected faces.",
+        "Documents cover photo, hide, birth date, merge, and favorite controls.",
+        "Processing uses generated previews, face detection and recognition models, embeddings, and incremental clustering; models may be downloaded and hardware acceleration is configurable."
+      ],
+      "does_not_support": [
+        "Does not establish that automatic face assignments are always correct or suitable as durable user-authored tags.",
+        "Does not establish that face processing is cheap on low-power NAS hardware."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.immich.app/features/sharing/",
+      "product": "Immich",
+      "documented_facts": [
+        "Albums can be shared to instance users with viewer/editor permissions.",
+        "Public links can share selected assets or albums and can have expiry, password, and action controls; public links can permit recipient uploads."
+      ],
+      "does_not_support": [
+        "Does not define RestoreWeave's authorization, link revocation, or export-manifest semantics."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.immich.app/features/libraries/",
+      "product": "Immich",
+      "documented_facts": [
+        "External libraries index photos/videos stored outside Immich into the main timeline and permit map viewing and album assignment.",
+        "External changes require rescanning; metadata changed in Immich is stored in Immich and is not written to the external asset file."
+      ],
+      "does_not_support": [
+        "Does not imply all external-library changes are immediately detected or that Immich metadata is embedded into originals."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.immich.app/features/mobile-app/",
+      "product": "Immich",
+      "documented_facts": [
+        "Provides native iOS and Android apps distributed through app stores and other listed channels; login uses a server endpoint URL."
+      ],
+      "does_not_support": [
+        "The opened page excerpt alone does not document a complete mobile viewer/navigation feature set."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/navigate/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "Responsive UI documents left navigation among Photos, Albums, Places, and Settings; top search accepts terms and filters; view modes include cards, mosaic, and list."
+      ],
+      "does_not_support": [
+        "Responsive web layout does not establish native mobile background backup behavior."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/organize/browse/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "Documents Search, Albums, Unsorted, Videos, Live Photos, People, Favorites, Moments, Calendar, Places, Regions, Labels, Folders, Private, and Originals sections.",
+        "Calendar is organized by capture time; Places uses location information; Moments are automatically created albums."
+      ],
+      "does_not_support": [
+        "The documentation does not show that every library will yield useful Moments, labels, or location facets."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/library/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "Indexing originals leaves existing files/folders unchanged, extracts metadata and can make existing folders appear as albums.",
+        "Import copies or moves files to originals, skips duplicates, assigns unique names and sorts by year/month; original filename is indexed as a property.",
+        "Indexing creates thumbnails and optionally JSON/YAML metadata sidecars."
+      ],
+      "does_not_support": [
+        "Import's duplicate behavior does not establish the RestoreWeave exact identity or deletion policy."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/organize/albums/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "Manual albums can be created and edited; multiple selected photos/videos can be added, removed, and one item set as cover."
+      ],
+      "does_not_support": [
+        "Does not document ordering, shared collaboration, or frozen exact-version export semantics in the cited page."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo",
+      "verified_by": "root_primary_open"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/organize/people/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "Face recognition detects faces during library scan and groups similar faces; person naming and starred people are documented.",
+        "Recognition waits until the library has been fully scanned and may cause high CPU load; the guide documents new clusters and correction behaviors."
+      ],
+      "does_not_support": [
+        "Does not establish acceptable error rates, privacy suitability, or performance for RestoreWeave target hardware."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/organize/places/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "The opened official documentation page is titled Places and is listed in PhotoPrism's organization guide."
+      ],
+      "does_not_support": [
+        "The opened page exposed no substantive body text in the browser result, so it does not support claims here about map behavior, geographic fields, or offline geocoding."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://docs.photoprism.app/user-guide/native-apps/",
+      "product": "PhotoPrism",
+      "documented_facts": [
+        "PhotoPrism identifies its platform-independent PWA and lists separately maintained third-party Android gallery, iOS/Android PhotoSync transfer, and iOS Stream apps.",
+        "The documented apps have distinct developers/licenses; the guide describes timeline browsing for Gallery and direct transfer for PhotoSync."
+      ],
+      "does_not_support": [
+        "These third-party integrations do not establish that PhotoPrism itself ships a first-party native mobile application."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://kb.synology.com/en-global/DSM/tutorial/Quick_Start_Synology_Photos",
+      "product": "Synology Photos",
+      "documented_facts": [
+        "Web portal has Photos, Albums, Sharing; Photos supports personal/shared spaces and timeline/folder modes, upload, filters, slideshow, and batch actions.",
+        "Documents automatic albums by faces, objects/themes, location, tags, file types, and date; documents mobile backup, search, sharing and Apple TV/Android TV or casting."
+      ],
+      "does_not_support": [
+        "The page documents Synology's DSM-integrated product; it does not support equivalent deployment portability or behavior on arbitrary NAS platforms."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://kb.synology.com/index.php/en-us/DSM/help/SynologyPhotos/Android",
+      "product": "Synology Photos",
+      "documented_facts": [
+        "Android app documents Timeline and Folder view, manually/automatically created albums, Sharing, spaces, backup progress/status, and cache settings.",
+        "Automatic backup supports personal/shared destination and a custom path; documents status/error visibility and free-up-space for backed-up items.",
+        "Documents Places map, keyword search, People/Subjects/Similar Items/Tags/Videos/Recently Added albums, photo detail edits, widget, and security/passcode lock.",
+        "Auto-backup stability depends on OS background-data, battery optimization, charging, and focused-backup conditions."
+      ],
+      "does_not_support": [
+        "Requires Synology Photos on DSM 7.2+ per the page; it is not a portable client/server feature specification for RestoreWeave.",
+        "Does not establish that deleting backed-up phone items is safe without an independent verified-recovery gate."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://kb.synology.com/en-global/DSM/help/SynologyPhotos/iPhone",
+      "product": "Synology Photos",
+      "documented_facts": [
+        "iOS app documents timeline/folder, albums, sharing, personal/shared spaces, slideshow, map view, search, cache/offline viewing, HEIC/HEVC preview assistance, and backup states.",
+        "Backup depends on iOS background refresh scheduling; page says Image Assistant generates JPEG previews for HEIC/HEVC and consumes network resources."
+      ],
+      "does_not_support": [
+        "Does not establish guaranteed timing of iOS background uploads or universal browser codec support."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "photo"
+    },
+    {
+      "source_url": "https://navidrome.org/docs/overview/",
+      "product": "Navidrome",
+      "documented_facts": [
+        "Standalone responsive web interface and Subsonic-compatible server.",
+        "Supports large collections, metadata tags, compilations, multi-disc box sets, playlists, dynamic playlists, per-user play counts/favorites/playlists, optional multi-library access, transcoding, scrobbling, lyrics, jukebox, and public links.",
+        "Subsonic compatibility lists tag-based browsing/search, playlists, favorites and ratings for artists/albums/tracks, transcoding/downsampling, and get/save play queue for continuation on another device.",
+        "Does not browse actual folders as its primary organization; it simulates folder browsing from tags. Compatible clients span mobile, desktop, TV, CarPlay and Android Auto, with capabilities dependent on the client."
+      ],
+      "does_not_support": [
+        "Does not establish that every compatible client has the same queue, offline, artwork, or playback behavior.",
+        "Does not constitute an evaluation of actual usability or evidence of demand among single-person NAS owners.",
+        "Does not support the claim that playback verifies exact source bytes or RestoreWeave recovery."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "music",
+      "verified_by": "root_primary_open"
+    },
+    {
+      "source_url": "https://navidrome.org/docs/usage/library/tagging/",
+      "product": "Navidrome",
+      "documented_facts": [
+        "Library grouping is based on embedded metadata tags rather than actual folder or filename organization.",
+        "Recommended core tags include title, artist, album, album artist, and track number; disc number and release date support multi-disc/release ordering.",
+        "Distinguishes album artist from track artist and recommends explicit multi-valued artist tags for collaborations.",
+        "Embedded and sidecar cover art are supported; consistent tags and art improve grouping and browsing."
+      ],
+      "does_not_support": [
+        "Does not establish universal metadata correctness across all tagging formats or damaged/incomplete libraries.",
+        "Does not establish that metadata matching or artist IDs are exact byte identity.",
+        "Does not provide demand or task-usability evidence."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://www.navidrome.org/docs/usage/library/artwork/",
+      "product": "Navidrome",
+      "documented_facts": [
+        "The official search excerpt says Navidrome can use artist and album art from configured local and external sources; full details were not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not guarantee artwork availability or correctness for every album or artist.",
+        "Does not establish that external enrichment is privacy-neutral or available offline."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://www.navidrome.org/docs/usage/smartplaylists/",
+      "product": "Navidrome",
+      "documented_facts": [
+        "The official search excerpt describes JSON-defined dynamic playlists and labels the feature beta; full behavior was not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not establish a polished visual rule editor; the overview describes such an editor as roadmap work.",
+        "Does not make a dynamic playlist semantically equivalent to a static ordered playlist, player queue, SavedView, LinkGroup or ExportManifest.",
+        "Does not establish actual usability or demand."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://jellyfin.org/docs/general/server/media/music/",
+      "product": "Jellyfin music",
+      "documented_facts": [
+        "Albums use one folder per album; embedded track metadata takes precedence over filenames, with filenames used as titles when metadata is absent.",
+        "Multi-disc albums use disc number and total-disc tags; tracks for all discs may be placed in one album folder.",
+        "Documents synchronized and unsynchronized sidecar lyrics; synchronized lyric lines can seek playback.",
+        "Documents embedded or local sidecar music and artist images, plus cover fallback from the first track with embedded artwork.",
+        "Documents music format/container caveats, including cases that are not recognized as music or may have browser playback issues."
+      ],
+      "does_not_support": [
+        "This page does not establish queue synchronization, saved queue behavior, offline downloads, or client parity.",
+        "This page does not establish music-specific search behavior or playlist semantics.",
+        "Documentation of player features is not byte-verification or preservation evidence."
+      ],
+      "retrieval_state": "opened_document",
+      "verified_by": "root_primary_open",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://jellyfin.org/docs/general/server/libraries/",
+      "product": "Jellyfin",
+      "documented_facts": [
+        "The official search excerpt describes libraries as virtual collections that can use multiple paths and recommends dedicated media types over mixed libraries; full details were not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not establish that the library abstraction should become RestoreWeave's physical storage or catalog model.",
+        "Does not prove useability or demand for a mixed content view."
+      ],
+      "retrieval_state": "official_search_excerpt_only",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://www.plex.tv/plexamp/",
+      "product": "Plexamp",
+      "documented_facts": [
+        "The official Plexamp page search excerpt lists playback, car integration, casting, visualizers, mixes, similarity, radio, lyrics, downloads, and other features; availability, entitlement, and details were not independently verified in an opened document."
+      ],
+      "does_not_support": [
+        "Marketing feature listing does not establish availability on every platform, detailed semantics, or hands-on quality.",
+        "Does not establish that Plexamp is fully self-contained without Plex account/server or subscription prerequisites.",
+        "Does not provide demand evidence for these features among RestoreWeave's target users."
+      ],
+      "retrieval_state": "open_failed",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://support.plex.tv/articles/205744257-getting-started-with-plex-music/",
+      "product": "Plex Music",
+      "documented_facts": [
+        "The official Plex Music page search excerpt lists artist and album browsing, genre sorting, multi-disc support, metadata editing, lyrics, loudness leveling, fades, and visualizers; details were not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not establish the exact current behavior of all Plexamp screens or features; the article is an overview of Plex Music.",
+        "Does not establish single-user NAS usability or demand."
+      ],
+      "retrieval_state": "open_failed",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://support.plex.tv/articles/202188298-play-queues/",
+      "product": "Plex playback",
+      "documented_facts": [
+        "The official support page search excerpt describes a mutable playback queue, its distinction from a permanent playlist, and different insertion behavior for Play Next and Add to Up Next; full details were not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not establish equivalent semantics in Navidrome, Jellyfin clients, or RestoreWeave.",
+        "Does not make the transient queue equivalent to a LinkGroup or frozen export manifest."
+      ],
+      "retrieval_state": "open_failed",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://support.plex.tv/articles/downloads-overview/",
+      "product": "Plex Downloads",
+      "documented_facts": [
+        "Downloads transfers personal Plex Media Server content to supported player apps for offline use; supported content can include albums, artists, playlists and tracks.",
+        "The documented supported apps include Android, iOS, Linux, macOS and Windows applications.",
+        "The feature requires an active Plex Pass condition and may require the server owner to allow downloads."
+      ],
+      "does_not_support": [
+        "Does not establish universal client support, arbitrary file placement, download conflict handling, or RestoreWeave's recovery semantics.",
+        "Does not prove downloaded/transcoded copies are byte-identical to protected originals."
+      ],
+      "retrieval_state": "opened_document",
+      "domain": "music"
+    },
+    {
+      "source_url": "https://support.plex.tv/articles/sonic-analysis-music/",
+      "product": "Plex music / Plexamp",
+      "documented_facts": [
+        "The official search excerpt describes audio-derived similarity, track and album radio, and mixes available through Plexamp; current entitlement and detailed prerequisites were not verified in an opened document."
+      ],
+      "does_not_support": [
+        "Does not establish that acoustic similarity is a reliable music identity or exact-content signal.",
+        "Does not establish that sonic analysis should be a prerequisite for preservation or baseline search.",
+        "Does not demonstrate usefulness for a particular user's library."
+      ],
+      "retrieval_state": "open_failed",
+      "domain": "music"
+    }
+  ]
+}

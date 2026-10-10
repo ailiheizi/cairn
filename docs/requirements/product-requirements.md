@@ -2,9 +2,17 @@
 
 ## 1. Product decision
 
-RestoreWeave is a self-hosted, content-first managed data layer for large heterogeneous collections. `RW-MVP-1` is its first read-only managed archive and multi-dimensional discovery profile; later profiles may broaden NAS and enterprise operation only after their additional consistency and recovery semantics are qualified.
+RestoreWeave is a **single-person self-hosted personal-content platform** for NAS and home-storage hobbyists: keep readable originals in one place, find them, use them through suitable domain experiences, and take them with you. Its trusted kernel remains a content-first managed data layer for large heterogeneous collections. `RW-MVP-1` qualifies the first read-only managed archive and multi-dimensional discovery profile; later NAS and enterprise profiles qualify their own additional consistency and recovery semantics.
 
-For the operator, it performs one complete job: attach an ordinary file tree, measure and reduce its managed footprint, understand and search mixed content with lexical, structured, and local semantic dimensions, materialize requested sets, and restore exact files with independent evidence. The exact storage and recovery path remains usable if the semantic index is temporarily unavailable, but the reference distribution MUST ship the semantic profile enabled by default.
+Complete Photos and Music workflows are product targets, including photo
+albums and music artist/album navigation, queues and playlists. Their first
+bounded local client slice is explicitly admitted by
+[First-Party Personal Client Experiences](first-party-client-experiences.md).
+That slice changes no durable format and does not admit album/playlist schemas
+or media gateways. Broader domain capabilities require reviewed successor
+contracts rather than silently expanding the current exact profile.
+
+For the operator, it performs one complete job: bring readable files from an explicitly attached tree into one managed library, retain their names, captured facts, and Notes, find mixed content with lexical, structured, and local semantic dimensions, materialize requested sets, and restore exact files with independent evidence. Measuring and reducing the managed footprint supports this workflow. The exact storage and recovery path remains usable if the semantic index is temporarily unavailable, but the reference distribution MUST ship the semantic profile enabled by default.
 
 Internally, RestoreWeave coordinates filesystem-shaped data, replaceable processing algorithms, storage engines, and discovery clients. It preserves a stable subject, namespace, representation, and recovery model so those implementations can change without stranding data or changing what a stored file means.
 
@@ -22,7 +30,11 @@ RestoreWeave is broader than a backup engine and narrower than a complete NAS op
 
 The reference distribution must be useful without custom plugins. `RW-MVP-1` pins and qualifies bundled capture, identification, processing, repository, lexical-index, query, and read-only namespace implementations. Extension points exist so selected implementations can evolve without changing recovery meaning; they do not require operators to assemble a product or accept an unstable third-party plugin marketplace.
 
-The primary product and release criteria target self-hosted Linux-based NAS and server deployments without requiring a particular vendor, distribution, or filesystem. Other source platforms attach through independently qualified `CaptureDriver` profiles.
+The primary product and release criteria target self-hosted Linux-based NAS and server deployments, especially the NAS and home-storage hobbyists who are the first product audience, without requiring a particular vendor, distribution, or filesystem. Other source platforms attach through independently qualified `CaptureDriver` profiles.
+
+Immediate personal-client development prioritizes the local Mac/browser daily
+experience. Separate release-host qualification is required for release claims,
+but is not a prerequisite for the admitted client slice above.
 
 ### 1.1 Normative and supporting documents
 

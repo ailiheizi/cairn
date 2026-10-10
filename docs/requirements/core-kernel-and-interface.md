@@ -4,6 +4,12 @@
 
 This document defines the normative product boundary for RestoreWeave as a self-hosted, content-first managed data layer. It specifies which semantics remain authoritative and stable, which algorithms are replaceable, what the reference distribution must deliver, and how stored data remains exportable, verifiable, searchable, and recoverable across implementation changes. `RW-MVP-1` is the first read-only managed-archive and multi-dimensional discovery profile over that broader data layer. The durable store/view/export model is defined by [Content Store, Views, and Export Requirements](content-store-views-and-exports.md).
 
+The [RW-PERSONAL-UX-1 local client profile](first-party-client-experiences.md)
+adds first-party domain presentation and bounded transient playback above
+these unchanged semantics. It grants no new kernel command, durable schema,
+provider or recovery format; browser controls are presentation state and all
+content reads resolve through the existing authorized operations.
+
 For questions of ownership, interface stability, plugin authority, exact fallback, publication, and the minimum useful product, this document takes precedence over platform-specific or older recovery-only descriptions. Detailed documents may add constraints, but they MUST NOT make an optional platform driver, AI model, semantic provider, WebUI, or external harness a prerequisite for the core exact-storage path.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative.

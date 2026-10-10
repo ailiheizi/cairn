@@ -16,7 +16,7 @@ The following decisions are frozen for `RW-MVP-1`. Changing one requires an expl
 
 | Topic | Frozen decision |
 | --- | --- |
-| Product shape | A content, description, discovery, export, and recovery plane; not a normal writable filesystem or a media application |
+| Product shape | The trusted kernel is a content, description, discovery, export, and recovery plane. The personal product adds explicitly admitted first-party domain clients; it is not a normal writable filesystem or a media-server gateway |
 | Organization | Stable subjects, durable facts, tags, descriptions, relations, saved views, and frozen exports; original paths are provenance and a recovery projection |
 | Tag organization | Durable multi-value `Annotation.TAG` facts are the `RW-MVP-1` user taxonomy; deterministic type and format facets remain system facts, and machine suggestions never silently replace user tags |
 | Minimal grouping | A `LinkGroup` is one stable group subject plus one current file-only mapping from group-relative paths to stable file links; it has no group version or history chain, and richer Collections remain deferred |
@@ -53,6 +53,14 @@ The words “complete”, “default”, and “available” MUST be qualified b
 ## 2. Product model
 
 RestoreWeave is a content, annotation, discovery, and recovery plane. Its canonical flow is:
+
+The personal platform may present dedicated Photos and Music clients under
+[RW-PERSONAL-UX-1](first-party-client-experiences.md). They resolve the same
+subjects and authorized originals, tags, Notes, queries and exact outputs.
+Client-only presentation and transient playback do not create another catalog,
+identity, policy or recovery authority. Album/playlist persistence and media
+processing remain separately reviewed successors; this admission does not
+move the minimal LinkGroup gate.
 
 ~~~text
 source trees / application exports / object sources
@@ -455,6 +463,16 @@ RestoreWeave MUST report each mechanism separately.
 
 The default user-visible claim is whole-content exact deduplication. Selecting a repository profile MAY add chunk-level savings without changing `ContentID`. The local zstd candidate reports logical and physical bytes separately in its placement receipt, but the current CLI does not yet provide a complete repository-growth or net-savings report. The controller MUST expose which layer produced a savings estimate and MUST NOT add source bytes, logical duplicate savings, compression savings, and physical stored bytes as if they were interchangeable measures.
 
+Receipt-bound physical and compression totals require an explicit `MEASURED`
+whole-object byte-length state as defined by the repository interface. Missing,
+unknown, or `UNAVAILABLE` state is not measured zero and MUST produce visibly
+unavailable totals without blocking independently verified exact preservation.
+Shared-chunk packed lengths do not establish a whole-object placement cost and
+MUST NOT be counted as whole-file compression savings. A separate report that
+independently verifies logical bytes and measures exclusive in-tree objects
+from the filesystem can still provide its own measured result; it does not
+retroactively make an unavailable placement receipt measured.
+
 Similarity MAY help a user review near-duplicates. It MUST NOT automatically delete, alias, or replace one exact subject with another.
 
 The default storage policy is intentionally simple: SHA-256 identity, whole-content duplicate elimination, and a mature lossless repository codec. Content-defined chunking MAY be added inside the qualified repository profile. RWKV/Transformer codecs are opt-in later profiles and are never silently selected by the optimizer.
@@ -806,7 +824,7 @@ This is the canonical checkout-status matrix. Other plans may add evidence, but 
 | User/imported description revisions and segments | implemented and tested for the admitted recovery profile | SQLite/CLI revisions, source-aligned segments, config/provider/segmentation bindings, and authenticated portable body bindings work; lifecycle and provider admission remain |
 | Lexical/structured discovery | implemented and tested for the stated field scope | Required fields, typed filters, segment provenance, coverage, and fused query are wired; semantic remains unavailable when no admitted real bundle is supplied |
 | Read-only capacity and per-item index status | implemented and tested for the current profile | `status.get` reports measured or explicit unknown capacity; `content.list`, `namespace.list`, and search results expose calculated tag/lexical/semantic coverage without creating a durable status table. Missing optional projections never make exact content unreadable |
-| Local ONNX/BGE encoder | implemented and tested for the opt-in worker/component profile | The supervised worker admits the pinned bundle and produces real vectors. Focused tests cover the fixed development installer, the real supervised ONNX/BGE + zvec daemon/CLI semantic E2E passes in the provisioned Darwin arm64 environment (with corresponding opt-in Linux arm64 evidence), and a dated Darwin run records bounded Chinese/English recall, latency, bundle-size, and RSS evidence. A candidate-only offline artifact assembler deterministically combines supplied daemon/CLI/Web builds and a retained semantic archive with verified checksums and separated license/SBOM evidence; it is not a supported installer. The browser adapter build/E2E covers honest semantic-unavailable degradation; no browser install/restart/rebuild/real-query evidence is claimed. Supported clean-host packaging and broader release qualification remain open |
+| Local ONNX/BGE encoder | implemented and tested for the opt-in worker/component profile | The supervised worker admits the pinned bundle and produces real vectors. Focused tests cover the fixed development installer, the real supervised ONNX/BGE + zvec daemon/CLI semantic E2E passes in the provisioned Darwin arm64 environment (with corresponding opt-in Linux arm64 evidence), and a dated Darwin run records bounded Chinese/English recall, latency, bundle-size, and RSS evidence. A candidate-only offline artifact assembler deterministically combines supplied daemon/CLI/Web builds and a retained semantic archive with verified checksums and separated license/SBOM evidence; it is not a supported installer. The browser adapter covers honest semantic-unavailable degradation. A 2026-10-05 Darwin arm64 candidate outer-package E2E additionally executes packaged CLI offline installation, daemon restart/reopen, and actual Chrome Settings rebuild plus fused real semantic query with description provenance; provider removal preserves lexical search and full-byte verification. This is candidate execution evidence, not supported-host or redistribution qualification; see the dated semantic qualification record. Supported clean-host packaging and broader release qualification remain open |
 | In-process zvec generation/query | implemented and tested for the opt-in component profile | Real zvec build/open/query and daemon generation-loss/rebuild evidence passes in the provisioned Darwin arm64 supervised E2E (with corresponding opt-in Linux arm64 evidence); fixture dimensions do not count as zvec |
 | Fused default search | partial | Lexical + structured + real semantic fusion is wired and covered by the provisioned supervised daemon E2E; profile switching preserves old generations and durable descriptions. The browser adapter build/E2E remains useful when semantic search is unavailable by exposing an honest degraded state. The development installer can provision the fixed bundle, but supported packaging/release qualification remain open |
 | Minimal file-only LinkGroup | planned | The current-link mapping, relative-path, missing/empty-group, semantic reuse, export, GC, and portable-recovery boundaries are documented; no catalog schema, public operation, subject-kind/search authorization, group-aware export successor, browser workflow, portable current-state record, or executable acceptance evidence exists yet |

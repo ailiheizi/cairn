@@ -2,6 +2,29 @@
 
 > **Status:** Normative implementation order, updated 2026-08-24. This plan does not add a new product surface. It translates the product requirements into one dependency-ordered path for the content, protection, discovery, export, and recovery core. FUSE, network filesystem servers, players, readers, and domain facades are outside this plan.
 
+> **2026-10-09 client-track admission:** The core phase order above remains
+> unchanged. The separately specified [RW-PERSONAL-UX-1](../requirements/first-party-client-experiences.md)
+> admits dedicated local Photos/Music client composition, bounded continuous
+> image inspection, downloaded-original audio playback, and daily existing
+> SavedView ergonomics in parallel with Phase 4/5. It adds no durable format or
+> backend endpoint and grants no phase/release credit. Media-server gateways,
+> durable albums/playlists and new processors remain outside this first slice.
+> The admitted UX-T1/P2 client successors reuse frozen export summaries for
+> bounded original ZIP downloads and existing content reads for transient
+> ordinary-photo renditions; their client evidence still grants no core gate.
+> The UX-C1 refinement groups domain presentations and retains host-owned
+> loaded/search/tag scope across presentation changes; it changes no durable
+> record, query authority, phase gate or release claim.
+> UX-C2 admits one fixed mixed-content client overview over that same scope
+> and shared action/read budgets. It creates no durable organization or runtime
+> extension capability and does not advance the phase gates.
+> UX-F1 adds an ordinary visible Favorite TAG shortcut with complete-read
+> status, shared filtering and revision-checked existing annotation actions.
+> It does not admit album/playlist state or new portable-publication semantics.
+> UX-Q1 makes the existing transient listening queue occurrence-aware and adds
+> batch actions over displayed Music selections. It retains one player and
+> admits no persistent playlist or backend/recovery change.
+
 ## 1. What We Are Building
 
 The first useful RestoreWeave core is one operator loop:
@@ -103,7 +126,7 @@ The Phase 3 implementation lock remains the recovery guardrail for this checkpoi
 
 After that, Phase 4 and Phase 5 may run in parallel. Phase 4 first delivers the real local ONNX/BGE worker, zvec generation, complete field coverage, segment provenance, and fused query. Phase 5 measures `local-zstd-v1` and selects and qualifies one mature repository target from the common evidence. Existing SavedView and legacy flat-output ExportManifest browser ergonomics may continue as a bounded convenience surface during this work. Only then does Phase 6 implement the reviewed minimal LinkGroup shape and complete and qualify groups, views, and exports. The LinkGroup documentation decision alone does not unlock that implementation, and the convenience surface cannot be used as qualification evidence for the blocked gates.
 
-The later phase locks prohibit FUSE or network filesystem behavior; an OpenList fork or dependency; player or domain-reader behavior; additional acoustic/graph/multimodal dimensions; and RWKV/Transformer codec implementation. The retired OpenSubsonic/OPDS/Inbox compatibility code is not part of the daemon. Any future browser/API surface must remain a bounded adapter and cannot count as recovery or storage qualification.
+The later phase locks prohibit FUSE or network filesystem behavior; an OpenList fork or dependency; player or domain-reader behavior outside the explicitly admitted RW-PERSONAL-UX-1 client-only slice; additional acoustic/graph/multimodal dimensions; and RWKV/Transformer codec implementation. The retired OpenSubsonic/OPDS/Inbox compatibility code is not part of the daemon. Any future browser/API surface must remain a bounded adapter and cannot count as recovery or storage qualification.
 
 The implemented and tested Phase 3 item uses the normative `PORTABLE_FACT_CLOSURE` v1 shape. It
 is a complete-state signed successor chain over the one exact parent, not a new
@@ -116,6 +139,12 @@ reader evidence; merely defining the structs or placing a child would not
 have closed the item.
 
 ## 4. Phase 0: Contract and Configuration Freeze
+
+The operator-admitted UX-E2/M2 successor to RW-PERSONAL-UX-1 may continue its
+compiled client-page/exhibition and existing-audio-fact/transient-queue work in
+parallel. It changes no core gate or durable format; see the first-party client
+contract for its exact scope and executable exits. Runtime extensions and
+durable media organization are not admitted by that client slice.
 
 ### In scope
 
@@ -320,7 +349,7 @@ The complete baseline feed must cover:
 - tags, notes, user descriptions, imported descriptions, extracted text, and model descriptions;
 - processing state, warnings, provenance, language, and available representations.
 
-The query broker fuses lexical, structured, and semantic segment results. It aggregates segments to subjects without discarding the matched text or source. The local ONNX/BGE + zvec profile is the default; online and hybrid profiles are replaceable and require explicit egress authorization. A provisioned Darwin arm64 bundle passes real daemon and local WebUI ingest/dedup/Note/query/restart/restore tests. Startup performs a real inference probe and reopens the latest digest-compatible zvec generation; lease loss immediately marks the provider unavailable and closes active workers. An explicitly provisioned Linux arm64 environment also exercises the supervised worker and zvec lifecycle. A candidate-only artifact assembler has deterministic fixture evidence for packaging supplied daemon/CLI/Web builds with an offline semantic archive, checksums, project license, and separated third-party evidence. It deliberately marks its top-level SBOM incomplete. Clean supported-host execution, redistribution review, broader coverage evidence, and release/default qualification remain open.
+The query broker fuses lexical, structured, and semantic segment results. It aggregates segments to subjects without discarding the matched text or source. The local ONNX/BGE + zvec profile is the default; online and hybrid profiles are replaceable and require explicit egress authorization. A provisioned Darwin arm64 bundle passes real daemon and local WebUI ingest/dedup/Note/query/restart/restore tests. Startup performs a real inference probe and reopens the latest digest-compatible zvec generation; lease loss immediately marks the provider unavailable and closes active workers. An explicitly provisioned Linux arm64 environment also exercises the supervised worker and zvec lifecycle. A candidate-only artifact assembler has deterministic fixture evidence for packaging supplied daemon/CLI/Web builds with an offline semantic archive, checksums, project license, and separated third-party evidence. It deliberately marks its top-level SBOM incomplete. The 2026-10-05 Darwin arm64 candidate outer-package test also executes packaged CLI offline installation, daemon restart/reopen, and actual Chrome Settings rebuild/default fused semantic query with description provenance, while provider loss preserves lexical search and exact verification. This does not close the phase gate. Clean supported-host execution, redistribution review, broader coverage evidence, and release/default qualification remain open.
 
 ### Exit tests
 

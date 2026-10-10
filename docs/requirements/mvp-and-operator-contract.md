@@ -8,6 +8,12 @@ This document freezes the first qualified product profile, `RW-MVP-1`. It specia
 
 Where broader documents describe semantic, perceptual, neural, enterprise, or writable-NAS behavior, this document determines what is required for the first release.
 
+The separately admitted [RW-PERSONAL-UX-1 local client development profile](first-party-client-experiences.md)
+may compose existing typed reads for dedicated Photos/Music presentation,
+bounded downloaded-original playback and daily SavedView access. This does not
+add a media-server gateway to `RW-MVP-1`, make the browser a recovery dependency,
+change durable formats, or close any of this profile's qualification gates.
+
 ## 2. One complete product job
 
 RestoreWeave MVP performs one complete job:

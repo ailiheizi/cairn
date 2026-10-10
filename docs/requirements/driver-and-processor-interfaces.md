@@ -395,8 +395,43 @@ Receipt:
   ContentID
   Bytes        # decoded logical length
   StoredBytes  # physical object length; diagnostic, not signed identity
+  StoredBytesState  # MEASURED or UNAVAILABLE; omitted/unknown is unavailable
   Existed
 ~~~
+
+`StoredBytesState: MEASURED` declares a measured, nonnegative byte length of
+an exclusively owned whole object. A nonempty logical stream cannot have a
+measured zero whole-object length; an empty raw object can. This measurement
+supports the existing receipt-bound whole-file compression accounting. It is
+not filesystem allocation, repository growth, or net savings. Shared chunks or
+packed object lengths MUST NOT use this state merely because individual chunk
+lengths can be read: they do not establish an exclusive placement cost or
+separate compression from chunk reuse.
+
+Missing, unknown, or `UNAVAILABLE` state means `StoredBytes` MUST NOT enter
+receipt-bound physical or compression totals, including when its numeric value
+is zero. A successful independent logical digest-and-length readback remains
+sufficient for the exact preservation lane; unavailable telemetry MUST NOT
+prevent that preservation. Reconciliation after a lost placement response
+MUST NOT synthesize physical measurements from the logical length. Independently
+remeasured in-tree savings reports retain their separate filesystem/readback
+boundary and may measure a value even when receipt telemetry is unavailable.
+This optional field is unsigned telemetry and changes no portable record,
+content identity, on-disk format, or existing profile digest.
+
+The current copy-forward migration report uses the same availability boundary
+for `VerifiedTargetBytesState`. Its numeric payload total is meaningful only
+when the state is `MEASURED`; missing measurement or aggregate overflow clears
+the total and reports `UNAVAILABLE` without invalidating already verified
+payload copies. This field excludes portable records and other overhead and is
+not total repository growth. It adds no migration authority or recovery field.
+
+The current `qualify.DriverGates` harness exercises the measured whole-object
+receipt subset used by the in-tree raw/zstd drivers. Its receipt measurement
+check is not the runtime exact-preservation gate, a complete section 9
+conformance test, or a requirement that a future shared-chunk engine fabricate
+an exclusive per-object length. Such an engine still needs separately qualified
+mechanism-separated accounting and the common release gates.
 
 `OpenProfileWithCompression` admits only `directory-cas-dev-v1 + identity-v1` and `local-zstd-v1 + zstd-v1`. Both implement payload and portable-record interfaces; the zstd driver transparently decodes payloads before callers hash or read them, while signed prepared/commit JSON remains uncompressed. `DescribeProfile` supplies status-only tuple metadata without making it a new storage requirement for third-party drivers. The repository root has a fail-closed profile marker so the two physical formats cannot be reinterpreted in place.
 

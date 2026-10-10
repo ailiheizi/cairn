@@ -2,7 +2,16 @@
 
 ## 1. Product position
 
-RestoreWeave is a self-hosted content-aware managed data layer for NAS and heterogeneous storage, not a WebUI product. Its canonical behavior is the transport-neutral command, result, reason, plan, event, namespace, content, processor, index, and query contracts.
+RestoreWeave's personal platform includes first-party domain experiences over
+its self-hosted content-aware kernel. Canonical data behavior remains the
+transport-neutral command, result, reason, plan, event, namespace, content,
+processor, index, and query contracts.
+
+[RW-PERSONAL-UX-1](first-party-client-experiences.md) explicitly admits a bounded
+local Photos/Music client and daily saved retrieval. It reuses existing typed
+operations and the exact download endpoint; adds no streaming endpoint,
+database, durable domain model, remote profile or recovery dependency. Its
+downloaded-original audio cap and full client identity check are defined there.
 
 The initial qualified interaction surfaces are:
 
@@ -47,6 +56,7 @@ The current bounded implementation exposes:
 
 - `GET /api/v1/healthz` for a transport-only liveness check;
 - `POST /api/v1/upload` for the bounded upload channel: multipart `files`, 1 GiB per file, 200 files per request, a process-wide in-flight byte cap; lands into the daemon-managed inbox staging area and echoes per-file SHA-256 and length; staged bytes are unprotected until an ingest plan is reviewed and applied.
+- `GET /api/v1/download` for one exact regular file, identified by the existing `workspace_id` and snapshot-local `entry_id`, with an optional safe single-component presentation `filename`. It composes the same `content.open/read/close` operations behind the same token gate, accepts no host path, URL, or caller-supplied handle, and reads at most 1 MiB per chunk. Before attachment headers, it verifies the logical length and complete SHA-256; while streaming, it verifies again and withholds the trailing chunk until the identity matches. A late failure aborts the incomplete response, cancellation closes the private handle, and early failures remain visible. This local convenience read does not freeze a selection or replace `ExportManifest` materialization and verification.
 - `POST /api/v1/command` with a strict `org.restoreweave.command.v1`
   envelope, returning the unchanged `org.restoreweave.result.v1` envelope;
 - optional `Authorization: Bearer <token>` validation when the host supplies

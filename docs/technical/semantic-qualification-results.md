@@ -341,3 +341,37 @@ supported platform package.
   upgrade/rollback, full SBOM and redistribution review, and supported-host
   deletion/rebuild qualification remain required before the profile is a
   release-qualified default.
+
+## Automated candidate package lifecycle, 2026-10-05
+
+`TestCandidateOfflinePackageSemanticLifecycle` passed on Darwin arm64 in
+98.51 seconds with real retained BGE, ONNX Runtime, and native zvec assets.
+It assembles the outer candidate artifact from current CLI, daemon, and WebUI
+builds, checks the platform, candidate status, package checksums, and presence
+of license/NOTICE/SBOM inventory, and extracts into isolated temporary roots.
+The packaged CLI installs the packaged semantic archive; the archive is then
+removed before the packaged daemon restarts. Chrome drives the packaged WebUI
+Settings rebuild and ordinary default fused search. Captured daemon responses
+identify `query.semantic.onnx-bge-zvec.v1`, a successful semantic component,
+its generation, and matched `DESCRIPTION` segment provenance.
+
+The same test reopens the generation after restart, removes the provider in
+its disposable root, and checks semantic `UNAVAILABLE` while lexical search
+and full-byte snapshot verification continue. Restoring the provider reports
+`NOT_BUILT` until a durable description action builds a fresh generation and
+the capability returns to `AVAILABLE`. The existing real daemon semantic E2E
+also passed after correcting its generation-loss assertion: an installed
+provider with no generation is `NOT_BUILT`, rather than `UNAVAILABLE`.
+
+This closes the absence of automated **Darwin candidate browser** evidence,
+not the Phase 4 release gate. The test uses temporary artifacts, not a
+delivered installer or a network-isolated/NAS host. The package remains
+`CANDIDATE_ONLY_NOT_SUPPORTED`, and its root SBOM remains
+`INCOMPLETE_NOT_RELEASE_SBOM`. File presence does not establish complete
+redistribution clearance; the retained semantic LICENSE is an inventory,
+and the full upstream notices and distribution obligations remain open.
+Upstream license evidence includes the pinned
+[zvec-go Apache license](https://raw.githubusercontent.com/zvec-ai/zvec-go/9199195b29dac4bf369bb16954464ddf2d73e932/LICENSE),
+[ONNX Go binding license](https://raw.githubusercontent.com/yalue/onnxruntime_go/b4e0f0b495a4ad1eb8a2f61c0286b6e670771525/LICENSE),
+and [ONNX Runtime third-party notices](https://raw.githubusercontent.com/microsoft/onnxruntime/v1.29.0/ThirdPartyNotices.txt).
+No retained provider assets or their recorded digests were rewritten.

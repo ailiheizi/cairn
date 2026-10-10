@@ -18,3 +18,7 @@ coverage/
 # Compiled scratch binaries from generator scripts (use `go run` instead).
 /generate-pinyin-table
 scripts/generate-pinyin-table/generate-pinyin-table
+# Throwaway harness output belongs outside version control.
+.tmp-*/
+__pycache__/
+*.pyc

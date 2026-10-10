@@ -5,9 +5,10 @@ delegating work. Preserve unrelated worktree changes.
 
 ## Product North Star
 
-RestoreWeave is a content, description, discovery, export, and recovery plane.
-It is not a normal filesystem, mount service, media application, or OpenList
-fork.
+RestoreWeave is a single-person self-hosted personal-content platform. Its
+trusted kernel is a content, description, discovery, export, and recovery
+plane. Dedicated first-party client experiences share that kernel. It is not
+a normal filesystem, mount service, media-server gateway, or OpenList fork.
 
 The ordinary user loop is:
 
@@ -29,6 +30,29 @@ entry, artifact, or other internal IDs.
 
 If a proposed change neither improves this loop nor closes one of its recovery
 or safety gates, keep it outside the core queue.
+
+Each deployed instance is one owner's trust domain: one operator, one
+repository, one catalog, no multi-tenant sharing model. Competitiveness comes
+from trust and verifiable recovery (exact-byte restore, signed portable
+records, honest fallback states), not from feature breadth. Real local
+semantic search over the operator's own content is a core differentiator, not
+an optional add-on. A small number of polished flagship surfaces (Photos,
+Music, Overview) sell the product better than many half-finished ones.
+
+## Convergence Phase
+
+RestoreWeave is currently in a convergence phase: finish and polish the
+admitted core loop and the admitted first-party client surfaces before adding
+new scope. Prefer closing an existing gap (recovery, trust, a rough edge in an
+admitted UX surface) over starting a new surface or integration. A runtime
+third-party plugin marketplace — installable third-party extensions, a
+public extension ABI, or a plugin store — is explicitly out of scope, not
+merely deferred; see ADR-026/028 in
+`docs/technical/build-stack-and-architecture-selection.md`. Compiled
+first-party components registered in-repo remain the only extension model.
+MCP/CLI/AI-harness integration is a real future direction but is deferred
+until after this convergence phase; do not start that work without a direct
+request.
 
 ## Frozen Decisions
 
@@ -174,8 +198,54 @@ The following remain outside the core queue:
 - automatic external download/reacquisition, source deletion, or destructive
   garbage collection.
 
-Existing adapters are maintenance-only. A fixture, mock, protocol handshake,
+The explicitly admitted `RW-PERSONAL-UX-1` local client track in
+`docs/requirements/first-party-client-experiences.md` is an exception to the
+player/domain-reader exclusion above: dedicated Photos presentation and
+bounded continuous inspection, Music presentation and explicit bounded
+downloaded-original playback, and existing daily SavedView access may run
+parallel to Phase 4/5. It adds no backend endpoint, schema, processor, index,
+durable domain state, remote profile or recovery meaning. Photo read budgets
+remain unchanged; audio is capped and fully identity-checked before playback.
+Album/playlist persistence, media streaming/transcoding and LinkGroup remain
+behind their separately reviewed contracts and gates. No client result closes
+a core phase or qualifies release.
+
+Its explicitly admitted UX-E2/M2 successor also permits compiled namespaced
+client page/presentation registration, a bounded photo exhibition, existing
+audio-fact browsing, and transient queue reorder/shuffle/repeat/play-loaded-set.
+It still admits no runtime third-party loader, new processor/durable format,
+album/playlist persistence, backend endpoint or recovery authority.
+
+Its UX-T1/P2 successor permits bounded browser ZIP takeout through the existing
+frozen ExportManifest summary and original-download route, and visible-card
+transient PNG/JPEG renditions under the byte, pixel, concurrency and cache
+ceilings in the same normative client contract. It adds no new manifest shape,
+processor, retained derivative, receipt or recovery authority. Single original
+and server-directory export remain available beyond browser memory budgets.
+
+Other existing adapters are maintenance-only. A fixture, mock, protocol handshake,
 interface, or signed foundation is not a shipped capability or a closed phase.
+
+Its UX-C1 client refinement permits domain-grouped compiled presentations over
+one host-owned loaded/search/tag result scope, compatible client deep links and
+identity-matched transient size projections. It does not admit a new query
+authority, saved-query semantics, runtime loader or durable domain record; the
+first-party client contract defines its limits and exits.
+
+Its UX-C2 successor admits one fixed compiled mixed-content overview with the
+same scope, host actions, global thumbnail budget and verified player. It adds
+no durable domain organization, runtime loader or recovery authority. The
+first-party client contract defines bounded blocks and loading/fallback exits.
+
+Its UX-F1 shortcut permits explicit favorite/unfavorite through the ordinary
+visible `Favorite` user TAG and shared filtering over existing annotations.
+Unknown tag reads remain unavailable and disable mutation. It adds no durable
+membership model, immediate portable-publication claim or backend contract.
+
+Its UX-Q1 successor permits distinct transient queue occurrences and batch
+append/play actions within the displayed Music scope, with one controlled
+queue editor and a 1,000-entry ceiling. It adds no persistent playlist,
+document-head convention, schema, endpoint or signed format.
 
 ## Mandatory Work Checkpoints
 
@@ -187,8 +257,8 @@ Before every implementation slice:
 2. Inspect the worktree and preserve changes not owned by the slice.
 3. State one active phase, one normative requirement, and one executable exit
    test that the slice advances.
-4. Confirm that the slice is inside the current lock and does not create a new
-   product surface.
+4. Confirm that the slice is inside the current lock or the explicitly
+   admitted `RW-PERSONAL-UX-1` client profile, and creates no other new surface.
 
 Re-read the core execution plan at these boundaries:
 
@@ -215,3 +285,17 @@ Before finishing a slice:
 Every delegated task must include these guardrails, its allowed file/scope
 boundary, and its phase/requirement/exit-test triple. Agents must report
 conflicts instead of silently broadening scope.
+
+## Subagent and Model-Drift Guardrails
+
+When delegating to a subagent or a different/cheaper model, the delegating
+prompt must restate: this file's North Star and Convergence Phase section,
+the exact file/scope boundary, the phase/requirement/exit-test triple, and
+"report conflicts instead of broadening scope; do not commit". The delegate
+must not introduce a new durable schema, endpoint, processor, runtime loader,
+or test framework, and must not mark a todo-ledger row `[x]` without stating
+the executable evidence. The reviewer (the delegating agent or the human)
+reads the diff before accepting it; an unreviewed subagent diff is not
+finished work. MCP/CLI/AI-harness integration work must not be started by a
+delegate without a direct human request, per the Convergence Phase section
+above.
