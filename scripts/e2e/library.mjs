@@ -8,7 +8,10 @@
 // statements and order and may be extended, never weakened.
 
 import assert from "node:assert/strict";
-import { fillNoteDraft, assertFocusReturned } from "./support.mjs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fillNoteDraft, assertFocusReturned, assertNoHorizontalOverflow } from "./support.mjs";
 
 // A tile is a picture and a name. Text tiles must render no preview text and
 // must not read content at all: the reader opens the file instead. The tiny
@@ -32,6 +35,7 @@ export async function assertLibraryTiles(ctx) {
     return {
       name: row.querySelector(".result-open-copy strong")?.textContent?.trim() ?? "tile",
       glyph: Boolean(icon?.querySelector("svg")),
+      format: icon?.querySelector(".result-format")?.textContent?.trim() ?? "",
       preview: Boolean(icon?.querySelector(".rw-content-preview")),
       image: Boolean(icon?.querySelector("img")),
       iconText: (icon?.textContent ?? "").trim(),
@@ -44,6 +48,7 @@ export async function assertLibraryTiles(ctx) {
     assert.equal(tile.preview, false, `${tile.name}: a text tile must not render a preview element`);
     assert.equal(tile.image, false, `${tile.name}: a text tile must not render an image`);
     assert.ok(!tile.iconText.includes("durable duplicate content"), `${tile.name}: a text tile must not render file text: ${tile.iconText}`);
+    assert.equal(tile.format, "TXT", `${tile.name}: the deterministic filename format cue must remain visible`);
   }
   // The image thumbnail may still be in flight; wait for the tile projection to
   // settle before counting what the tiles asked the daemon for.
@@ -327,6 +332,96 @@ export async function assertLibrarySortAndSelection(ctx) {
   await composer.fill("");
 }
 
+// The native download route must deliver original bytes for empty, small, and
+// multi-chunk files. This reads the browser's saved download, not a page fetch
+// or a preview buffer, and checks both full bytes and the exact identity.
+export async function assertOriginalDownloads(ctx) {
+  const { page, sourcePath } = ctx;
+  const large = Buffer.alloc(1_250_123);
+  for (let index = 0; index < large.length; index += 1) large[index] = (index * 31 + (index >>> 8)) & 0xff;
+  const fixtures = [
+    { name: "download-small.txt", bytes: Buffer.from("native browser download preserves these original bytes\n") },
+    { name: "download-empty.bin", bytes: Buffer.alloc(0) },
+    { name: "download-large.bin", bytes: large },
+  ];
+  for (const fixture of fixtures) writeFileSync(join(sourcePath, fixture.name), fixture.bytes);
+
+  const command = async (operation, input) => {
+    const response = await page.request.post(new URL("/api/v1/command", ctx.url).toString(), { data: { operation, input } });
+    assert.ok(response.ok(), `${operation} must answer over the local adapter: ${response.status()}`);
+    const envelope = await response.json();
+    assert.equal(envelope.status, "SUCCEEDED", `${operation} must succeed: ${JSON.stringify(envelope.reasons ?? [])}`);
+    return envelope.data ?? {};
+  };
+  const plan = await command("plan.ingest", { root: sourcePath });
+  assert.equal(plan.executable, true, `download fixture plan must be executable: ${JSON.stringify(plan.blocked_entries ?? [])}`);
+  const applied = await command("plan.apply", { workspace_id: plan.workspace_id, plan_id: plan.plan_id, plan_digest: plan.plan_digest });
+  assert.equal(applied.state, "SUCCEEDED", `download fixture must be saved: ${JSON.stringify(applied)}`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /全部内容|All content/ }).click();
+
+  for (const fixture of fixtures) {
+    const tile = page.getByRole("main").getByRole("button", { name: new RegExp(`^${fixture.name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`) }).first();
+    await tile.waitFor({ state: "visible", timeout: 15000 });
+    await tile.click();
+    const downloadButton = page.getByRole("button", { name: /下载原始文件|Download original/ });
+    await downloadButton.waitFor({ state: "visible", timeout: 10000 });
+    const [download] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), downloadButton.click()]);
+    assert.equal(download.suggestedFilename(), fixture.name, `${fixture.name}: browser attachment filename must be preserved`);
+    const savedPath = await download.path();
+    assert.ok(savedPath, `${fixture.name}: browser must save an actual download`);
+    const saved = readFileSync(savedPath);
+    assert.deepEqual(saved, fixture.bytes, `${fixture.name}: browser download bytes must match the original file`);
+    const expectedDigest = createHash("sha256").update(fixture.bytes).digest("hex");
+    assert.equal(createHash("sha256").update(saved).digest("hex"), expectedDigest, `${fixture.name}: full saved bytes must match SHA-256 identity`);
+  }
+  assert.equal(await page.getByText(/download complete|下载完成/i).count(), 0, "the UI must not claim completion before browser bytes are saved");
+  const refusalURL = new URL("/api/v1/download", ctx.url);
+  refusalURL.searchParams.set("workspace_id", plan.workspace_id);
+  refusalURL.searchParams.set("entry_id", "missing-snapshot-entry");
+  const errorTabReady = page.context().waitForEvent("page", { timeout: 10000 });
+  const refusalRequestReady = page.context().waitForEvent("request", {
+    predicate: (request) => request.url().includes("missing-snapshot-entry"),
+    timeout: 10000,
+  });
+  await page.evaluate((href) => {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.target = "_blank";
+    anchor.rel = "noopener";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  }, refusalURL.toString());
+  const errorTab = await errorTabReady;
+  const refusalRequest = await refusalRequestReady;
+  const refusalResponse = await refusalRequest.response();
+  assert.ok(refusalResponse, "the refused download must receive a transport response");
+  assert.ok(refusalResponse.status() >= 400, "a refused download must return an HTTP error before attachment headers");
+  await errorTab.locator("body").waitFor({ state: "visible", timeout: 10000 });
+  assert.ok((await errorTab.locator("body").innerText()).trim().length > 0, "the new tab must visibly show the structured refusal");
+  assert.equal(await page.getByRole("button", { name: /下载原始文件|Download original/ }).count(), 1, "a refusal must leave the library inspector intact");
+  await errorTab.close();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.getByRole("heading", { name: "download-large.bin" }).count(), 1, "the selected large file must stay in the inspector after the refusal");
+  const mobileDownloadButton = page.getByRole("button", { name: /下载原始文件|Download original/ });
+  const mobileExportButton = page.getByRole("button", { name: /导出此文件|Export this file/ });
+  await mobileDownloadButton.waitFor({ state: "visible", timeout: 10000 });
+  await mobileExportButton.waitFor({ state: "visible", timeout: 10000 });
+  await assertNoHorizontalOverflow(ctx);
+  for (const action of [mobileDownloadButton, mobileExportButton]) {
+    const box = await action.boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 390, "mobile inspector actions must fit within the viewport");
+  }
+  const evidenceDir = "/tmp/restoreweave-download-evidence-20261005";
+  mkdirSync(evidenceDir, { recursive: true });
+  await page.screenshot({ path: `${evidenceDir}/390-download-details.png`, fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("button", { name: /返回列表|Back to results/ }).click();
+  await page.getByRole("main").getByRole("button", { name: /^download-large\.bin$/i }).first().waitFor({ state: "visible", timeout: 10000 });
+  await page.screenshot({ path: `${evidenceDir}/1280-all-content.png`, fullPage: true, animations: "disabled" });
+}
+
 // The Phase-4 browser quick wins over the loaded listing: the space report, the
 // timeline strip, the URL-hash deep links, and the empty-listing onboarding
 // guide. Every projection here is browser-local over data the daemon already
@@ -348,8 +443,15 @@ export async function assertLibraryQuickWins(ctx) {
   //    the honest scope label; clicking the current-month bucket filters the
   //    listing and clicking it again clears. A bucket count must equal the
   //    number of loaded rows whose captured time falls in that month.
-  const strip = page.locator(".timeline-strip");
+  const timelineControl = page.locator(".timeline-control");
+  await timelineControl.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await timelineControl.evaluate((node) => node.parentElement?.classList.contains("library-tool-controls")), true, "the month picker belongs to the secondary browse tools");
+  const firstTileTopBeforeTimeline = await page.locator(".result-list .result-row").first().evaluate((node) => Math.round(node.getBoundingClientRect().top));
+  await timelineControl.locator("summary").click();
+  const strip = timelineControl.locator(".timeline-strip");
   await strip.waitFor({ state: "visible", timeout: 10000 });
+  const firstTileTopWithTimelineOpen = await page.locator(".result-list .result-row").first().evaluate((node) => Math.round(node.getBoundingClientRect().top));
+  assert.equal(firstTileTopWithTimelineOpen, firstTileTopBeforeTimeline, "opening the month picker must not push the content wall down");
   assert.match(await strip.innerText(), /范围为已加载的 \d+ 个|loaded subjects/, `the strip must state its loaded scope: ${await strip.innerText()}`);
   const loadedItemsForTime = ctx.state.contentListItems ?? [];
   const expectedMonth = (() => {
@@ -371,22 +473,30 @@ export async function assertLibraryQuickWins(ctx) {
   await page.reload({ waitUntil: "networkidle" });
   await page.getByRole("main").getByRole("button", { name: /alpha\.txt/ }).first().waitFor({ state: "visible", timeout: 20000 });
   await page.waitForTimeout(400);
+  await timelineControl.locator("summary").click();
+  await strip.waitFor({ state: "visible", timeout: 10000 });
   assert.match(await page.evaluate(() => window.location.hash), new RegExp(`month=${expectedMonth}`), "the month deep link must survive a reload");
   assert.equal((await tileNames()).length, expectedInMonth, "the restored month filter must still narrow the listing");
-  await page.locator(".timeline-strip").locator(`[data-month="${expectedMonth}"]`).click();
+  await strip.locator(`[data-month="${expectedMonth}"]`).click();
   await page.waitForTimeout(250);
   assert.deepEqual(await tileNames(), before, "clicking the bucket again must clear the month filter");
+  await timelineControl.locator("summary").click();
 
   // 2. Space report: the byte total equals the sum of the loaded rows'
   //    logical_size exactly as the daemon returned them, and the largest-file
   //    entries name rows from that same payload.
   const spaceReport = page.locator(".space-report");
   await spaceReport.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await spaceReport.evaluate((node) => node.parentElement?.classList.contains("library-tool-controls")), true, "the space report belongs to the secondary browse tools");
+  const firstTileTopBeforeReport = await page.locator(".result-list .result-row").first().evaluate((node) => Math.round(node.getBoundingClientRect().top));
   const loadedItems = ctx.state.contentListItems ?? [];
   assert.ok(loadedItems.length > 0, "the harness must have captured the content.list payload");
   const expectedTotal = loadedItems.reduce((sum, item) => sum + (typeof item.logical_size === "number" && Number.isSafeInteger(item.logical_size) && item.logical_size >= 0 ? item.logical_size : 0), 0);
   assert.equal(Number(await spaceReport.getAttribute("data-total-bytes")), expectedTotal, `the space report total must equal the sum of the loaded rows' logical_size (${expectedTotal})`);
   await spaceReport.locator("summary").click();
+  const firstTileTopWithReportOpen = await page.locator(".result-list .result-row").first().evaluate((node) => Math.round(node.getBoundingClientRect().top));
+  assert.equal(firstTileTopWithReportOpen, firstTileTopBeforeReport, "opening the space report must not push the content wall down");
+  assert.match(await spaceReport.innerText(), /not a server query|不是服务器查询/, "the expanded report must retain its local-scope caveat");
   const topNames = (await spaceReport.locator(".space-report-top button strong").allInnerTexts()).map((value) => value.trim());
   const loadedNames = new Set(loadedItems.map((item) => String(item.name ?? "")));
   assert.ok(topNames.length >= 1 && topNames.length <= 3, `the space report must list at most three largest files: ${JSON.stringify(topNames)}`);
@@ -437,4 +547,97 @@ export async function assertLibraryQuickWins(ctx) {
   await search.press("Enter");
   await page.getByRole("main").getByRole("heading", { name: /没有找到匹配内容|No matches found/ }).waitFor({ state: "visible", timeout: 15000 });
   assert.equal(await page.locator(".onboarding-steps").count(), 0, "a searched-empty state must keep the filtered-empty style, not the onboarding guide");
+}
+
+// Photos and Audio are presentation modes inside the existing Library, not
+// additional workspace entries. This fixture contains one real image and no
+// audio, so these views must reuse the loaded set without type leakage or API
+// requests and return to the complete listing locally.
+export async function assertLibraryMediaViews(ctx) {
+  const { page } = ctx;
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const operations = [];
+  const onRequest = (request) => {
+    if (request.method() !== "POST" || !request.url().endsWith("/api/v1/command")) return;
+    try { operations.push(request.postDataJSON()?.operation); } catch { /* non-JSON request */ }
+  };
+  page.on("request", onRequest);
+  try {
+    const libraryNav = page.locator(".workspace-nav-item").filter({ hasText: /内容库|Library/ });
+    assert.equal(await libraryNav.count(), 1, "the sidebar must have exactly one Library destination");
+    assert.equal(await page.locator('.workspace-nav-item[data-view="photos"], .workspace-nav-item[data-view="music"]').count(), 0, "media modes must not be separate sidebar destinations");
+    const viewSwitch = page.locator(".library-view-switch");
+    await viewSwitch.waitFor({ state: "visible", timeout: 10000 });
+    const allTab = viewSwitch.locator('[data-view="content"]');
+    const photosTab = viewSwitch.locator('[data-view="photos"]');
+    const audioTab = viewSwitch.locator('[data-view="music"]');
+    assert.equal(await allTab.count(), 1, "Library must expose its all-types mode in the in-page switcher");
+    assert.equal(await photosTab.count(), 1, "Library must expose Photos as an in-page mode");
+    assert.equal(await audioTab.count(), 1, "Library must expose Audio as an in-page mode");
+
+    await photosTab.click();
+    const photos = page.locator('section.content-column[data-view="photos"]');
+    await photos.waitFor({ state: "visible", timeout: 10000 });
+    assert.match(await photos.locator(".media-view-context").innerText(), /shows image files saved in your Library|展示内容库中保存的图片文件/);
+    assert.equal(await photosTab.getAttribute("aria-pressed"), "true", "the Photos mode must announce its selected state");
+    assert.equal(await libraryNav.evaluate((node) => node.classList.contains("active")), true, "the single Library destination stays active in Photos mode");
+    const photoNames = (await photos.locator(".result-list .result-open-copy strong").allInnerTexts()).map((name) => name.trim());
+    assert.deepEqual(photoNames, ["tiny.png"], `Photos must show only regular image-suffix files: ${photoNames.join(", ")}`);
+    assert.equal(await photos.locator(".space-report").isVisible(), false, "a filtered view must not show an unscoped whole-library report");
+    const about = photos.locator(".media-view-about");
+    assert.match(await about.locator("summary").innerText(), /About this view|关于此视图/, "Photos must expose keyboard-operable view details");
+    await about.locator("summary").click();
+    assert.equal(await photos.locator(".media-view-note").isVisible(), true, "expanded Photos details must retain the accurate suffix and preview limits");
+    assert.match(await photos.locator(".media-view-note").innerText(), /filename suffixes|文件名后缀/i);
+    await about.locator("summary").click();
+    assert.match(await page.evaluate(() => window.location.hash), /v=photos/, "Photos must be deep-linkable");
+
+    await page.setViewportSize({ width: 707, height: 900 });
+    const photoOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.equal(photoOverflow, 0, `Photos must not overflow at 707px: ${photoOverflow}px`);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.reload({ waitUntil: "networkidle" });
+    const restoredPhotos = page.locator('section.content-column[data-view="photos"]');
+    await restoredPhotos.waitFor({ state: "visible", timeout: 20000 });
+    assert.deepEqual((await restoredPhotos.locator(".result-list .result-open-copy strong").allInnerTexts()).map((name) => name.trim()), ["tiny.png"], "the Photos hash must restore its local projection");
+    operations.length = 0;
+
+    const restoredViewSwitch = page.locator(".library-view-switch");
+    const restoredAudioTab = restoredViewSwitch.locator('[data-view="music"]');
+    await restoredAudioTab.click();
+    const audio = page.locator('section.content-column[data-view="music"]');
+    await audio.waitFor({ state: "visible", timeout: 10000 });
+    assert.match(await audio.locator("h1").innerText(), /音频|Audio/, "the Audio mode must be clearly labeled in the Library heading");
+    assert.match(await audio.locator(".media-view-context").innerText(), /does not play them|不会播放/);
+    assert.equal(await audio.locator(".media-view-about summary").isVisible(), true, "Audio must expose the view explanation on demand");
+    await audio.locator(".media-view-about summary").click();
+    assert.match(await audio.locator(".media-view-note").innerText(), /does not play|不播放/i, "Audio must make clear that browsing does not promise playback");
+    await audio.locator(".media-view-about summary").click();
+    assert.equal(await audio.locator(".result-list .result-row").count(), 0, "documents and images must not leak into the Audio mode");
+    assert.equal(await audio.locator(".empty-state.media-empty-state").isVisible(), true, "the empty media state must stay compact");
+    assert.equal(await audio.getByRole("heading", { name: /已加载列表中没有音频文件|No audio files in the loaded listing/ }).count(), 1, "an empty Audio mode must be explicit");
+    assert.match(await page.evaluate(() => window.location.hash), /v=music/, "Audio must remain deep-linkable");
+    assert.equal(await libraryNav.evaluate((node) => node.classList.contains("active")), true, "the same Library destination stays active in Audio mode");
+    assert.equal(operations.some((operation) => operation === "search.query"), false, "switching Library modes must not issue a search query");
+    assert.equal(operations.some((operation) => operation === "content.list"), false, "switching Library modes must filter the already loaded listing locally");
+
+    await page.setViewportSize({ width: 707, height: 900 });
+    const audioOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.equal(audioOverflow, 0, `Audio must not overflow at 707px: ${audioOverflow}px`);
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    await page.reload({ waitUntil: "networkidle" });
+    const restoredAudio = page.locator('section.content-column[data-view="music"]');
+    await restoredAudio.waitFor({ state: "visible", timeout: 20000 });
+    assert.equal(await restoredAudio.locator(".result-list .result-row").count(), 0, "the Audio hash must restore its honest empty projection");
+    operations.length = 0;
+
+    await page.locator(".library-view-switch [data-view=content]").click();
+    await page.locator('section.content-column[data-view="content"]').waitFor({ state: "visible", timeout: 10000 });
+    assert.equal(await page.locator(".result-list .result-row").count(), 3, "All types must restore the complete loaded Library set");
+    assert.equal(await page.evaluate(() => window.location.hash), "", "the default Library mode must clear the media hash");
+    assert.equal(operations.some((operation) => operation === "content.list" || operation === "search.query"), false, "returning to All types must remain a local view switch");
+  } finally {
+    page.off("request", onRequest);
+  }
 }

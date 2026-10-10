@@ -9,6 +9,9 @@
 # compression savings, physical stored bytes, repository growth, typed overhead
 # categories, and net physical savings separately and never adds the layers
 # together. UNMEASURED index/model/temp categories remain visible as status.
+# A supplied temporary peak is retained only as a caller-reported claim; it is
+# not a measured category, and unbound external paths cannot produce measured
+# deployment net savings.
 #
 # The runner is a build-tagged Go program under
 # server/internal/repository/savingsreport/ and is invoked via `go run` so the
@@ -35,7 +38,8 @@
 #   --catalog-path P  existing catalog file/directory to measure read-only
 #   --index-path P    existing search index file/directory to measure read-only
 #   --model-path P    existing model file/directory to measure read-only
-#   --temporary-peak-bytes N  caller-supplied peak temporary bytes
+#   --temporary-peak-bytes N  caller-reported peak claim; category/net remain
+#                             UNMEASURED
 #   --keep            keep the corpus and work dirs on exit
 #
 # Dependencies: bash, awk, cmp, cp, dd, find, mkdir, rm, go.
@@ -198,8 +202,8 @@ for d in 0 1; do
     done
 done
 mkdir -p "$CORPUS_DIR/zeros"
-dd if=/dev/zero of="$CORPUS_DIR/zeros/zero_0.dat" bs=1m count=2 2>/dev/null
-dd if=/dev/zero of="$CORPUS_DIR/zeros/zero_1.dat" bs=1m count=2 2>/dev/null
+dd if=/dev/zero of="$CORPUS_DIR/zeros/zero_0.dat" bs=1048576 count=2 2>/dev/null
+dd if=/dev/zero of="$CORPUS_DIR/zeros/zero_1.dat" bs=1048576 count=2 2>/dev/null
 mkdir -p "$CORPUS_DIR/rand"
 for i in 0 1 2; do
     awk -v seed=$((42 + i * 7919)) 'BEGIN{

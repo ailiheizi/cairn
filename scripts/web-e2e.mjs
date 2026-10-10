@@ -14,8 +14,8 @@
 import assert from "node:assert/strict";
 import process from "node:process";
 import { createHarness } from "./e2e/harness.mjs";
-import { assertLibraryTiles, assertDetailsViewerNotesAndGuard, assertLibrarySortAndSelection, assertLibraryQuickWins } from "./e2e/library.mjs";
-import { seedFixtureAndConnect, assertSourcePlanAndSave, assertSourcePreviewOnEnter, assertSourceSuggestionRecheck, assertSourcesView } from "./e2e/sources.mjs";
+import { assertLibraryTiles, assertDetailsViewerNotesAndGuard, assertLibrarySortAndSelection, assertLibraryQuickWins, assertLibraryMediaViews, assertOriginalDownloads } from "./e2e/library.mjs";
+import { seedFixtureAndConnect, assertSourcePlanAndSave, assertSourcePreviewOnEnter, assertSourceSuggestionRecheck, assertSourcesView, assertBrowserUploadIntake } from "./e2e/sources.mjs";
 import { assertExportSidecarPolicy, assertExportBrowserPreset, assertRestoreDrawer, assertRestoreFromRecentDestination, assertRestoreUnknownOutcome, assertSelectedExport, assertViewExportWithVerifyRetry, assertDurableSavedViewsAfterReload } from "./e2e/drawers.mjs";
 import { assertSearchResultSurface, assertSearchQueryReexecuted, assertSearchRecents } from "./e2e/search.mjs";
 import { assertResponsiveLayout, assertNarrowDrawers, assertImageBundleInstallControl, assertOnlineProviderEgressControl } from "./e2e/settings.mjs";
@@ -67,6 +67,7 @@ async function assertOnline(ctx) {
   await seedFixtureAndConnect(ctx, { sourcePath });
   await assertSourcePlanAndSave(ctx, { sourcePath });
   await assertLibraryTiles(ctx);
+  await assertLibraryMediaViews(ctx);
   await assertSourcePreviewOnEnter(ctx, { sourcePath });
   await assertSourceSuggestionRecheck(ctx, { sourcePath });
 
@@ -120,4 +121,6 @@ async function assertOnline(ctx) {
   // The Phase-4 browser quick wins run last: they reload the page for the
   // deep-link assertions, so no earlier surface's view state is disturbed.
   await assertLibraryQuickWins(ctx);
+  await assertOriginalDownloads(ctx);
+  await assertBrowserUploadIntake(ctx);
 }

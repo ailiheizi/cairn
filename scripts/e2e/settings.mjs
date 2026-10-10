@@ -6,7 +6,36 @@
 // weakened.
 
 import assert from "node:assert/strict";
-import { assertFocusReturned, assertNoHorizontalOverflow, assertSettingsCategories, assertStickyBarInView, settingsLayoutProbe } from "./support.mjs";
+import { assertFocusReturned, assertNoHorizontalOverflow, assertStickyBarInView, settingsLayoutProbe } from "./support.mjs";
+
+const settingsCategories = [
+  { label: /^(Appearance|外观)$/, content: /^(Interface|界面方案)$/, selector: ".appearance-preferences h3" },
+  { label: /^(Storage|存储)$/, content: /^(Storage|存储)$/ },
+  { label: /^(Search|搜索)$/, content: /^(Search|搜索)$/ },
+  { label: /^(Notes|备注)$/, content: /^(Notes|备注)$/ },
+  { label: /^(Recovery|恢复)$/, content: /^(Recovery|恢复)$/ },
+  { label: /^(Service|服务)$/, content: /^(Service|服务)$/ },
+];
+
+async function assertSettingsCategories(ctx, settings) {
+  const { page } = ctx;
+  for (const category of settingsCategories) {
+    await settings.getByRole("button", { name: category.label }).click();
+    const heading = settings.locator(category.selector ?? ".settings-content .config-heading h3");
+    await heading.waitFor({ state: "visible", timeout: 10000 });
+    let contentText = "";
+    let activeText = "";
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      contentText = (await heading.innerText()).trim();
+      activeText = (await settings.locator(".settings-category.active .settings-category-label").first().innerText()).trim();
+      if (category.content.test(contentText) && category.label.test(activeText)) break;
+      await page.waitForTimeout(50);
+    }
+    assert.match(contentText, category.content, `activating ${category.label} must render its content: ${contentText}`);
+    assert.match(activeText, category.label, `the active category indicator must follow the selection: ${activeText}`);
+    assert.equal(await settings.locator(".settings-content .config-section").count(), 1, `only the active category may render its section: ${contentText}`);
+  }
+}
 
 export async function assertResponsiveLayout(ctx) {
   const { page } = ctx;
@@ -25,7 +54,7 @@ export async function assertResponsiveLayout(ctx) {
   await settingsDesktop.locator(".settings-content .config-section").first().waitFor({ state: "visible", timeout: 10000 });
   const desktopProbe = await settingsLayoutProbe(ctx);
   assert.equal(desktopProbe.bodyColumns, 2, `1512px settings must show two panes: ${JSON.stringify(desktopProbe)}`);
-  assert.equal(desktopProbe.categoryCount, 5, `1512px settings must list every category: ${JSON.stringify(desktopProbe)}`);
+  assert.equal(desktopProbe.categoryCount, settingsCategories.length, `1512px settings must list every category: ${JSON.stringify(desktopProbe)}`);
   assert.equal(desktopProbe.sectionCount, 1, `1512px settings must render only the active section: ${JSON.stringify(desktopProbe)}`);
   assert.equal(desktopProbe.overflow, 0, `1512px settings overflow: ${JSON.stringify(desktopProbe)}`);
   await assertSettingsCategories(ctx, settingsDesktop);
@@ -53,7 +82,7 @@ export async function assertResponsiveLayout(ctx) {
   await settingsAt640.locator(".config-section").first().waitFor({ state: "visible", timeout: 10000 });
   const mobileSettings = await settingsLayoutProbe(ctx);
   assert.equal(mobileSettings.bodyColumns, 1, `640px settings should collapse to one column: ${JSON.stringify(mobileSettings)}`);
-  assert.equal(mobileSettings.categoryCount, 5, `640px settings must keep every category reachable: ${JSON.stringify(mobileSettings)}`);
+  assert.equal(mobileSettings.categoryCount, settingsCategories.length, `640px settings must keep every category reachable: ${JSON.stringify(mobileSettings)}`);
   assert.equal(mobileSettings.overflow, 0, `640px settings overflow: ${JSON.stringify(mobileSettings)}`);
   // Every section must still render from the horizontal category strip.
   await assertSettingsCategories(ctx, settingsAt640);
@@ -103,7 +132,10 @@ export async function assertResponsiveLayout(ctx) {
     assert.equal(paneGeometry.railTrigger, width <= 640 ? 1 : 0, `${width}px workspace button visibility changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
     assert.equal(paneGeometry.list > 0, expectList, `${width}px list visibility changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
     assert.ok(paneGeometry.inspector > 0, `${width}px inspector is missing: ${JSON.stringify(paneGeometry)}`);
-    if (expectRail) assert.ok(paneGeometry.rail >= 160 && paneGeometry.rail <= 230, `${width}px rail width changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
+    if (expectRail) {
+      if (width <= 900) assert.equal(paneGeometry.rail, 146, `${width}px compact desktop rail width changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
+      else assert.ok(paneGeometry.rail >= 160 && paneGeometry.rail <= 230, `${width}px rail width changed unexpectedly: ${JSON.stringify(paneGeometry)}`);
+    }
     if (expectList) assert.ok(paneGeometry.list >= 400, `${width}px list is too narrow: ${JSON.stringify(paneGeometry)}`);
     assert.ok(paneGeometry.inspector >= 300, `${width}px inspector is too narrow: ${JSON.stringify(paneGeometry)}`);
     assert.equal(paneGeometry.detailPosition, "static", `${width}px detail pane must stay in normal flow: ${JSON.stringify(paneGeometry)}`);
@@ -226,10 +258,11 @@ export async function assertNarrowDrawers(ctx) {
   await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
   await assertFocusReturned(ctx, settingsTrigger);
 
-  const addTrigger = page.getByRole("button", { name: /添加来源|Add source/ }).first();
+  const addTrigger = page.getByRole("button", { name: /添加内容|Add content|添加来源|Add source/ }).first();
   await addTrigger.click();
-  const addDrawer = page.getByRole("dialog", { name: /添加来源|Add source/ });
+  const addDrawer = page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await addDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await addDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
   assert.ok(await addDrawer.getByRole("textbox", { name: /路径|Path on RestoreWeave host/ }).isVisible());
   await assertNoHorizontalOverflow(ctx);
   await addDrawer.getByRole("button", { name: /关闭添加来源|Close add source/ }).click();

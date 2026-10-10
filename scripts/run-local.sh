@@ -31,8 +31,6 @@ case "$port" in
 esac
 [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || { echo "error: --listen port must be 1..65535" >&2; exit 2; }
 
-command -v go >/dev/null 2>&1 || { echo "error: go is required" >&2; exit 1; }
-command -v npm >/dev/null 2>&1 || { echo "error: npm is required" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "error: curl is required" >&2; exit 1; }
 
 # curl 7 is "failed to connect" (port free). HTTP success, empty reply,
@@ -43,6 +41,11 @@ if [ "$listen_status" -ne 7 ]; then
   echo "error: listen address is occupied: $listen (no process was stopped)" >&2
   exit 1
 fi
+
+# Reject an occupied listener before checking build dependencies or creating
+# data paths. This safety gate also works on a host that cannot build the UI.
+command -v go >/dev/null 2>&1 || { echo "error: go is required" >&2; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo "error: npm is required" >&2; exit 1; }
 
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 mkdir -p "$data_dir/bin"

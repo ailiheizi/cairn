@@ -7,17 +7,21 @@
 // What the daemon actually defines (probed against a real temporary daemon):
 // `capability.list` advertises `description.list`, `description.get`, and
 // `description.create`; a daemon that started without a describe provider
-// profile leaves `description.generate` unimplemented, so its capability row
-// is UNAVAILABLE. `description.create` stores a caller-supplied body
+// profile does not advertise an AVAILABLE `description.generate` operation;
+// that alone does not prove the implementation is absent. `description.create` stores a caller-supplied body
 // (`source_ref: "command:description.create"`, `producer_profile: "command"`,
 // `accepted: false`) and runs no provider, and an empty body is rejected with
 // `invalid_input: body is required`. The default profile has
 // `descriptions.enabled: true`, `generate: "on_demand"`, and an empty
 // `provider_profile`/`credential_ref`.
 //
-// These assertions prove the honest shape end to end: the action is disabled
-// with every unmet gate named (no provider profile, no DESCRIBE_SUBJECT
-// operation, no live egress grant), it never sends a generation request on
+// The initial disabled-state proof uses the real temporary daemon. The enabled
+// provider branch below mocks browser responses and proves UI gating,
+// confirmation, and Notes rendering only; it does not prove real model
+// execution. These assertions prove the honest shape end to end: the action is disabled
+// with a short visible reason and every unmet gate in a keyboard-expandable
+// details disclosure (no provider profile, no DESCRIBE_SUBJECT operation,
+// no live egress grant), it never sends a generation request on
 // open or selection, and when the daemon does advertise the operation the
 // action still needs one live DESCRIBE egress grant plus one explicit
 // confirmation step that names what will be sent. The enabled path then
@@ -30,7 +34,7 @@ import assert from "node:assert/strict";
 import { escapeRegExp } from "./support.mjs";
 
 const describeButtonName = /生成描述|Generate a description/;
-const describeUnavailableName = /暂时无法生成|Generation is unavailable/;
+const describeUnavailableName = /选择描述提供方|Choose a description provider/;
 const notesUnavailable = /部分导入或生成的备注暂时不可用|Some imported or generated notes are unavailable/;
 
 function waitForCondition(check, message, timeout = 10000) {
@@ -115,6 +119,11 @@ export async function assertDescriptionAction(ctx) {
   };
   const describeAction = () => page.locator(".detail-column .notes-section .describe-action");
   const describeTrigger = () => describeAction().getByRole("button", { name: describeButtonName });
+  const expandDescribeReasons = async () => {
+    const disclosure = describeAction().locator("details.describe-reason-details");
+    if (!(await disclosure.evaluate((element) => element.open))) await disclosure.locator("summary").click();
+    return describeAction().locator(".describe-reasons").innerText();
+  };
   const overflow = () => page.evaluate(() => ({
     viewport: `${window.innerWidth}x${window.innerHeight}`,
     clientWidth: document.documentElement.clientWidth,
@@ -143,8 +152,8 @@ export async function assertDescriptionAction(ctx) {
 
     // 1. The default checkout: no provider profile, no credential reference,
     // and no daemon-side generation operation. The action exists for the
-    // inspected subject, is disabled, and every unmet gate is named on the
-    // element the button itself points at with aria-describedby.
+    // inspected subject, is disabled, and a short reason stays connected to it
+    // through aria-describedby while detailed gate names stay collapsed.
     await openSubject("alpha.txt");
     assert.equal(await page.locator(".describe-action").count(), 1, "the inspector must own exactly one description action");
     assert.equal(await page.locator(".describe-action").first().evaluate((element) => element.closest(".notes-section") !== null), true, "the description action must live in the one Notes section");
@@ -157,15 +166,25 @@ export async function assertDescriptionAction(ctx) {
     assert.equal(await reasonBlock.count(), 1, "the described-by reason block must exist exactly once");
     const reasons = await reasonBlock.innerText();
     assert.match(reasons, describeUnavailableName, `the action must say that generation is unavailable: ${reasons}`);
-    assert.match(reasons, /descriptions\.provider_profile/, `the action must name the missing provider profile: ${reasons}`);
-    assert.match(reasons, /DESCRIBE_SUBJECT/, `the action must name the missing capability: ${reasons}`);
-    // The disabled control is not focusable, exactly like every other disabled
-    // inspector control; a keyboard walk never lands on it.
+    assert.doesNotMatch(reasons, /descriptions\.|DESCRIBE_SUBJECT/, "internal setting keys and operation ids stay out of the default Notes view");
+    const disclosure = describeAction().locator("details.describe-reason-details");
+    assert.equal(await disclosure.evaluate((element) => element.open), false, "detailed unmet gates must start collapsed");
+    await disclosure.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await disclosure.evaluate((element) => element.open), true, "keyboard activation of the details summary must expand unmet reasons");
+    await page.keyboard.press("Enter");
+    assert.equal(await disclosure.evaluate((element) => element.open), false, "keyboard activation must collapse detailed reasons again");
+    const detailedReasons = await expandDescribeReasons();
+    assert.match(detailedReasons, /descriptions\.provider_profile/, `the disclosure must include the missing provider profile: ${detailedReasons}`);
+    assert.match(detailedReasons, /DESCRIBE_SUBJECT/, `the disclosure must include the unavailable capability: ${detailedReasons}`);
+    await disclosure.locator("summary").click();
+    // The disabled control is not focusable; the new disclosure summary may
+    // receive focus as a normal keyboard-accessible details control.
     await page.getByRole("textbox", { name: /新备注|New note/ }).focus();
     for (let step = 0; step < 6; step += 1) {
       await page.keyboard.press("Tab");
-      const inside = await page.evaluate(() => document.activeElement?.closest(".describe-action") !== null);
-      assert.equal(inside, false, "a disabled description action must stay out of the tab order");
+      const disabledActionFocused = await page.evaluate(() => document.activeElement?.matches(".describe-trigger") ?? false);
+      assert.equal(disabledActionFocused, false, "the disabled description action must stay out of the tab order");
     }
     // Reading the inspector must not send a generation request, and waiting
     // changes nothing: the action is explicit, never polling and never implicit.
@@ -182,6 +201,12 @@ export async function assertDescriptionAction(ctx) {
     );
     await capture("/tmp/rw-describe-disabled.png", ".detail-column .notes-section .describe-action");
     await assertNoOverflow("disabled action at 1512x950");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertNoOverflow("disabled Notes action at 390x844");
+    assert.equal(await describeAction().locator("details.describe-reason-details").evaluate((element) => element.open), false, "the phone-width Notes view must keep detailed gates collapsed by default");
+    await capture("/tmp/rw-describe-disabled-390.png", ".detail-column .notes-section");
+    await page.setViewportSize({ width: 1512, height: 950 });
+    await page.waitForTimeout(100);
 
     // 2. Selection alone never triggers a request. Switching the inspected
     // subject issues the inspector's own bound reads only.
@@ -284,7 +309,7 @@ export async function assertDescriptionAction(ctx) {
     await subjectButton("alpha.txt").click();
     await page.getByRole("main").getByRole("heading", { name: /^alpha\.txt$/ }).waitFor({ state: "visible", timeout: 10000 });
     await page.locator('.describe-action[data-describe-state="disabled"]').waitFor({ state: "visible", timeout: 10000 });
-    const probeReason = await describeAction().locator(".describe-reasons").innerText();
+    const probeReason = await expandDescribeReasons();
     assert.match(probeReason, /simulated settings outage/, `a failed settings read must surface the daemon's own reason: ${probeReason}`);
     assert.equal(await describeTrigger().isDisabled(), true, "an unreadable settings response must leave the action disabled");
     assert.deepEqual(generationRequests(observed.operations), [], `an unreadable settings response must not be answered with a generation request: ${JSON.stringify(observed.operations)}`);
@@ -309,7 +334,7 @@ export async function assertDescriptionAction(ctx) {
     await subjectButton("alpha.txt").click();
     await page.getByRole("main").getByRole("heading", { name: /^alpha\.txt$/ }).waitFor({ state: "visible", timeout: 10000 });
     await page.locator('.describe-action[data-describe-state="disabled"]').waitFor({ state: "visible", timeout: 10000 });
-    const configuredReason = await describeAction().locator(".describe-reasons").innerText();
+    const configuredReason = await expandDescribeReasons();
     assert.match(configuredReason, /DESCRIBE_SUBJECT/, `a configured profile must still name the missing daemon capability: ${configuredReason}`);
     assert.doesNotMatch(configuredReason, /descriptions\.provider_profile|descriptions\.credential_ref/, `a configured profile and credential must clear their own gate: ${configuredReason}`);
     assert.equal(await describeTrigger().isDisabled(), true, "a configured profile must not enable a generation the daemon cannot run");
@@ -338,7 +363,7 @@ export async function assertDescriptionAction(ctx) {
     await subjectButton("alpha.txt").click();
     await page.getByRole("main").getByRole("heading", { name: /^alpha\.txt$/ }).waitFor({ state: "visible", timeout: 10000 });
     await page.locator('.describe-action[data-describe-state="disabled"]').waitFor({ state: "visible", timeout: 10000 });
-    const noGrantReason = await describeAction().locator(".describe-reasons").innerText();
+    const noGrantReason = await expandDescribeReasons();
     assert.match(noGrantReason, /egress\.grant\.list/, `a missing live grant must be named on the action: ${noGrantReason}`);
     assert.doesNotMatch(noGrantReason, /DESCRIBE_SUBJECT/, `a wired daemon clears its own capability gate: ${noGrantReason}`);
     assert.equal(await describeTrigger().isDisabled(), true, "no live egress grant must leave the action disabled");

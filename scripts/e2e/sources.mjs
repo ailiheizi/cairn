@@ -6,6 +6,7 @@
 // statements and order and may be extended, never weakened.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { assertNoHorizontalOverflow, assertStickyBarInView } from "./support.mjs";
@@ -278,9 +279,10 @@ export async function seedFixtureAndConnect(ctx, { sourcePath }) {
 // step in the same pinned position at every stage, and the confirmed save
 // reports a measured receipt instead of a second save.
 export async function assertSourcePlanAndSave(ctx, { sourcePath }) {
-  await ctx.button(/添加来源|Add source/).first().click();
-  const addDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source/ });
+  await ctx.button(/添加内容|Add content|添加来源|Add source/).first().click();
+  const addDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await addDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await addDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
   const pathInput = addDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
   // The drawer's next step is one sticky action bar at the bottom edge. With no
   // path it offers the preview action, disabled, and it stays in view without
@@ -331,9 +333,10 @@ export async function assertSourcePlanAndSave(ctx, { sourcePath }) {
 // suggestions built only from data the client already has. Both flows end in
 // the same sticky bar, in the same position.
 export async function assertSourcePreviewOnEnter(ctx, { sourcePath }) {
-  await ctx.button(/添加来源|Add source/).first().click();
-  const enterDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source/ });
+  await ctx.button(/添加内容|Add content|添加来源|Add source/).first().click();
+  const enterDrawer = ctx.page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await enterDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await enterDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
   const enterInput = enterDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
   await enterInput.waitFor({ state: "visible", timeout: 10000 });
   // The keyboard lands on the path field, not on the bar: a user opens the
@@ -362,9 +365,10 @@ export async function assertSourcePreviewOnEnter(ctx, { sourcePath }) {
 // recheck, not a fresh add, and the drawer must read that way.
 export async function assertSourceSuggestionRecheck(ctx, { sourcePath }) {
   const { page } = ctx;
-  await ctx.button(/添加来源|Add source/).first().click();
+  await ctx.button(/添加内容|Add content|添加来源|Add source/).first().click();
   const chipDrawer = page.locator(".source-drawer");
   await chipDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await chipDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
   const sourceChip = chipDrawer.locator('.source-suggestion[data-kind="source"]').first();
   await sourceChip.waitFor({ state: "visible", timeout: 10000 });
   // The daemon reports the source locator with normalized separators.
@@ -383,11 +387,74 @@ export async function assertSourceSuggestionRecheck(ctx, { sourcePath }) {
   await chipDrawer.getByRole("button", { name: /关闭添加来源|Close add source/ }).click();
 }
 
+// Browser drag-and-drop and file selection both feed the same staging path.
+// The staged rows stay outside the protected library until the digest-bound
+// STORE_EXACT plan is explicitly confirmed.
+export async function assertBrowserUploadIntake(ctx) {
+  const text = "browser intake preserves exact bytes\n";
+  const bytes = Buffer.from(text, "utf8");
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  async function assertNotProtected(name) {
+    const listing = await ctx.page.evaluate(async (itemName) => {
+      const workspaceID = localStorage.getItem("restoreweave.workspace_id") ?? "";
+      if (!workspaceID) return { workspaceID, httpOk: false, status: "", items: null };
+      const response = await fetch("/api/v1/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "content.list", input: { workspace_id: workspaceID } }) });
+      let body;
+      try { body = await response.json(); } catch { body = {}; }
+      return { workspaceID, httpOk: response.ok, status: body?.status ?? "", items: body?.data?.items, present: Array.isArray(body?.data?.items) && body.data.items.some((item) => item.name === itemName) };
+    }, name);
+    assert.ok(listing.workspaceID, "a saved workspace id is required for protection verification");
+    assert.equal(listing.httpOk, true, "content.list must answer successfully while checking staged bytes");
+    assert.equal(listing.status, "SUCCEEDED", "content.list must succeed while checking staged bytes");
+    assert.ok(Array.isArray(listing.items), "content.list must return an item array");
+    assert.equal(listing.present, false, `${name} must stay outside protected content until confirmation`);
+  }
+  await ctx.page.locator("main.workspace").evaluate((element, payload) => {
+    const file = new File([payload.text], payload.name, { type: "text/plain" });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
+  }, { name: "browser-intake.txt", text });
+  const drawer = ctx.page.locator(".source-drawer");
+  await drawer.waitFor({ state: "visible", timeout: 10000 });
+  await drawer.locator('.upload-rows[data-staged="1"]').waitFor({ state: "visible", timeout: 10000 });
+  assert.match(await drawer.locator(".upload-rows").innerText(), new RegExp(digest.slice(0, 12)), "staging receipt must show daemon-reported digest");
+  await assertNotProtected("browser-intake.txt");
+  await drawer.getByRole("button", { name: /检查暂存文件|Review staged files/ }).click();
+  await drawer.getByText(/存储计划已生成|Storage plan is ready/).waitFor({ state: "visible", timeout: 15000 });
+  assert.match(await drawer.locator(".plan-stats").innerText(), /1\s*(?:files?|文件(?:数)?)/i, "the staged file must enter the ordinary one-file plan");
+  await drawer.locator(".plan-files").first().waitFor({ state: "visible", timeout: 10000 });
+  await drawer.locator(".plan-files").first().click();
+  assert.match(await drawer.locator(".plan-file-list").innerText(), new RegExp(digest), "the review plan must bind the exact content identity");
+  assert.match(await drawer.locator(".plan-file-list").innerText(), /STORE_EXACT/, "the reviewed plan must use the exact-save default");
+  await drawer.getByRole("button", { name: /确认保存|Confirm save/ }).click();
+  await drawer.locator('.drawer-action-bar[data-state="SAVED"]').waitFor({ state: "visible", timeout: 15000 });
+  await drawer.getByRole("button", { name: /查看已保存内容|View saved content/ }).click();
+  await ctx.page.getByRole("main").getByRole("button", { name: /browser-intake\.txt/ }).waitFor({ state: "visible", timeout: 15000 });
+
+  const pickerText = "file chooser intake remains staged\n";
+  const pickerBytes = Buffer.from(pickerText, "utf8");
+  const pickerDigest = createHash("sha256").update(pickerBytes).digest("hex");
+  const pickerPath = `/tmp/restoreweave-picker-${process.pid}.txt`;
+  writeFileSync(pickerPath, pickerBytes);
+  try {
+    await ctx.button(/添加内容|Add content|添加来源|Add source/).first().click();
+    const pickerDrawer = ctx.page.getByRole("dialog", { name: /上传文件|Upload files/ });
+    await pickerDrawer.waitFor({ state: "visible", timeout: 10000 });
+    await pickerDrawer.locator('input[type="file"]').setInputFiles(pickerPath);
+    await pickerDrawer.locator('.upload-rows[data-staged="1"]').waitFor({ state: "visible", timeout: 10000 });
+    assert.match(await pickerDrawer.locator(".upload-rows").innerText(), new RegExp(pickerDigest.slice(0, 12)), "the real browser file picker must stage a file with its daemon-reported digest");
+    await assertNotProtected("restoreweave-picker-" + process.pid + ".txt");
+    await pickerDrawer.getByRole("button", { name: /关闭添加来源|Close add source/ }).click();
+  } finally {
+    unlinkSync(pickerPath);
+  }
+}
+
 // Sources are one workspace view. The rail switches the content column to the
 // configured sources instead of jumping to a second disclosure bar that
 // duplicated the same surface inside the library. The rail is hidden on
-// phones, so the compact entry above the library heading must reach the same
-// view there.
+// phones, so its shared workspace menu must reach the same view there.
 export async function assertSourcesView(ctx) {
   const { page } = ctx;
   const contentColumn = page.locator(".content-column");
@@ -411,9 +478,14 @@ export async function assertSourcesView(ctx) {
   await page.setViewportSize({ width: 640, height: 900 });
   await page.waitForTimeout(150);
   assert.equal(await page.locator(".workspace-sidebar").isVisible(), false, "the navigation rail must stay hidden on phones");
-  const compactSourcesEntry = page.locator(".sources-entry");
-  await compactSourcesEntry.waitFor({ state: "visible", timeout: 10000 });
-  await compactSourcesEntry.click();
+  assert.equal(await page.locator(".sources-entry").isVisible(), false, "the phone layout must not duplicate Sources above the library; it stays available in workspace navigation");
+  const railTrigger = page.getByRole("button", { name: /打开工作区导航|Open workspace navigation/ });
+  await railTrigger.waitFor({ state: "visible", timeout: 10000 });
+  await railTrigger.click();
+  const railPanel = page.getByRole("dialog", { name: /工作区导航|Workspace navigation/ });
+  await railPanel.waitFor({ state: "visible", timeout: 10000 });
+  await railPanel.locator("button.workspace-nav-item").filter({ hasText: /^(来源|Sources)/ }).click();
+  await railPanel.waitFor({ state: "hidden", timeout: 10000 });
   await contentColumn.locator(".sources-surface .source-card").first().waitFor({ state: "visible", timeout: 10000 });
   await assertNoHorizontalOverflow(ctx);
   await contentColumn.getByRole("button", { name: /全部内容|All content/ }).click();

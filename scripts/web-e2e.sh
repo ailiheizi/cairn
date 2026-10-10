@@ -13,14 +13,48 @@ daemon_bin=${RESTOREWEAVE_DAEMON_BIN:-restoreweaved}
 rw_bin=${RESTOREWEAVE_RW_BIN:-rw}
 api_listen=${RESTOREWEAVE_WEB_E2E_API_LISTEN:-127.0.0.1:4536}
 
-command -v curl >/dev/null 2>&1 || { echo "SKIP: curl is not available"; exit 0; }
-command -v node >/dev/null 2>&1 || { echo "SKIP: node is not available"; exit 0; }
-command -v npm >/dev/null 2>&1 || { echo "SKIP: npm is not available"; exit 0; }
-command -v cmp >/dev/null 2>&1 || { echo "SKIP: cmp is not available"; exit 0; }
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || { echo "FAIL: required command '$1' is not available" >&2; exit 1; }
+}
+
+# Validate every cheap prerequisite before creating build directories or
+# invoking Go/npm. An opted-in run must never turn missing coverage into a
+# successful skip.
+require_command curl
+require_command node
+require_command npm
+require_command cmp
+require_command awk
+require_command env
+require_command mktemp
+require_command mkdir
+require_command cp
+require_command rm
+require_command sleep
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+  echo "FAIL: required command 'sha256sum' or 'shasum' is not available" >&2
+  exit 1
+fi
+
+playwright_module=${RESTOREWEAVE_PLAYWRIGHT_MODULE:-}
+# When Playwright is available but its managed browser cache is not, set
+# RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH to an installed Chrome/Chromium.
+# The variable is inherited by each phase invocation below.
+if [ -z "$playwright_module" ] && [ -f "web/node_modules/playwright/index.mjs" ]; then
+  playwright_module=$(pwd)/web/node_modules/playwright/index.mjs
+fi
+if [ -z "$playwright_module" ] || ! node --input-type=module -e 'import(process.argv[1]).catch(() => process.exit(77))' "$playwright_module" >/dev/null 2>&1; then
+  echo "FAIL: required npm package playwright is not installed" >&2
+  echo "      install playwright under web/node_modules or set RESTOREWEAVE_PLAYWRIGHT_MODULE" >&2
+  exit 1
+fi
 
 # A missing local installation must not turn the real browser run into a
 # false skip. Build both binaries into an isolated temporary directory when
 # the caller did not supply usable paths.
+if ! command -v "$daemon_bin" >/dev/null 2>&1 || ! command -v "$rw_bin" >/dev/null 2>&1; then
+  require_command go
+fi
 build_root=$(mktemp -d "${TMPDIR:-/tmp}/restoreweave-web-e2e-build.XXXXXX")
 cleanup_build() { rm -rf "$build_root"; }
 trap cleanup_build EXIT INT TERM
@@ -33,19 +67,6 @@ if ! command -v "$rw_bin" >/dev/null 2>&1; then
   command -v go >/dev/null 2>&1 || { echo "FAIL: rw is unavailable and go is not installed" >&2; exit 1; }
   go build -tags purego -o "$build_root/rw" ./client/cmd/rw || { echo "FAIL: could not build rw" >&2; exit 1; }
   rw_bin=$build_root/rw
-fi
-
-playwright_module=${RESTOREWEAVE_PLAYWRIGHT_MODULE:-}
-# When Playwright is available but its managed browser cache is not, set
-# RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH to an installed Chrome/Chromium.
-# The variable is inherited by each phase invocation below.
-if [ -z "$playwright_module" ] && [ -f "web/node_modules/playwright/index.mjs" ]; then
-  playwright_module=$(pwd)/web/node_modules/playwright/index.mjs
-fi
-if [ -z "$playwright_module" ] || ! node --input-type=module -e 'import(process.argv[1]).catch(() => process.exit(77))' "$playwright_module" >/dev/null 2>&1; then
-  echo "SKIP: optional npm package playwright is not installed"
-  echo "      install playwright under web/node_modules or set RESTOREWEAVE_PLAYWRIGHT_MODULE"
-  exit 0
 fi
 
 npm --prefix web run build >/dev/null || { echo "FAIL: WebUI production build failed" >&2; exit 1; }
@@ -62,15 +83,22 @@ trap cleanup EXIT INT TERM
 config_path=$tmp_root/config.toml
 source_path=$tmp_root/source
 socket_path=$tmp_root/restoreweaved.sock
-web_root=$(cd web/dist 2>/dev/null && pwd -P) || { echo "SKIP: web/dist is not built; run npm --prefix web run build"; exit 0; }
-[ -f "$web_root/index.html" ] || { echo "SKIP: web/dist/index.html is missing; run npm --prefix web run build"; exit 0; }
+web_root=$(cd web/dist 2>/dev/null && pwd -P) || { echo "FAIL: web/dist is missing after the WebUI build" >&2; exit 1; }
+[ -f "$web_root/index.html" ] || { echo "FAIL: web/dist/index.html is missing after the WebUI build" >&2; exit 1; }
 mkdir -p "$source_path"
 printf '%s\n' 'RestoreWeave browser E2E durable duplicate content' > "$source_path/alpha.txt"
 cp "$source_path/alpha.txt" "$source_path/beta.txt"
 restore_destination=$tmp_root/restored
 export_destination=$tmp_root/exported
 
+XDG_DATA_HOME="$tmp_root/xdg-data" XDG_CONFIG_HOME="$tmp_root/xdg-config" \
 "$rw_bin" config init --path "$config_path" >/dev/null
+env -u RESTOREWEAVE_API_TOKEN \
+-u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE \
+-u RESTOREWEAVE_BGE_ONNX_RUNTIME -u RESTOREWEAVE_BGE_ONNX_MODEL \
+-u RESTOREWEAVE_BGE_TOKENIZER -u RESTOREWEAVE_ZVEC_LIBRARY \
+-u RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT -u RESTOREWEAVE_RUN_SUPERVISED_ONNX \
+-u ZVEC_LIBRARY_PATH \
 RESTOREWEAVE_CATALOG="$tmp_root/catalog.sqlite" \
 RESTOREWEAVE_REPOSITORY="$tmp_root/repository" \
 RESTOREWEAVE_VECTORS="$tmp_root/vectors" \
@@ -120,6 +148,12 @@ kill "$daemon_pid"
 wait "$daemon_pid" 2>/dev/null || true
 daemon_pid=
 
+env -u RESTOREWEAVE_API_TOKEN \
+-u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE \
+-u RESTOREWEAVE_BGE_ONNX_RUNTIME -u RESTOREWEAVE_BGE_ONNX_MODEL \
+-u RESTOREWEAVE_BGE_TOKENIZER -u RESTOREWEAVE_ZVEC_LIBRARY \
+-u RESTOREWEAVE_SEMANTIC_BUNDLE_ROOT -u RESTOREWEAVE_RUN_SUPERVISED_ONNX \
+-u ZVEC_LIBRARY_PATH \
 RESTOREWEAVE_CATALOG="$tmp_root/catalog.sqlite" \
 RESTOREWEAVE_REPOSITORY="$tmp_root/repository" \
 RESTOREWEAVE_VECTORS="$tmp_root/vectors" \

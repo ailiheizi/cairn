@@ -7,10 +7,10 @@ export TZ=UTC
 umask 077
 
 usage() {
-  echo "usage: $0 --version VERSION --os OS --arch ARCH --rw FILE --daemon FILE --web-dist DIR --semantic-archive FILE --output FILE" >&2
+  echo "usage: $0 --version VERSION --os OS --arch ARCH --rw FILE --daemon FILE --web-dist DIR --semantic-archive FILE [--redistribution-evidence DIR] --output FILE" >&2
 }
 
-version=""; target_os=""; target_arch=""; rw_bin=""; daemon_bin=""; web_dist=""; semantic_archive=""; output=""
+version=""; target_os=""; target_arch=""; rw_bin=""; daemon_bin=""; web_dist=""; semantic_archive=""; redistribution_evidence=""; output=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) version="${2:-}"; shift 2;;
@@ -20,6 +20,7 @@ while [[ $# -gt 0 ]]; do
     --daemon) daemon_bin="${2:-}"; shift 2;;
     --web-dist) web_dist="${2:-}"; shift 2;;
     --semantic-archive) semantic_archive="${2:-}"; shift 2;;
+    --redistribution-evidence) redistribution_evidence="${2:-}"; shift 2;;
     --output) output="${2:-}"; shift 2;;
     -h|--help) usage; exit 0;;
     *) usage; exit 2;;
@@ -66,9 +67,16 @@ canonical_dir() {
 
 rw_bin="$(canonical_file "$rw_bin")"; daemon_bin="$(canonical_file "$daemon_bin")"; semantic_archive="$(canonical_file "$semantic_archive")"; web_dist="$(canonical_dir "$web_dist")"
 executable_file "$rw_bin"; executable_file "$daemon_bin"; regular_file "$semantic_archive"; regular_dir "$web_dist"
+if [[ -n "$redistribution_evidence" ]]; then
+  redistribution_evidence="$(canonical_dir "$redistribution_evidence")"
+  [[ -f "$script_root/web/package-lock.json" && ! -L "$script_root/web/package-lock.json" ]] || { echo "error: Web package lock is unavailable for redistribution evidence" >&2; exit 2; }
+  python3 --version >/dev/null 2>&1 || { echo "error: Python 3 is required when redistribution evidence is supplied" >&2; exit 2; }
+fi
 [[ "$semantic_archive" == *.tar.gz || "$semantic_archive" == *.tgz ]] || { echo "error: semantic archive must be gzip tar (.tar.gz or .tgz)" >&2; exit 2; }
 [[ -f "$web_dist/index.html" && ! -L "$web_dist/index.html" ]] || { echo "error: web-dist/index.html must be a regular non-symlink file" >&2; exit 2; }
 [[ -f "$script_root/LICENSE" && ! -L "$script_root/LICENSE" ]] || { echo "error: project LICENSE is unavailable" >&2; exit 2; }
+pinyin_license="$script_root/server/internal/search/pinyin/LICENSE.txt"
+regular_file "$pinyin_license"
 [[ "$output" == *.tar.gz ]] || { echo "error: output must end in .tar.gz" >&2; exit 2; }
 output="$(canonical_file "$(dirname "$output")/$(basename "$output")")"
 [[ ! -e "$output" && ! -L "$output" ]] || { echo "error: output already exists" >&2; exit 2; }
@@ -152,14 +160,33 @@ cp "$semantic_archive" "$root/semantic/semantic-bundle.tar.gz"
 "$tar_cmd" -xOf "$semantic_archive" LICENSE >"$root/licenses/semantic-bundle.LICENSE"
 "$tar_cmd" -xOf "$semantic_archive" NOTICE >"$root/licenses/semantic-bundle.NOTICE"
 "$tar_cmd" -xOf "$semantic_archive" sbom.json >"$root/licenses/semantic-bundle.sbom.json"
+if [[ -n "$redistribution_evidence" ]]; then
+  python3 "$script_root/scripts/package-redistribution-evidence.py" \
+    --evidence-dir "$redistribution_evidence" \
+    --semantic-archive "$semantic_archive" \
+    --platform-os "$target_os" \
+    --platform-arch "$target_arch" \
+    --cli "$rw_bin" \
+    --daemon "$daemon_bin" \
+    --web-dist "$web_dist" \
+    --web-lockfile "$script_root/web/package-lock.json" \
+    --output-dir "$root/licenses/redistribution-evidence"
+fi
 cp "$script_root/LICENSE" "$root/LICENSE"
 cp "$root/licenses/semantic-bundle.NOTICE" "$root/NOTICE"
+cp "$pinyin_license" "$root/licenses/Unihan.LICENSE.txt"
+cat >>"$root/NOTICE" <<'NOTICE'
+
+Unicode Unihan data notice
+The bundled pinyin table uses readings from the Unicode Unihan database.
+See licenses/Unihan.LICENSE.txt for the required Unicode License V3 notice.
+NOTICE
 cat >"$root/SBOM.json" <<EOF
 {
   "schema": "restoreweave.candidate-artifact-sbom.v1",
   "status": "INCOMPLETE_NOT_RELEASE_SBOM",
   "note": "Candidate wrapper; it is not a complete release dependency inventory.",
-  "semantic_bundle_sbom": "licenses/semantic-bundle.sbom.json"
+  "semantic_bundle_sbom": "licenses/semantic-bundle.sbom.json"$(if [[ -n "$redistribution_evidence" ]]; then printf ',\n  "redistribution_evidence": {"status":"PARTIAL_CANDIDATE_EVIDENCE","manifest":"licenses/redistribution-evidence/manifest.json"}'; fi)
 }
 EOF
 
@@ -172,7 +199,7 @@ cat >"$root/manifest.json" <<EOF
   "platform": {"os": "${target_os}", "arch": "${target_arch}"},
   "daemon_build": {"main_path": "${daemon_main_path}", "go_version": "${daemon_go_version}", "goos": "${daemon_goos}", "goarch": "${daemon_goarch}", "build_tags": "${daemon_tags}", "zvec_go": {"module": "${zvec_module}", "version": "${zvec_version}", "sum": "${zvec_sum}", "commit": "${zvec_commit}"}},
   "cli_build": {"main_path": "${cli_main_path}", "go_version": "${cli_go_version}", "goos": "${cli_goos}", "goarch": "${cli_goarch}"},
-  "semantic_archive_sha256": "sha256:${archive_digest}",
+  "semantic_archive_sha256": "sha256:${archive_digest}"$(if [[ -n "$redistribution_evidence" ]]; then printf ',\n  "redistribution_evidence": "licenses/redistribution-evidence/manifest.json"'; fi),
   "layout": {"daemon": "bin/restoreweaved", "cli": "bin/rw", "web": "web/dist", "semantic": "semantic/semantic-bundle.tar.gz"}
 }
 EOF

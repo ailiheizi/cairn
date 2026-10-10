@@ -168,9 +168,10 @@ export async function assertSearchRecents(ctx) {
   assert.equal(await activeLabel(), await noteComposer.getAttribute("aria-label"), "the / key must not steal focus from another text field");
   await noteComposer.fill("");
 
-  await button(/添加来源|Add source/).first().click();
-  const shortcutDrawer = page.getByRole("dialog", { name: /添加来源|Add source/ });
+  await button(/添加内容|Add content|添加来源|Add source/).first().click();
+  const shortcutDrawer = page.getByRole("dialog", { name: /添加来源|Add source|上传文件|Upload files/ });
   await shortcutDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await shortcutDrawer.getByRole("tab", { name: /服务器目录|Server folder/ }).click();
   const drawerPath = shortcutDrawer.getByRole("textbox", { name: /RestoreWeave 主机上的路径|Path on RestoreWeave host/ });
   await drawerPath.waitFor({ state: "visible", timeout: 10000 });
   await drawerPath.press("/");

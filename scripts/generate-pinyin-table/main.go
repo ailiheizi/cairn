@@ -1,7 +1,9 @@
 // Command generate-pinyin-table builds the committed Hanzi-to-pinyin table
 // used by server/internal/search/pinyin from the Unicode Unihan database.
 //
-// The source data is the public-domain Unicode Character Database:
+// The source data is from the Unicode Character Database (Unihan). Its terms
+// and required copyright/permission notice are recorded in the adjacent
+// server/internal/search/pinyin/LICENSE.txt:
 //
 //	https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
 //
@@ -363,8 +365,8 @@ func emit(table *pinyinTable, sourceUsed string, digest [32]byte) ([]byte, error
 	fmt.Fprintf(&b, "// Input SHA-256: sha256:%s\n", hex.EncodeToString(digest[:]))
 	fmt.Fprintf(&b, "// Generated (UTC): %s\n", time.Now().UTC().Format("2006-01-02"))
 	fmt.Fprintf(&b, "// Characters covered: %d\n", table.runeCount)
-	fmt.Fprintln(&b, "// License: Unicode Character Database terms of use (public domain);")
-	fmt.Fprintln(&b, "// see https://www.unicode.org/license.txt")
+	fmt.Fprintln(&b, "// License: Unicode License V3; see LICENSE.txt for the required copyright")
+	fmt.Fprintln(&b, "// and permission notice (https://www.unicode.org/license.txt).")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "package pinyin")
 	fmt.Fprintln(&b)
