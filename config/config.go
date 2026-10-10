@@ -1,4 +1,4 @@
-// Package config defines RestoreWeave's persisted operator configuration.
+// Package config defines Cairn's persisted operator configuration.
 //
 // The configuration is deliberately small and versioned.  It describes where
 // the operational projections live and which replaceable storage, embedding,

@@ -385,7 +385,7 @@
   shortcuts, focus behavior, ARIA attributes, and daemon calls are unchanged,
   and a surface change no longer needs an edit in the shell or in another
   surface's file.
-- Licensed the RestoreWeave project source under the MIT License.
+- Licensed the Cairn project source under the MIT License.
 - Added detailed Chinese and English public README guides.
 - Reconciled public capability and roadmap wording with the tested core preview.
 - Marked the removed Inbox, OpenSubsonic, and OPDS adapters as historical.

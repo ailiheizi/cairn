@@ -1,4 +1,4 @@
-// Command restoreweaved runs the RestoreWeave control-plane daemon. It
+// Command restoreweaved runs the Cairn control-plane daemon. It
 // exposes the client/command envelope protocol over a Unix socket.
 package main
 

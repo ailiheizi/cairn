@@ -19,7 +19,7 @@ import (
 	"github.com/ailiheizi/restoreweave/server/internal/repository"
 )
 
-// DriverGates are the RestoreWeave-owned checks a RepositoryDriver must pass
+// DriverGates are the Cairn-owned checks a RepositoryDriver must pass
 // before it can be considered for the exact lane. Engine-level backup CLI
 // probes live beside these gates and never replace them.
 func DriverGates(ctx context.Context, repo repository.Driver, payload []byte) error {
