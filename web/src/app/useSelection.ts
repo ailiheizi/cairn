@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import type { Translator } from "../i18n";
 import { command } from "./command";
@@ -61,6 +61,18 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     }
     return selectionRefs.map((subjectRef) => byRef.get(subjectRef)).filter((hit): hit is SearchHit => Boolean(hit));
   }, [hits, selectionRefs]);
+  // A selection follows subject identity across page presentations, but it
+  // must not outlive the loaded result context in which it was made. Keeping
+  // this set and the resolved SearchHits in sync prevents batch actions from
+  // silently acting on fewer subjects than the visible selected count.
+  useEffect(() => {
+    const available = new Set(hits.map((hit) => hit.subject_ref?.trim() ?? "").filter(Boolean));
+    setSelectionRefs((current) => {
+      const next = current.filter((subjectRef) => available.has(subjectRef));
+      return next.length === current.length ? current : next;
+    });
+    setSelectionAnchor((current) => current && !available.has(current) ? "" : current);
+  }, [hits]);
   const rovingRow = renderedHits.length ? Math.min(rovingIndex, renderedHits.length - 1) : 0;
 
   // Selection helpers read the rendered order, so a range or a keyboard step

@@ -11,11 +11,11 @@ connection status, the top-level actions) and the readiness rail. */
   background: rgba(10, 9, 16, 0.8);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58), 0 1px 0 rgba(167, 139, 250, 0.08), inset 0 1px rgba(255, 255, 255, 0.08);
 }
-.brand { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; color: #f1f4f6; font-size: 17px; font-weight: 790; text-decoration: none; }
+.brand { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; color: var(--ink); font-size: 17px; font-weight: 790; text-decoration: none; }
 .brand-mark {
   width: 44px; height: 44px; display: grid; place-items: center;
   border: 1px solid rgba(211, 198, 255, 0.62); border-radius: 8px;
-  color: #110d1f; background: #b9a5ff;
+  color: var(--primary-ink); background: var(--primary);
   box-shadow: 0 0 0 5px rgba(167, 139, 250, 0.08), 0 12px 30px rgba(139, 92, 246, 0.28), inset 0 1px rgba(255, 255, 255, 0.42);
 }
 .global-search {
@@ -28,9 +28,9 @@ connection status, the top-level actions) and the readiness rail. */
 }
 .global-search:focus-within { border-color: rgba(167, 139, 250, 0.76); background: #08070e; box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.14), 0 16px 40px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.08); }
 .global-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
-.global-search input::placeholder { color: #737b85; }
-.global-search button { min-height: 38px; border: 0; border-radius: 6px; padding: 9px 19px; color: #110d1f; background: var(--primary); font-weight: 760; }
-.global-search button:hover { background: #b9a5ff; }
+.global-search input::placeholder { color: var(--quiet); }
+.global-search button { min-height: 38px; border: 0; border-radius: 6px; padding: 9px 19px; color: var(--primary-ink); background: var(--primary); font-weight: 760; }
+.global-search button:hover { background: var(--primary-deep); }
 .global-search button:disabled { opacity: 0.46; cursor: wait; }
 .top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .secondary-button, .primary-button {
@@ -38,10 +38,10 @@ connection status, the top-level actions) and the readiness rail. */
   border-radius: 7px; padding: 9px 14px; font-weight: 690;
   transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background 150ms ease;
 }
-.secondary-button { border: 1px solid var(--line-strong); color: #d7dce2; background: rgba(255, 255, 255, 0.055); }
+.secondary-button { border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface-raised); }
 .secondary-button:hover { border-color: rgba(167, 139, 250, 0.48); color: var(--ink); background: var(--primary-soft); }
-.primary-button { width: max-content; border: 1px solid rgba(231, 224, 255, 0.16); color: #110d1f; background: var(--primary); box-shadow: 0 8px 22px rgba(139, 92, 246, 0.2); }
-.primary-button:hover { transform: translateY(-1px); background: #b9a5ff; box-shadow: 0 10px 26px rgba(139, 92, 246, 0.28); }
+.primary-button { width: max-content; border: 1px solid var(--hairline-strong); color: var(--primary-ink); background: var(--primary); box-shadow: 0 8px 22px var(--shadow-soft); }
+.primary-button:hover { transform: translateY(-1px); background: var(--primary-deep); box-shadow: 0 10px 26px var(--shadow); }
 .primary-button:active, .secondary-button:active, .icon-button:active { transform: translateY(1px); }
 .primary-button:disabled, .secondary-button:disabled { opacity: 0.42; cursor: not-allowed; transform: none; box-shadow: none; }
 .primary-button.compact, .secondary-button.compact { min-height: 34px; padding: 8px 12px; }
@@ -63,7 +63,7 @@ connection status, the top-level actions) and the readiness rail. */
   .topbar { gap: 11px; }
   .brand > span:last-child, .connection > span { display: none; }
   .global-search { max-width: none; }
-  .restore-button span, .add-button span { display: none; }
+  .restore-button span { display: none; }
   .restore-button, .add-button { width: 38px; padding: 8px; }
 }
 @media (max-width: 640px) {
@@ -111,18 +111,19 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
 .connection.bad svg { color: var(--coral); }
 
 
-@media (prefers-color-scheme: light) {
+:root[data-appearance="light"] .topbar { background: var(--glass); border-color: var(--hairline); box-shadow: var(--card-shadow-soft); }
 
-  .topbar { background: rgb(247 250 251 / 92%); border-color: rgb(34 42 48 / 7%); box-shadow: 0 6px 20px rgb(25 48 67 / 8%); }
 
-  .global-search { background: rgb(231 237 240 / 88%); border-color: rgb(34 42 48 / 9%); }
+:root[data-appearance="light"] .global-search { background: var(--surface-container-low); border-color: var(--hairline-strong); }
 
-  .global-search:focus-within { background: rgb(231 237 240 / 96%); box-shadow: 0 0 0 3px rgb(56 100 131 / 14%); }
 
-  .topbar .secondary-button, .topbar .icon-button { border-color: rgb(34 42 48 / 11%); background: rgb(34 42 48 / 4%); }
+:root[data-appearance="light"] .global-search:focus-within { background: var(--surface-raised); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
 
-  .topbar .primary-button { border-color: rgb(34 42 48 / 11%); }
-}
+
+:root[data-appearance="light"] .topbar .secondary-button, :root[data-appearance="light"] .topbar .icon-button { border-color: var(--hairline-strong); background: var(--glass); }
+
+
+:root[data-appearance="light"] .topbar .primary-button { border-color: var(--hairline-strong); }
 @media (max-width: 640px) {
 
   .topbar { width: calc(100% - 2 * var(--page-gutter)); min-height: 58px; display: grid; grid-template-columns: auto minmax(0, 1fr); margin: 9px auto 0; padding: 10px; border-radius: 20px; gap: 9px; }
@@ -157,4 +158,63 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
   /* The panel follows the field onto its own topbar row without covering the
      whole phone viewport. */
   .global-search .search-recents { max-height: 62vh; overflow-y: auto; }
+}
+
+/* Keep the product name and primary actions recognizable at intermediate and
+   phone widths; only the secondary labels collapse. */
+@media (min-width: 641px) and (max-width: 1079px) {
+  .topbar { gap: 9px; }
+  .brand > span:last-child { display: inline; font-size: 14px; }
+  .top-actions .icon-button, .top-actions .restore-button { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 6px; }
+  .top-actions > .add-button { width: max-content; min-width: max-content; flex: 0 0 auto; padding: 8px 12px; white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .topbar { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 12px 10px; }
+  .brand { gap: 8px; font-size: 12px; }
+  .brand > span:last-child { display: inline; }
+  .global-search { min-height: 42px; }
+  .top-actions { width: 100%; grid-column: 1; grid-row: 2; flex-wrap: wrap; justify-content: space-between; gap: 2px; margin-left: 0; }
+  .top-actions button, .top-actions .icon-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; padding: 8px; }
+  .top-actions > .add-button { width: max-content; min-width: max-content; flex: 0 0 auto; padding: 8px 6px; font-size: 13px; white-space: nowrap; }
+  .top-actions > .add-button span { display: inline; }
+  .global-search { grid-column: 1; grid-row: 3; }
+}
+
+/* Two-row header (SP-1 convergence pass). The brand and the primary actions
+   share the first row and the one search field keeps the second, so the header
+   costs at most two tight rows above the content wall instead of three. Every
+   control keeps its accessible name, order, and focusability; only the two
+   visible text labels inside the phone-width action buttons collapse, exactly
+   as the <=1079px boundary above already collapses them. */
+@media (max-width: 640px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 8px auto 0;
+    padding: 7px 10px 9px;
+    border-radius: 16px;
+  }
+  .brand { grid-column: 1; grid-row: 1; min-width: 0; gap: 6px; }
+  .brand > span:last-child { display: inline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 9px; }
+  .top-actions {
+    grid-column: 2; grid-row: 1; width: max-content; max-width: 100%;
+    flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 2px; margin: 0;
+  }
+  .top-actions button, .top-actions .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; flex: 0 0 36px; padding: 6px; }
+  .top-actions > .add-button { width: 36px; min-width: 36px; flex: 0 0 36px; padding: 6px; }
+  .top-actions > .add-button span { display: none; }
+  .global-search { grid-column: 1 / -1; grid-row: 2; min-height: 40px; padding: 4px 5px 4px 12px; }
+  .global-search button { min-height: 32px; padding: 6px 14px; }
+}
+
+/* Desktop/tablet header density: the same card, a shorter row. The showcase
+   header keeps its own frame rule (interface-frame.css) because that selector
+   is more specific. */
+@media (min-width: 641px) {
+  .topbar { min-height: 52px; gap: 10px; padding: 6px 14px; }
+  .brand-mark { width: 30px; height: 30px; }
+  .global-search { min-height: 38px; padding: 3px 5px 3px 12px; }
+  .global-search button { min-height: 30px; padding: 6px 14px; }
 }

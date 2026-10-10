@@ -10,6 +10,8 @@
 // between partials is a presentation change, not a translation change.
 // `scripts/web-i18n-check.mjs` proves the split kept every key exactly once.
 
+import { appearance } from "./i18n/appearance";
+import { libraryViews } from "./i18n/libraryViews";
 import { activity } from "./i18n/activity";
 import { common } from "./i18n/common";
 import { description } from "./i18n/description";
@@ -24,12 +26,24 @@ import { status } from "./i18n/status";
 import { tags } from "./i18n/tags";
 import { verification } from "./i18n/verification";
 import { viewer } from "./i18n/viewer";
+import { photoExperience } from "./i18n/photoExperience";
+import { musicExperience } from "./i18n/musicExperience";
+import { queueExperience } from "./i18n/queueExperience";
+import { musicBrowseExperience } from "./i18n/musicBrowseExperience";
+import { exhibitionExperience } from "./i18n/exhibitionExperience";
+import { savedRetrieval } from "./i18n/savedRetrieval";
+import { originalTakeout } from "./i18n/originalTakeout";
+import { resultScope } from "./i18n/resultScope";
+import { overviewExperience } from "./i18n/overviewExperience";
+import { favorites } from "./i18n/favorites";
 
 export type Locale = "en" | "zh-CN";
 export type Translator = (message: string, values?: Record<string, string | number>) => string;
 
 const chinese: Record<string, string> = {
   ...common,
+  ...appearance,
+  ...libraryViews,
   ...status,
   ...library,
   ...sources,
@@ -43,6 +57,16 @@ const chinese: Record<string, string> = {
   ...searchops,
   ...report,
   ...description,
+  ...photoExperience,
+  ...musicExperience,
+  ...savedRetrieval,
+  ...queueExperience,
+  ...musicBrowseExperience,
+  ...exhibitionExperience,
+  ...originalTakeout,
+  ...resultScope,
+  ...overviewExperience,
+  ...favorites,
 };
 
 export function resolveInitialLocale(): Locale {

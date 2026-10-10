@@ -1,50 +1,15 @@
-/* Design tokens.
-
-Every palette this client renders with: the original dark palette, the
-maintenance neutral palette, and the light color-scheme overrides. Tokens are
-the only cross-surface layer that is safe to import first. */
-
+/* Shared semantic tokens for the built-in appearance palettes. Themes are
+   static color data selected by the host; they do not load code or assets. */
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #edf0f6;
-  background: #07080c;
   font-synthesis: none;
-  --ink: #edf0f6;
-  --muted: #a7acb9;
-  --quiet: #7e8493;
-  --line: rgba(230, 226, 255, 0.1);
-  --line-strong: rgba(230, 226, 255, 0.18);
-  --surface: #0e1017;
-  --surface-raised: #151722;
-  --surface-soft: #1b1d2a;
-  --surface-dim: #090a10;
-  --surface-container-low: #0d0e15;
-  --surface-container: #131520;
-  --surface-container-high: #1a1c29;
-  --surface-container-highest: #242637;
-  --primary-container: #241b3d;
-  --on-primary-container: #ddd4ff;
-  --glass: rgba(13, 12, 22, 0.8);
-  --primary: #a78bfa;
-  --primary-deep: #8b5cf6;
-  --primary-soft: rgba(167, 139, 250, 0.14);
-  --health: #55d6a4;
-  --health-soft: rgba(85, 214, 164, 0.12);
-  --coral: #f4776b;
-  --gold: #dda952;
-  --blue: #91b4d8;
-  --shadow: 0 24px 64px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(167, 139, 250, 0.035);
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.32);
-}
+  color-scheme: dark;
+  color: var(--ink);
+  background: var(--canvas);
 
-/* Neutral maintenance baseline: content, settings, and recovery surfaces stay
-   opaque. The topbar is the only surface allowed to use light glass. */
-:root {
-  color: #e9edf0;
-  background: #101214;
   --ink: #e9edf0;
   --muted: #abb5bd;
-  --quiet: #7e8a92;
+  --quiet: #929ea6;
   --line: #30363b;
   --line-strong: #46515a;
   --surface: #1a1c1e;
@@ -69,46 +34,109 @@ the only cross-surface layer that is safe to import first. */
   --coral: #dc8278;
   --gold: #d0a152;
   --blue: #a8cce8;
+  --canvas: #101214;
+  --overlay: rgb(0 0 0 / 56%);
+  --floating-surface: #202428;
   --shadow: 0 7px 22px rgb(0 0 0 / 22%);
   --shadow-soft: 0 3px 14px rgb(0 0 0 / 18%);
   --page-gutter: clamp(14px, 2.5vw, 32px);
-  /* Navigation rail: one fluid width instead of per-breakpoint values. */
   --rail: clamp(176px, 12vw, 208px);
-  /* Shared surface language: large radii, near-opaque fills, hairline borders,
-     and soft shadows. A real backdrop blur stays reserved for the drawer and
-     the settings modal, which genuinely float above the library. */
   --hairline: rgb(255 255 255 / 6%);
   --hairline-strong: rgb(255 255 255 / 8%);
-  --card-radius: 20px;
-  --card-radius-sm: 16px;
+  --card-radius: 16px;
+  --card-radius-sm: 12px;
   --card-fill: rgb(32 36 40 / 92%);
   --card-fill-quiet: rgb(26 28 30 / 92%);
   --card-shadow: 0 8px 24px rgb(0 0 0 / 26%);
   --card-shadow-soft: 0 4px 16px rgb(0 0 0 / 20%);
 }
 
-@media (prefers-color-scheme: light) {
-
-  :root {
-    color: #222a30;
-    background: #edf1f3;
-    --ink: #222a30; --muted: #5e6b74; --quiet: #7b8992;
-    --line: #dde4e8; --line-strong: #c8d2d8;
-    --surface: #fcfdfd; --surface-raised: #f7fafb; --surface-soft: #eaf0f3; --surface-dim: #e7edf0;
-    --surface-container-low: #e7edf0; --surface-container: #fcfdfd; --surface-container-high: #f7fafb; --surface-container-highest: #eaf0f3;
-    --primary-container: #d7e5f0; --on-primary-container: #222a30; --glass: rgb(255 255 255 / 76%);
-    --primary: #355f7d; --primary-deep: #2d536f; --primary-ink: #ffffff; --primary-soft: #e5eef5;
-    --accent: #386483; --accent-soft: #e5eef5; --health: #357558; --health-soft: #eaf6f0; --coral: #bd4c44; --gold: #98621c; --blue: #386483;
-    --shadow: 0 7px 22px rgb(25 48 67 / 7%); --shadow-soft: 0 3px 14px rgb(25 48 67 / 6%);
-    --hairline: rgb(34 42 48 / 8%);
-    --hairline-strong: rgb(34 42 48 / 11%);
-    --card-fill: rgb(247 250 251 / 94%);
-    --card-fill-quiet: rgb(252 253 253 / 94%);
-    --card-shadow: 0 8px 24px rgb(25 48 67 / 9%);
-    --card-shadow-soft: 0 4px 16px rgb(25 48 67 / 7%);
-  }
-}
 @media (max-width: 640px) {
-
   :root { --page-gutter: 9px; }
+}
+
+/* Slate is the default palette. Its light values preserve the existing
+   maintenance neutral colors while the dark values use a restrained slate. */
+:root[data-theme="slate"][data-appearance="light"] {
+  color-scheme: light;
+  color: #222a30;
+  background: var(--canvas);
+  --ink: #222a30; --muted: #5e6b74; --quiet: #606d75;
+  --line: #dde4e8; --line-strong: #c8d2d8;
+  --surface: #fcfdfd; --surface-raised: #f7fafb; --surface-soft: #eaf0f3; --surface-dim: #e7edf0;
+  --surface-container-low: #e7edf0; --surface-container: #fcfdfd; --surface-container-high: #f7fafb; --surface-container-highest: #eaf0f3;
+  --primary-container: #d7e5f0; --on-primary-container: #222a30; --glass: rgb(255 255 255 / 76%);
+  --primary: #355f7d; --primary-deep: #2d536f; --primary-ink: #fff; --primary-soft: #e5eef5;
+  --accent: #386483; --accent-soft: #e5eef5; --health: #357558; --health-soft: #eaf6f0; --coral: #bd4c44; --gold: #80520f; --blue: #386483;
+  --canvas: #edf1f3; --overlay: rgb(13 25 35 / 42%); --floating-surface: #fcfdfd;
+  --shadow: 0 7px 22px rgb(25 48 67 / 7%); --shadow-soft: 0 3px 14px rgb(25 48 67 / 6%);
+  --hairline: rgb(34 42 48 / 8%); --hairline-strong: rgb(34 42 48 / 11%);
+  --card-fill: rgb(247 250 251 / 94%); --card-fill-quiet: rgb(252 253 253 / 94%);
+  --card-shadow: 0 8px 24px rgb(25 48 67 / 9%); --card-shadow-soft: 0 4px 16px rgb(25 48 67 / 7%);
+}
+
+/* Warm paper palette. */
+:root[data-theme="paper"][data-appearance="light"] {
+  color-scheme: light; color: #302820; background: var(--canvas);
+  --ink: #302820; --muted: #695e51; --quiet: #706558;
+  --line: #e5d9c9; --line-strong: #cdbda8;
+  --surface: #fffdf8; --surface-raised: #fbf6ec; --surface-soft: #f3eadb; --surface-dim: #eee4d4;
+  --surface-container-low: #f3eadb; --surface-container: #fffdf8; --surface-container-high: #fbf6ec; --surface-container-highest: #f1e6d6;
+  --primary-container: #ead9c0; --on-primary-container: #302820; --glass: rgb(255 253 248 / 84%);
+  --primary: #78552d; --primary-deep: #634521; --primary-ink: #fffdf8; --primary-soft: #f1e4cf;
+  --accent: #78552d; --accent-soft: #f1e4cf; --health: #3c7253; --health-soft: #e8f1e8; --coral: #a84639; --gold: #754812; --blue: #46697a;
+  --canvas: #f3ecdf; --overlay: rgb(43 32 18 / 46%); --floating-surface: #fffdf8;
+  --shadow: 0 8px 24px rgb(72 51 27 / 9%); --shadow-soft: 0 3px 14px rgb(72 51 27 / 7%);
+  --hairline: rgb(48 40 32 / 9%); --hairline-strong: rgb(48 40 32 / 13%);
+  --card-fill: rgb(251 246 236 / 96%); --card-fill-quiet: rgb(255 253 248 / 96%);
+  --card-shadow: 0 8px 24px rgb(72 51 27 / 10%); --card-shadow-soft: 0 4px 16px rgb(72 51 27 / 8%);
+}
+
+:root[data-theme="paper"][data-appearance="dark"] {
+  color-scheme: dark; color: #f0e6d8; background: var(--canvas);
+  --ink: #f0e6d8; --muted: #c0ae99; --quiet: #af9c85;
+  --line: #493f34; --line-strong: #625444;
+  --surface: #25211c; --surface-raised: #302920; --surface-soft: #393126; --surface-dim: #1d1915;
+  --surface-container-low: #1d1915; --surface-container: #25211c; --surface-container-high: #302920; --surface-container-highest: #393126;
+  --primary-container: #58432b; --on-primary-container: #f0e6d8; --glass: rgb(37 33 28 / 88%);
+  --primary: #e2bd89; --primary-deep: #d1a66d; --primary-ink: #302314; --primary-soft: #493a28;
+  --accent: #e2bd89; --accent-soft: #493a28; --health: #a4c59e; --health-soft: #29392b; --coral: #ed9a88; --gold: #e4bd78; --blue: #a9c6cb;
+  --canvas: #1a1713; --overlay: rgb(9 7 4 / 68%); --floating-surface: #302920;
+  --shadow: 0 8px 26px rgb(0 0 0 / 35%); --shadow-soft: 0 3px 16px rgb(0 0 0 / 27%);
+  --hairline: rgb(255 245 230 / 7%); --hairline-strong: rgb(255 245 230 / 10%);
+  --card-fill: rgb(48 41 32 / 94%); --card-fill-quiet: rgb(37 33 28 / 94%);
+  --card-shadow: 0 8px 24px rgb(0 0 0 / 28%); --card-shadow-soft: 0 4px 16px rgb(0 0 0 / 22%);
+}
+
+/* Deep indigo palette. */
+:root[data-theme="indigo"][data-appearance="light"] {
+  color-scheme: light; color: #28263b; background: var(--canvas);
+  --ink: #28263b; --muted: #5f5d78; --quiet: #6a6781;
+  --line: #dcdaeb; --line-strong: #c3c0dd;
+  --surface: #fdfcff; --surface-raised: #f7f5ff; --surface-soft: #eceafd; --surface-dim: #e6e3f5;
+  --surface-container-low: #e6e3f5; --surface-container: #fdfcff; --surface-container-high: #f7f5ff; --surface-container-highest: #eceafd;
+  --primary-container: #dedafa; --on-primary-container: #28263b; --glass: rgb(253 252 255 / 82%);
+  --primary: #554a9a; --primary-deep: #453c83; --primary-ink: #fff; --primary-soft: #ebe8fb;
+  --accent: #554a9a; --accent-soft: #ebe8fb; --health: #31765d; --health-soft: #e6f3ed; --coral: #b54958; --gold: #79510d; --blue: #3f658e;
+  --canvas: #efedfa; --overlay: rgb(22 18 48 / 48%); --floating-surface: #fdfcff;
+  --shadow: 0 8px 24px rgb(42 34 82 / 8%); --shadow-soft: 0 3px 14px rgb(42 34 82 / 6%);
+  --hairline: rgb(40 38 59 / 8%); --hairline-strong: rgb(40 38 59 / 12%);
+  --card-fill: rgb(247 245 255 / 95%); --card-fill-quiet: rgb(253 252 255 / 95%);
+  --card-shadow: 0 8px 24px rgb(42 34 82 / 9%); --card-shadow-soft: 0 4px 16px rgb(42 34 82 / 7%);
+}
+
+:root[data-theme="indigo"][data-appearance="dark"] {
+  color-scheme: dark; color: #eeecff; background: var(--canvas);
+  --ink: #eeecff; --muted: #b8b5d1; --quiet: #a3a0be;
+  --line: #35334e; --line-strong: #4a4768;
+  --surface: #1a1927; --surface-raised: #222135; --surface-soft: #29283e; --surface-dim: #13121e;
+  --surface-container-low: #13121e; --surface-container: #1a1927; --surface-container-high: #222135; --surface-container-highest: #2d2b45;
+  --primary-container: #393457; --on-primary-container: #eeecff; --glass: rgb(26 25 39 / 88%);
+  --primary: #c2b8ff; --primary-deep: #aca0f4; --primary-ink: #231e42; --primary-soft: #302d4c;
+  --accent: #c2b8ff; --accent-soft: #302d4c; --health: #8ecdb2; --health-soft: #20372f; --coral: #f19aab; --gold: #e1bd76; --blue: #9abde5;
+  --canvas: #11101a; --overlay: rgb(5 4 12 / 70%); --floating-surface: #222135;
+  --shadow: 0 8px 28px rgb(0 0 0 / 42%); --shadow-soft: 0 3px 16px rgb(0 0 0 / 30%);
+  --hairline: rgb(240 236 255 / 7%); --hairline-strong: rgb(240 236 255 / 10%);
+  --card-fill: rgb(34 33 53 / 94%); --card-fill-quiet: rgb(26 25 39 / 94%);
+  --card-shadow: 0 8px 24px rgb(0 0 0 / 30%); --card-shadow-soft: 0 4px 16px rgb(0 0 0 / 23%);
 }

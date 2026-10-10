@@ -107,6 +107,14 @@ export function sortLibraryHits(hits: SearchHit[], field: SortField, direction: 
     return collator(value(left), value(right));
   };
   return [...hits].sort((left, right) => {
+    if (field === "size") {
+      const leftSize = sortableSize(left);
+      const rightSize = sortableSize(right);
+      // Keep unknown sizes at the end independently of the requested value
+      // direction. Equal unknowns still use the same directional name tie-break.
+      if (leftSize === null && rightSize !== null) return 1;
+      if (rightSize === null && leftSize !== null) return -1;
+    }
     const primary = comparePrimary(left, right);
     if (primary !== 0) return direction === "asc" ? primary : -primary;
     // Equal keys keep a deterministic, locale-aware name order that follows the
@@ -303,6 +311,13 @@ export function mediaClassFromSuffix(suffix: string): SpaceReportClass | "" {
     if (suffixes.includes(normalized)) return className;
   }
   return "";
+}
+export type MediaBrowseClass = "image" | "audio";
+// Media workspaces are browser projections over regular files in the loaded
+// content listing. The suffix is a deterministic system facet, not proof of
+// file contents and never a reason to create or rewrite durable facts.
+export function mediaContentItems(items: SearchHit[], mediaClass: MediaBrowseClass): SearchHit[] {
+  return items.filter((item) => item.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(item)) === mediaClass);
 }
 export type SpaceReport = {
   totalBytes: number;

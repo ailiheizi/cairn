@@ -39,13 +39,15 @@ type PreviewState =
   | { kind: "loading" }
   | { kind: "ready-text"; text: string }
   | { kind: "ready-image"; url: string; mime: string }
-  | { kind: "unavailable"; message: string }
+  | { kind: "unavailable"; reason: "unsupported-format" | "size-limit" | "original-unavailable"; message: string }
   | { kind: "error"; message: string };
+type UnavailablePreviewState = Extract<PreviewState, { kind: "unavailable" }>;
 type NaturalSize = { width: number; height: number };
 
 const FALLBACK_MAX_READ = 1 << 20;
 const TEXT_BUDGET = 64 << 10;
 const IMAGE_BUDGET = 1 << 20;
+const INSPECTOR_IMAGE_BUDGET = 8 << 20;
 const TEXT_EXTENSIONS = /\.(txt|md|markdown|json|csv|tsv|log|yaml|yml|toml|xml|css|js|jsx|ts|tsx|go|rs|py|sh|sql|ini|conf)$/i;
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp)$/i;
 // A natural size of 32px or less is too small to judge at tile scale, so the
@@ -65,7 +67,7 @@ const thumbCache = new Map<string, ThumbCacheEntry>();
 
 type ThumbCacheEntry =
   | { kind: "image"; blob: Blob; mime: string }
-  | { kind: "unavailable"; message: string }
+  | { kind: "unavailable"; reason: "unsupported-format" | "size-limit" | "original-unavailable"; message: string }
   | { kind: "error"; message: string };
 
 function readThumbCache(key: string): ThumbCacheEntry | undefined {
@@ -89,6 +91,24 @@ function clampZoom(value: number): number {
 
 function messageFor(result: PreviewCommandResult, fallback: string): string {
   return result.reasons?.find((reason) => reason.message)?.message ?? fallback;
+}
+
+function unsupportedFormatMessage(name: string, t: ReturnType<typeof createTranslator>): string {
+  const suffixHint = /\.(wav|mp3|m4a|aac|flac|ogg|oga|opus|wma|aiff?)$/i.test(name) ? t("audio")
+    : /\.(mp4|m4v|mov|mkv|avi|webm|mpeg|mpg|wmv|3gp)$/i.test(name) ? t("video")
+      : /\.pdf$/i.test(name) ? "PDF"
+        : /\.(zip|7z|rar|tar|gz|bz2|xz|zst|tgz)$/i.test(name) ? t("archive")
+          : "";
+  return suffixHint
+    ? t("The filename suffix suggests {{kind}} content. This preview does not open that format. Try Download original in Details to open it in your own app.", { kind: suffixHint })
+    : t("This file type is not previewed here. Try Download original in Details to open it in your own app.");
+}
+
+function previewLimitMessage(name: string, variant: "inspector" | "thumb", t: ReturnType<typeof createTranslator>): string {
+  if (isTextName(name)) return t("Text preview is limited to 64 KiB. Try Download original in Details to open the full file.");
+  return variant === "thumb"
+    ? t("Image thumbnails are limited to 1 MiB. Try Download original in Details to inspect the full image.")
+    : t("Image inspection is limited to 8 MiB. Try Download original in Details to inspect the full image.");
 }
 
 function bytesFromBase64(value: unknown): Uint8Array {
@@ -176,7 +196,7 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     // content type it cannot draw, so a tile cannot fetch a preview it will
     // not show.
     if (variant === "thumb" && !imageCandidate) return undefined;
-    const budget = imageCandidate ? IMAGE_BUDGET : TEXT_BUDGET;
+    const budget = imageCandidate ? (variant === "thumb" ? IMAGE_BUDGET : INSPECTOR_IMAGE_BUDGET) : TEXT_BUDGET;
     // A tile never fetches content it already knows it cannot render. The
     // inspector keeps reporting the same state inside the panel instead.
     if (variant === "thumb" && logicalSize !== undefined && (!Number.isSafeInteger(logicalSize) || logicalSize < 0 || logicalSize > budget)) return undefined;
@@ -199,23 +219,31 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
         const url = URL.createObjectURL(cached.blob);
         objectUrlRef.current = url;
         setState({ kind: "ready-image", url, mime: cached.mime });
-      } else setState({ kind: cached.kind, message: cached.message });
+      } else setState({ ...cached });
       return cleanup;
     }
+    const setUnavailable = (reason: UnavailablePreviewState["reason"], message: string) => {
+      const result: UnavailablePreviewState = { kind: "unavailable", reason, message };
+      writeThumbCache(cacheKey, result);
+      setState(result);
+    };
     const run = async () => {
       if (!exactAvailable) {
-        writeThumbCache(cacheKey, { kind: "unavailable", message: t("The original content is currently unavailable for reading.") });
-        setState({ kind: "unavailable", message: t("The original content is currently unavailable for reading.") });
+        setUnavailable("original-unavailable", t("The original content is currently unavailable; preview or download may not be possible."));
         return;
       }
       if (!imageCandidate && !textCandidate) {
-        writeThumbCache(cacheKey, { kind: "unavailable", message: t("Supported: text up to 64 KiB and PNG, JPEG, GIF, or WebP up to 1 MiB. Larger files can be viewed after export.") });
-        setState({ kind: "unavailable", message: t("Supported: text up to 64 KiB and PNG, JPEG, GIF, or WebP up to 1 MiB. Larger files can be viewed after export.") });
+        setUnavailable("unsupported-format", unsupportedFormatMessage(name, t));
         return;
       }
-      if (logicalSize !== undefined && (!Number.isSafeInteger(logicalSize) || logicalSize < 0 || logicalSize > budget)) {
-        writeThumbCache(cacheKey, { kind: "unavailable", message: t("Supported: text up to 64 KiB and images up to 1 MiB. Larger files can be viewed after export.") });
-        setState({ kind: "unavailable", message: t("Supported: text up to 64 KiB and images up to 1 MiB. Larger files can be viewed after export.") });
+      if (logicalSize !== undefined && (!Number.isSafeInteger(logicalSize) || logicalSize < 0)) {
+        const message = t("The preview size could not be verified.");
+        writeThumbCache(cacheKey, { kind: "error", message });
+        setState({ kind: "error", message });
+        return;
+      }
+      if (logicalSize !== undefined && logicalSize > budget) {
+        setUnavailable("size-limit", previewLimitMessage(name, variant, t));
         return;
       }
       setState({ kind: "loading" });
@@ -230,21 +258,36 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
         if (entryId !== undefined && data.entry_id !== entryId) throw new Error(t("Preview could not be loaded."));
         if (subjectRef !== undefined && data.subject_ref !== subjectRef) throw new Error(t("Preview could not be loaded."));
         if (logicalSize !== undefined && data.logical_size !== logicalSize) throw new Error(t("Preview could not be loaded."));
-        const size = data.logical_size ?? logicalSize ?? 0;
+        if (!Number.isSafeInteger(data.logical_size) || (data.logical_size ?? -1) < 0 || typeof data.content_id !== "string" || !/^sha256:[a-f0-9]{64}$/i.test(data.content_id)) throw new Error(t("The content could not be decoded safely."));
+        const size = data.logical_size as number;
         const maxRead = data.max_read;
-        if (!Number.isSafeInteger(size) || size < 0 || typeof maxRead !== "number" || !Number.isSafeInteger(maxRead) || maxRead <= 0 || maxRead > FALLBACK_MAX_READ || size > budget || size > maxRead) {
-          writeThumbCache(cacheKey, { kind: "unavailable", message: t("Supported: text up to 64 KiB and images up to 1 MiB. Larger files can be viewed after export.") });
-          setState({ kind: "unavailable", message: t("Supported: text up to 64 KiB and images up to 1 MiB. Larger files can be viewed after export.") });
+        if (size > budget) {
+          setUnavailable("size-limit", previewLimitMessage(name, variant, t));
           return;
         }
+        if (typeof maxRead !== "number" || !Number.isSafeInteger(maxRead) || maxRead <= 0 || maxRead > FALLBACK_MAX_READ) throw new Error(t("Preview could not be loaded."));
         if (requestId !== requestRef.current || controller.signal.aborted) return;
-        const read = await command(operations.content.read, { handle, offset: 0, length: size });
+        const all = new Uint8Array(size);
+        let offset = 0;
+        do {
+          if (requestId !== requestRef.current || controller.signal.aborted) return;
+          const length = Math.min(maxRead, size - offset);
+          const read = await command(operations.content.read, { handle, offset, length });
+          if (requestId !== requestRef.current || controller.signal.aborted) return;
+          if (!read.data || !["SUCCEEDED", "DEGRADED"].includes(read.status ?? "")) throw new Error(messageFor(read, t("Preview could not be loaded.")));
+          const readData = read.data as ReadData;
+          const nextOffset = offset + length;
+          if (readData.handle !== handle || readData.offset !== offset || readData.length !== length || readData.eof !== (nextOffset === size)) throw new Error(t("The content could not be decoded safely."));
+          const chunk = bytesFromBase64(readData.bytes);
+          if (chunk.length !== length) throw new Error(t("The content could not be decoded safely."));
+          all.set(chunk, offset);
+          offset = nextOffset;
+        } while (offset < size);
         if (requestId !== requestRef.current || controller.signal.aborted) return;
-        if (!read.data || !["SUCCEEDED", "DEGRADED"].includes(read.status ?? "")) throw new Error(messageFor(read, t("Preview could not be loaded.")));
-        const readData = read.data as ReadData;
-        if (readData.handle !== handle || readData.offset !== 0 || readData.length !== size || !readData.eof) throw new Error(t("The content could not be decoded safely."));
-        const all = bytesFromBase64(readData.bytes);
-        if (all.length !== size) throw new Error(t("The content could not be decoded safely."));
+        const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", all));
+        if (requestId !== requestRef.current || controller.signal.aborted) return;
+        const actualContentId = `sha256:${Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+        if (actualContentId !== data.content_id.toLowerCase() || all.length !== size) throw new Error(t("The content could not be decoded safely."));
         const mime = imageMime(all, name);
         if (imageCandidate && mime) {
           const blob = new Blob([all.buffer as ArrayBuffer], { type: mime });
@@ -257,8 +300,7 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
           if (text.includes("\u0000")) throw new Error(t("The content could not be decoded safely."));
           setState({ kind: "ready-text", text });
         } else {
-          writeThumbCache(cacheKey, { kind: "unavailable", message: t("The content could not be decoded safely.") });
-          setState({ kind: "unavailable", message: t("The content could not be decoded safely.") });
+          throw new Error(t("The content could not be decoded safely."));
         }
       } catch (error) {
         if (requestId === requestRef.current && !controller.signal.aborted) {
@@ -277,7 +319,8 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
   if (variant === "thumb") {
     // A tile preview is decorative: it adds no interactive element and it
     // never renders an empty box. It draws a real image or keeps the ordinary
-    // glyph and explains, in one short line, why no picture is shown.
+    // glyph and marks an unavailable preview in one compact line. The full
+    // reason remains available through the badge's title and accessible name.
     if (state.kind === "ready-image") {
       return <>
         <img className="rw-content-preview__thumb-image" src={state.url} alt="" onLoad={(event) => {
@@ -290,7 +333,8 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
       </>;
     }
     if (state.kind === "unavailable" || state.kind === "error") {
-      return <span className="rw-content-preview__thumb-note" aria-hidden="true" title={`${t("Preview unavailable")} · ${state.message}`}><AlertCircle size={11} aria-hidden="true" /><span>{state.message}</span></span>;
+      const unavailableLabel = t("Preview unavailable");
+      return <span className="rw-content-preview__thumb-note" role="img" aria-label={`${unavailableLabel}: ${state.message}`} title={`${unavailableLabel} · ${state.message}`}><AlertCircle size={11} aria-hidden="true" /><span>{t("No preview")}</span></span>;
     }
     return null;
   }
@@ -312,7 +356,7 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     {open && <section className="rw-content-preview__panel" aria-live="polite" aria-label={t("Preview")}>
       <div className="rw-content-preview__header"><strong>{name}</strong><button type="button" className="rw-content-preview__close" onClick={closePreview} aria-label={t("Close preview")}><X size={18} aria-hidden="true" /></button></div>
       {state.kind === "loading" && <div className="rw-content-preview__status"><LoaderCircle className="rw-content-preview__spin" size={18} aria-hidden="true" /> {t("Reading exact content...")}</div>}
-      {(state.kind === "unavailable" || state.kind === "error") && <div className="rw-content-preview__status rw-content-preview__status--error"><strong>{t("Preview unavailable")}</strong><span>{state.message}</span>{state.kind === "error" && <button type="button" className="rw-content-preview__retry" onClick={() => { closePreview(); setTimeout(() => setOpen(true), 0); }}>{t("Retry")}</button>}</div>}
+      {(state.kind === "unavailable" || state.kind === "error") && <div className={`rw-content-preview__status ${state.kind === "error" ? "rw-content-preview__status--error" : `rw-content-preview__status--unavailable ${state.reason === "original-unavailable" ? "rw-content-preview__status--unavailable-critical" : ""}`}`} data-state={state.kind} data-reason={state.kind === "unavailable" ? state.reason : undefined}><strong>{state.kind === "error" ? t("Preview failed") : state.reason === "size-limit" ? t("Preview size limit reached") : state.reason === "original-unavailable" ? t("Original content unavailable") : t("Preview not provided for this format")}</strong><span>{state.message}</span>{state.kind === "error" && <button type="button" className="rw-content-preview__retry" onClick={() => { closePreview(); setTimeout(() => setOpen(true), 0); }}>{t("Retry")}</button>}</div>}
       {state.kind === "ready-text" && <pre className="rw-content-preview__text">{state.text}</pre>}
       {state.kind === "ready-image" && <div className="rw-content-preview__image-wrap">
         <button type="button" className="rw-content-preview__image-button" aria-label={t("View full size")} onClick={(event) => openViewer(event.currentTarget)}>

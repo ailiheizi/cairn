@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { createTranslator, resolveInitialLocale } from "./i18n";
 import type { Locale } from "./i18n";
@@ -9,6 +10,10 @@ import { isTextEntryTarget, useSearch } from "./app/useSearch";
 import { useSettings } from "./app/useSettings";
 import { useRecents } from "./app/useRecents";
 import { useViewMode } from "./app/useViewMode";
+import { useAppearance } from "./app/useAppearance";
+import { useLibraryViews } from "./app/useLibraryViews";
+import { bootstrapAppearance } from "./lib/appearance";
+import { isLibraryViewEnabled, libraryPageForMode, libraryPageRoot } from "./lib/libraryViews";
 import { useCompactLayout } from "./app/useCompactLayout";
 import { useLibraryDrafts } from "./app/useLibraryDrafts";
 import { useLibrary } from "./app/useLibrary";
@@ -17,7 +22,15 @@ import { useSelection } from "./app/useSelection";
 import { useSources } from "./app/useSources";
 import { useRestore } from "./app/useRestore";
 import { useExport } from "./app/useExport";
+import { useAudioPlayback } from "./app/useAudioPlayback";
+import { useMusicMetadata } from "./app/useMusicMetadata";
+import { useFavorites } from "./app/useFavorites";
+import { useOriginalTakeout } from "./app/useOriginalTakeout";
+import { resolveArchiveSelectionSizes } from "./lib/originalArchive";
+import { AudioPlayer } from "./components/AudioPlayer";
+import { OriginalTakeoutStatus } from "./components/OriginalTakeoutStatus";
 import { TopBar } from "./components/TopBar";
+import { InterfaceRenderBoundary } from "./components/InterfaceRenderBoundary";
 import { WorkspaceRail, WorkspaceRailPanel } from "./components/WorkspaceRail";
 import { StatusPanel } from "./components/StatusPanel";
 import { LibrarySurface } from "./components/LibrarySurface";
@@ -33,7 +46,7 @@ import { VerificationDrawer } from "./components/VerificationDrawer";
 import { SettingsDialog } from "./components/SettingsDialog";
 import "./styles/index.css";
 import "antd/dist/reset.css";
-import type { Notice, SearchHit, SnapshotSummary, SourceSummary } from "./lib/types";
+import type { LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary } from "./lib/types";
 
 // The application shell.
 //
@@ -50,6 +63,7 @@ const semanticProvider = "query.semantic.onnx-bge-zvec.v1";
 function App() {
   const [locale, setLocale] = useState<Locale>(resolveInitialLocale);
   const [notice, setNotice] = useState<Notice>();
+  const presentationFallbackNoticeRef = useRef<Notice | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   // The query text and the last submitted query live in the shell because the
   // search field, the library heading, and the export drawer all describe the
@@ -61,11 +75,17 @@ function App() {
   const [capabilities, setCapabilities] = useState<any[]>([]);
   const [snapshotRef, setSnapshotRef] = useState("");
   const [workspaceID, setWorkspaceID] = useState(() => window.localStorage.getItem("restoreweave.workspace_id") ?? "");
+  const workspaceIDRef = useRef(workspaceID);
+  workspaceIDRef.current = workspaceID;
   // Selection is a second, explicit concept on top of the one details subject:
   // `selected` means "whose details are open", while the batch selection lives
   // in the selection flow.
   const [selected, setSelected] = useState<SearchHit>();
+  // A page's browsing focus is separate from Details and batch selection.
+  const [focusedSubjectRef, setFocusedSubjectRef] = useState("");
+  useEffect(() => { setFocusedSubjectRef(""); }, [workspaceID]);
   const [addOpen, setAddOpen] = useState(false);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -90,6 +110,16 @@ function App() {
   const notesRailRef = useRef<HTMLButtonElement | null>(null);
   const activityRailRef = useRef<HTMLButtonElement | null>(null);
   const t = useMemo(() => createTranslator(locale), [locale]);
+  function showPresentationFallbackNotice(text: string) {
+    const fallback: Notice = { kind: "warning", text };
+    presentationFallbackNoticeRef.current = fallback;
+    setNotice(fallback);
+  }
+  function clearPresentationFallbackNotice() {
+    const fallback = presentationFallbackNoticeRef.current;
+    presentationFallbackNoticeRef.current = undefined;
+    if (fallback) setNotice((current) => current === fallback ? undefined : current);
+  }
 
   const lexicalReady = useMemo(() => capabilities.some((item) => item.kind === "index-dimension" && item.id === lexicalDimension && item.state === "AVAILABLE"), [capabilities]);
   const semanticReady = useMemo(() => capabilities.some((item) => item.kind === "index-dimension" && item.id === semanticDimension && item.source === semanticProvider && item.state === "AVAILABLE"), [capabilities]);
@@ -239,44 +269,126 @@ function App() {
   const settings = useSettings({ t, settingsOpen, workspaceID, semanticInstallAvailable, imageInstallAvailable, searchRebuildAvailable, refreshCapabilities, notify: setNotice });
   const recents = useRecents();
   const view = useViewMode();
+  const appearance = useAppearance();
+  const libraryViews = useLibraryViews();
   const drafts = useLibraryDrafts({ t });
-  const library = useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode: view.viewMode, setViewMode: view.setViewMode, sortField: view.sortField, sortDirection: view.sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify: setNotice, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, discardDetailDrafts: drafts.discardDetailDrafts });
+  const library = useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode: view.viewMode, presentationMode: view.presentationMode, setViewMode: view.setViewMode, setPresentationMode: view.setPresentationMode, sortField: view.sortField, sortDirection: view.sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify: setNotice, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, discardDetailDrafts: drafts.discardDetailDrafts });
   const details = useDetails({ t, workspaceID, selected, setSelected, drafts, library, setViewMode: view.setViewMode, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice });
   const selection = useSelection({ t, workspaceID, hits: library.hits, renderedHits: library.renderedHits, selected, details, library, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice, libraryListRef });
   const sources = useSources({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, refresh, refreshGenerationRef, lastPlannedSource: recents.lastPlannedSource, rememberLastSourcePath: recents.rememberLastSourcePath, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setRestoreOpen(false); setExportOpen(false); setSettingsOpen(false); }, setAddOpen, library, rememberWorkspace });
   const restore = useRestore({ t, snapshotRef, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, pushRecentDestination: recents.pushRecentDestination, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setExportOpen(false); setSettingsOpen(false); }, setRestoreOpen });
-  const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode: view.setViewMode, selection, library, drafts, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
+  const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode: view.setViewMode, selection, library, drafts, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
   const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
+  const topBarSearch = {
+    ...search,
+    async runSearch(event?: Parameters<typeof search.runSearch>[0], explicitQuery?: string) {
+      const succeeded = await search.runSearch(event, explicitQuery);
+      if (succeeded) completeUserNavigation();
+      return succeeded;
+    },
+    pickRecentSearch(value: string) {
+      search.handleSearchFieldChange(value);
+      void search.runSearch(undefined, value).then((succeeded) => { if (succeeded) completeUserNavigation(); });
+    },
+  };
+  const audioPlayback = useAudioPlayback(workspaceID);
+  const musicMetadata = useMusicMetadata(workspaceID, library.libraryItems, command);
+  const favoriteControls = useFavorites({ t, workspaceID, library, annotationStorageReady, catalogStorageMessage, busy, setBusy, notify: setNotice, refreshCapabilities });
+  const originalTakeout = useOriginalTakeout(workspaceID);
+  const originalTakeoutBusy = ["planning", "downloading", "preparing"].includes(originalTakeout.status);
+  const presentationRoot = libraryPageForMode(view.presentationMode);
+  const presentationRootKey = presentationRoot ? libraryPageRoot(presentationRoot)?.id ?? presentationRoot.id : "content";
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [presentationRootKey]);
+
+  // Hiding a library lens changes presentation only. Keep the inspected subject
+  // and its unsaved Notes intact while restoring the shared loaded listing.
+  useEffect(() => {
+    if (isLibraryViewEnabled(view.presentationMode, libraryViews.enabledViewIds)) return;
+    view.setPresentationMode("content");
+    selection.clearSelection();
+    showPresentationFallbackNotice(t("This presentation is disabled. Showing all types for the same results."));
+  }, [view.presentationMode, libraryViews.enabledViewIds]);
 
   // The URL hash is a browser-local deep link over the library's projection
-  // state (view mode, the submitted search text, the active tag facets, the
-  // timeline month). It is read once on mount and restored after the daemon's
+  // state (view mode, including the photo/music lenses, submitted search text,
+  // active tag facets, and timeline month). It is read once on mount and restored after the daemon's
   // first content listing arrived — restoring a search re-runs that query, so
   // the restored view is always derived from the daemon, never from the hash.
   // Every later change replaces the hash (replaceState, never pushState), so
   // a refresh lands where the user was without spamming session history.
   const pendingHashView = useRef(parseHashView(window.location.hash));
   const [hashViewApplied, setHashViewApplied] = useState(false);
+  const [hashRestoreComplete, setHashRestoreComplete] = useState(!pendingHashView.current.mode);
+  const hashRestoreFailedRef = useRef(false);
+  const hashRestoreSupersededRef = useRef(false);
+  const [hashRestoreFailed, setHashRestoreFailed] = useState(false);
+  const scopeRestoring = !hashRestoreComplete && !hashRestoreFailed && Boolean(pendingHashView.current.mode);
   useEffect(() => {
     if (hashViewApplied) return;
+    if (hashRestoreSupersededRef.current) { setHashViewApplied(true); return; }
     const pending = pendingHashView.current;
-    if (!pending.mode) { setHashViewApplied(true); return; }
+    if (!pending.mode) { setHashViewApplied(true); setHashRestoreComplete(true); return; }
     if (!isConnected) return;
-    if ((pending.mode === "search" || pending.mode === "content" || pending.mode === "tag") && !library.libraryLoaded) return;
+    if ((pending.mode === "search" || pending.mode === "content" || pending.mode === "tag" || libraryPageForMode(pending.mode)) && !library.libraryLoaded) return;
     setHashViewApplied(true);
+    const requestedPresentation = pending.presentation;
+    const presentationUnavailable = pending.invalidPresentation || Boolean(requestedPresentation && libraryPageForMode(requestedPresentation) && !isLibraryViewEnabled(requestedPresentation, libraryViews.enabledViewIds));
+    if (requestedPresentation && libraryPageForMode(requestedPresentation)) {
+      view.setPresentationMode(isLibraryViewEnabled(requestedPresentation, libraryViews.enabledViewIds) ? requestedPresentation as "content" | LibraryPageMode : "content");
+    }
     if (pending.mode === "search") {
       const text = pending.q.trim();
-      if (!text) return;
+      if (!text) {
+        markHashRestoreFailed();
+        setNotice((current) => current ?? { kind: "error", text: t("Your view could not be restored. The original link is retained; search again or choose a view.") });
+        return;
+      }
       setQuery(text);
-      void search.runSearch(undefined, text);
+      const restoringWorkspace = workspaceID;
+      const restoringGeneration = refreshGenerationRef.current;
+      void search.runSearch(undefined, text).then((succeeded) => {
+        if (hashRestoreSupersededRef.current) return;
+        const stillCurrent = workspaceIDRef.current === restoringWorkspace && restoringGeneration === refreshGenerationRef.current;
+        if (succeeded && stillCurrent) {
+          library.setActiveTags(pending.tags);
+          library.setActiveTimelineMonth(pending.month);
+          hashRestoreFailedRef.current = false;
+          setHashRestoreFailed(false);
+          setHashRestoreComplete(true);
+        } else {
+          markHashRestoreFailed();
+          if (stillCurrent) setNotice((current) => current ?? { kind: "error", text: t("Your view could not be restored. The original link is retained; search again or choose a view.") });
+        }
+        if (presentationUnavailable && succeeded && stillCurrent) showPresentationFallbackNotice(t("This presentation is unavailable. Showing all types for the same results."));
+      });
       return;
     }
-    if (pending.mode === "content" || pending.mode === "tag") { library.restoreLibraryHashView(pending.mode, pending.tags, pending.month); return; }
+    if (pending.mode === "content" || pending.mode === "tag") {
+      library.restoreLibraryHashView(pending.mode, pending.tags, pending.month);
+      setHashRestoreComplete(true);
+      if (presentationUnavailable) showPresentationFallbackNotice(t("This presentation is unavailable. Showing all types for the same results."));
+      return;
+    }
+    if (libraryPageForMode(pending.mode)) { openLibrarySurface(pending.mode as LibraryPageMode); setHashRestoreComplete(true); return; }
     view.setViewMode(pending.mode);
+    setHashRestoreComplete(true);
   }, [hashViewApplied, isConnected, library.libraryLoaded]);
   useEffect(() => {
-    writeHashView({ mode: view.viewMode, q: lastExecutedQuery, tags: library.activeTags, month: library.activeTimelineMonth });
-  }, [lastExecutedQuery, library.activeTags, library.activeTimelineMonth, view.viewMode]);
+    if (!hashRestoreComplete) return;
+    const mode = libraryPageForMode(view.viewMode) ? "content" : view.viewMode;
+    writeHashView({ mode, presentation: view.presentationMode, q: lastExecutedQuery, tags: library.activeTags, month: library.activeTimelineMonth });
+  }, [hashRestoreComplete, lastExecutedQuery, library.activeTags, library.activeTimelineMonth, view.viewMode, view.presentationMode]);
+  function completeUserNavigation() {
+    hashRestoreSupersededRef.current = true;
+    hashRestoreFailedRef.current = false;
+    setHashRestoreFailed(false);
+    setHashRestoreComplete(true);
+    clearPresentationFallbackNotice();
+  }
+  function markHashRestoreFailed() {
+    hashRestoreFailedRef.current = true;
+    setHashRestoreFailed(true);
+  }
 
   useEffect(() => { void refresh(); }, []);
   // The panel exists only below the compact boundary. A resize across it
@@ -286,12 +398,12 @@ function App() {
   // being kept as a hidden member of the batch. Reordering (sorting) keeps the
   // same subjects and therefore the same selection.
   useEffect(() => {
-    const visible = new Set(library.hits.map((hit) => hit.subject_ref?.trim()).filter((value): value is string => Boolean(value)));
+    const visible = new Set(library.renderedHits.map((hit) => hit.subject_ref?.trim()).filter((value): value is string => Boolean(value)));
     selection.setSelectionRefs((current) => {
       const next = current.filter((subjectRef) => visible.has(subjectRef));
       return next.length === current.length ? current : next;
     });
-  }, [library.hits]);
+  }, [library.renderedHits]);
   // Escape clears the batch selection only when no drawer, modal viewer, or
   // settings surface owns the key; those keep their own dismiss behavior.
   useEffect(() => {
@@ -412,6 +524,25 @@ function App() {
   function viewSource(sourceItem: SourceSummary) { void sources.viewSource(sourceItem); }
   function recheckSource(sourceItem: SourceSummary, trigger?: EventTarget | null) { sources.openAdd(sourceItem, trigger); }
   function addSource(trigger?: EventTarget | null) { sources.openAdd(undefined, trigger); }
+  function handleLibraryFileDrop(event: DragEvent<HTMLElement>) {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    const directory = Array.from(event.dataTransfer.items).some((item) => {
+      const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => { isDirectory?: boolean } | null }).webkitGetAsEntry?.();
+      return entry?.isDirectory === true;
+    });
+    if (directory) { setNotice({ kind: "warning", text: t("Folder drops are not supported. Choose individual files or use a server folder.") }); return; }
+    if (!event.dataTransfer.files.length) return;
+    if (isUnavailable) { setNotice({ kind: "error", text: t("Start the RestoreWeave service before previewing this source.") }); return; }
+    if (!coreStorageReady) { setNotice({ kind: "error", text: coreStorageMessage }); return; }
+    if (drawerOpen || settingsOpen || busy || sources.planAction !== "IDLE" || sources.planCheckBusy) {
+      setNotice({ kind: "warning", text: t("Finish the current source operation before uploading files.") });
+      return;
+    }
+    setPendingUploadFiles(Array.from(event.dataTransfer.files));
+    setNotice(undefined);
+    sources.openAdd();
+  }
   // The compact workspace panel is opened from the topbar button and dismissed
   // like every other modal surface: Escape, the backdrop, or its own close
   // control. The shell's drawer effect owns the focus trap, the `drawer-open`
@@ -447,10 +578,35 @@ function App() {
     drafts.discardDetailDrafts();
     setSelected(undefined);
     view.setViewMode("activity");
+    completeUserNavigation();
   }
-  // The rail's Library entry returns from every other view mode; from the
-  // activity view it restores the unfiltered content projection.
+  function openLibrarySurface(mode: "content" | LibraryPageMode) {
+    const availableMode = isLibraryViewEnabled(mode, libraryViews.enabledViewIds) ? mode : "content";
+    const currentPage = libraryPageForMode(view.presentationMode);
+    const nextPage = libraryPageForMode(availableMode);
+    const sameDomain = currentPage && nextPage && libraryPageRoot(currentPage)?.id === libraryPageRoot(nextPage)?.id;
+    if ((view.viewMode === "search" || view.viewMode === "tag") && availableMode === "content") {
+      if (view.presentationMode !== "content" && !drafts.canLeaveDetailDrafts()) return;
+      if (view.presentationMode !== "content") { drafts.discardDetailDrafts(); selection.clearSelection(); }
+      view.setPresentationMode("content");
+      completeUserNavigation();
+      return;
+    }
+    if (sameDomain) { view.setPresentationMode(availableMode); completeUserNavigation(); return; }
+    if (view.viewMode === "search" || view.viewMode === "tag") {
+      if (!drafts.canLeaveDetailDrafts()) return;
+      drafts.discardDetailDrafts();
+      selection.clearSelection();
+      view.setPresentationMode(availableMode);
+      completeUserNavigation();
+      return;
+    }
+    if (library.showLibrarySurface(availableMode)) { view.setPresentationMode(availableMode); selection.clearSelection(); completeUserNavigation(); }
+  }
+  // The rail has one Library destination; its internal views stay local to the
+  // already-loaded set, while a true return from other workspaces reloads it.
   function openLibrary(event: { currentTarget: EventTarget | null }) {
+    if (libraryPageForMode(view.viewMode)) { openLibrarySurface("content"); return; }
     if (view.viewMode === "activity") { library.clearLibraryFilters(); return; }
     if (library.hasActiveFilters) library.clearLibraryFilters();
     else reloadLibrary();
@@ -495,79 +651,101 @@ function App() {
     />
   </WorkspaceRailPanel>;
 
-  return <div className="app-shell">
-    <TopBar
-      t={t}
-      query={query}
-      busy={busy}
-      status={status}
-      statusData={statusData}
-      capabilities={capabilities}
-      isConnected={isConnected}
-      coreStorageReady={coreStorageReady}
-      catalogHealthy={catalogHealthy}
-      snapshotRef={snapshotRef}
-      search={search}
-      compact={compactLayout}
-      onOpenRail={openRail}
-      railTriggerRef={railTriggerRef}
-      onRefresh={() => void refresh()}
-      onOpenRestore={(trigger) => restore.openRestore(trigger)}
-      onOpenAdd={(_, trigger) => addSource(trigger)}
+  return <div className="app-shell client-host">
+    <InterfaceRenderBoundary
+      interfaceId={appearance.preference.interfaceId}
+      immersive={(view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || Boolean(libraryPageForMode(view.viewMode))) && libraryPageForMode(view.presentationMode)?.chrome === "immersive"}
+      onFallbackToWorkspace={() => appearance.updatePreference({ ...appearance.preference, interfaceId: "workspace" })}
       onOpenSettings={(trigger) => openSettings(trigger)}
-      onOpenVerification={(trigger) => { rememberDrawerTrigger(trigger); setVerificationOpen(true); }}
-      onOpenActivity={openActivity}
-      canLeaveSettings={settings.canLeaveSettings}
-    />
-    <main className={`workspace ${selected ? "detail-active" : ""} ${showFirstSource ? "empty-library" : ""}`}>
-      {compactLayout ? undefined : rail}
-      {view.viewMode === "duplicates" ? <DuplicatesSurface t={t} /> : view.viewMode === "tags" ? <TagsSurface t={t} /> : view.viewMode === "notes" ? <NotesSurface
+      header={<TopBar
         t={t}
-        locale={locale}
-        workspaceID={workspaceID}
-        onOpenSubject={(hit) => void details.loadDetails(hit)}
-      /> : view.viewMode === "activity" ? <ActivitySurface
-        t={t}
-        locale={locale}
-        workspaceID={workspaceID}
-        isConnected={isConnected}
-        statusData={statusData}
-        onExitToRail={() => activityRailRef.current?.focus()}
-      /> : <LibrarySurface
-        t={t}
-        locale={locale}
-        workspaceID={workspaceID}
-        viewMode={view.viewMode}
-        library={library}
-        selection={selection}
-        sources={sources}
-        view={view}
-        command={command}
-        selectedRef={selected?.subject_ref ?? ""}
-        showFirstSource={showFirstSource}
-        recalledView={exportFlow.recalledView}
-        lastExecutedQuery={lastExecutedQuery}
-        sortAvailable={view.sortAvailable}
-        canOpenExport={exportFlow.canOpenExport}
-        isConnected={isConnected}
-        isUnavailable={isUnavailable}
-        coreStorageReady={coreStorageReady}
-        coreStorageMessage={coreStorageMessage}
-        notice={notice}
+        query={query}
         busy={busy}
-        refresh={() => void refresh()}
-        onOpenAdd={addSource}
-        onViewSource={viewSource}
-        onRecheckSource={recheckSource}
-        onRowClick={handleResultClick}
-        onLibraryKeyDown={selection.handleLibraryKeyDown}
-        onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
-        onClearNotice={() => setNotice(undefined)}
-        onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
-        onOpenHit={(hit) => void details.loadDetails(hit)}
-        libraryListRef={libraryListRef}
+        status={status}
+        statusData={statusData}
+        capabilities={capabilities}
+        isConnected={isConnected}
+        coreStorageReady={coreStorageReady}
+        catalogHealthy={catalogHealthy}
+        snapshotRef={snapshotRef}
+        search={topBarSearch}
+        compact={compactLayout}
+        onOpenRail={openRail}
+        railTriggerRef={railTriggerRef}
+        onRefresh={() => void refresh()}
+        onOpenRestore={(trigger) => restore.openRestore(trigger)}
+        onOpenAdd={(_, trigger) => addSource(trigger)}
+        onOpenSettings={(trigger) => openSettings(trigger)}
+        onOpenVerification={(trigger) => { rememberDrawerTrigger(trigger); setVerificationOpen(true); }}
+        onOpenActivity={openActivity}
+        canLeaveSettings={settings.canLeaveSettings}
       />}
-      {selected && <DetailsPanel
+      navigation={rail}
+      content={<>
+        {view.viewMode === "duplicates" ? <DuplicatesSurface t={t} /> : view.viewMode === "tags" ? <TagsSurface t={t} /> : view.viewMode === "notes" ? <NotesSurface
+          t={t}
+          locale={locale}
+          workspaceID={workspaceID}
+          onOpenSubject={(hit) => void details.loadDetails(hit)}
+        /> : view.viewMode === "activity" ? <ActivitySurface
+          t={t}
+          locale={locale}
+          workspaceID={workspaceID}
+          isConnected={isConnected}
+          statusData={statusData}
+          onExitToRail={() => activityRailRef.current?.focus()}
+        /> : <LibrarySurface
+          t={t}
+          locale={locale}
+          workspaceID={workspaceID}
+          viewMode={view.viewMode}
+          enabledViews={libraryViews.enabledViewIds}
+          onLibraryView={openLibrarySurface}
+          library={library}
+          selection={selection}
+          sources={sources}
+          view={view}
+          command={command}
+          selectedRef={selected?.subject_ref ?? ""}
+          showFirstSource={showFirstSource}
+          recalledView={exportFlow.recalledView}
+          lastExecutedQuery={lastExecutedQuery}
+          sortAvailable={view.sortAvailable}
+          canOpenExport={exportFlow.canOpenExport}
+          isConnected={isConnected}
+          isUnavailable={isUnavailable}
+          coreStorageReady={coreStorageReady}
+          coreStorageMessage={coreStorageMessage}
+          notice={notice}
+          busy={busy}
+          scopeRestoring={scopeRestoring}
+          scopeRestoreFailed={hashRestoreFailed}
+          originalTakeoutBusy={originalTakeoutBusy}
+          onDownloadOriginals={(subjects) => { void originalTakeout.start(resolveArchiveSelectionSizes(subjects, library.libraryItems)); }}
+          refresh={() => void refresh()}
+          onOpenAdd={addSource}
+          onViewSource={viewSource}
+          onRecheckSource={recheckSource}
+          onRowClick={handleResultClick}
+          onLibraryKeyDown={selection.handleLibraryKeyDown}
+          onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
+          onClearNotice={() => setNotice(undefined)}
+          onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
+          onOpenHit={(hit) => void details.loadDetails(hit)}
+          onFocusSearch={() => search.searchInputRef.current?.focus()}
+          libraryListRef={libraryListRef}
+          onPlayTrack={(track) => void audioPlayback.play(track)}
+          onQueueTrack={audioPlayback.addToQueue}
+          onPlayTracks={(tracks) => { void audioPlayback.playQueue(tracks); }}
+          musicMetadata={musicMetadata}
+          favoriteControls={favoriteControls}
+          musicQueueControls={{ count: audioPlayback.queue.length, addTracks: (tracks) => { audioPlayback.addTracksToQueue(tracks); }, show: audioPlayback.showQueue }}
+          focusedSubjectRef={focusedSubjectRef}
+          onFocusSubject={setFocusedSubjectRef}
+          retrievalFlow={exportFlow}
+        />}
+      </>}
+      details={selected && <DetailsPanel
         workspaceId={workspaceID}
         hit={selected}
         annotations={details.annotations}
@@ -603,12 +781,22 @@ function App() {
         onSaveEdit={(note) => void details.saveNote(note.annotation_id, drafts.editingBody, note.revision, note.subject_ref)}
         onCancelEdit={() => { drafts.setEditingNoteID(""); drafts.setEditingBody(""); drafts.setEditingOriginalBody(""); }}
       />}
-    </main>
+      compact={compactLayout}
+      detailActive={Boolean(selected)}
+      empty={showFirstSource}
+      t={t}
+      onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
+      onDrop={handleLibraryFileDrop}
+    />
+    <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => { const hit = library.libraryItems.find((item) => item.entry_id === track.entryID); if (hit) void details.loadDetails(hit); }} />
+    <OriginalTakeoutStatus takeout={originalTakeout} t={t} />
     {compactLayout && railOpen && railPanel}
     {settingsOpen && <SettingsDialog
       t={t}
       locale={locale}
       settings={settings}
+      appearance={appearance}
+      libraryViews={libraryViews}
       workspaceID={workspaceID}
       statusData={statusData}
       notice={notice}
@@ -634,9 +822,11 @@ function App() {
       coreStorageMessage={coreStorageMessage}
       notice={notice}
       repositoryPath={repositoryPath}
+      pendingFiles={pendingUploadFiles}
+      onPendingFilesConsumed={() => setPendingUploadFiles([])}
       onStaged={() => void refresh()}
       onClose={sources.closeAdd}
-      onDone={() => { sources.closeAdd(); reloadLibrary(); }}
+      onDone={() => { sources.closeAdd(); openLibrarySurface("content"); reloadLibrary(); }}
     />}
     {restoreOpen && <RestoreDrawer
       t={t}
@@ -667,6 +857,7 @@ function App() {
   </div>;
 }
 
+bootstrapAppearance();
 const rootElement = document.getElementById("root")! as HTMLElement & { restoreWeaveRoot?: ReturnType<typeof createRoot> };
 const root = rootElement.restoreWeaveRoot ?? createRoot(rootElement);
 rootElement.restoreWeaveRoot = root;

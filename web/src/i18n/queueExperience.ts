@@ -1,0 +1,32 @@
+export const queueExperience: Record<string, string> = {
+  "Shuffle upcoming": "随机播放后续曲目",
+  "Repeat: {{mode}}": "循环：{{mode}}",
+  "Repeat mode: {{mode}}": "循环模式：{{mode}}",
+  "off": "关闭",
+  "all": "全部",
+  "one": "单曲",
+  "Move up": "上移",
+  "Move down": "下移",
+  "Open listening queue": "打开聆听队列",
+  "Close listening queue": "关闭聆听队列",
+  "{{count}} items · temporary queue": "{{count}} 项 · 临时队列",
+  "This listening queue is cleared on refresh.": "刷新页面后会清空此聆听队列。",
+  "{{count}} displayed items were unavailable or unsupported and were not added.": "有 {{count}} 个当前显示项目不可用或格式不受支持，因此未加入队列。",
+  "Play queue": "播放队列",
+  "Queue item {{position}}: {{name}}": "队列第 {{position}} 项：{{name}}",
+  "Move queue item {{position}} up: {{name}}": "将队列第 {{position}} 项上移：{{name}}",
+  "Move queue item {{position}} down: {{name}}": "将队列第 {{position}} 项下移：{{name}}",
+  "Remove queue item {{position}}: {{name}}": "移除队列第 {{position}} 项：{{name}}",
+  "Now playing": "正在播放",
+  "Add tracks from Music to start listening.": "前往音乐页面添加曲目以开始聆听。",
+  "No supported tracks were available; the current queue and playback were left unchanged.": "当前集合中没有可播放曲目；原队列和当前播放均保持不变。",
+  "No tracks from this set could be queued; the current queue and playback were left unchanged.": "当前集合中没有曲目可以加入队列；原队列和当前播放均保持不变。",
+  "Some loaded tracks were omitted because they could not be played here.": "部分已加载曲目因无法在此播放而被跳过。",
+  "The queue limit is 1,000 entries; existing queue and playback were left unchanged.": "队列最多包含 1,000 项；原队列和当前播放均保持不变。",
+  "Stop playback before removing the current track.": "请先停止播放，再移除当前曲目。",
+  // Playback-eligibility failures. AudioPlayer.tsx maps these typed codes to the
+  // English sentences before t(); keep them byte-identical to
+  // PLAYBACK_ERROR_TEXTS in AudioPlayer.tsx.
+  "This track belongs to a different workspace.": "曲目不属于当前工作区。",
+  "The identity, format, or size of this track does not meet the playback conditions.": "曲目身份、格式或大小不符合播放条件。",
+};

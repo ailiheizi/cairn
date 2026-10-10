@@ -118,3 +118,21 @@
   .status-panel-summary .status-panel-summary-text { white-space: normal; flex: 1 1 auto; }
   .status-panel-summary .status-panel-asof { flex: 1 1 100%; }
 }
+
+/* The four-state word remains the status cue at every width, not a dot or
+   color alone. A compact outlined chip gives UNKNOWN and other states enough
+   contrast without promoting the disclosure over the workspace. */
+.status-panel-summary { min-height: 30px; }
+.status-panel-summary .health-state {
+  min-height: 21px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.status-panel-summary .status-panel-summary-text { font-size: 12px; font-weight: 700; }
+.status-panel-summary .status-panel-chevron { margin-left: auto; }

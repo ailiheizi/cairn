@@ -14,72 +14,75 @@ The settings dialog, its category index, and the configuration controls. */
 .settings-header h2 { margin: 0; font-size: 24px; }
 .settings-header-actions { display: flex; align-items: center; gap: 8px; }
 .language-switch { min-height: 34px; display: grid; grid-template-columns: repeat(2, minmax(34px, 1fr)); overflow: hidden; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.035); }
-.language-switch button { min-width: 36px; border: 0; border-right: 1px solid var(--line); padding: 7px 9px; color: #8f99a2; background: transparent; font-size: 11px; font-weight: 760; }
+.language-switch button { min-width: 36px; border: 0; border-right: 1px solid var(--line); padding: 7px 9px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 760; }
 .language-switch button:last-child { border-right: 0; }
-.language-switch button:hover { color: #dce2e7; background: var(--surface-container-high); }
+.language-switch button:hover { color: var(--ink); background: var(--surface-container-high); }
 .language-switch button[aria-pressed="true"] { color: var(--on-primary-container); background: var(--primary-container); box-shadow: inset 0 -2px var(--primary); }
-.config-state { min-height: 32px; display: inline-flex; align-items: center; padding: 6px 11px; border: 1px solid var(--line); border-radius: 8px; color: #aab2ba; background: var(--surface-container-highest); box-shadow: inset 0 1px rgba(255, 255, 255, 0.045); font-size: 11px; font-weight: 720; }
-.config-state.saved { color: #a9ebd0; border-color: rgba(85, 214, 164, 0.28); background: #10251e; }
-.config-state.dirty { color: #c4e7f2; border-color: rgba(121, 185, 209, 0.28); background: #172d35; }
-.config-state.restart { color: #f1d9a9; border-color: rgba(221, 169, 82, 0.3); background: #342a18; }
+.config-state { min-height: 32px; display: inline-flex; align-items: center; padding: 6px 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--surface-container-highest); box-shadow: inset 0 1px rgba(255, 255, 255, 0.045); font-size: 11px; font-weight: 720; }
+.config-state.saved { color: var(--health); border-color: color-mix(in srgb, var(--health) 32%, transparent); background: var(--health-soft); }
+.config-state.dirty { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 32%, transparent); background: var(--accent-soft); }
+.config-state.restart { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 34%, transparent); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
 .settings-content { min-width: 0; overflow-y: auto; padding: 34px clamp(24px, 4vw, 48px) 52px; background: var(--surface-dim); }
-.settings-loading { min-height: 320px; display: grid; place-items: center; align-content: center; gap: 12px; color: #9ba5ae; font-size: 13px; }
+.settings-loading { min-height: 320px; display: grid; place-items: center; align-content: center; gap: 12px; color: var(--muted); font-size: 13px; }
 .config-section { max-width: 700px; }
 .config-heading { position: relative; margin-bottom: 24px; padding-left: 17px; }
 .config-heading::before { position: absolute; inset: 1px auto 1px 0; width: 4px; border-radius: 3px; content: ""; background: var(--primary); box-shadow: 0 0 18px rgba(167, 139, 250, 0.4); }
-.config-heading h3 { margin: 0; color: #f0f3f5; font-size: 24px; }
-.config-heading > p:last-child { max-width: 640px; margin: 9px 0 0; color: #9da7b0; font-size: 13px; line-height: 1.58; }
-.config-group { margin-top: 28px; }
+.config-heading h3 { margin: 0; color: var(--ink); font-size: 24px; }
+.config-heading > p:last-child { max-width: 640px; margin: 9px 0 0; color: var(--muted); font-size: 13px; line-height: 1.58; }
+/* Group rhythm: the gap between settings groups stays at or below 24px at
+   every width. 20px is the narrow-width value; the 641px+ refinement below
+   tightens it to 16px. Only presentation is affected. */
+.config-group { margin-top: 20px; }
 .config-heading + .config-group { margin-top: 0; }
 .config-group-heading { display: grid; gap: 6px; margin-bottom: 12px; }
-.config-group-heading h4 { margin: 0; color: #e3e8ec; font-size: 14px; font-weight: 760; }
-.config-group-heading p { max-width: 620px; margin: 0; color: #87929c; font-size: 12px; line-height: 1.5; }
+.config-group-heading h4 { margin: 0; color: var(--ink); font-size: 14px; font-weight: 760; }
+.config-group-heading p { max-width: 620px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .config-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.config-option { min-width: 0; min-height: 150px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; gap: 10px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 17px; color: #b9c1c8; background: var(--surface-container); text-align: left; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), inset 0 1px rgba(255, 255, 255, 0.035); }
-.config-option:hover { border-color: rgba(255, 255, 255, 0.22); background: var(--surface-container-high); }
-.config-option.selected { border-color: rgba(167, 139, 250, 0.6); background: linear-gradient(180deg, rgba(167, 139, 250, 0.14), rgba(167, 139, 250, 0.045)); box-shadow: 0 13px 30px rgba(0, 0, 0, 0.32), 0 0 22px rgba(139, 92, 246, 0.08), inset 0 2px var(--primary); }
-.option-check { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid #4a4d5e; border-radius: 50%; color: #110d1f; background: #171722; }
+.config-option { min-width: 0; min-height: 150px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; gap: 10px; border: 1px solid var(--hairline-strong); border-radius: 8px; padding: 17px; color: var(--ink); background: var(--surface-container); text-align: left; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18), inset 0 1px rgba(255, 255, 255, 0.035); }
+.config-option:hover { border-color: var(--line-strong); background: var(--surface-container-high); }
+.config-option.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 13px 30px rgba(0, 0, 0, 0.18), inset 0 2px var(--primary); }
+.option-check { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--primary-ink); background: var(--surface-container-high); }
 .config-option.selected .option-check { border-color: var(--primary); background: var(--primary); }
 .option-title { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.option-title strong { color: #e4e9ed; font-size: 14px; }
-.option-title em { border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 5px; color: #98a2aa; font-size: 9px; font-style: normal; text-transform: uppercase; }
-.config-option > small { grid-column: 1 / -1; min-height: 40px; color: #919ba4; font-size: 11px; line-height: 1.5; }
-.form-grid { display: grid; gap: 18px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.105); border-radius: 8px; background: var(--surface-container); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.035); }
+.option-title strong { color: var(--ink); font-size: 14px; }
+.option-title em { border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 5px; color: var(--muted); font-size: 9px; font-style: normal; text-transform: uppercase; }
+.config-option > small { grid-column: 1 / -1; min-height: 40px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.form-grid { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface-container); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), inset 0 1px rgba(255, 255, 255, 0.035); }
 .form-grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
-.config-field { min-width: 0; display: grid; gap: 8px; color: #c9d0d6; font-size: 12px; font-weight: 680; }
+.config-field { min-width: 0; display: grid; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 680; }
 .config-field input, .config-field select {
-  width: 100%; min-width: 0; min-height: 46px; border: 1px solid rgba(255, 255, 255, 0.13); border-bottom-color: rgba(255, 255, 255, 0.29); border-radius: 7px; outline: 0; padding: 11px 12px;
-  color: #edf0f2; background: var(--surface-container-high); box-shadow: inset 0 1px rgba(255, 255, 255, 0.035); font: inherit; font-weight: 520;
+  width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-bottom-color: var(--accent); border-radius: 7px; outline: 0; padding: 11px 12px;
+  color: var(--ink); background: var(--surface-container-high); box-shadow: inset 0 1px rgba(255, 255, 255, 0.035); font: inherit; font-weight: 520;
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 .config-field input:hover, .config-field select:hover { background: var(--surface-container-highest); }
 .config-field input:focus, .config-field select:focus { border-color: rgba(167, 139, 250, 0.78); background: var(--surface-container-highest); box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.12), inset 0 -2px var(--primary); }
 .config-field input:disabled, .config-field select:disabled { opacity: 0.48; cursor: not-allowed; }
-.config-field.readonly strong { min-height: 46px; display: flex; align-items: center; overflow-wrap: anywhere; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 7px; padding: 11px 12px; color: #b3bcc4; background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); font-size: 12px; font-weight: 560; }
+.config-field.readonly strong { min-height: 46px; display: flex; align-items: center; overflow-wrap: anywhere; border: 1px solid var(--hairline); border-radius: 7px; padding: 11px 12px; color: var(--ink); background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); font-size: 12px; font-weight: 560; }
 .config-field.wide { grid-column: 1 / -1; }
-.toggle-field { min-height: 70px; display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: center; gap: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); padding: 11px 1px; cursor: pointer; }
+.toggle-field { min-height: 70px; display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: center; gap: 14px; border-bottom: 1px solid var(--hairline); padding: 11px 1px; cursor: pointer; }
 .toggle-field.disabled { opacity: 0.48; cursor: not-allowed; }
 .toggle-copy { min-width: 0; display: grid; gap: 4px; }
-.toggle-copy strong { color: #d7dde2; font-size: 12px; }
-.toggle-copy small { color: #828d97; font-size: 11px; line-height: 1.45; }
+.toggle-copy strong { color: var(--ink); font-size: 12px; }
+.toggle-copy small { color: var(--muted); font-size: 11px; line-height: 1.45; }
 .toggle-field input { position: absolute; opacity: 0; pointer-events: none; }
-.toggle-field > i { position: relative; width: 46px; height: 26px; border: 1px solid #4b555e; border-radius: 13px; background: var(--surface-container-highest); transition: background 150ms ease, border-color 150ms ease; }
-.toggle-field > i::after { position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%; content: ""; background: #96a0a9; transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+.toggle-field > i { position: relative; width: 46px; height: 26px; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--surface-container-highest); transition: background 150ms ease, border-color 150ms ease; }
+.toggle-field > i::after { position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%; content: ""; background: var(--muted); transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease; }
 .toggle-field input:checked + i { border-color: var(--primary); background: var(--primary-container); }
 .toggle-field input:checked + i::after { transform: translateX(20px); background: var(--primary); box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.14); }
 .toggle-field input:focus-visible + i { outline: 3px solid rgba(167, 139, 250, 0.58); outline-offset: 3px; }
-.config-advanced { margin-top: 28px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); }
-.config-advanced summary { min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 12px 16px; color: #cbd2d8; font-size: 13px; font-weight: 720; list-style: none; cursor: pointer; }
+.config-advanced { margin-top: 24px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); }
+.config-advanced summary { min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 12px 16px; color: var(--ink); font-size: 13px; font-weight: 720; list-style: none; cursor: pointer; }
 .config-advanced summary::-webkit-details-marker { display: none; }
-.config-advanced summary svg { margin-left: auto; color: #707b85; transition: transform 150ms ease; }
+.config-advanced summary svg { margin-left: auto; color: var(--muted); transition: transform 150ms ease; }
 .config-advanced[open] summary { border-bottom: 1px solid var(--line); }
 .config-advanced[open] summary svg { transform: rotate(90deg); }
-.config-advanced > p { margin: 14px 16px 0; color: #87929c; font-size: 12px; line-height: 1.5; }
+.config-advanced > p { margin: 14px 16px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .config-advanced .form-grid { margin: 14px; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .segmented { width: max-content; max-width: 100%; display: grid; grid-template-columns: repeat(3, minmax(96px, 1fr)); margin: 0 0 24px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px; overflow: hidden; background: var(--surface-container-low); box-shadow: inset 0 1px rgba(255, 255, 255, 0.03); }
-.segmented button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-right: 1px solid rgba(255, 255, 255, 0.11); padding: 8px 15px; color: #a0a9b1; background: transparent; font-size: 12px; text-transform: capitalize; }
+.segmented button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-right: 1px solid var(--hairline-strong); padding: 8px 15px; color: var(--muted); background: transparent; font-size: 12px; text-transform: capitalize; }
 .segmented button:last-child { border-right: 0; }
-.segmented button:hover { color: #e1e6ea; background: var(--surface-container-high); }
+.segmented button:hover { color: var(--ink); background: var(--surface-container-high); }
 .segmented button.active { color: var(--on-primary-container); background: var(--primary-container); box-shadow: inset 0 -2px var(--primary); font-weight: 760; }
 .model-card { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 15px; background: var(--surface-container); box-shadow: inset 0 1px rgba(255, 255, 255, 0.035); }
 .model-card.ready { border-color: rgba(85, 214, 164, 0.36); }
@@ -87,12 +90,12 @@ The settings dialog, its category index, and the configuration controls. */
 .model-card.offline { border-color: rgba(221, 169, 82, 0.28); }
 .model-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 7px; color: var(--primary); background: var(--primary-container); }
 .model-card strong, .model-card small { display: block; overflow-wrap: anywhere; }
-.model-card strong { color: #e7ebee; font-size: 13px; }
-.model-card small { margin-top: 4px; color: #8c969f; font-size: 10px; }
-.model-state { border-radius: 5px; padding: 5px 7px; color: #99e6c5; background: var(--health-soft); font-size: 9px; font-weight: 780; text-transform: uppercase; }
-.model-card.installed .model-state { color: #b9dce8; background: rgba(121, 185, 209, 0.12); }
-.model-card.offline .model-state { color: #e1c48b; background: rgba(221, 169, 82, 0.1); }
-.model-meta { grid-column: 2 / -1; min-width: 0; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; color: #73808a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
+.model-card strong { color: var(--ink); font-size: 13px; }
+.model-card small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.model-state { border-radius: 5px; padding: 5px 7px; color: var(--health); background: var(--health-soft); font-size: 9px; font-weight: 780; text-transform: uppercase; }
+.model-card.installed .model-state { color: var(--blue); background: var(--accent-soft); }
+.model-card.offline .model-state { color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
+.model-meta { grid-column: 2 / -1; min-width: 0; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
 /* The label keeps its own line; only the value may ellipsize, so a long daemon
    note can never squeeze the label into one character per row. */
 .model-meta span:first-child { flex: none; white-space: nowrap; }
@@ -104,10 +107,10 @@ The settings dialog, its category index, and the configuration controls. */
 .model-action label input { width: 100%; min-height: 32px; border-radius: 12px; font-size: 11px; }
 .model-action button { min-height: 32px; font-size: 10px; }
 .model-action button svg { width: 14px; height: 14px; }
-.model-action small { color: #a0a8b0; font-size: 10px; line-height: 1.4; }
+.model-action small { color: var(--muted); font-size: 10px; line-height: 1.4; }
 .model-action-message { grid-column: 1 / -1; border-radius: 5px; padding: 7px 8px; font-size: 10px; line-height: 1.45; }
-.model-action-message.success { color: #a7dec6; background: rgba(85, 214, 164, 0.08); }
-.model-action-message.error { color: #e2b9a8; background: rgba(244, 119, 107, 0.08); }
+.model-action-message.success { color: var(--health); background: var(--health-soft); }
+.model-action-message.error { color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, var(--surface)); }
 .provider-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 18px; margin-bottom: 22px; padding: 0 17px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: var(--surface-container); box-shadow: inset 0 1px rgba(255, 255, 255, 0.03); }
 /* One installed online provider profile or one durable egress grant. The
    head keeps the identity on one line and the declared scope below it, so a
@@ -119,22 +122,22 @@ The settings dialog, its category index, and the configuration controls. */
 .egress-row-head small { min-width: 0; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 .egress-row > small { color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
 .egress-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.egress-row-actions small { color: #a0a8b0; font-size: 10px; line-height: 1.4; }
+.egress-row-actions small { color: var(--muted); font-size: 10px; line-height: 1.4; }
 
 .provider-status span, .provider-status strong { min-height: 48px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
-.provider-status span { color: #b8c0c7; }
+.provider-status span { color: var(--ink); }
 .provider-status span svg { color: var(--primary); }
-.provider-status strong { justify-content: flex-end; color: #87919a; font-size: 10px; text-transform: uppercase; }
-.provider-status strong.ready { color: #99e6c5; }
-.provider-status strong.offline { color: #d8bd87; }
-.running-label { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; color: #87929b; font-size: 10px; font-weight: 780; text-transform: uppercase; }
+.provider-status strong { justify-content: flex-end; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.provider-status strong.ready { color: var(--health); }
+.provider-status strong.offline { color: var(--gold); }
+.running-label { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; color: var(--muted); font-size: 10px; font-weight: 780; text-transform: uppercase; }
 .running-label span { width: 7px; height: 7px; border-radius: 50%; background: var(--health); box-shadow: 0 0 0 3px rgba(85, 214, 164, 0.1); }
-.running-label.draft { margin-bottom: 12px; color: #a8cbd8; }
+.running-label.draft { margin-bottom: 12px; color: var(--blue); }
 .running-label.draft span { background: var(--blue); box-shadow: 0 0 0 3px rgba(121, 185, 209, 0.08); }
-.config-notice { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; border: 1px solid rgba(121, 185, 209, 0.16); border-left: 4px solid var(--blue); border-radius: 7px; padding: 13px 15px; color: #b8c8cf; background: #142229; box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); font-size: 12px; line-height: 1.55; }
-.config-notice.warning { border-color: rgba(221, 169, 82, 0.17); border-left-color: var(--gold); color: #ddcca9; background: #2a2418; }
+.config-notice { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; border: 1px solid color-mix(in srgb, var(--blue) 22%, transparent); border-left: 4px solid var(--blue); border-radius: 7px; padding: 13px 15px; color: var(--ink); background: var(--accent-soft); box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); font-size: 12px; line-height: 1.55; }
+.config-notice.warning { border-color: color-mix(in srgb, var(--gold) 24%, transparent); border-left-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
 .settings-footer { position: relative; z-index: 2; min-height: 76px; display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding: 14px 24px; border-top: 1px solid rgba(255, 255, 255, 0.13); background: var(--surface-container-high); box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.04); }
-.settings-footer > span { margin-right: auto; color: #8d97a0; font-size: 12px; }
+.settings-footer > span { margin-right: auto; color: var(--muted); font-size: 12px; }
 @media (max-width: 640px) {
   .settings-backdrop { padding: 8px; }
   .settings-page { max-height: calc(100vh - 16px); border-radius: 10px; }
@@ -216,16 +219,26 @@ The settings dialog, its category index, and the configuration controls. */
 .config-section { width: min(100%, 820px); max-width: 820px; margin-inline: auto; }
 .config-section + .config-section { margin-top: 36px; padding-top: 32px; border-top: 1px solid var(--hairline); }
 
-/* Two-pane settings: the category list is an index over the same five
-   sections, and only the active section is rendered in the right pane. */
-.settings-body { min-height: 0; display: grid; grid-template-columns: clamp(168px, 16vw, 216px) minmax(0, 1fr); }
-.settings-categories { min-width: 0; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--hairline); padding: 16px 10px; background: var(--card-fill-quiet); }
+/* Two-pane settings: the category list is an index over the five configuration
+   sections, and only the active section is rendered in the right pane.
+   The category pane sits beside the content pane whenever the dialog has the
+   width for both; at the 640px boundary it becomes a horizontal strip above
+   the content instead, so no category is squeezed out. The explicit
+   minmax(0, 1fr) row is the same bound that arrangement already uses: it keeps
+   both panes inside the dialog, so each one is a real scroll container that
+   keyboard focus can scroll, instead of an overgrown box the page clips. */
+.settings-body { min-height: 0; display: grid; grid-template-columns: clamp(168px, 16vw, 216px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.settings-categories { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; border-right: 1px solid var(--hairline); padding: 16px 10px; background: var(--card-fill-quiet); }
 .settings-categories ul { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
 .settings-category { width: 100%; min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 12px; padding: 9px 10px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
 .settings-category svg { color: var(--quiet); }
 .settings-category:hover { color: var(--ink); background: var(--surface-soft); }
 .settings-category.active { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
 .settings-category.active svg { color: var(--accent); }
+/* The index scrolls, so the ring is drawn inside the item: a keyboard-focused
+   category always shows where focus is, and the ring can never be clipped by
+   the pane edge. */
+.settings-category:focus-visible { outline: 3px solid var(--accent); outline-offset: -2px; }
 .settings-category-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-category-dirty { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px rgb(208 161 82 / 18%); }
 .settings-change-link { border: 0; padding: 0; color: var(--accent); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
@@ -283,7 +296,9 @@ The settings dialog, its category index, and the configuration controls. */
 .settings-change-summary { display: grid; gap: 4px; border: 1px solid rgba(141, 184, 232, 0.38); border-left: 3px solid var(--accent); border-radius: 14px; padding: 10px 12px; color: var(--muted); background: var(--accent-soft); font-size: 11px; line-height: 1.45; }
 .settings-change-summary strong { color: var(--ink); font-size: 12px; }
 .settings-change-summary span { overflow-wrap: anywhere; }
-.identity-disclosure { margin-top: 28px; }
+/* Same 24px ceiling as .config-advanced above; this disclosure is the last
+   group of the Service category, so it must not open a 28px gap below 641px. */
+.identity-disclosure { margin-top: 24px; }
 .identity-disclosure > summary { display: flex; align-items: center; gap: 7px; color: var(--ink); }
 .identity-disclosure > summary svg { margin-left: auto; color: var(--muted); transition: transform 150ms ease; }
 .identity-disclosure[open] > summary { border-bottom: 1px solid var(--hairline); }
@@ -307,14 +322,11 @@ The settings dialog, its category index, and the configuration controls. */
   .settings-category-label { overflow: visible; text-overflow: clip; }
 }
 
-@media (prefers-color-scheme: light) {
+:root[data-appearance="light"] .drawer-backdrop, :root[data-appearance="light"] .settings-backdrop { background: var(--overlay); }
 
-  .drawer-backdrop, .settings-backdrop { background: rgb(34 42 48 / 38%); }
+:root[data-appearance="light"] .settings-page { background: var(--glass); box-shadow: var(--card-shadow); }
 
-  .settings-page { background: rgb(252 253 253 / 94%); box-shadow: 0 24px 72px rgb(25 48 67 / 16%); }
-
-  .config-option.selected { background: var(--surface-soft); }
-}
+:root[data-appearance="light"] .config-option.selected { background: var(--surface-soft); }
 @media (max-width: 640px) {
 
   .settings-header { height: auto; min-height: 0; align-items: flex-start; flex-wrap: wrap; row-gap: 10px; padding: 14px; }

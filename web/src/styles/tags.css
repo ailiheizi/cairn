@@ -305,12 +305,18 @@
   .tag-subject-facts > div { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (prefers-color-scheme: light) {
-  .tags-detail-pane,
-  .tag-row-button,
-  .tag-subject-row,
-  .tags-preview,
-  .tags-applied { background-image: none; }
-  .tags-blocked,
-  .tags-applied-partial { background: rgb(152 98 28 / 8%); }
+:root[data-appearance="light"] .tags-detail-pane, :root[data-appearance="light"] .tag-row-button, :root[data-appearance="light"] .tag-subject-row, :root[data-appearance="light"] .tags-preview, :root[data-appearance="light"] .tags-applied { background-image: none; }
+
+:root[data-appearance="light"] .tags-blocked, :root[data-appearance="light"] .tags-applied-partial { background: color-mix(in srgb, var(--gold) 8%, var(--surface)); }
+
+.tags-empty { margin-top: 8px; }
+.tags-layout { gap: 18px; }
+.tags-list-pane,
+.tags-detail-pane { border-radius: var(--card-radius-sm); }
+.tag-row-button { min-height: 42px; border-radius: 10px; padding: 9px 12px; }
+.tag-subject-row { border-radius: 10px; padding: 11px 12px; }
+.tags-add, .tags-rename { border-top-color: var(--line); }
+@media (max-width: 640px) {
+  .tags-layout { gap: 12px; }
+  .tag-row-button { min-height: 44px; }
 }

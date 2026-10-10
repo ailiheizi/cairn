@@ -9,9 +9,13 @@
 .rw-content-preview__status { display: flex; align-items: center; gap: 8px; padding: 20px 14px; color: var(--muted, #435466); }
 .rw-content-preview__status--error { align-items: flex-start; flex-direction: column; color: var(--coral, #ff7d72); }
 .rw-content-preview__status--error span { color: var(--muted, #5b6470); }
+.rw-content-preview__status--unavailable { align-items: flex-start; flex-direction: column; border-top: 1px solid var(--line, #d9e1e8); color: var(--muted, #5b6470); background: var(--surface, #f8fafc); }
+.rw-content-preview__status--unavailable strong { color: var(--ink, #17324d); }
+.rw-content-preview__status--unavailable-critical { border-top-color: color-mix(in srgb, var(--gold, #b7791f) 38%, var(--line, #d9e1e8)); background: color-mix(in srgb, var(--gold, #b7791f) 7%, var(--surface, #f8fafc)); }
+.rw-content-preview__status > span { overflow-wrap: anywhere; }
 .rw-content-preview__text { max-height: 420px; margin: 0; padding: 14px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface, #f8fafc); color: var(--ink, #1f2937); font: 0.8125rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .rw-content-preview__panel small { display: block; padding: 7px 14px 10px; color: var(--muted, #667085); }
-.rw-content-preview__retry { border: 1px solid var(--line-strong, #cbd5e1); border-radius: 4px; padding: 5px 9px; color: var(--ink, #17324d); background: var(--surface, #fff); cursor: pointer; }
+.rw-content-preview__retry { min-height: 44px; border: 1px solid var(--line-strong, #cbd5e1); border-radius: 4px; padding: 5px 12px; color: var(--ink, #17324d); background: var(--surface, #fff); cursor: pointer; }
 .rw-content-preview__spin { animation: rw-content-preview-spin 0.9s linear infinite; }
 @keyframes rw-content-preview-spin { to { transform: rotate(360deg); } }
 .rw-content-preview__thumb-image { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -30,7 +34,8 @@
 /* The inspector preview is the entry point to the real viewer: the picture and
    one labelled control both open the modal reader. */
 .rw-content-preview__image-wrap { display: grid; gap: 8px; padding: 10px 12px 12px; background: var(--card-fill-quiet, var(--surface, #f8fafc)); }
-.rw-content-preview__image-button { display: block; width: 100%; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
+.rw-content-preview__image-button { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 100%; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
+.rw-content-preview__image { display: block; width: auto; height: auto; max-width: 100%; max-height: 320px; object-fit: contain; }
 .rw-content-preview__image-button:focus-visible { outline: 3px solid var(--accent, #a8cce8); outline-offset: 3px; }
 .rw-content-preview__viewer-button { justify-self: start; min-height: 32px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line-strong, #cbd5e1); border-radius: 12px; padding: 6px 11px; color: var(--ink, #17324d); background: var(--card-fill-quiet, #fff); font-size: 12px; font-weight: 650; cursor: pointer; }
 .rw-content-preview__viewer-button:hover { border-color: var(--accent, #a8cce8); background: var(--accent-soft, #eef3f7); }
@@ -59,6 +64,9 @@
 .rw-image-viewer__status strong { display: block; font-size: 13px; }
 .rw-image-viewer__status span { display: block; margin-top: 4px; color: var(--muted, #a7acb9); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 @media (max-width: 640px) {
+  .rw-content-preview__trigger, .rw-content-preview__close, .rw-content-preview__viewer-button, .rw-image-viewer__control, .rw-image-viewer__close { min-height: 44px; }
+  .rw-content-preview__close, .rw-image-viewer__close { width: 44px; height: 44px; }
+  .rw-content-preview__status { padding: 16px 12px; }
   /* The chrome wraps instead of hiding controls: every zoom control stays
      reachable on a phone. */
   .rw-image-viewer__chrome { padding: 8px 10px; gap: 8px; }

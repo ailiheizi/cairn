@@ -25,3 +25,7 @@
 @import "./tags.css";
 @import "./searchops.css";
 @import "./report.css";
+
+@import "./appearance.css";
+@import "./library-views.css";
+@import "./interface-frame.css";

@@ -321,17 +321,15 @@
   .duplicates-tag { flex: 1 1 100%; }
 }
 
-@media (prefers-color-scheme: light) {
-  .duplicate-group { background: var(--surface); }
-  .duplicate-member { background: var(--surface-raised); }
-  .duplicate-member.expanded { background: var(--surface-soft); }
-  .duplicate-member-details-facts,
-  .duplicate-note-list li,
-  .duplicate-tag input,
-  .duplicate-note input { background: var(--surface-container-low); }
-  .duplicates-blocked,
-  .duplicates-partial { background: rgba(221, 169, 82, 0.1); }
-}
+:root[data-appearance="light"] .duplicate-group { background: var(--surface); }
+
+:root[data-appearance="light"] .duplicate-member { background: var(--surface-raised); }
+
+:root[data-appearance="light"] .duplicate-member.expanded { background: var(--surface-soft); }
+
+:root[data-appearance="light"] .duplicate-member-details-facts, :root[data-appearance="light"] .duplicate-note-list li, :root[data-appearance="light"] .duplicate-tag input, :root[data-appearance="light"] .duplicate-note input { background: var(--surface-container-low); }
+
+:root[data-appearance="light"] .duplicates-blocked, :root[data-appearance="light"] .duplicates-partial { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
 /* Similar candidates (not identity): review evidence beside the exact
    duplicate groups. The section has no destructive control by construction;
    members show their evidence (distance, hash, declared facts) as text. */
@@ -353,3 +351,24 @@
 .similarity-member small { color: var(--muted); overflow-wrap: anywhere; }
 .similarity-exact-flag { color: var(--gold); }
 .similarity-unscanned { overflow-wrap: anywhere; }
+
+.duplicates-empty { margin-top: 8px; }
+.duplicate-group { gap: 8px; border-radius: 12px; padding: 12px 14px; }
+.duplicate-group-toggle { min-height: 38px; border-radius: 8px; }
+.duplicate-identity { font-family: inherit; font-size: 13px; font-weight: 760; }
+.duplicate-members-count { border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 650; }
+.duplicate-logical-size { font-size: 12px; font-weight: 700; }
+.duplicate-group-technical { flex: 1 1 100%; border-top: 1px solid var(--line); padding: 5px 6px 0; }
+.duplicate-group-technical > summary { min-height: 27px; color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
+.duplicate-group-technical-body { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 5px 0 2px; color: var(--muted); font-size: 10px; }
+.duplicate-group-technical-body code { overflow-wrap: anywhere; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.duplicate-member { gap: 7px; border-radius: 10px; padding: 11px 12px; }
+.duplicate-member-open { font-size: 13px; }
+.duplicate-fact dt { font-size: 10px; }
+.duplicate-fact dd { font-size: 12px; line-height: 1.5; }
+.duplicate-member-details-facts { border-radius: 8px; }
+@media (max-width: 640px) {
+  .duplicate-group { padding: 10px; }
+  .duplicate-group-toggle { flex: 1 1 100%; }
+  .duplicate-group-technical { padding-inline: 4px; }
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { LibraryLayout, SortDirection, SortField, ViewMode } from "../lib/types";
+import type { LibraryLayout, LibraryPageMode, SortDirection, SortField, ViewMode } from "../lib/types";
 
 // Presentation preferences of the library view.
 //
@@ -10,6 +10,8 @@ import type { LibraryLayout, SortDirection, SortField, ViewMode } from "../lib/t
 export type ViewModeFlow = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  presentationMode: "content" | LibraryPageMode;
+  setPresentationMode: (mode: "content" | LibraryPageMode) => void;
   libraryLayout: LibraryLayout;
   changeLibraryLayout: (next: LibraryLayout) => void;
   sortField: SortField;
@@ -23,6 +25,7 @@ export type ViewModeFlow = {
 
 export function useViewMode(): ViewModeFlow {
   const [viewMode, setViewMode] = useState<ViewMode>("content");
+  const [presentationMode, setPresentationMode] = useState<"content" | LibraryPageMode>("content");
   // The pane container owns desktop sizing; below this width the workspace
   // falls back to a single stacked column (mobile is deferred).
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(() => (window.localStorage.getItem("restoreweave.library_layout") === "list" ? "list" : "grid"));
@@ -51,6 +54,8 @@ export function useViewMode(): ViewModeFlow {
   return {
     viewMode,
     setViewMode,
+    presentationMode,
+    setPresentationMode,
     libraryLayout,
     changeLibraryLayout,
     sortField,

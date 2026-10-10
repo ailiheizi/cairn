@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
@@ -12,6 +12,22 @@ import type { ExportActionState, ExportManifestData, ExportManifestSource, Expor
 // A frozen manifest is a durable catalog record: this flow plans, materializes
 // once, and verifies against the same frozen digest. A manifest recalled from
 // history may be verified again but is never written again.
+
+// A recalled saved view plus the scope disclosure this browser can honestly
+// make about it. The stored scope is a durable catalog fact owned by the view
+// record; `foreignScope` is only this render's comparison of that fact with the
+// workspace currently open, so it is presentation state and is never written
+// back to the catalog. It is never rendered as a raw scope/workspace id: the
+// operator is told the results came from another stored scope, not shown an
+// internal identifier.
+export type RecalledViewState = RecalledView & {
+  /** True only when a stored scope and the current workspace are both known and differ. */
+  foreignScope?: boolean;
+};
+
+// A saved view this browser failed to open, kept only long enough to explain
+// the failure. It is not a durable record and never becomes one.
+export type FailedRecall = { name: string; message: string };
 
 export type ExportFlow = {
   exportMode: ExportMode;
@@ -32,16 +48,27 @@ export type ExportFlow = {
   savedViews: SavedViewData[];
   savedViewsLoading: boolean;
   savedViewsError: string;
+  savedRetrievalSaving: boolean;
+  savedRetrievalMessage: string;
+  savedRetrievalError: boolean;
   exportHistory: ExportManifestData[];
   exportHistoryLoading: boolean;
   exportHistoryError: string;
   canOpenExport: boolean;
-  recalledView: RecalledView | undefined;
+  recalledView: RecalledViewState | undefined;
+  /**
+   * A saved view this browser failed to open while the library was displaying
+   * another recalled view. That view's outcome and hits were retracted, so the
+   * library shows this failure instead; it is cleared by any new search or
+   * recall attempt, and a failure that retracted nothing sets nothing here.
+   */
+  failedRecall: FailedRecall | undefined;
   openExport: (trigger?: EventTarget | null, explicitSelection?: SearchHit[]) => void;
   closeExport: () => void;
   changeExportMode: (mode: ExportMode) => void;
   changeExportDestination: (value: string) => void;
   saveViewForExport: () => Promise<void>;
+  saveSavedRetrievalView: (name: string, query: string, fields: string[]) => Promise<void>;
   previewExport: () => Promise<void>;
   applyExport: () => Promise<void>;
   verifyExport: () => Promise<void>;
@@ -98,7 +125,7 @@ function writeExportPreset(workspaceID: string, preset: ExportPreset) {
   } catch { /* a browser that refuses storage keeps no preset; the drawer still works */ }
 }
 
-export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode, selection, library, drafts, setBusy, notify, canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers, setExportOpen }: {
+export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode, selection, library, drafts, setBusy, notify, canLeaveSettings, canLeaveDetailDrafts, rememberDrawerTrigger, closeOtherDrawers, setExportOpen }: {
   t: Translator;
   workspaceID: string;
   isConnected: boolean;
@@ -118,6 +145,7 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   setBusy: (value: boolean) => void;
   notify: (notice: Notice | undefined) => void;
   canLeaveSettings: () => boolean;
+  canLeaveDetailDrafts: () => boolean;
   rememberDrawerTrigger: (trigger?: EventTarget | null) => void;
   closeOtherDrawers: () => void;
   setExportOpen: (value: boolean) => void;
@@ -143,11 +171,33 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   const [savedViews, setSavedViews] = useState<SavedViewData[]>([]);
   const [savedViewsLoading, setSavedViewsLoading] = useState(false);
   const [savedViewsError, setSavedViewsError] = useState("");
+  const [savedRetrievalSaving, setSavedRetrievalSaving] = useState(false);
+  const [savedRetrievalMessage, setSavedRetrievalMessage] = useState("");
+  const [savedRetrievalError, setSavedRetrievalError] = useState(false);
   const [exportHistory, setExportHistory] = useState<ExportManifestData[]>([]);
   const [exportHistoryLoading, setExportHistoryLoading] = useState(false);
   const [exportHistoryError, setExportHistoryError] = useState("");
-  const [recalledView, setRecalledView] = useState<RecalledView>();
+  const [recalledView, setRecalledView] = useState<RecalledViewState>();
+  const [failedRecall, setFailedRecall] = useState<FailedRecall>();
   const exportRequestRef = useRef(0);
+  const recallRequestRef = useRef(0);
+  const currentWorkspaceRef = useRef(workspaceID);
+  currentWorkspaceRef.current = workspaceID;
+  // Read at failure time so a retraction only clears hits the library is still
+  // showing in the search view it was displaying when the recall was asked for.
+  const currentViewModeRef = useRef(viewMode);
+  currentViewModeRef.current = viewMode;
+
+  useEffect(() => {
+    setSavedViews([]);
+    setSavedViewsLoading(false);
+    setSavedViewsError("");
+    setSavedRetrievalSaving(false);
+    setSavedRetrievalMessage("");
+    setSavedRetrievalError(false);
+    setRecalledView(undefined);
+    setFailedRecall(undefined);
+  }, [workspaceID]);
 
   const canUseSearch = viewMode === "search" && Boolean(lastExecutedQuery.trim());
   // An explicit multi-selection is a stronger statement of intent than the
@@ -240,6 +290,36 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       if (exportRequestRef.current !== request) return;
       setExportAction("FAILED");
       setExportMessage(error instanceof Error ? error.message : t("Could not save query"));
+    }
+  }
+  // Daily retrieval has its own explicit save path. It records only the
+  // already-submitted lexical query and field constraints the caller has
+  // confirmed are supported by view.evaluate; the export drawer's legacy
+  // query-only save flow above remains unchanged.
+  async function saveSavedRetrievalView(name: string, query: string, fields: string[]) {
+    const requestWorkspaceID = workspaceID;
+    const savedName = name.trim();
+    const savedQuery = query.trim();
+    if (!savedName || !savedQuery || !workspaceID || savedRetrievalSaving) return;
+    setSavedRetrievalSaving(true);
+    setSavedRetrievalMessage("");
+    setSavedRetrievalError(false);
+    try {
+      await command(operations.view.save, {
+        name: savedName,
+        query: savedQuery,
+        scope: workspaceID,
+        fields: [...new Set(fields.map((field) => field.trim()).filter(Boolean))],
+      });
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
+      setSavedRetrievalMessage(t("Saved view updated. It will be evaluated against current lexical results when opened."));
+      await loadSavedViews();
+    } catch (error) {
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
+      setSavedRetrievalMessage(error instanceof Error ? error.message : t("Could not save this view."));
+      setSavedRetrievalError(true);
+    } finally {
+      if (currentWorkspaceRef.current === requestWorkspaceID) setSavedRetrievalSaving(false);
     }
   }
   async function previewExport() {
@@ -336,14 +416,17 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   // reads them back from the daemon instead of caching them in the browser, so
   // a reload or a second browser sees the same organization.
   async function loadSavedViews() {
+    const requestWorkspaceID = workspaceID;
     setSavedViewsLoading(true); setSavedViewsError("");
     try {
       const response = await command(operations.view.list, {});
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
       setSavedViews(Array.isArray(response.data) ? (response.data as SavedViewData[]) : []);
     } catch (error) {
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
       setSavedViews([]);
       setSavedViewsError(error instanceof Error ? error.message : t("Saved views are unavailable."));
-    } finally { setSavedViewsLoading(false); }
+    } finally { if (currentWorkspaceRef.current === requestWorkspaceID) setSavedViewsLoading(false); }
   }
   async function loadExportHistory() {
     setExportHistoryLoading(true); setExportHistoryError("");
@@ -367,21 +450,45 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   async function recallSavedView(view: SavedViewData) {
     const viewID = view?.view_id?.trim() ?? "";
     if (!viewID) return;
-    setBusy(true); notify(undefined);
+    if (!canLeaveSettings() || !canLeaveDetailDrafts()) return;
+    const requestWorkspaceID = workspaceID;
+    const request = ++recallRequestRef.current;
+    // The listed name is what the operator asked to open. It is the honest
+    // label if resolution or evaluation fails before a resolved name exists.
+    const requestedName = view.name?.trim() || t("Unnamed saved view");
+    // Whether the library was actually displaying a recalled view's hits: only
+    // then does a failure have stale results to retract, and only then does the
+    // failure surface need to replace them. The test matches the library's own
+    // "recalled view is active" test: the same view, in the search view, with
+    // the query it was recalled with.
+    const retractsDisplayedResults = Boolean(recalledView && viewMode === "search" && lastExecutedQuery === recalledView.query);
+    // No older view may stay described as "live" or "opened" while this
+    // request is in flight, and a failure below must not resurrect that claim.
+    setRecalledView(undefined);
+    setFailedRecall(undefined);
+    setBusy(true); setSavedRetrievalMessage(""); setSavedRetrievalError(false); notify(undefined);
     try {
       // Re-read the durable revision before evaluating: the listed row may
       // predate a successor revision, and the library caption must describe
       // the view that was actually evaluated.
       const current = await command(operations.view.get, { view_id: viewID });
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
       const resolved = ((current.data ?? view) ?? {}) as SavedViewData;
+      // view.evaluate resolves its workspace from the stored record, not from
+      // the workspace this browser has open. Comparing the two is the only way
+      // this client can tell the operator that the hits below came from a
+      // different saved scope instead of the library they are looking at.
+      const storedScope = resolved.scope?.trim() ?? "";
+      const foreignScope = Boolean(storedScope && workspaceID && storedScope !== workspaceID);
       const evaluation = await command(operations.view.evaluate, { view_id: viewID, limit: libraryPageSize });
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
       const evaluatedHits = ((evaluation.data?.hits ?? []) as SearchHit[]);
       const viewQuery = resolved.query?.trim() ?? "";
       const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
       drafts.discardDetailDrafts();
       setQuery(viewQuery); setLastExecutedQuery(viewQuery);
       library.setHits(evaluatedHits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
-      setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" });
+      setSelected(undefined); selection.clearSelection(); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth("");
       setViewMode("search");
       const degradedReason = evaluation.status === "DEGRADED"
         ? (evaluation.reasons ?? []).map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.")
@@ -391,6 +498,8 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
         name: resolved.name || t("Unnamed saved view"),
         revision: Number(resolved.revision ?? 0),
         query: viewQuery,
+        fields: [...(resolved.fields ?? [])],
+        foreignScope,
         state: evaluation.status === "DEGRADED" ? "DEGRADED" : evaluatedHits.length === 0 ? "EMPTY" : "READY",
         message: degradedReason
           ? t("Saved view evaluation is degraded: {{reason}}", { reason: degradedReason })
@@ -402,9 +511,28 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       // its result and closes instead of covering the result list.
       closeExport();
     } catch (error) {
+      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
       setExportAction("FAILED");
-      setExportMessage(error instanceof Error ? error.message : t("Could not evaluate this saved view."));
-    } finally { setBusy(false); }
+      const message = error instanceof Error ? error.message : t("Could not evaluate this saved view.");
+      // A refused view has no membership to show. Drop the recalled projection,
+      // and when the library was actually displaying a previous view's hits,
+      // drop those too so neither the earlier view's "opened"/"live" claim nor
+      // its rows can be read as this view's outcome. A failure that retracted
+      // nothing keeps its explanation in the saved-retrieval panel only.
+      setRecalledView(undefined);
+      if (retractsDisplayedResults && currentViewModeRef.current === "search") {
+        library.setHits([]);
+        setFailedRecall({ name: requestedName, message });
+      }
+      setExportMessage(message);
+      setSavedRetrievalMessage(message);
+      setSavedRetrievalError(true);
+    } finally {
+      // Workspace changes suppress stale data writes, but must not strand the
+      // busy flag this request acquired. A request token keeps an older recall
+      // from releasing a newer recall's busy state.
+      if (recallRequestRef.current === request) setBusy(false);
+    }
   }
   function pickHistoryManifest(manifest: ExportManifestData) {
     if (!manifest?.manifest_id || !manifest?.manifest_digest) return;
@@ -417,7 +545,19 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   // A search changes what a "last submitted query" export would freeze, so the
   // drawer's frozen unit is discarded with an explicit reason instead of
   // silently describing a membership that no longer matches the query.
+  //
+  // It also ends any recalled saved view. Recall re-issues the stored query
+  // *and* its stored structured conditions; a search submitted from the input
+  // text carries only the text, so the displayed results are no longer the
+  // view's evaluation and the library caption and saved-retrieval preview must
+  // stop describing them with that view's stored conditions. This clear is
+  // deliberately independent of the export drawer's own state, because the
+  // recalled projection is shown while the drawer is closed.
   function invalidateForSearch() {
+    setRecalledView(undefined);
+    // A new search is a result the browser did produce, so the previous
+    // recall's failure explanation no longer describes what is on screen.
+    setFailedRecall(undefined);
     if (!exportOpen) return;
     exportRequestRef.current += 1;
     setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
@@ -448,16 +588,21 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     savedViews,
     savedViewsLoading,
     savedViewsError,
+    savedRetrievalSaving,
+    savedRetrievalMessage,
+    savedRetrievalError,
     exportHistory,
     exportHistoryLoading,
     exportHistoryError,
     canOpenExport,
     recalledView,
+    failedRecall,
     openExport,
     closeExport,
     changeExportMode,
     changeExportDestination,
     saveViewForExport,
+    saveSavedRetrievalView,
     previewExport,
     applyExport,
     verifyExport,

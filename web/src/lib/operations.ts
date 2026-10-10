@@ -19,6 +19,8 @@ export const endpoints = {
   // behind the same token gate as /command; staging is daemon scratch until
   // an ingest plan is reviewed and applied.
   upload: `${API_BASE}/upload`,
+  // One explicit snapshot-local exact file; bytes are streamed by the browser.
+  download: `${API_BASE}/download`,
 } as const;
 
 /**

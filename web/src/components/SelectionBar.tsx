@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Check, Download as DownloadIcon, FileText, Image as ImageIcon, LoaderCircle, Tag, X } from "lucide-react";
+import { Check, Download as DownloadIcon, FileText, Image as ImageIcon, LoaderCircle, Tag, X, Archive } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
@@ -114,18 +114,21 @@ function downloadMarkdown(filename: string, text: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, query, tagDraft, busy, t, onSelectAll, onExport, onTagDraft, onApplyTag, onClear, onImageSearch }: {
+export function SelectionBar({ count, subjects, unresolvedCount = 0, workspaceID, locale, viewMode, query, tagDraft, busy, originalTakeoutBusy = false, t, onSelectAll, onExport, onDownloadOriginals, onTagDraft, onApplyTag, onClear, onImageSearch }: {
   count: number;
   subjects: SearchHit[];
+  unresolvedCount?: number;
   workspaceID: string;
   locale: Locale;
   viewMode: ViewMode;
   query: string;
   tagDraft: string;
   busy: boolean;
+  originalTakeoutBusy?: boolean;
   t: Translator;
   onSelectAll: () => void;
   onExport: (trigger?: EventTarget | null) => void;
+  onDownloadOriginals?: (subjects: SearchHit[]) => void;
   onTagDraft: (value: string) => void;
   onApplyTag: () => void;
   onClear: () => void;
@@ -135,6 +138,7 @@ export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, q
   const [reportState, setReportState] = useState<{ state: "IDLE" | "RUNNING" | "DONE" | "FAILED"; text: string }>({ state: "IDLE", text: "" });
   const reportToken = useRef(0);
   const reportBusy = reportState.state === "RUNNING";
+  const selectionMismatch = unresolvedCount > 0;
   // The one selected admitted image, when the parent offers the action at all.
   const imageSubject = onImageSearch ? imageSearchSubject(subjects) : "";
 
@@ -364,14 +368,15 @@ export function SelectionBar({ count, subjects, workspaceID, locale, viewMode, q
   }
 
   return <section className="selection-bar" role="region" aria-label={t("Selection actions")}>
-    <span className="selection-count" role="status">{t("{{count}} selected", { count })}</span>
+    <span className="selection-count" role="status">{t("{{count}} selected", { count })}{selectionMismatch && <small>{t("{{count}} selected items are not in these results; batch actions are paused.", { count: unresolvedCount })}</small>}</span>
     <button type="button" className="secondary-button compact selection-all" onClick={onSelectAll}><Check size={14} />{t("Select all visible")}</button>
-    <button type="button" className="secondary-button compact selection-export" onClick={(event) => onExport(event.currentTarget)} disabled={busy}><DownloadIcon size={14} />{t("Export selected")}</button>
-    <button type="button" className="secondary-button compact selection-report" data-action="selection-report" aria-busy={reportBusy} title={t("Download this selection as Markdown")} aria-label={t("Download this selection as Markdown")} onClick={() => void downloadSelectionReport()} disabled={busy || reportBusy}>{reportBusy ? <LoaderCircle className="spin" size={14} /> : <FileText size={14} />}{t("Download Markdown")}</button>
-    {imageSubject && <button type="button" className="secondary-button compact selection-image-search" data-action="selection-image-search" title={t("Search the library for images that look like this one")} aria-label={t("Search the library for images that look like this one")} onClick={() => onImageSearch?.(imageSubject)} disabled={busy}><ImageIcon size={14} />{t("Search by this image")}</button>}
+    <button type="button" className="secondary-button compact selection-export" onClick={(event) => onExport(event.currentTarget)} disabled={busy || selectionMismatch}><DownloadIcon size={14} />{t("Export selected")}</button>
+    {onDownloadOriginals && <button type="button" className="secondary-button compact selection-originals" title={t("Download up to 32 files, 32 MiB each, 64 MiB total.")} onClick={() => onDownloadOriginals(subjects)} disabled={busy || selectionMismatch || originalTakeoutBusy || subjects.length === 0}><Archive size={14} />{t("Download originals (ZIP)")}</button>}
+    <button type="button" className="secondary-button compact selection-report" data-action="selection-report" aria-busy={reportBusy} title={t("Download this selection as Markdown")} aria-label={t("Download this selection as Markdown")} onClick={() => void downloadSelectionReport()} disabled={busy || selectionMismatch || reportBusy}>{reportBusy ? <LoaderCircle className="spin" size={14} /> : <FileText size={14} />}{t("Download Markdown")}</button>
+    {imageSubject && <button type="button" className="secondary-button compact selection-image-search" data-action="selection-image-search" title={t("Search the library for images that look like this one")} aria-label={t("Search the library for images that look like this one")} onClick={() => onImageSearch?.(imageSubject)} disabled={busy || selectionMismatch}><ImageIcon size={14} />{t("Search by this image")}</button>}
     <p className="selection-report-note">{t("Reads the selected subjects' tags, notes, representations, and protection outcomes from this daemon with bounded concurrency, then downloads one Markdown file in this browser. Nothing is uploaded and nothing is stored.")}</p>
     {reportState.state !== "IDLE" && <p className="selection-report-state" role="status" data-report-state={reportState.state}>{reportState.text}</p>}
-    <form className="selection-tag" onSubmit={(event) => { event.preventDefault(); onApplyTag(); }}><input list="restoreweave-tag-vocabulary" aria-label={t("Tag for selected items")} value={tagDraft} onChange={(event) => onTagDraft(event.target.value)} placeholder={t("Add or reuse a tag")} disabled={busy} /><button type="submit" className="primary-button compact" disabled={busy || !tagDraft.trim()}><Tag size={14} />{t("Add tag")}</button></form>
+    <form className="selection-tag" onSubmit={(event) => { event.preventDefault(); onApplyTag(); }}><input list="restoreweave-tag-vocabulary" aria-label={t("Tag for selected items")} value={tagDraft} onChange={(event) => onTagDraft(event.target.value)} placeholder={t("Add or reuse a tag")} disabled={busy || selectionMismatch} /><button type="submit" className="primary-button compact" disabled={busy || selectionMismatch || !tagDraft.trim()}><Tag size={14} />{t("Add tag")}</button></form>
     <button type="button" className="text-button selection-clear" onClick={onClear}><X size={13} />{t("Clear selection")}</button>
   </section>;
 }

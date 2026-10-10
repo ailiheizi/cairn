@@ -6,11 +6,11 @@ surface; everything here is shared by all of them. */
 
 * { box-sizing: border-box; }
 html { color-scheme: dark; }
-body { min-width: 0; min-height: 100vh; margin: 0; background: #07080c; }
+body { min-width: 0; min-height: 100vh; margin: 0; background: var(--surface); }
 body.drawer-open { overflow: hidden; }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
-button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid rgba(167, 139, 250, 0.62); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 .app-shell { min-height: 100vh; }
 
@@ -30,19 +30,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-html { color-scheme: dark; background: #101214; }
+html { color-scheme: dark; background: var(--surface); }
 body { position: relative; isolation: isolate; overflow-x: hidden; background: var(--surface); }
 body::before, body::after { display: none; }
 .app-shell { position: relative; z-index: 0; background: var(--surface); }
 
-@media (prefers-color-scheme: light) {
+html[data-appearance="light"] { color-scheme: light; background: var(--surface); }
 
-  html { color-scheme: light; background: #edf1f3; }
+:root[data-appearance="light"] body, :root[data-appearance="light"] .app-shell { background: var(--surface); }
 
-  body, .app-shell { background: #edf1f3; }
-
-  .workspace { background: #edf1f3; }
-}
+:root[data-appearance="light"] .workspace { background: var(--surface); }
 
 @media (prefers-reduced-transparency: reduce) {
   .topbar, .drawer, .settings-page {
@@ -66,3 +63,36 @@ body::before, body::after { display: none; }
 /* Screen-reader-only descriptions: the sort control states plainly that it
    orders what is already loaded instead of running a server query. */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Progressive disclosure for scope, evidence and safety notes. The page keeps
+   its task and current state in the foreground; the full contract stays one
+   click away instead of being repeated above every result list. */
+.surface-guidance {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+.surface-guidance[open] { width: 100%; padding-bottom: 10px; }
+.surface-guidance > summary {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.surface-guidance > summary::-webkit-details-marker { display: none; }
+.surface-guidance > summary::before { content: "›"; color: var(--accent); font-size: 16px; line-height: 1; transition: transform 150ms ease; }
+.surface-guidance[open] > summary { color: var(--ink); }
+.surface-guidance[open] > summary::before { transform: rotate(90deg); }
+.surface-guidance-body { display: grid; gap: 5px; padding: 0 12px; }
+.surface-guidance-body > p { max-width: 90ch; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.surface-guidance-body > p.surface-guidance-contract { color: var(--ink); }

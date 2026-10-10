@@ -1,6 +1,8 @@
 import { Activity, Copy, HardDrive, Home, StickyNote, Tags, X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import type { Translator } from "../i18n";
+import { libraryPageForMode } from "../lib/libraryViews";
+import type { ViewMode } from "../lib/types";
 
 // The workspace rail: the workspace views.
 //
@@ -35,12 +37,15 @@ export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sou
 }) {
   return <aside className="workspace-sidebar" aria-label={t("Workspace navigation")}>
     <div className="workspace-sidebar-group">
-      <p className="workspace-sidebar-label">{t("WORKSPACE")}</p>
-      <button type="button" className={`workspace-nav-item ${viewMode === "content" && !hasActiveFilters ? "active" : ""}`} onClick={onLibrary}><Home size={16} /><span>{t("Library")}</span><small>{libraryCount || 0}</small></button>
-      <button type="button" className={`workspace-nav-item ${viewMode === "sources" ? "active" : ""}`} onClick={onSources}><HardDrive size={16} /><span>{t("Sources")}</span><small>{sourceCount}</small></button>
-      <button type="button" ref={duplicatesRef} data-view="duplicates" className={`workspace-nav-item ${viewMode === "duplicates" ? "active" : ""}`} onClick={onDuplicates}><Copy size={16} /><span>{t("Duplicates")}</span></button>
+      <p className="workspace-sidebar-label">{t("ORGANIZE")}</p>
+      <button type="button" className={`workspace-nav-item ${["content", "search", "tag"].includes(viewMode) || libraryPageForMode(viewMode as ViewMode) ? "active" : ""}`} onClick={onLibrary}><Home size={16} /><span>{t("Library")}</span><small>{libraryCount || 0}</small></button>
       <button type="button" ref={tagsRef} data-view="tags" className={`workspace-nav-item ${viewMode === "tags" ? "active" : ""}`} onClick={onTags}><Tags size={16} /><span>{t("Tags")}</span></button>
       <button type="button" ref={notesRef} data-view="notes" className={`workspace-nav-item ${viewMode === "notes" ? "active" : ""}`} onClick={onNotes}><StickyNote size={16} /><span>{t("Notes")}</span></button>
+    </div>
+    <div className="workspace-sidebar-group workspace-sidebar-group-management">
+      <p className="workspace-sidebar-label">{t("MANAGE")}</p>
+      <button type="button" className={`workspace-nav-item ${viewMode === "sources" ? "active" : ""}`} onClick={onSources}><HardDrive size={16} /><span>{t("Sources")}</span><small>{sourceCount}</small></button>
+      <button type="button" ref={duplicatesRef} data-view="duplicates" className={`workspace-nav-item ${viewMode === "duplicates" ? "active" : ""}`} onClick={onDuplicates}><Copy size={16} /><span>{t("Duplicates")}</span></button>
       <button type="button" ref={activityRef} data-view="activity" className={`workspace-nav-item ${viewMode === "activity" ? "active" : ""}`} onClick={onActivity}><Activity size={16} /><span>{t("Activity")}</span></button>
     </div>
   </aside>;

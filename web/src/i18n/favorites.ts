@@ -1,0 +1,16 @@
+export const favorites = {
+  "Updating favorite for {{name}}": "正在更新 {{name}} 的收藏",
+  "Favorite status is unavailable": "收藏状态暂不可用",
+  "Remove {{name}} from favorites": "取消收藏 {{name}}",
+  "Add {{name}} to favorites": "收藏 {{name}}",
+  "Only favorites": "只看收藏",
+  "Loading tags and favorites…": "正在读取标签与收藏…",
+  "Tags and favorites could not be read. Retry before editing them.": "无法读取标签与收藏，请重试后再编辑。",
+  "Favorites use the visible Favorite tag shared across your library.": "收藏与内容库中的 Favorite 标签互通。",
+  "Favorite changed, but the operation was partial or degraded. The tag list was refreshed.": "收藏已更新，但操作有部分失败或索引不可用；标签列表已重新读取。",
+  "Added to favorites.": "已加入收藏。",
+  "Removed from favorites.": "已取消收藏。",
+  "Could not update favorite.": "无法更新收藏。",
+  "Reload tags and favorites": "重新读取标签与收藏",
+  "Favorite update was partial.": "收藏更新仅部分完成。",
+};

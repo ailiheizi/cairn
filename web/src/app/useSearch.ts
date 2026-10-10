@@ -10,6 +10,7 @@ import {
 } from "../lib/searchops";
 import type { ParsedSearchQuery, SearchOperatorInfo, SearchParseError, SearchPlan } from "../lib/searchops";
 import { exactIdentityKey } from "../lib/format";
+import { resolveArchiveSelectionSizes } from "../lib/originalArchive";
 import type { ExportFlow } from "./useExport";
 import type { LibraryDraftsFlow } from "./useLibraryDrafts";
 import type { LibraryFlow } from "./useLibrary";
@@ -77,7 +78,7 @@ export type SearchFlow = {
   handleSearchFieldCaret: (caret: number) => void;
   handleSearchFieldKeyDown: (event: ReactKeyboardEvent<HTMLFormElement>) => void;
   handleRecentsListKeyDown: (event: ReactKeyboardEvent<HTMLUListElement>) => void;
-  runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<void>;
+  runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<boolean>;
   /** Submits search.query with one selected image as the query material (search by image). */
   runImageSearch: (subjectRef: string) => Promise<void>;
   ops: SearchOpsFlow;
@@ -414,9 +415,9 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   }
   async function runSearch(event?: FormEvent, explicitQuery?: string) {
     event?.preventDefault();
-    if (!canLeaveSettings()) return;
+    if (!canLeaveSettings()) return false;
     const submittedQuery = (explicitQuery ?? query).trim();
-    if (!submittedQuery) return;
+    if (!submittedQuery) return false;
     // A token this surface cannot express is an error, never a silently
     // different query: no request leaves the browser while one is present.
     const submitted = parseSearchQuery(submittedQuery);
@@ -426,11 +427,11 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setActiveSuggestion(-1);
       notify(undefined);
       focusSearchField();
-      return;
+      return false;
     }
-    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return; }
-    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return; }
-    if (!drafts.canLeaveDetailDrafts()) return;
+    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return false; }
+    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return false; }
+    if (!drafts.canLeaveDetailDrafts()) return false;
     setBusy(true); notify(undefined);
     try {
       // Leave dimension selection to the typed dispatcher so ordinary search
@@ -439,7 +440,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // daemon already accepts.
       const response = await command(operations.search.query, { workspace_id: workspaceID, ...submittedPlan.request });
       const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
-      const returned = (response.data?.hits ?? []) as SearchHit[];
+      const returned = resolveArchiveSelectionSizes((response.data?.hits ?? []) as SearchHit[], library.libraryItems);
       const identityBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref ?? "", exactIdentityKey(item)]));
       const narrowed = narrowSearchHits(returned, submittedPlan, {
         tagsBySubject: library.tagsBySubject,
@@ -466,7 +467,8 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         notify({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
       }
       markConnected();
-    } catch (error) { notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") }); }
+      return true;
+    } catch (error) { notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") }); return false; }
     finally { setBusy(false); }
   }
 
@@ -488,7 +490,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // that has no material for it and reports each one's reason.
       const response = await command(operations.search.query, { workspace_id: workspaceID, image_subject_ref: imageSubjectRef });
       const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
-      const returned = (response.data?.hits ?? []) as SearchHit[];
+      const returned = resolveArchiveSelectionSizes((response.data?.hits ?? []) as SearchHit[], library.libraryItems);
       drafts.discardDetailDrafts();
       library.setHits(returned.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
       // An image query has no field text: the results heading says so instead

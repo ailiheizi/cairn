@@ -1,0 +1,59 @@
+.saved-retrieval {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line, #dedede);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+.saved-retrieval-header, .saved-retrieval-list-heading, .saved-retrieval-rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saved-retrieval-header h2 { margin: 2px 0 0; font-size: 18px; }
+.saved-retrieval-copy, .saved-retrieval-save small { margin: 0; color: var(--muted, #686868); font-size: 13px; line-height: 1.5; }
+.saved-retrieval-save { display: grid; gap: 8px; }
+.saved-retrieval-preview { display: grid; gap: 10px; border: 1px solid var(--line, #dedede); border-radius: 10px; padding: 11px 12px; background: var(--surface-muted, #f7f8fa); }
+.saved-retrieval-preview > div { display: grid; gap: 5px; min-width: 0; }
+.saved-retrieval-preview strong { font-size: 12px; }
+.saved-retrieval-preview code { min-width: 0; overflow-wrap: anywhere; color: var(--ink, #333); font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.saved-retrieval-preview small { color: var(--muted, #686868); font-size: 11px; font-weight: 400; }
+.saved-retrieval-preview ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.saved-retrieval-preview li { display: flex; justify-content: space-between; gap: 10px; min-width: 0; font-size: 12px; }
+.saved-retrieval-preview li span { color: var(--muted, #686868); }
+.saved-retrieval-explainer { color: var(--muted, #686868); font-size: 12px; }
+.saved-retrieval-explainer summary { cursor: pointer; }
+.saved-retrieval-explainer p { margin: 6px 0 0; line-height: 1.45; }
+.saved-retrieval-save label { display: grid; gap: 7px; font-size: 13px; font-weight: 600; }
+.saved-retrieval-form { display: flex; gap: 8px; }
+.saved-retrieval-form input { flex: 1; min-width: 0; }
+.saved-retrieval-block, .saved-retrieval-error { display: flex; align-items: flex-start; gap: 7px; margin: 0; color: var(--danger, #a33); font-size: 13px; }
+.saved-retrieval-message { margin: 0; color: var(--muted, #686868); font-size: 13px; }
+.saved-retrieval-message.error { color: var(--danger, #a33); }
+.saved-retrieval-outcome { margin: 0; padding: 9px 11px; border-radius: 8px; background: var(--surface-muted, #f4f4f4); font-size: 13px; line-height: 1.45; }
+.saved-retrieval-outcome.degraded { color: var(--danger, #a33); }
+.saved-retrieval-outcome.stale { color: var(--muted, #686868); }
+.saved-retrieval-scope-note { margin: 0; color: var(--muted, #686868); font-size: 12px; line-height: 1.45; }
+/* A stored condition this build cannot label stays visible as raw key=value
+   text and carries this marker, so it is disclosed instead of dropped. */
+.saved-retrieval-preview .saved-retrieval-unlabelled { flex: 0 0 auto; color: var(--muted, #686868); font-size: 11px; font-style: italic; }
+.saved-retrieval-list-heading { padding-top: 4px; }
+.saved-retrieval-list-heading span { color: var(--muted, #686868); font-size: 12px; }
+.saved-retrieval-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.saved-retrieval-rows li { padding: 10px 0; border-top: 1px solid var(--line, #dedede); }
+.saved-retrieval-view { display: grid; gap: 3px; min-width: 0; }
+.saved-retrieval-view strong, .saved-retrieval-view small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-retrieval-view small { color: var(--muted, #686868); font-size: 12px; }
+.saved-retrieval-view-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+/* The stored-scope flag: a saved view the server lists here belongs to another
+   workspace, so its results do not describe the library open now. */
+.saved-retrieval-scope-flag { flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--line, #dedede); border-radius: 999px; color: var(--muted, #686868); font-size: 11px; font-style: normal; white-space: nowrap; }
+@media (max-width: 520px) {
+  .saved-retrieval { padding: 14px; }
+  .saved-retrieval-rows li { align-items: flex-start; flex-direction: column; }
+  .saved-retrieval-view-actions { width: 100%; justify-content: space-between; }
+  .saved-retrieval-form { align-items: stretch; flex-direction: column; }
+}

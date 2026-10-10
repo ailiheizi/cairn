@@ -15,6 +15,7 @@ export const common: Record<string, string> = {
   "Retry": "重试",
   "RestoreWeave home": "RestoreWeave 首页",
   "Search protected content": "搜索受保护内容",
+  "Search names, notes, tags, or facts": "搜索名称、备注、标签或信息",
   "Search": "搜索",
   "Restore latest snapshot": "恢复最新快照",
   "Restore": "恢复",

@@ -1,0 +1,16 @@
+export const resultScope: Record<string, string> = {
+  "{{count}} selected items are outside this display. Batch actions still include them.": "有 {{count}} 个已选项目不在当前展示中；批量操作仍包含它们。",
+  "Current result scope": "当前内容范围",
+  "Clear search": "清除搜索",
+  "Among returned results: {{photos}} photos, {{music}} audio, {{other}} other items. Display changes keep this query and relevance order.": "已返回结果中：{{photos}} 张照片、{{music}} 个音频、{{other}} 个其他项目。切换展示保留查询和相关度顺序。",
+  "Within this filtered listing: {{photos}} photos, {{music}} audio, {{other}} other items.": "当前筛选范围中：{{photos}} 张照片、{{music}} 个音频、{{other}} 个其他项目。",
+  "These counts cover the returned results, which may be limited; they are not full-library matching totals.": "数量仅涵盖本次返回的结果，可能未包含全部匹配项。",
+  "No photos among these {{count}} scoped results.": "当前 {{count}} 个结果中没有照片。",
+  "No audio among these {{count}} scoped results.": "当前 {{count}} 个结果中没有音频。",
+  "Show all returned types": "查看所有类型的结果",
+  "Switch to All types before saving this retrieval; a display choice is not a saved query condition.": "请切换到“全部类型”再保存检索；展示方式不会自动成为保存的查询条件。",
+  "This presentation is disabled. Showing all types for the same results.": "此展示方式已关闭，已在同一内容范围内切换到全部类型。",
+  "This presentation is unavailable. Showing all types for the same results.": "此展示方式不可用，已在同一内容范围内切换到全部类型。",
+  "Restoring your content view…": "正在恢复内容视图…",
+  "Your view could not be restored. The original link is retained; search again or choose a view.": "无法恢复此视图。原始链接已保留；请重新搜索或选择其他视图。",
+};

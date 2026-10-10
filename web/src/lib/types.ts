@@ -21,6 +21,8 @@ export type SearchSegment = {
   producer?: string;
   accepted?: boolean;
   language?: string;
+  matched_excerpt?: string;
+  match_spans?: Array<{ start_byte: number; end_byte: number }>;
 };
 
 export type SearchHit = { subject_ref?: string; entry_id?: string; name?: string; path?: string; entry_type?: string; content_id?: string; logical_size?: number; segments?: SearchSegment[]; index_status?: { lexical?: string; semantic?: string; tags?: string } };
@@ -119,11 +121,11 @@ export type BrowseCrumb = { subject_ref: string; entry_id: string; name: string 
 export type BrowseRoot = { root_id: string; name: string; source_path?: string };
 export type SettingsSection = "storage" | "search" | "descriptions" | "recovery" | "service";
 
-// `sources` and `activity` are real workspace views like the library filters:
-// the configured sources and the durable job rows are each one surface, not a
-// second disclosure bar inside the library. `notes` is the read-oriented
-// cross-subject Notes view (the same one Notes surface, seen across subjects).
-export type ViewMode = "content" | "tag" | "path" | "search" | "sources" | "activity" | "duplicates" | "tags" | "notes";
+// `sources`, `activity`, and `notes` are host-owned workspace views. Registered
+// library pages are client projections over shared loaded subjects, not separate
+// content authorities or media services.
+export type LibraryPageMode = "photos" | "music" | `page:${string}`;
+export type ViewMode = "content" | LibraryPageMode | "tag" | "path" | "search" | "sources" | "activity" | "duplicates" | "tags" | "notes";
 export type ExportMode = "selected" | "view";
 
 // A frozen manifest reaches the drawer either from export.plan (the live
@@ -139,7 +141,7 @@ export type ExportManifestSource = "planned" | "history";
 export type SortField = "name" | "size" | "type" | "path";
 export type SortDirection = "asc" | "desc";
 export type LibraryLayout = "grid" | "list";
-export type RecalledView = { view_id: string; name: string; revision: number; query: string; state: "READY" | "DEGRADED" | "EMPTY"; message?: string };
+export type RecalledView = { view_id: string; name: string; revision: number; query: string; fields?: string[]; state: "READY" | "DEGRADED" | "EMPTY"; message?: string };
 export type SavedViewData = { view_id?: string; name?: string; query?: string; fields?: string[]; scope?: string; sort?: string; output_names?: string; when_missing?: string; required_capabilities?: string[]; revision?: number; created_at?: string; updated_at?: string };
 export type ExportActionState = "IDLE" | "SAVING_VIEW" | "PLANNING" | "APPLYING" | "VERIFYING" | "SUCCEEDED" | "FAILED";
 export type PlanActionState = "IDLE" | "INSPECTING" | "PROTECTING" | "SUCCEEDED" | "FAILED";

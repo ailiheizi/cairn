@@ -5,6 +5,7 @@ import { abbreviateIdentity, identityBars } from "../identity";
 import { ContentPreview } from "./ContentPreview";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
+import { downloadOriginal } from "../lib/contentDownload";
 import { deriveSystemTags, descriptionKindLabel, formatBytes, formatEntryType, formatNoteDate } from "../lib/format";
 import type { DetailResourceStatus, SearchHit } from "../lib/types";
 
@@ -116,12 +117,23 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     if (String(describeProbe.descriptions.generate ?? "").trim() === "disabled") describeReasons.push(t("On-demand generation is turned off in the settings (descriptions.generate)."));
     if (!String(describeProbe.descriptions.provider_profile ?? "").trim()) describeReasons.push(t("No description provider profile is selected (descriptions.provider_profile)."));
     if (!String(describeProbe.descriptions.credential_ref ?? "").trim()) describeReasons.push(t("No credential reference is configured for the description provider (descriptions.credential_ref)."));
-    if (!describeProbe.generationAdvertised) describeReasons.push(t("This daemon does not implement on-demand description generation (no DESCRIBE_SUBJECT operation)."));
+    if (!describeProbe.generationAdvertised) describeReasons.push(t("No available description generation operation is advertised (DESCRIBE_SUBJECT)."));
     if (describeProbe.generationAdvertised && !describeProbe.coveringGrant) describeReasons.push(t("No live egress grant covers description generation (egress.grant.list)."));
   }
   const describeChecking = describeProbe.state === "checking";
   const describeGrant = describeProbe.state === "ready" ? describeProbe.coveringGrant : null;
   const describeEnabled = describeProbe.state === "ready" && describeReasons.length === 0 && describeGrant !== null;
+  const describeShortReason = (() => {
+    if (describeChecking) return t("Checking description availability...");
+    if (describeProbe.state === "unreadable") return t("Could not check description availability right now.");
+    if (describeProbe.descriptions.enabled !== true) return t("Turn on descriptions in Settings.");
+    if (String(describeProbe.descriptions.generate ?? "").trim() === "disabled") return t("On-demand descriptions are turned off in Settings.");
+    if (!String(describeProbe.descriptions.provider_profile ?? "").trim()) return t("Choose a description provider in Settings.");
+    if (!String(describeProbe.descriptions.credential_ref ?? "").trim()) return t("Configure credentials for the description provider in Settings.");
+    if (!describeProbe.generationAdvertised) return t("Description generation unavailable on this service.");
+    if (!describeGrant) return t("Authorize description requests before sending content.");
+    return t("Description generation unavailable on this service.");
+  })();
   // runDescribeGeneration is the ONLY dispatch site of description.generate in
   // this surface. It fires exactly once per confirmed click, carrying the
   // egress confirmation the daemon's gate resolves against its live grant.
@@ -239,7 +251,7 @@ export function Details({ workspaceId, hit, annotations, representations, descri
   };
   return <div className="details">
     <button className="detail-back text-button" onClick={onBack}><ArrowLeft size={15} />{t("Back to results")}</button>
-    <div className="detail-title"><span className="file-icon large"><FileSearch size={23} /></span><div className="detail-title-copy"><p className="eyebrow">{t("CONTENT ITEM")}</p><h2>{hit.name || t("Untitled subject")}</h2><small>{formatEntryType(hit.entry_type, t)}</small></div><div className="detail-title-actions">{onExport && <button type="button" className="secondary-button compact detail-export" onClick={onExport}><DownloadIcon size={14} />{t("Export this file")}</button>}<span className={`assurance-seal ${verifiedExact ? "" : "warning"}`}><ShieldCheck size={16} />{t(assuranceLabel)}</span></div></div>
+    <div className="detail-title"><span className="file-icon large"><FileSearch size={23} /></span><div className="detail-title-copy"><p className="eyebrow">{t("CONTENT ITEM")}</p><h2>{hit.name || t("Untitled subject")}</h2><small>{formatEntryType(hit.entry_type, t)}</small></div><div className="detail-title-actions">{hit.entry_type === "REGULAR_FILE" && hit.entry_id && hit.content_id && <button type="button" className="secondary-button compact detail-download" onClick={() => downloadOriginal(workspaceId, hit.entry_id!, hit.name || "download.bin")}><DownloadIcon size={14} />{t("Download original")}</button>}{onExport && <button type="button" className="secondary-button compact detail-export" onClick={onExport}><DownloadIcon size={14} />{t("Export this file")}</button>}<span className={`assurance-seal ${verifiedExact ? "" : "warning"}`}><ShieldCheck size={16} />{t(assuranceLabel)}</span></div></div>
     {hit.entry_type !== "DIRECTORY" && <section className="detail-section preview-section"><div className="section-heading"><h3>{t("Preview")}</h3></div><ContentPreview key={`${workspaceId}:${hit.entry_id || hit.subject_ref || "subject"}:${hit.content_id || ""}`} command={command} locale={locale === "zh-CN" ? "zh-CN" : "en"} workspaceId={workspaceId} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={hit.name || t("Untitled subject")} logicalSize={hit.logical_size} exactAvailable={representationsStatus === "ready" ? previewAvailable : representationsStatus !== "error"} autoOpen /></section>}
     <MediaFacts facts={mediaFacts} state={mediaFactsState} track={track} work={work} t={t} />
     <dl className="facts"><div><dt>{t("Protection")}</dt><dd><span className={`inline-state ${verifiedExact ? "" : "warning"}`}>{verifiedExact ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{t(exactState)}</span></dd></div>{exact && <div><dt>{t("Logical size")}</dt><dd>{formatBytes(exact.decoded_length)}</dd></div>}</dl>
@@ -247,8 +259,8 @@ export function Details({ workspaceId, hit, annotations, representations, descri
       <div className="describe-action" data-describe-state={describeChecking ? "checking" : describeEnabled ? "ready" : "disabled"}>
         <button type="button" className="secondary-button compact describe-trigger" aria-describedby={describeReasonID} disabled={!describeEnabled || describeBusy} onClick={() => setDescribeConfirmOpen(true)}><Sparkles size={14} />{t("Generate a description")}</button>
         <div className="describe-status" id={describeReasonID} role="status">
-          {describeChecking && <p className="muted">{t("Checking whether this daemon can generate a description...")}</p>}
-          {!describeChecking && describeReasons.length > 0 && <><p className="muted">{t("Generation is unavailable:")}</p><ul className="describe-reasons">{describeReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></>}
+          {describeChecking && <p className="muted">{describeShortReason}</p>}
+          {!describeChecking && describeReasons.length > 0 && <><p className="muted">{describeShortReason}</p><details className="describe-reason-details"><summary>{t("Why is description generation unavailable?")}</summary><ul className="describe-reasons">{describeReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></details></>}
           {describeEnabled && !describeConfirmOpen && !generatedDocument && <p className="muted">{t("Generation runs only from this action, for this one subject; it never starts on selection or ingest.")}</p>}
           {describeEnabled && describeConfirmOpen && describeGrant && <div className="describe-confirm">
             <p>{t("Send one description request for this subject to the model provider?")}</p>
@@ -299,41 +311,66 @@ export function Details({ workspaceId, hit, annotations, representations, descri
 // MediaFacts renders the durable typed facts one subject declared, read from
 // the same metadata_facts rows the processor host writes. Only a fact the file
 // itself declared is shown: an absent fact is an absent row, never a zero, and
-// an estimated duration says so instead of posing as a measured one. Track and
-// work metadata come from the daemon's own audio/books projections and are
-// labelled as extractor facts with their source.
+// an estimated duration says so instead of posing as a measured one. Track
+// and work metadata come from the daemon's audio/books projections and stay
+// in their own readable groups.
 function MediaFacts({ facts, state, track, work, t }: { facts: any[]; state: "idle" | "loading" | "ready" | "error"; track: any | undefined; work: any | undefined; t: Translator }) {
-  const mediaState = String(t("Media information"));
   const rows = (labels: Record<string, string>) => {
-    const out: Array<{ key: string; label: string; value: string }> = [];
+    const out: Array<{ key: string; field: string; label: string; value: string }> = [];
     for (const fact of facts) {
-      const label = labels[`${fact.namespace}:${fact.key}`];
+      const field = `${fact.namespace}:${fact.key}`;
+      const label = labels[field];
       if (!label) continue;
       let value = fact.value_json;
-      if (fact.value_type === "string") value = String(value ?? "").replace(/^"|"$/g, "");
-      if (value === undefined || value === null || value === "") continue;
-      out.push({ key: `${fact.namespace}:${fact.key}:${fact.revision}`, label, value: String(value) });
+      if (fact.value_type === "string") value = String(value ?? "");
+      if (value === undefined || value === null) continue;
+      if (value === "") value = t("Empty value");
+      const numeric = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+      if (fact.key.endsWith(".duration_ms") && Number.isFinite(numeric)) value = formatDuration(numeric, t);
+      else if ((fact.key.endsWith(".width") || fact.key.endsWith(".height")) && Number.isFinite(numeric)) value = `${value} ${t("pixels")}`;
+      else if (fact.key.endsWith(".sample_rate") && Number.isFinite(numeric)) value = `${value} ${t("Hz")}`;
+      else if (fact.value_type === "boolean" && typeof value === "boolean") value = value ? t("Yes") : t("No");
+      out.push({ key: `${field}:${fact.revision}`, field, label, value: String(value) });
     }
     return out;
   };
-  const label = (key: string) => t(`media.fact.${key}`);
-  const imageLabels = Object.fromEntries(["image.format", "image.width", "image.height"].map((key) => [`restoreweave.domain.image:${key}`, label(key)]));
-  const videoLabels = Object.fromEntries(["video.container", "video.duration_ms", "video.width", "video.height", "video.video_codec", "video.audio_codec"].map((key) => [`restoreweave.domain.video:${key}`, label(key)]));
-  const audioLabels = Object.fromEntries(["audio.duration_ms", "audio.duration_estimated", "audio.sample_rate", "audio.channels", "audio.codec"].map((key) => [`restoreweave.domain.audio:${key}`, label(key)]));
+  const labels: Record<string, string> = {
+    "image.format": t("Image format"), "image.width": t("Width"), "image.height": t("Height"),
+    "video.container": t("Container"), "video.duration_ms": t("Duration"), "video.width": t("Width"), "video.height": t("Height"), "video.video_codec": t("Video codec"), "video.audio_codec": t("Audio codec"),
+    "audio.duration_ms": t("Duration"), "audio.duration_estimated": t("Duration estimated"), "audio.sample_rate": t("Sample rate"), "audio.channels": t("Channels"), "audio.codec": t("Audio codec"),
+  };
+  const imageLabels = Object.fromEntries(["image.format", "image.width", "image.height"].map((key) => [`restoreweave.domain.image:${key}`, labels[key]]));
+  const videoLabels = Object.fromEntries(["video.container", "video.duration_ms", "video.width", "video.height", "video.video_codec", "video.audio_codec"].map((key) => [`restoreweave.domain.video:${key}`, labels[key]]));
+  const audioLabels = Object.fromEntries(["audio.duration_ms", "audio.duration_estimated", "audio.sample_rate", "audio.channels", "audio.codec"].map((key) => [`restoreweave.domain.audio:${key}`, labels[key]]));
   const rowsAll = [...rows(imageLabels), ...rows(videoLabels), ...rows(audioLabels)];
-  const estimated = facts.some((fact) => `${fact.namespace}:${fact.key}` === "restoreweave.domain.audio:audio.duration_estimated" && fact.value_json === true);
-  const trackParts = track ? [track.title || track.name, track.artist, track.album, track.year, track.duration_ms ? t("{{ms}} ms", { ms: track.duration_ms }) : ""].filter(Boolean) : [];
-  const workParts = work ? [work.title || work.name, work.author, work.year].filter(Boolean) : [];
-  const nothing = state === "ready" && rowsAll.length === 0 && !trackParts.length && !workParts.length;
+  const estimatedDuration = facts.some((fact) => `${fact.namespace}:${fact.key}` === "restoreweave.domain.audio:audio.duration_estimated" && fact.value_json === true);
+  const trackRows = track ? [[t("Title"), track.title || track.name], [t("Artist"), track.artist], [t("Album"), track.album], [t("Track number"), track.track], [t("Year"), track.year], [t("Duration"), track.duration_ms !== undefined && track.duration_ms !== null ? formatDuration(track.duration_ms, t) : ""]].filter((row) => row[1] !== undefined && row[1] !== null && row[1] !== "") as Array<[string, unknown]> : [];
+  const workRows = work ? [[t("Title"), work.title || work.name], [t("Author"), work.author], [t("Year"), work.year], [t("Kind"), work.kind]].filter((row) => row[1] !== undefined && row[1] !== null && row[1] !== "") as Array<[string, unknown]> : [];
+  const nothing = state === "ready" && rowsAll.length === 0 && !trackRows.length && !workRows.length;
   return <div className="detail-section media-section" data-media-state={state}>
-    <div className="section-heading"><h3>{mediaState}</h3>{trackParts.length > 0 && <span>{t("Track")}</span>}{workParts.length > 0 && <span>{t("Work")}</span>}</div>
-    {state === "loading" && <p className="muted" role="status">{t("Checking service")}</p>}
-    {state === "error" && <p className="muted" role="status">{t("Media facts are unavailable in this build.")}</p>}
-    {nothing && <p className="muted">{t("No media facts are declared for this file.")}</p>}
-    {rowsAll.length > 0 && <dl className="facts media-facts">{rowsAll.map((row) => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}{row.key.endsWith("audio.duration_ms") && estimated ? ` · ${t("estimated")}` : ""}</dd></div>)}</dl>}
-    {trackParts.length > 0 && <p className="media-extract mono">{t("Track")}: {trackParts.join(" · ")}</p>}
-    {workParts.length > 0 && <p className="media-extract mono">{t("Work")}: {workParts.join(" · ")}</p>}
+    <div className="section-heading"><h3>{t("File information")}</h3></div>
+    {state === "idle" && <p className="muted" role="status">{t("File information has not been checked yet.")}</p>}
+    {state === "loading" && <p className="muted" role="status">{t("Checking file information...")}</p>}
+    {state === "error" && <p className="muted" role="status">{t("Could not load file information from this service.")}</p>}
+    {nothing && <p className="muted">{t("No file information has been declared for this item.")}</p>}
+    {rowsAll.length > 0 && <dl className="facts media-facts">{rowsAll.map((row) => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}{row.field === "restoreweave.domain.audio:audio.duration_ms" && estimatedDuration ? ` · ${t("estimated")}` : ""}</dd></div>)}</dl>}
+    {trackRows.length > 0 && <section className="media-fact-group"><h4>{t("Track details")}</h4><dl className="facts media-facts">{trackRows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}</dl></section>}
+    {workRows.length > 0 && <section className="media-fact-group"><h4>{t("Work details")}</h4><dl className="facts media-facts">{workRows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}</dl></section>}
   </div>;
+}
+
+function formatDuration(milliseconds: number | string, t: Translator): string {
+  if (typeof milliseconds === "string" && !milliseconds.trim()) return t("Empty value");
+  const value = Number(milliseconds);
+  if (!Number.isSafeInteger(value) || value < 0) return `${String(milliseconds)} ${t("ms")}`;
+  if (value < 1000) return `${Number((value / 1000).toFixed(3))} ${t("s")}`;
+  const totalSeconds = Math.floor(value / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const fractional = value % 1000;
+  const secondText = `${String(seconds).padStart(2, "0")}${fractional ? `.${String(fractional).padStart(3, "0").replace(/0+$/, "")}` : ""}`;
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${secondText}` : `${minutes}:${secondText}`;
 }
 
 export function IdentityWeave({ value, t, compact = false }: { value?: string; t: Translator; compact?: boolean }) {

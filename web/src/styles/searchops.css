@@ -257,9 +257,10 @@
   .global-search .search-suggest-entry { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (prefers-color-scheme: light) {
-  .search-ops-chip { background: var(--surface); }
-  .search-ops-chip-wire { background: var(--surface-container-low); }
-  .global-search .search-suggest { background: var(--surface); }
-  .search-ops-notice { background: rgba(221, 169, 82, 0.1); }
-}
+:root[data-appearance="light"] .search-ops-chip { background: var(--surface); }
+
+:root[data-appearance="light"] .search-ops-chip-wire { background: var(--surface-container-low); }
+
+:root[data-appearance="light"] .global-search .search-suggest { background: var(--surface); }
+
+:root[data-appearance="light"] .search-ops-notice { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertCircle, Check, ChevronRight, Download as DownloadIcon, FileText, HardDrive, Image as ImageIcon, KeyRound, LoaderCircle, RefreshCw, Save, Search, Server, ShieldCheck, Sparkles, X } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, Download as DownloadIcon, FileText, HardDrive, Image as ImageIcon, KeyRound, LoaderCircle, Palette, RefreshCw, Save, Search, Server, ShieldCheck, Sparkles, X } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import type { SettingsFlow } from "../app/useSettings";
+import type { useAppearance } from "../app/useAppearance";
+import type { useLibraryViews } from "../app/useLibraryViews";
+import { AppearancePreferences } from "./AppearancePreferences";
+import { LibraryViewPreferences } from "./LibraryViewPreferences";
 import type { ActionFeedback, Notice, SettingsSection } from "../lib/types";
 import { formatBytes } from "../lib/format";
 
@@ -22,10 +26,14 @@ function ConfigReadonly({ label, value, t, mono = false, wide = false }: { label
 function ConfigToggle({ label, copy, checked, disabled = false, wide = false, onChange }: { label: string; copy: string; checked: boolean; disabled?: boolean; wide?: boolean; onChange: (value: boolean) => void }) { return <label className={`toggle-field ${disabled ? "disabled" : ""} ${wide ? "wide" : ""}`}><span className="toggle-copy"><strong>{label}</strong><small>{copy}</small></span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i /></label>; }
 function ConfigNotice({ kind = "info", children }: { kind?: "info" | "warning"; children: ReactNode }) { return <div className={`config-notice ${kind}`}>{children}</div>; }
 
-export function SettingsDialog({ t, locale, settings, workspaceID, statusData, notice, lexicalReady, semanticReady, semanticBundleReady, semanticBundleRestartRequired, semanticBundleOperatorProvided, semanticInstallAvailable, imageInstallAvailable, imageBundleState, imageBundleReason, searchRebuildAvailable, onLocale, onClose, onDismissNotice }: {
+type ClientSettingsSection = SettingsSection | "appearance";
+
+export function SettingsDialog({ t, locale, settings, appearance, libraryViews, workspaceID, statusData, notice, lexicalReady, semanticReady, semanticBundleReady, semanticBundleRestartRequired, semanticBundleOperatorProvided, semanticInstallAvailable, imageInstallAvailable, imageBundleState, imageBundleReason, searchRebuildAvailable, onLocale, onClose, onDismissNotice }: {
   t: Translator;
   locale: Locale;
   settings: SettingsFlow;
+  appearance: ReturnType<typeof useAppearance>;
+  libraryViews: ReturnType<typeof useLibraryViews>;
   workspaceID: string;
   statusData: any;
   notice: Notice | undefined;
@@ -44,7 +52,8 @@ export function SettingsDialog({ t, locale, settings, workspaceID, statusData, n
   onDismissNotice: () => void;
 }) {
   const { configData, configDraft: draft, configLoading: loading, configDirty: dirty, semanticInstall, imageInstall, installImageBundle, searchRebuild, egressFacts, egressAction } = settings;
-  const sections: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
+  const sections: Array<{ id: ClientSettingsSection; label: string; icon: ReactNode }> = [
+    { id: "appearance", label: t("Appearance"), icon: <Palette size={17} /> },
     { id: "storage", label: t("Storage"), icon: <HardDrive size={17} /> },
     { id: "search", label: t("Search"), icon: <Search size={17} /> },
     { id: "descriptions", label: t("Notes"), icon: <FileText size={17} /> },
@@ -124,13 +133,19 @@ export function SettingsDialog({ t, locale, settings, workspaceID, statusData, n
   // A category is dirty when its own persisted fields differ from the saved
   // configuration. The summary and the category list read the same set, so the
   // indicator is never a decoration.
-  const dirtySectionIDs = new Set(sections.filter((item) => JSON.stringify(sectionConfigParts[item.id]) !== JSON.stringify(savedSectionConfigParts[item.id])).map((item) => item.id));
-  const [activeSection, setActiveSection] = useState<SettingsSection>("storage");
+  const dirtySectionIDs = new Set(sections.filter((item) => item.id !== "appearance" && JSON.stringify(sectionConfigParts[item.id]) !== JSON.stringify(savedSectionConfigParts[item.id])).map((item) => item.id));
+  const [activeSection, setActiveSection] = useState<ClientSettingsSection>("storage");
+  const browserPreferencesOpen = activeSection === "appearance";
   const runningStateAvailable = Boolean(configData?.running_config_digest);
   const runningStateLabel = runningStateAvailable ? "Running now" : "Running state unavailable";
   const closeButton = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => { closeButton.current?.focus(); }, []);
+  // Switching categories swaps the whole pane. Reset its scroll position so a
+  // category selected from the keyboard opens at the section heading instead of
+  // wherever the previous section happened to be scrolled to. Presentation only:
+  // no draft, setting, or persisted value is touched.
+  useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [activeSection]);
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -146,7 +161,7 @@ export function SettingsDialog({ t, locale, settings, workspaceID, statusData, n
   }, [onClose]);
   return <div className="settings-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="settings-page" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <header className="settings-header"><div className="settings-heading"><div><h1 id="settings-title">{t("Settings")}</h1><small className={`settings-running-state ${runningStateAvailable ? "" : "unavailable"}`}><span />{t(runningStateLabel)}</small></div></div><div className="settings-header-actions"><div className="language-switch" role="group" aria-label={t("Switch language")}><button type="button" aria-pressed={locale === "zh-CN"} title={t("Chinese")} onClick={() => onLocale("zh-CN")}>中</button><button type="button" aria-pressed={locale === "en"} title={t("English")} onClick={() => onLocale("en")}>EN</button></div><span className={`config-state ${dirty ? "dirty" : restartRequired ? "restart" : "saved"}`}>{t(dirty ? "Unsaved changes" : restartRequired ? "Restart required" : "Saved")}</span><button type="button" className="icon-button" title={t("Reload configuration")} aria-label={t("Reload configuration")} onClick={settings.reloadSettings} disabled={loading}><RefreshCw className={loading ? "spin" : ""} size={17} /></button><button ref={closeButton} type="button" className="icon-button" title={t("Close settings")} aria-label={t("Close settings")} onClick={onClose}><X size={17} /></button></div></header>
+      <header className="settings-header"><div className="settings-heading"><div><h1 id="settings-title">{t("Settings")}</h1>{!browserPreferencesOpen && <small className={`settings-running-state ${runningStateAvailable ? "" : "unavailable"}`}><span />{t(runningStateLabel)}</small>}</div></div><div className="settings-header-actions"><div className="language-switch" role="group" aria-label={t("Switch language")}><button type="button" aria-pressed={locale === "zh-CN"} title={t("Chinese")} onClick={() => onLocale("zh-CN")}>中</button><button type="button" aria-pressed={locale === "en"} title={t("English")} onClick={() => onLocale("en")}>EN</button></div>{!browserPreferencesOpen && <span className={`config-state ${dirty ? "dirty" : restartRequired ? "restart" : "saved"}`}>{t(dirty ? "Unsaved changes" : restartRequired ? "Restart required" : "Saved")}</span>}{!browserPreferencesOpen && <button type="button" className="icon-button" title={t("Reload configuration")} aria-label={t("Reload configuration")} onClick={settings.reloadSettings} disabled={loading}><RefreshCw className={loading ? "spin" : ""} size={17} /></button>}<button ref={closeButton} type="button" className="icon-button" title={t("Close settings")} aria-label={t("Close settings")} onClick={onClose}><X size={17} /></button></div></header>
       <div className="settings-body">
       {/* One category at a time: the left list is the category index, the right
           pane keeps the existing heading, copy, and controls of that section.
@@ -170,7 +185,7 @@ export function SettingsDialog({ t, locale, settings, workspaceID, statusData, n
       <div ref={content} className="settings-content">
           {notice && <div className={`notice settings-notice ${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>{notice.kind === "error" ? <AlertCircle size={16} /> : notice.kind === "warning" ? <Sparkles size={16} /> : <Check size={16} />}{notice.text}<button type="button" aria-label={t("Dismiss notice")} onClick={onDismissNotice}><X size={14} /></button></div>}
           {sections.some((item) => dirtySectionIDs.has(item.id)) && <div className="settings-change-summary" role="status"><strong>{t("Unsaved changes by category")}</strong><span>{sections.filter((item) => dirtySectionIDs.has(item.id)).map((item, index) => <span key={item.id}>{index > 0 && " · "}<button type="button" className="settings-change-link" onClick={() => setActiveSection(item.id)}>{item.label}</button></span>)}</span></div>}
-          {loading && !draft ? <div className="settings-loading"><LoaderCircle className="spin" size={24} /><span>{t("Loading configuration")}</span></div> : <>
+          {browserPreferencesOpen ? <section className="config-section"><AppearancePreferences t={t} preference={appearance.preference} onChange={appearance.updatePreference} onReset={appearance.resetPreference} /><LibraryViewPreferences t={t} enabledViewIds={libraryViews.enabledViewIds} onEnabledChange={libraryViews.setEnabled} /></section> : loading && !draft ? <div className="settings-loading"><LoaderCircle className="spin" size={24} /><span>{t("Loading configuration")}</span></div> : <>
             {activeSection === "storage" && <section className="config-section"><ConfigHeading eyebrow={t("CONTENT LOCATIONS")} title={t("Storage")} copy={t("Choose the content location and storage mode.")} />
               <ConfigGroup title={t("Content location")} copy={t("The repository contains exact file bytes; changing this path does not move existing data.")}><div className="form-grid"><ConfigInput label={t("Content repository")} value={config.paths?.repository} onChange={(value) => settings.setConfigField("paths", "repository", value)} wide /></div></ConfigGroup>
               <ConfigGroup title={t("Storage plan")} copy={t("Choose how exact file bytes are stored. Both options keep SHA-256 whole-file deduplication.")}><ConfigOptions value={config.storage?.repository_profile} onChange={settings.setRepositoryProfile} options={[{ value: "directory-cas-dev-v1", title: t("Directory CAS"), state: t("Development"), copy: t("Stores exact bytes without compression. Best for inspection and compatibility tests.") }, { value: "local-zstd-v1", title: t("Local zstd"), state: t("Candidate"), copy: t("Keeps exact recovery while compressing each unique whole file.") }]} /><p className="current-policy" aria-label={t("Current storage policy")}>{t("Compression")}: <strong>{config.storage?.compression_profile || t("Unknown")}</strong> · {t("Default storage mode")}: <strong>{config.storage?.default_protection || "STORE_EXACT"}</strong></p></ConfigGroup>
@@ -232,7 +247,7 @@ export function SettingsDialog({ t, locale, settings, workspaceID, statusData, n
           </>}
       </div>
       </div>
-      <footer className="settings-footer"><span>{t(dirty ? "Review and save your changes." : configData?.restart_required ? "Saved configuration differs from the running daemon." : "Configuration is synchronized.")}</span><button className="primary-button" onClick={() => void settings.saveSettings()} disabled={loading || !dirty}><Save size={16} />{t(loading ? "Saving..." : "Save settings")}</button></footer>
+      <footer className="settings-footer"><span>{t(browserPreferencesOpen ? "Changes apply immediately in this browser." : dirty ? "Review and save your changes." : configData?.restart_required ? "Saved configuration differs from the running daemon." : "Configuration is synchronized.")}</span>{!browserPreferencesOpen && <button className="primary-button" onClick={() => void settings.saveSettings()} disabled={loading || !dirty}><Save size={16} />{t(loading ? "Saving..." : "Save settings")}</button>}</footer>
     </section>
   </div>;
 }

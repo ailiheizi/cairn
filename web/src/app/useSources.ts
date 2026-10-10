@@ -388,7 +388,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
         ? "AWAITING"
         : !plan.executable
           ? "BLOCKED"
-          : Number(plan.new_bytes ?? 0) <= 0 ? "UP_TO_DATE" : "READY";
+          : Number(plan.files ?? 0) <= 0 ? "UP_TO_DATE" : "READY";
   const sourceBlockedCount = Number(plan?.blocked_entries?.length ?? 0);
   const sourceFileCount = Number(plan?.files ?? 0);
   const sourceBarReason = sourceBarState === "AWAITING"

@@ -213,6 +213,13 @@ selection bar, and the details inspector column. */
   padding: 42px 20px; border: 1px solid rgba(230, 226, 255, 0.15); border-radius: 8px;
   color: var(--muted); background: #0e1017; box-shadow: 0 24px 58px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.045); text-align: center;
 }
+.media-empty-state {
+  min-height: 118px; grid-template-columns: 36px minmax(0, 1fr); place-items: center start;
+  gap: 3px 13px; margin-top: 10px; padding: 17px 18px; text-align: left;
+}
+.media-empty-icon { grid-column: 1; grid-row: 1 / span 2; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--hairline); border-radius: 10px; color: var(--accent); background: var(--surface-soft); }
+.empty-state.media-empty-state h2 { grid-column: 2; margin: 0; font-size: 15px; }
+.empty-state.media-empty-state p { grid-column: 2; max-width: none; margin: 0; font-size: 12px; }
 .vault-sigil { width: 86px; height: 86px; display: grid; place-items: center; margin-bottom: 7px; border: 1px solid rgba(211, 198, 255, 0.52); border-radius: 8px; color: #110d1f; background: var(--primary); box-shadow: 0 0 0 10px rgba(167, 139, 250, 0.06), 0 18px 46px rgba(139, 92, 246, 0.24), inset 0 1px rgba(255, 255, 255, 0.42); }
 .empty-state h2 { margin: 5px 0 0; color: #eef1f3; font-size: 20px; }
 .empty-state p { max-width: 410px; margin: 0 0 9px; font-size: 14px; line-height: 1.55; }
@@ -404,12 +411,12 @@ selection bar, and the details inspector column. */
 .tag-filter.all.active b { color: var(--primary-ink); background: var(--accent); }
 .system-facet { min-height: 32px; border-color: var(--hairline-strong); border-radius: 10px; color: var(--muted); background: var(--card-fill-quiet); }
 .system-facet:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
-.system-facet.active { border-color: var(--accent); color: var(--primary-ink); background: var(--accent); box-shadow: inset 0 -2px #5c86b6; }
+.system-facet.active { border-color: var(--accent); color: var(--primary-ink); background: var(--accent); box-shadow: inset 0 -2px color-mix(in srgb, var(--primary-ink) 34%, var(--accent)); }
 .system-facet b { color: var(--muted); background: var(--surface); }
 .filter-summary { color: var(--muted); }
 .filter-summary-label { color: var(--ink); }
 .active-filter { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
-.active-filter:hover, .active-filter:focus-visible { border-color: var(--accent); background: #31485d; }
+.active-filter:hover, .active-filter:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
 .active-filter, .filter-summary-clear { min-height: 32px; border-radius: 10px; }
 .filter-summary-clear { color: var(--muted); }
 .filter-summary-clear:hover, .filter-summary-clear:focus-visible { color: var(--ink); }
@@ -432,7 +439,7 @@ selection bar, and the details inspector column. */
 .source-health { border-color: rgba(98, 189, 145, 0.34); background: var(--health-soft); }
 .source-health > span { background: var(--health); box-shadow: none; }
 .source-health.offline, .source-recovery.pending { color: var(--gold); }
-.source-health.offline { border-color: rgba(208, 161, 82, 0.34); background: rgba(208, 161, 82, 0.12); }
+.source-health.offline { border-color: color-mix(in srgb, var(--gold) 34%, transparent); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
 .source-health.offline > span { background: var(--gold); box-shadow: none; }
 .source-changes { border-top-color: var(--hairline); color: var(--muted); }
 .source-changes-label, .source-changes-detail > summary small, .source-changes-verification, .source-changes-empty { color: var(--muted); }
@@ -441,14 +448,14 @@ selection bar, and the details inspector column. */
 .source-changes-detail > summary { color: var(--muted); }
 .source-change-kind { border-color: var(--hairline-strong); border-radius: 10px; color: var(--ink); background: var(--card-fill-quiet); }
 .source-change-path { color: var(--ink); }
-.source-projection-warning, .drawer-inline-warning, .plan-warning { color: var(--gold); background: rgba(208, 161, 82, 0.1); }
-.source-projection-warning, .drawer-inline-warning, .plan-warning { border-color: rgba(208, 161, 82, 0.34); border-radius: 14px; }
+.source-projection-warning, .drawer-inline-warning, .plan-warning { color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
+.source-projection-warning, .drawer-inline-warning, .plan-warning { border-color: color-mix(in srgb, var(--gold) 34%, transparent); border-radius: 14px; }
 
-.notice { border-color: rgba(98, 189, 145, 0.34); border-radius: 14px; color: var(--health); background: var(--health-soft); box-shadow: none; }
-.notice.warning { border-color: rgba(208, 161, 82, 0.34); color: var(--gold); background: rgba(208, 161, 82, 0.1); }
-.notice.error { border-color: rgba(220, 130, 120, 0.38); color: var(--coral); background: rgba(220, 130, 120, 0.1); }
-.service-offline { border-color: rgba(220, 130, 120, 0.38); border-radius: var(--card-radius-sm); color: var(--coral); background: rgba(220, 130, 120, 0.1); box-shadow: none; }
-.service-offline > span { color: var(--coral); background: rgba(220, 130, 120, 0.12); }
+.notice { border-color: color-mix(in srgb, var(--health) 34%, transparent); border-radius: 14px; color: var(--health); background: var(--health-soft); box-shadow: none; }
+.notice.warning { border-color: color-mix(in srgb, var(--gold) 34%, transparent); color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
+.notice.error { border-color: color-mix(in srgb, var(--coral) 38%, transparent); color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, var(--surface)); }
+.service-offline { border-color: color-mix(in srgb, var(--coral) 38%, transparent); border-radius: var(--card-radius-sm); color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, var(--surface)); box-shadow: none; }
+.service-offline > span { color: var(--coral); background: color-mix(in srgb, var(--coral) 12%, var(--surface)); }
 
 .result-list, .empty-state { border-color: var(--hairline); border-radius: var(--card-radius); background: var(--card-fill); box-shadow: var(--card-shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .result-row { min-height: 74px; padding: 10px 14px; border-bottom-color: var(--hairline); color: var(--ink); }
@@ -491,7 +498,7 @@ selection bar, and the details inspector column. */
 .detail-title h2 { color: var(--ink); }
 .detail-title small, .facts dt, .identity-label small, .technical-details > summary small, .technical-identity span { color: var(--muted); }
 .assurance-seal { border-color: rgba(98, 189, 145, 0.34); color: var(--health); background: var(--health-soft); }
-.assurance-seal.warning { border-color: rgba(208, 161, 82, 0.34); color: var(--gold); background: rgba(208, 161, 82, 0.1); }
+.assurance-seal.warning { border-color: color-mix(in srgb, var(--gold) 34%, transparent); color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
 .identity-band { background: var(--surface-dim); box-shadow: none; }
 .identity-label span, .facts dd, .technical-identity strong { color: var(--ink); }
 .technical-details { border-color: var(--hairline); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); }
@@ -508,7 +515,7 @@ selection bar, and the details inspector column. */
 .tag-chip.system { border-color: rgba(141, 184, 232, 0.4); color: var(--accent); background: var(--accent-soft); }
 .tag-chip.user { border-color: var(--hairline-strong); color: var(--ink); background: var(--surface-soft); box-shadow: none; }
 .tag-chip button { width: 26px; height: 26px; margin: -3px -6px -3px 1px; color: var(--muted); }
-.tag-chip button:hover { color: var(--coral); background: rgba(220, 130, 120, 0.12); }
+.tag-chip button:hover { color: var(--coral); background: color-mix(in srgb, var(--coral) 12%, var(--surface)); }
 .tag-composer input, .note-row textarea, .note-composer textarea, .stack-form input, .inline-form input { border-color: var(--hairline-strong); border-radius: 14px; color: var(--ink); background: var(--card-fill-quiet); }
 .tag-composer input:focus, .note-row textarea:focus, .note-composer textarea:focus, .stack-form input:focus, .inline-form input:focus { border-color: var(--accent); background: var(--card-fill-quiet); box-shadow: 0 0 0 3px rgba(141, 184, 232, 0.16); }
 .note-composer { border: 0; border-radius: 0; padding: 12px 0 0; background: transparent; box-shadow: none; }
@@ -528,20 +535,17 @@ selection bar, and the details inspector column. */
 .recall-caption.degraded > svg, .recall-caption.degraded .recall-caption-detail { color: var(--gold); }
 .recall-caption.empty > svg, .recall-caption.empty .recall-caption-detail { color: var(--muted); }
 
-@media (prefers-color-scheme: light) {
+:root[data-appearance="light"] .result-row.selected { background: var(--accent-soft); }
 
-  .result-row.selected { background: #e5eef5; }
+:root[data-appearance="light"] .result-row.selected .file-icon, :root[data-appearance="light"] .file-icon.large { color: var(--primary-ink); background: var(--accent); }
 
-  .result-row.selected .file-icon, .file-icon.large { color: #ffffff; background: #386483; }
+:root[data-appearance="light"] .system-facet.active { color: var(--primary-ink); background: var(--accent); }
 
-  .system-facet.active { color: #ffffff; background: #386483; }
+:root[data-appearance="light"] .system-facet.active b, :root[data-appearance="light"] .tag-filter.active b { color: var(--primary-ink); background: var(--accent); }
 
-  .system-facet.active b, .tag-filter.active b { color: #ffffff; background: #315f7d; }
+:root[data-appearance="light"] .tag-filter.all, :root[data-appearance="light"] .tag-filter.all.active { background: var(--surface-raised); }
 
-  .tag-filter.all, .tag-filter.all.active { background: var(--surface-raised); }
-
-  .source-card, .result-list, .empty-state, .details, .drawer, .settings-page { background-image: none; }
-}
+:root[data-appearance="light"] .source-card, :root[data-appearance="light"] .result-list, :root[data-appearance="light"] .empty-state, :root[data-appearance="light"] .details, :root[data-appearance="light"] .drawer, :root[data-appearance="light"] .settings-page { background-image: none; }
 
 /* Below the three-column width the inspector replaces the list; a zoomed-in
    desktop window therefore never squeezes both into unreadable columns. */
@@ -581,6 +585,10 @@ selection bar, and the details inspector column. */
   border: 0; border-radius: 0; background: transparent;
 }
 .workspace-sidebar-group { display: grid; gap: 3px; }
+.workspace-sidebar-group-management { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.workspace-sidebar-group-management .workspace-nav-item { color: var(--quiet); font-weight: 580; }
+.workspace-sidebar-group-management .workspace-nav-item svg { color: var(--quiet); }
+.workspace-sidebar-group-management .workspace-nav-item.active { color: var(--ink); }
 .workspace-sidebar-label { margin: 0 8px 5px; color: var(--quiet); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
 .workspace-nav-item { min-width: 0; min-height: 38px; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 0; border-radius: 7px; padding: 8px 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
 .workspace-nav-item svg { color: var(--quiet); }
@@ -590,6 +598,9 @@ selection bar, and the details inspector column. */
 .workspace-nav-item.active { color: var(--ink); background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
 .workspace-nav-item.active small { color: var(--accent); }
 .workspace-nav-item:disabled { opacity: .45; cursor: not-allowed; }
+/* Export is the main action once the user has selected content. */
+.selection-export { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 750; }
+.selection-export:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
 @media (max-width: 640px) {
   /* Below the compact boundary the rail is not mounted inline; it lives in
      the panel the topbar button opens. */
@@ -632,10 +643,9 @@ selection bar, and the details inspector column. */
   /* Fluid tile size: scales with the window instead of per-breakpoint values. */
   --tile-size: clamp(150px, 12vw, 208px);
   display: grid;
-  /* auto-fit sizes the columns from the container and drops the tracks the
-     current items do not use, so every row fills the content edge to edge;
-     with few files the tiles grow instead of leaving an empty tail. */
-  grid-template-columns: repeat(auto-fit, minmax(var(--tile-size), 1fr));
+  /* Empty grid tracks keep a small number of files at the same readable tile
+     size as a full library. The inspector owns large previews. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile-size)), 1fr));
   gap: 14px;
   overflow: visible;
   border: 0;
@@ -695,6 +705,11 @@ selection bar, and the details inspector column. */
   background-size: 16px 16px;
 }
 .result-list .file-icon svg { width: 30%; height: 30%; max-width: 96px; max-height: 96px; }
+.result-list .file-icon.is-audio { color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface-raised)); }
+.result-list .file-icon.is-video { color: var(--coral); background: color-mix(in srgb, var(--coral) 9%, var(--surface-raised)); }
+.result-list .file-icon.is-document { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); }
+.result-list .file-icon.is-archive { color: var(--gold); background: color-mix(in srgb, var(--gold) 11%, var(--surface-raised)); }
+.result-format { position: absolute; top: 8px; left: 50%; z-index: 1; max-width: calc(100% - 56px); overflow: hidden; transform: translateX(-50%); border: 1px solid var(--hairline-strong); border-radius: 6px; padding: 4px 6px; color: var(--ink); background: var(--surface-raised); font-size: 10px; font-weight: 750; letter-spacing: .04em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .result-list .result-duplicate {
   position: absolute; top: 8px; left: 8px;
   min-width: 22px; justify-content: center; margin: 0;
@@ -734,7 +749,8 @@ selection bar, and the details inspector column. */
 .layout-switch button:last-child { border-right: 0; }
 .layout-switch button:hover { color: var(--ink); background: var(--surface-soft); }
 .layout-switch button[aria-pressed="true"] { color: var(--ink); background: var(--accent-soft); }
-.result-list .result-meta { display: none; }
+.result-list .result-meta { min-width: 0; max-width: 100%; display: inline-flex; justify-content: center; overflow: hidden; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.result-list .result-meta > span { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .result-list.list-mode {
   display: block;
@@ -763,9 +779,10 @@ selection bar, and the details inspector column. */
 .result-list.list-mode .result-row.selected { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
 .result-list.list-mode .file-icon { width: 40px; height: 40px; flex: 0 0 auto; }
 .result-list.list-mode .file-icon svg { width: 20px; height: 20px; }
+.result-list.list-mode .result-format { display: none; }
 .result-list.list-mode .result-open-copy { min-width: 0; flex: 1 1 auto; text-align: left; }
 .result-list.list-mode .result-open-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-line-clamp: 1; font-size: 13px; }
-.result-list.list-mode .result-meta { display: inline-flex; flex: 0 0 auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.result-list.list-mode .result-meta { display: inline-flex; flex: 0 1 220px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .result-list.list-mode .result-match { min-width: 0; flex: 1 1 40%; color: var(--muted); text-align: left; }
 .result-list.list-mode .result-duplicate { position: static; top: auto; left: auto; order: -1; }
 
@@ -807,6 +824,11 @@ selection bar, and the details inspector column. */
 /* Selection bar: count, select all, export selected, add tag, clear. */
 .selection-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--card-radius-sm); background: var(--card-fill); box-shadow: var(--card-shadow-soft); }
 .selection-count { display: inline-flex; align-items: center; min-height: 32px; border: 1px solid var(--accent); border-radius: 999px; padding: 5px 12px; color: var(--ink); background: var(--accent-soft); font-size: 12px; font-weight: 700; }
+.selection-count small { margin-left: 8px; color: var(--danger); font-size: 11px; font-weight: 500; }
+.original-takeout-status { position: fixed; right: 12px; bottom: 76px; z-index: 90; display: flex; align-items: center; gap: 12px; width: min(460px, calc(100vw - 24px)); padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--card-radius-sm); background: var(--card-fill); color: var(--ink); box-shadow: var(--card-shadow); }
+.original-takeout-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.original-takeout-copy span, .original-takeout-copy small { overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
+.original-takeout-copy code { font-size: 10px; }
 .selection-tag { min-width: 0; flex: 1 1 210px; display: inline-flex; align-items: center; gap: 6px; }
 .selection-tag input { min-width: 110px; flex: 1 1 120px; min-height: 34px; border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 14px; color: var(--ink); background: var(--surface-raised); font-size: 13px; }
 .selection-tag input::placeholder { color: var(--quiet); }
@@ -819,6 +841,7 @@ selection bar, and the details inspector column. */
   .sort-field { max-width: 92px; }
   .selection-tag { flex-basis: 100%; }
   .selection-clear { margin-left: 0; }
+  .original-takeout-status { bottom: 165px; align-items: flex-start; }
 }
 
 /* The on-demand description action in the inspector's Notes section. It is one
@@ -888,6 +911,10 @@ selection bar, and the details inspector column. */
 .onboarding-steps li b { color: var(--ink); font-size: 13px; }
 .onboarding-steps li span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .onboarding-steps li .primary-button { justify-self: start; margin-top: 4px; }
+.first-use-next-step { max-width: 680px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--card-fill-quiet); color: var(--muted); }
+.first-use-next-step summary { color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.first-use-next-step p { max-width: none; margin: 7px 0 9px; font-size: 12px; line-height: 1.5; }
+.first-use-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 @media (max-width: 640px) {
   .timeline-heading small, .space-report > summary small { display: none; }
@@ -1014,4 +1041,292 @@ selection bar, and the details inspector column. */
 @media (max-width: 640px) {
   .notes-surface .note-row-head { flex-wrap: wrap; }
   .notes-surface .note-row-expand { margin-left: 0; }
+}
+
+/* Desktop density pass (SP-1). Scoped to >=641px so the phone layout keeps its
+   own rules. Presentation only: no markup, selector, or accessible-name change,
+   so the E2E surfaces keep working. The honesty captions that say a projection
+   is browser-local are kept, only their surrounding spacing is tightened. */
+@media (min-width: 641px) {
+  .workspace-heading { min-height: 38px; margin-bottom: 7px; }
+  .workspace-heading h1 { font-size: 20px; line-height: 1.2; }
+  .workspace-heading .eyebrow { margin: 0 0 2px; font-size: 10px; }
+
+  .space-report { margin: -2px 0 7px; }
+  .space-report > summary { min-height: 32px; padding: 6px 10px; }
+
+  .tag-browser { gap: 6px; margin: -1px 0 7px; padding: 5px 0; }
+  .tag-filter, .system-facet { min-height: 28px; }
+  /* Let the system-facet disclosure share the tag row instead of forcing its
+     own full-width line. */
+  .system-facets-disclosure { flex: 0 1 auto; }
+
+  .timeline-strip { gap: 6px; margin: -2px 0 8px; padding: 7px 0; }
+  .timeline-bucket { min-width: 42px; gap: 2px; padding: 4px 6px 3px; }
+
+  .source-aux-row { margin: 0 0 7px; }
+  .source-disclosure summary { min-height: 28px; padding: 5px 9px; }
+
+  /* A denser wall: more columns per row at desktop widths. */
+  .result-list { --tile-size: clamp(104px, 8.4vw, 168px); gap: 10px; }
+}
+
+/* Desktop density pass, part two (SP-1). Same rules: >=641px only, no markup
+   or accessible-name change. Selectors carry two classes where the source rule
+   lives in another stylesheet, so bundle order cannot defeat the override. */
+@media (min-width: 641px) {
+  /* The timeline heading shares its row with the buckets instead of stacking. */
+  .timeline-strip { display: flex; align-items: center; gap: 10px; }
+  .timeline-strip .timeline-heading { flex: 0 0 auto; }
+  .timeline-strip .timeline-buckets { flex: 1 1 auto; }
+
+  /* The eyebrow duplicates the rail's own label. */
+  .workspace-heading .eyebrow { display: none; }
+
+  .status-panel .status-panel-summary { min-height: 26px; }
+  .workspace { padding-top: 12px; }
+}
+
+/* Header popovers keep secondary, browser-local projections discoverable
+   without consuming a full content row. Their detailed scope remains visible
+   when opened; the collapsed controls stay compact. */
+.library-controls { min-width: 0; display: grid; gap: 5px; margin: 0 0 9px; }
+.library-controls > .library-view-switch { justify-self: start; }
+.library-controls > .heading-actions { min-width: 0; width: 100%; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+.library-secondary-tools { position: relative; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 4px; border-top: 1px solid var(--line); }
+.library-secondary-tools-label { flex: 0 0 auto; color: var(--quiet); font-size: 10px; font-weight: 700; }
+.library-tool-controls { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.library-tool-controls > .space-report,
+.library-tool-controls > .timeline-control { position: static; flex: 0 0 auto; margin: 0; }
+.library-tool-controls > .space-report > summary,
+.library-tool-controls > .timeline-control > summary {
+  min-height: 30px; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+  color: var(--ink); background: var(--card-fill-quiet); font-size: 11px;
+  font-weight: 700; cursor: pointer; list-style: none; white-space: nowrap;
+}
+.library-tool-controls > .space-report > summary::-webkit-details-marker,
+.library-tool-controls > .timeline-control > summary::-webkit-details-marker { display: none; }
+.library-tool-controls > .space-report > summary > svg:first-child,
+.library-tool-controls > .timeline-control > summary > svg:first-child { flex: 0 0 auto; color: var(--accent); }
+.library-tool-controls > .space-report > summary > svg:last-child,
+.library-tool-controls > .timeline-control > summary > svg:last-child {
+  flex: 0 0 auto; color: var(--muted); transition: transform 160ms ease;
+}
+.library-tool-controls > .space-report[open],
+.library-tool-controls > .timeline-control[open] { z-index: 50; }
+.library-tool-controls > .space-report .space-report-body {
+  position: absolute; top: calc(100% + 6px); left: 0; right: auto; z-index: 50;
+  width: min(380px, 100%); max-height: min(70vh, 520px);
+  overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--line);
+  border-radius: var(--card-radius-sm); background: var(--surface-raised);
+  box-shadow: var(--card-shadow-soft);
+}
+.space-report-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.library-tool-controls > .timeline-control .timeline-strip {
+  position: absolute; top: calc(100% + 6px); left: 0; right: auto; z-index: 49;
+  width: min(640px, 100%); max-width: 100%; max-height: min(70vh, 460px);
+  display: grid; gap: 9px; overflow: auto; margin: 0; padding: 12px;
+  border: 1px solid var(--line); border-radius: var(--card-radius-sm);
+  background: var(--surface-raised); box-shadow: var(--card-shadow-soft);
+}
+.library-tool-controls > .timeline-control .timeline-heading { min-height: 0; }
+.library-tool-controls > .timeline-control .timeline-heading small { display: block; }
+.library-tool-controls > .timeline-control .timeline-buckets { max-width: 100%; }
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .workspace-heading { min-height: 0; align-items: center; flex-wrap: wrap; gap: 7px 12px; }
+  .library-controls > .heading-actions { min-width: 0; width: 100%; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+}
+
+@media (min-width: 901px) and (max-width: 1199px) {
+  .content-column .workspace-heading { align-items: flex-start; flex-wrap: wrap; }
+  .content-column .workspace-heading > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .content-column .library-controls > .heading-actions { min-width: 0; max-width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+}
+
+/* Multiple content-type views stay in the one Library header and share its
+   loaded subjects, selection model, and details inspector. */
+.library-view-switch { min-width: 0; display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--hairline); border-radius: 10px; padding: 3px; background: var(--surface-soft); }
+.library-view-option { min-height: 27px; border: 0; border-radius: 7px; padding: 4px 9px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 680; white-space: nowrap; cursor: pointer; }
+.library-view-option:hover { color: var(--ink); background: var(--surface-raised); }
+.library-view-option.active { color: var(--ink); background: var(--card-fill); box-shadow: var(--card-shadow-soft); }
+.library-summary { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.media-view-context { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.media-view-about { margin-top: 5px; }
+.media-view-about summary { width: fit-content; color: var(--muted); font-size: 11px; cursor: pointer; }
+.media-view-about summary:hover { color: var(--ink); }
+.media-view-note { max-width: 62ch; margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.library-type-view .space-report,
+.library-type-view .layout-switch { display: none; }
+.library-type-view[data-view="photos"] .result-list { --tile-size: clamp(150px, 14vw, 220px); gap: 12px; }
+.media-empty-state .vault-sigil { display: none; }
+@media (max-width: 640px) {
+  .library-controls > .library-view-switch { width: 100%; }
+  .library-view-option { flex: 1 1 0; }
+  .library-secondary-tools { align-items: flex-start; gap: 6px; }
+  .library-secondary-tools-label { flex-basis: 100%; }
+  .library-type-view[data-view="photos"] .result-list { --tile-size: clamp(124px, 34vw, 176px); gap: 8px; }
+}
+
+/* Product-wide hierarchy and responsive workspace refinements. */
+.empty-state {
+  min-height: 240px;
+  gap: 9px;
+  padding: 28px 20px;
+  border-radius: var(--card-radius-sm);
+  color: var(--muted);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow-soft);
+}
+.empty-state .vault-sigil {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+.empty-state .vault-sigil svg { width: 23px; height: 23px; }
+.empty-state h2 { margin: 2px 0 0; color: var(--ink); font-size: 18px; line-height: 1.3; }
+.empty-state p { max-width: 54ch; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+.source-card {
+  gap: 8px;
+  border-color: var(--line);
+  border-radius: var(--card-radius-sm);
+  padding: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow-soft);
+}
+.source-card-header { gap: 10px; }
+.source-card-icon { width: 36px; height: 36px; border-color: var(--line-strong); border-radius: 11px; color: var(--accent); background: var(--accent-soft); }
+.source-card-title strong { color: var(--ink); font-size: 12px; }
+.source-card-title small { color: var(--muted); font-size: 11px; }
+.source-health { min-height: 27px; border-radius: 999px; padding: 4px 9px; font-size: 10px; }
+.source-card-state { gap: 4px; border-left: 0; border-radius: 10px; padding: 9px 11px; background: var(--surface-soft); }
+.source-card-state span, .source-card-stats span, .source-recovery span { color: var(--muted); font-size: 10px; }
+.source-card-state strong { color: var(--ink); font-size: 13px; }
+.source-card-stats { gap: 8px; }
+.source-card-stats > div { gap: 4px; border-color: var(--line); border-radius: 10px; padding: 9px; background: var(--surface-container); }
+.source-card-stats strong { color: var(--ink); font-size: 12px; }
+.source-card-stats small { color: var(--muted); font-size: 10px; }
+.source-card-actions { flex-wrap: wrap; }
+.source-card-actions button { min-height: 36px; padding: 7px 11px; font-size: 11px; }
+
+@media (min-width: 641px) and (max-width: 900px) {
+  :root { --rail: 146px; }
+  .workspace { gap: 14px; }
+  .workspace-nav-item { grid-template-columns: 16px minmax(0, 1fr) auto; gap: 6px; padding-inline: 7px; font-size: 12px; }
+  .workspace-nav-item svg { width: 15px; height: 15px; }
+}
+
+@media (min-width: 1080px) {
+  /* Keep the inspector from flex-shrinking the page title into a narrow column. */
+  .workspace.detail-active .workspace-heading { align-items: flex-start; flex-wrap: wrap; }
+  .workspace.detail-active .workspace-heading > div:first-child { flex: 1 1 100%; min-width: 0; }
+  .workspace.detail-active .workspace-heading .heading-actions { flex: 1 1 100%; min-width: 0; justify-content: flex-start; flex-wrap: wrap; }
+  .workspace.detail-active .workspace-heading h1 { overflow-wrap: break-word; word-break: normal; }
+}
+
+@media (max-width: 640px) {
+  .workspace { padding-top: 12px; }
+  /* The phone menu already contains the full Sources route; avoid a second
+     full-width navigation row above the Library content. */
+  .sources-entry { display: none; }
+  .workspace-heading { min-height: 0; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 6px; }
+  .workspace-heading > div:first-child { min-width: 0; flex: 1 1 120px; }
+  .workspace-heading .eyebrow { display: none; }
+  .workspace-heading h1 { font-size: 21px; line-height: 1.2; }
+  .workspace-heading .heading-actions { min-width: 0; width: 100%; flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
+  .heading-actions .library-view-switch { width: auto; flex: 0 0 auto; }
+  .library-view-option { flex: 0 0 auto; }
+  .tag-browser { align-items: center; gap: 6px; margin: 0 0 6px; padding: 5px 0; }
+  .tag-browser-heading { flex: 0 0 auto; gap: 5px; }
+  .tag-filter-list { min-width: 0; flex: 1 1 150px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .tag-filter-list::-webkit-scrollbar { display: none; }
+  .tag-filter { min-height: 30px; flex: 0 0 auto; }
+  .system-facets-disclosure { flex: 0 1 auto; }
+  .filter-summary { flex: 1 1 100%; }
+  .source-card-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .empty-state { min-height: 200px; padding: 22px 16px; }
+  .empty-state h2 { font-size: 17px; }
+  .empty-state p { font-size: 12px; }
+}
+
+/* One host result scope, independent of its domain presentation. */
+.library-presentation-navigation { flex-basis: 100%; width: 100%; }
+.library-result-scope { margin: 10px 0 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); color: var(--ink); overflow-wrap: anywhere; }
+.library-result-scope strong { display: block; font-size: 13px; }
+.library-result-scope p { margin: 4px 0; font-size: 12px; line-height: 1.6; }
+.library-result-scope small { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.library-result-scope__empty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
+.library-selection-scope { margin: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+/* SP-1 convergence pass: the chrome above the content wall.
+ *
+ * Presentation only. No label, role, order, accessible name, command, or piece
+ * of state changes; every control keeps its own box and stays focusable. The
+ * rules are scoped to the library surface (`[data-presentation]`, which only
+ * components/LibrarySurface.tsx sets) so the shared block flow of the Notes,
+ * Tags, Duplicates, and Activity surfaces is untouched. */
+
+/* Medium and up: the title line and the three browse-control groups use their
+   natural width and share one wrapping line instead of stacking as three
+   poster-sized blocks, and the surrounding strips lose the padding that only
+   made sense at that older size. */
+@media (min-width: 641px) {
+  .content-column[data-presentation] > .workspace-heading { align-items: center; min-height: 0; margin-bottom: 5px; }
+  .content-column[data-presentation] > .workspace-heading > div:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+  .content-column[data-presentation] > .workspace-heading .library-summary { margin: 0; }
+  .content-column[data-presentation] > .library-controls {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start;
+    gap: 5px 10px; margin: 0 0 5px;
+  }
+  .content-column[data-presentation] > .library-controls > .library-presentation-navigation { width: auto; flex: 0 1 auto; }
+  .content-column[data-presentation] .library-presentation-navigation__domain,
+  .content-column[data-presentation] .library-presentation-navigation__presentation { min-height: 28px; }
+  .content-column[data-presentation] > .library-controls > .heading-actions { width: auto; flex: 0 1 auto; }
+  .content-column[data-presentation] > .library-controls > .library-secondary-tools { width: auto; flex: 0 1 auto; border-top: 0; padding-top: 0; }
+  /* The section keeps its accessible name; only the duplicated visual caption
+     that repeated it above the same two controls is not needed in the row. */
+  .content-column[data-presentation] > .library-controls > .library-secondary-tools > .library-secondary-tools-label { display: none; }
+  .content-column[data-presentation] > .tag-browser { padding: 2px 0; margin-bottom: 4px; }
+  .content-column[data-presentation] .tag-filter, .content-column[data-presentation] .system-facet { min-height: 26px; }
+  .content-column[data-presentation] .system-facet-heading { min-height: 26px; }
+  .content-column[data-presentation] > .notice { padding: 4px 12px; margin-bottom: 8px; }
+  .content-column[data-presentation] > .first-use-next-step { padding: 4px 12px; margin-bottom: 5px; }
+  .content-column[data-presentation] > .result-list { padding-top: 0; }
+  .workspace { padding-top: 0; }
+  /* The readiness rail stays a full line of its own state string; only the row
+     around it is tightened. */
+  .status-panel .status-panel-summary { min-height: 21px; }
+}
+
+/* Phone: the title block and the three control groups lose their stacking
+   padding, and the presentation switch and browse tools each keep one row
+   instead of a full-width line. The wall therefore starts in the first
+   viewport while every control stays in place. */
+@media (max-width: 640px) {
+  .workspace { padding-top: 8px; }
+  .content-column[data-presentation] > .workspace-heading { margin-bottom: 4px; }
+  .content-column[data-presentation] > .workspace-heading h1 { font-size: 19px; }
+  .content-column[data-presentation] > .workspace-heading > div:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1px 8px; min-width: 0; }
+  .content-column[data-presentation] > .workspace-heading .library-summary { margin: 0; font-size: 11px; line-height: 1.3; }
+  .content-column[data-presentation] > .library-controls { gap: 4px; margin-bottom: 6px; }
+  /* library-views.css stacks this switch into two full-width rows below 391px;
+     the same two pills fit on one row here, and wrap again if they cannot. */
+  .content-column[data-presentation] > .library-controls > .library-presentation-navigation { width: auto; flex: 0 1 auto; flex-direction: row; align-items: center; justify-content: flex-start; }
+  .content-column[data-presentation] > .library-controls > .heading-actions { width: 100%; gap: 4px; }
+  .content-column[data-presentation] > .library-controls > .heading-actions .secondary-button.compact { min-height: 32px; padding: 6px 10px; font-size: 12px; }
+  .content-column[data-presentation] > .library-controls > .heading-actions .layout-switch button { height: 30px; }
+  .content-column[data-presentation] > .library-controls > .library-secondary-tools { align-items: center; gap: 6px; padding-top: 0; border-top: 0; }
+  .content-column[data-presentation] > .library-controls > .library-secondary-tools > .library-secondary-tools-label { flex: 0 0 auto; }
+  .content-column[data-presentation] > .tag-browser { padding: 3px 0; margin-bottom: 4px; }
+  .content-column[data-presentation] .system-facet-heading small { font-size: 10px; line-height: 1.25; }
+  .content-column[data-presentation] > .notice { padding: 8px 10px; font-size: 12px; }
+  .content-column[data-presentation] > .first-use-next-step { padding: 7px 12px; margin-bottom: 10px; }
+  .content-column[data-presentation] > .result-list { padding-top: 0; }
 }

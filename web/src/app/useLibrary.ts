@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Locale, Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
 import { dedupFacetValue, exactIdentityKey, formatFacetValue, itemInMonth, sortLibraryHits } from "../lib/format";
 import { isMonthBucketKey } from "../lib/hashView";
-import type { AnnotationRecord, BrowseCrumb, BrowseRoot, Notice, SearchHit, SortDirection, SortField, SystemFacetState, ViewMode } from "../lib/types";
+import { libraryPageForMode } from "../lib/libraryViews";
+import { filterResultScope, projectResultScope, resultScopeSource } from "../lib/resultScope";
+import type { AnnotationRecord, BrowseCrumb, BrowseRoot, LibraryPageMode, Notice, SearchHit, SortDirection, SortField, SystemFacetState, ViewMode } from "../lib/types";
 
 // The content library projection.
 //
 // `content.list` returns the complete publication set and the browser keeps it
-// as one projection: tags, system facets, sorting, and path browsing are
-// client-side views over data the daemon already returned. No filter here
-// changes stored content, membership, or recovery meaning.
+// as one projection: tags, system facets, sorting, path browsing, and the
+// registered pages are client-side views over data the daemon already
+// returned. No filter here changes stored content, membership, or recovery
+// meaning.
 
 export type LibraryFlow = {
   hits: SearchHit[];
@@ -20,6 +23,9 @@ export type LibraryFlow = {
   setLibraryItems: (value: SearchHit[] | ((current: SearchHit[]) => SearchHit[])) => void;
   workspaceTags: AnnotationRecord[];
   setWorkspaceTags: (value: AnnotationRecord[]) => void;
+  tagStatus: "loading" | "ready" | "unavailable";
+  tagVocabularyWorkspaceID: string;
+  tagSnapshotKnown: boolean;
   activeTags: string[];
   setActiveTags: (value: string[]) => void;
   activeSystemFacets: SystemFacetState;
@@ -37,6 +43,8 @@ export type LibraryFlow = {
   /** The facet-filtered listing further narrowed by the active timeline month. */
   monthFilteredItems: SearchHit[];
   filteredLibraryItems: SearchHit[];
+  /** Current result set after host-local tag/facet/month conditions, before page projection. */
+  scopeHits: SearchHit[];
   activeTimelineMonth: string;
   setActiveTimelineMonth: (value: string) => void;
   toggleTimelineMonth: (month: string) => void;
@@ -51,22 +59,27 @@ export type LibraryFlow = {
   loadNamespace: (activeWorkspaceID: string, rootID: string, parentEntryID?: string, crumbs?: BrowseCrumb[]) => Promise<void>;
   navigateLibrary: (parentEntryID: string, crumbs: BrowseCrumb[], rootID?: string) => Promise<void>;
   loadTagVocabulary: (activeWorkspaceID: string) => Promise<AnnotationRecord[]>;
+  reloadTagVocabulary: (activeWorkspaceID: string) => Promise<{ workspaceID: string; status: "ready" | "unavailable" | "stale"; records: AnnotationRecord[] }>;
   syncTagCoverage: (subjectRef: string, tags: AnnotationRecord[]) => void;
   showSourcesSurface: () => void;
+  showLibrarySurface: (mode: "content" | LibraryPageMode) => boolean;
   toggleTagFilter: (value: string) => void;
   toggleSystemFacet: (kind: keyof SystemFacetState, value: string) => void;
   clearLibraryFilters: () => void;
+  clearSearchScope: () => void;
   showFacetFilteredLibrary: () => void;
   resetLibraryProjection: () => void;
 };
 
-export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode, setViewMode, sortField, sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify, canLeaveDetailDrafts, discardDetailDrafts }: {
+export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode, presentationMode, setViewMode, setPresentationMode, sortField, sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify, canLeaveDetailDrafts, discardDetailDrafts }: {
   t: Translator;
   locale: Locale;
   workspaceID: string;
   refreshGenerationRef: { current: number };
   viewMode: ViewMode;
+  presentationMode: "content" | LibraryPageMode;
   setViewMode: (mode: ViewMode) => void;
+  setPresentationMode: (mode: "content" | LibraryPageMode) => void;
   sortField: SortField;
   sortDirection: SortDirection;
   setQuery: (value: string) => void;
@@ -80,6 +93,15 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [libraryItems, setLibraryItems] = useState<SearchHit[]>([]);
   const [workspaceTags, setWorkspaceTags] = useState<AnnotationRecord[]>([]);
+  const [tagVocabularyWorkspaceID, setTagVocabularyWorkspaceID] = useState("");
+  const [tagStatus, setTagStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [tagSnapshotKnown, setTagSnapshotKnown] = useState(false);
+  const tagLoadSequence = useRef(0);
+  const tagScopeRef = useRef("");
+  const tagStatusRef = useRef<"loading" | "ready" | "unavailable">("loading");
+  const tagRecordsRef = useRef<AnnotationRecord[]>([]);
+  const currentWorkspaceID = useRef(workspaceID);
+  currentWorkspaceID.current = workspaceID;
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [activeSystemFacets, setActiveSystemFacets] = useState<SystemFacetState>({ type: "", format: "", dedup: "", tags: "", index: "" });
   const [browseRootID, setBrowseRootID] = useState("");
@@ -91,9 +113,11 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   const [activeTimelineMonth, setActiveTimelineMonth] = useState("");
   const [libraryLoaded, setLibraryLoaded] = useState(false);
 
+  const visibleWorkspaceTags = tagVocabularyWorkspaceID === workspaceID ? workspaceTags : [];
+  const visibleTagStatus = tagVocabularyWorkspaceID === workspaceID ? tagStatus : "loading";
   const tagsBySubject = useMemo(() => {
     const result = new Map<string, string[]>();
-    for (const tag of workspaceTags) {
+    for (const tag of visibleWorkspaceTags) {
       const subject = tag.subject_ref?.trim();
       const value = tag.body?.trim();
       if (!subject || !value || tag.kind !== "TAG" || tag.tombstoned) continue;
@@ -103,7 +127,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     }
     for (const values of result.values()) values.sort((left, right) => left.localeCompare(right, locale));
     return result;
-  }, [locale, workspaceTags]);
+  }, [locale, visibleWorkspaceTags]);
   const identityCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of libraryItems) {
@@ -121,15 +145,19 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     return (!activeSystemFacets.type || item.entry_type === activeSystemFacets.type) && (!activeSystemFacets.format || format === activeSystemFacets.format) && (!activeSystemFacets.dedup || dedup === activeSystemFacets.dedup) && (!activeSystemFacets.tags || tagState === activeSystemFacets.tags) && (!activeSystemFacets.index || (activeSystemFacets.index === "NOT_READY" && indexNotReady));
   }), [activeSystemFacets, identityCounts, libraryItems]);
   const monthFilteredItems = useMemo(() => activeTimelineMonth ? facetFilteredItems.filter((item) => itemInMonth(item, activeTimelineMonth)) : facetFilteredItems, [activeTimelineMonth, facetFilteredItems]);
+  const resultSource = useMemo(() => resultScopeSource(viewMode, hits, libraryItems), [hits, libraryItems, viewMode]);
+  const scopedResult = useMemo(() => filterResultScope(resultSource, { activeTags, activeSystemFacets, activeTimelineMonth, tagsBySubject, identityCounts }), [activeTags, activeSystemFacets, activeTimelineMonth, identityCounts, resultSource, tagsBySubject]);
+  const scopeMonthFilteredItems = scopedResult.monthFiltered;
+  const scopeHits = scopedResult.scopeHits;
   const tagFacets = useMemo(() => {
-    const visibleSubjects = new Set(monthFilteredItems.map((item) => item.subject_ref).filter((value): value is string => Boolean(value)));
+    const visibleSubjects = new Set(scopeMonthFilteredItems.map((item) => item.subject_ref).filter((value): value is string => Boolean(value)));
     const counts = new Map<string, number>();
     for (const [subject, values] of tagsBySubject) {
       if (!visibleSubjects.has(subject)) continue;
       for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
     }
     return [...counts].map(([value, count]) => ({ value, count })).sort((left, right) => left.value.localeCompare(right.value, locale));
-  }, [locale, monthFilteredItems, tagsBySubject]);
+  }, [locale, scopeMonthFilteredItems, tagsBySubject]);
   const systemFacets = useMemo(() => {
     const types = new Map<string, number>();
     const formats = new Map<string, number>();
@@ -163,22 +191,17 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   // same facets, not the imperative hits state: the loader, the hash restore,
   // and the facet toggles can then never race each other over hits. Search
   // keeps its daemon-ordered hits.
-  const gridItems = viewMode !== "search" && hasActiveFilters ? filteredLibraryItems : hits;
-  const renderedHits = useMemo(() => sortAvailable && gridItems.length > 1
-    ? sortLibraryHits(gridItems, sortField, sortDirection, locale)
-    : gridItems, [gridItems, locale, sortAvailable, sortDirection, sortField]);
-  const tagVocabulary = useMemo(() => [...new Set(workspaceTags.map((tag) => tag.body?.trim()).filter((value): value is string => Boolean(value)))].sort((left, right) => left.localeCompare(right, locale)), [locale, workspaceTags]);
+  const pageHits = useMemo(() => projectResultScope(scopeHits, presentationMode), [presentationMode, scopeHits]);
+  const renderedHits = useMemo(() => sortAvailable && pageHits.length > 1
+    ? sortLibraryHits(pageHits, sortField, sortDirection, locale)
+    : pageHits, [locale, pageHits, sortAvailable, sortDirection, sortField]);
+  const tagVocabulary = useMemo(() => [...new Set(visibleWorkspaceTags.map((tag) => tag.body?.trim()).filter((value): value is string => Boolean(value)))].sort((left, right) => left.localeCompare(right, locale)), [locale, visibleWorkspaceTags]);
 
   useEffect(() => {
-    if (!workspaceID) { setWorkspaceTags([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); return; }
+    if (!workspaceID) { tagLoadSequence.current += 1; tagScopeRef.current = ""; tagStatusRef.current = "unavailable"; tagRecordsRef.current = []; setTagVocabularyWorkspaceID(""); setTagStatus("unavailable"); setTagSnapshotKnown(false); setWorkspaceTags([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); return; }
     void loadTagVocabulary(workspaceID);
+    return () => { tagLoadSequence.current += 1; };
   }, [workspaceID]);
-  useEffect(() => {
-    if (viewMode !== "tag") return;
-    const subjects = new Set(filteredLibraryItems.map((item) => item.subject_ref));
-    setHits(filteredLibraryItems);
-    setSelected((current) => current?.subject_ref && subjects.has(current.subject_ref) ? current : undefined);
-  }, [filteredLibraryItems, viewMode]);
 
   async function loadNamespace(activeWorkspaceID: string, rootID: string, parentEntryID = "", crumbs: BrowseCrumb[] = []) {
     if (!canLeaveDetailDrafts()) return;
@@ -212,21 +235,50 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     setSelected(undefined); setBrowseRoots(roots); setBrowseRootID(rootID); setBrowseCrumbs([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
     setLibraryLoaded(true);
   }
-  async function loadTagVocabulary(activeWorkspaceID: string): Promise<AnnotationRecord[]> {
+  async function reloadTagVocabulary(activeWorkspaceID: string): Promise<{ workspaceID: string; status: "ready" | "unavailable" | "stale"; records: AnnotationRecord[] }> {
+    if (activeWorkspaceID !== currentWorkspaceID.current) return { workspaceID: activeWorkspaceID, status: "stale", records: [] };
+    const requestSequence = ++tagLoadSequence.current;
+    const sameScope = tagScopeRef.current === activeWorkspaceID;
+    if (!sameScope) {
+      tagScopeRef.current = activeWorkspaceID;
+      tagRecordsRef.current = [];
+      setTagVocabularyWorkspaceID(activeWorkspaceID);
+      setTagSnapshotKnown(false);
+      setWorkspaceTags([]);
+    }
+    tagStatusRef.current = "loading";
+    setTagStatus("loading");
     try {
       const response = await command(operations.annotation.list, { workspace_id: activeWorkspaceID });
+      if (requestSequence !== tagLoadSequence.current || currentWorkspaceID.current !== activeWorkspaceID) return { workspaceID: activeWorkspaceID, status: "stale", records: [] };
+      if (response.status !== "SUCCEEDED" || !Array.isArray(response.data?.annotations)) throw new Error("Tag list was not completely available.");
       const items = ((response.data?.annotations ?? []) as AnnotationRecord[])
         .filter((item) => item.kind === "TAG" && !item.tombstoned && typeof item.body === "string" && Boolean(item.body.trim()));
+      tagScopeRef.current = activeWorkspaceID;
+      tagStatusRef.current = "ready";
+      tagRecordsRef.current = items;
+      setTagVocabularyWorkspaceID(activeWorkspaceID);
+      setTagSnapshotKnown(true);
       setWorkspaceTags(items);
-      return items;
+      setTagStatus("ready");
+      return { workspaceID: activeWorkspaceID, status: "ready", records: items };
     } catch {
-      setWorkspaceTags([]);
-      return [];
+      if (requestSequence !== tagLoadSequence.current || currentWorkspaceID.current !== activeWorkspaceID) return { workspaceID: activeWorkspaceID, status: "stale", records: [] };
+      tagScopeRef.current = activeWorkspaceID;
+      tagStatusRef.current = "unavailable";
+      setTagVocabularyWorkspaceID(activeWorkspaceID);
+      if (!sameScope) { tagRecordsRef.current = []; setWorkspaceTags([]); }
+      setTagStatus("unavailable");
+      return { workspaceID: activeWorkspaceID, status: "unavailable", records: sameScope ? tagRecordsRef.current : [] };
     }
+  }
+  async function loadTagVocabulary(activeWorkspaceID: string): Promise<AnnotationRecord[]> {
+    const result = await reloadTagVocabulary(activeWorkspaceID);
+    return result.status === "ready" ? result.records : [];
   }
   function syncTagCoverage(subjectRef: string, tags: AnnotationRecord[]) {
     const normalized = subjectRef.trim();
-    if (!normalized) return;
+    if (!normalized || tagStatusRef.current !== "ready" || tagScopeRef.current !== workspaceID || currentWorkspaceID.current !== workspaceID) return;
     const state = tags.some((item) => item.subject_ref?.trim() === normalized && item.kind === "TAG" && !item.tombstoned) ? "MARKED" : "UNMARKED";
     const update = (item: SearchHit) => item.subject_ref?.trim() === normalized ? { ...item, index_status: { ...item.index_status, tags: state } } : item;
     setLibraryItems((items) => items.map(update));
@@ -242,31 +294,56 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     setSelected(undefined);
     setViewMode("sources");
   }
+  // Registered pages are transient projections over one loaded Library set.
+  // Their declared media context selects an existing suffix facet locally;
+  // switching pages adds no query, index generation, or durable membership.
+  function showLibrarySurface(mode: "content" | LibraryPageMode): boolean {
+    if (!canLeaveDetailDrafts()) return false;
+    discardDetailDrafts();
+    setPresentationMode(mode);
+    if (viewMode === "search" || viewMode === "tag") {
+      setViewMode(viewMode);
+      return true;
+    }
+    setQuery(""); setLastExecutedQuery("");
+    setHits(libraryItems);
+    setSelected(undefined); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth("");
+    setBrowseRootID(""); setBrowseCrumbs([]); setViewMode(mode);
+    return true;
+  }
   function toggleTagFilter(value: string) {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
     const next = activeTags.includes(value) ? activeTags.filter((tag) => tag !== value) : [...activeTags, value];
-    if (next.length === 0) {
-      setQuery(""); setLastExecutedQuery(""); setHits(monthFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
-      return;
-    }
-    setQuery(""); setLastExecutedQuery(""); setSelected(undefined); setActiveTags(next); setViewMode("tag");
+    setSelected(undefined); setActiveTags(next);
+    if (viewMode !== "search") setViewMode(next.length || hasSystemFacets || activeTimelineMonth ? "tag" : "content");
   }
   function toggleSystemFacet(kind: keyof SystemFacetState, value: string) {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
     const next = { ...activeSystemFacets, [kind]: activeSystemFacets[kind] === value ? "" : value };
-    setQuery(""); setLastExecutedQuery(""); setSelected(undefined); setActiveSystemFacets(next); setViewMode("tag");
+    setSelected(undefined); setActiveSystemFacets(next);
+    if (viewMode !== "search") setViewMode(activeTags.length || Object.values(next).some(Boolean) || activeTimelineMonth ? "tag" : "content");
   }
   function clearLibraryFilters() {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
-    setQuery(""); setLastExecutedQuery(""); setHits(libraryItems); setSelected(undefined); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
+    if (viewMode !== "search") { setQuery(""); setLastExecutedQuery(""); setViewMode(presentationMode === "content" ? "content" : presentationMode); }
+    setHits((current) => viewMode === "search" ? current : libraryItems);
+    setSelected(undefined); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth("");
+  }
+  function clearSearchScope() {
+    if (viewMode !== "search" || !canLeaveDetailDrafts()) return;
+    discardDetailDrafts();
+    setQuery(""); setLastExecutedQuery(""); setHits(libraryItems); setSelected(undefined);
+    setViewMode(activeTags.length || hasSystemFacets || activeTimelineMonth ? "tag" : presentationMode);
   }
   function showFacetFilteredLibrary() {
     if (!canLeaveDetailDrafts()) return;
     discardDetailDrafts();
-    setQuery(""); setLastExecutedQuery(""); setHits(monthFilteredItems); setSelected(undefined); setActiveTags([]); setViewMode(hasSystemFacets ? "tag" : "content");
+    setSelected(undefined);
+    setActiveTags([]);
+    if (viewMode !== "search") { setHits(monthFilteredItems); setViewMode(hasSystemFacets ? "tag" : "content"); }
   }
   // Timeline browse: one month bucket filters the listing; clicking the active
   // bucket again clears it. The strip lives in the content and tag views; the
@@ -277,8 +354,8 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     discardDetailDrafts();
     const next = activeTimelineMonth === month ? "" : month;
     setActiveTimelineMonth(next);
-    setQuery(""); setLastExecutedQuery(""); setSelected(undefined);
-    if (viewMode === "content") setHits(libraryItems);
+    setSelected(undefined);
+    if (viewMode !== "search") setViewMode(next ? "tag" : (activeTags.length || hasSystemFacets ? "tag" : "content"));
   }
   // Restores the browser-local filter view encoded in the URL hash. The hash
   // is never durable state: an unknown tag or month yields the honest
@@ -315,8 +392,11 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     setHits,
     libraryItems,
     setLibraryItems,
-    workspaceTags,
+    workspaceTags: visibleWorkspaceTags,
     setWorkspaceTags,
+    tagStatus: visibleTagStatus,
+    tagVocabularyWorkspaceID,
+    tagSnapshotKnown: tagVocabularyWorkspaceID === workspaceID && tagSnapshotKnown,
     activeTags,
     setActiveTags,
     activeSystemFacets,
@@ -333,6 +413,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     facetFilteredItems,
     monthFilteredItems,
     filteredLibraryItems,
+    scopeHits,
     activeTimelineMonth,
     setActiveTimelineMonth,
     toggleTimelineMonth,
@@ -347,11 +428,14 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     loadNamespace,
     navigateLibrary,
     loadTagVocabulary,
+    reloadTagVocabulary,
     syncTagCoverage,
     showSourcesSurface,
+    showLibrarySurface,
     toggleTagFilter,
     toggleSystemFacet,
     clearLibraryFilters,
+    clearSearchScope,
     showFacetFilteredLibrary,
     resetLibraryProjection,
   };

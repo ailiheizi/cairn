@@ -1,0 +1,131 @@
+/* Browser-local photo/audio visibility choices in Settings > Appearance. */
+.library-presentation-navigation { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.library-presentation-navigation__domains, .library-presentation-navigation__presentations { display: inline-flex; min-width: 0; align-items: center; gap: 4px; flex-wrap: wrap; }
+.library-presentation-navigation__domains { border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface-raised); }
+.library-presentation-navigation__presentations { margin-left: auto; }
+.library-presentation-navigation__layouts { display: inline-flex; min-width: 0; gap: 4px; border-left: 1px solid var(--line); padding-left: 8px; }
+.library-presentation-navigation__domain, .library-presentation-navigation__presentation { min-height: 32px; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.library-presentation-navigation__domain.is-active { border-color: var(--line); background: var(--surface-container); color: var(--ink); font-weight: 700; }
+.library-presentation-navigation__presentation.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+.library-presentation-navigation button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 58%, transparent); outline-offset: 2px; }
+.library-view-preference-group { display: grid; gap: 8px; }
+.library-view-preference-group h4 { margin: 8px 2px 0; color: var(--ink); font-size: 12px; font-weight: 720; }
+.library-view-preference-group + .library-view-preference-group { margin-top: 8px; }
+.library-view-preferences {
+  min-width: 0;
+  margin: 2px 0 0;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  padding: 20px 0 0;
+  color: var(--ink);
+}
+
+.library-view-preferences legend {
+  margin: 0 0 6px;
+  padding: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.library-view-preferences-note {
+  max-width: 640px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.library-view-preference-list {
+  display: grid;
+  gap: 8px;
+}
+
+.library-view-preference-row {
+  min-width: 0;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 14px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.library-view-preference-row:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
+}
+
+.library-view-preference-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.library-view-preference-copy strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.library-view-preference-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.library-view-preference-toggle {
+  appearance: none;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  justify-self: end;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-container-highest);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.library-view-preference-toggle::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.library-view-preference-toggle:checked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.library-view-preference-toggle:checked::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+.library-view-preference-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 390px) {
+  .library-view-preferences { padding-top: 16px; }
+  .library-view-preference-row { gap: 10px; padding-inline: 11px; }
+  .library-presentation-navigation { align-items: stretch; flex-direction: column; }
+  .library-presentation-navigation__presentations { margin-left: 0; }
+  .library-presentation-navigation__layouts { border-left: 0; padding-left: 0; }
+}

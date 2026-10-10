@@ -1,8 +1,8 @@
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
-import { Check, FileText, Folder, Tag } from "lucide-react";
+import { Archive, Check, FileAudio, FileText, FileType2, FileVideo, Folder, Image as ImageIcon, Tag } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { ContentPreview, previewThumbBudget, previewThumbKind } from "./ContentPreview";
-import { exactIdentityKey, formatBytes, formatEntryType, previewUnicodeText, searchSegmentSourceLabel, sortableSize } from "../lib/format";
+import { exactIdentityKey, formatBytes, formatEntryType, formatFacetValue, mediaClassFromSuffix, previewUnicodeText, searchSegmentSourceLabel, sortableSize } from "../lib/format";
 import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, SortField, ViewMode } from "../lib/types";
 
 // The library result list: one grid of tiles or one dense list, both rendered
@@ -21,23 +21,31 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
   const thumbKind = showThumb && !directory && Boolean(workspaceId) ? previewThumbKind(title) : undefined;
   const thumbSizeKnown = hit.logical_size == null || (Number.isSafeInteger(hit.logical_size) && hit.logical_size >= 0 && hit.logical_size <= previewThumbBudget());
   const showImageThumb = thumbKind === "image" && thumbSizeKnown;
+  const format = directory ? "" : formatFacetValue(hit);
+  const mediaClass = mediaClassFromSuffix(format);
+  const typeCue = mediaClass === "audio" ? "audio" : mediaClass === "video" ? "video" : mediaClass === "image" ? "image" : ["zip", "7z", "rar", "tar", "gz", "bz2", "xz"].includes(format) ? "archive" : mediaClass === "document" ? "document" : "file";
+  const TypeIcon = typeCue === "audio" ? FileAudio : typeCue === "video" ? FileVideo : typeCue === "image" ? ImageIcon : typeCue === "archive" ? Archive : typeCue === "document" ? FileType2 : FileText;
   const exactSize = sortableSize(hit);
   // The size becomes visible whenever it is the sort key, so a size ordering
   // (and the entries that have no logical size at all) can be checked by eye.
   const sizeLabel = exactSize === null ? t("No logical size") : formatBytes(exactSize);
+  const entryTypeLabel = hit.entry_type === "REGULAR_FILE" ? t("File") : hit.entry_type === "DIRECTORY" ? t("Folder") : hit.entry_type === "SYMLINK" ? t("Symbolic link") : formatEntryType(hit.entry_type, t);
+  const metaText = `${sizeLabel} · ${entryTypeLabel}${format ? ` · ${format.toUpperCase()}` : ""}`;
   const visibleTags = userTags.slice(0, 2);
   return <div className={`result-row ${selected ? "selected" : ""} ${multiSelected ? "multi-selected" : ""} ${showImageThumb ? "has-thumb" : directory ? "is-folder" : "is-file"}`} role="group" aria-label={title} data-result-index={index} onClick={(event) => onRowClick(index, event)}>
     <span className="result-select" role="checkbox" aria-checked={multiSelected} tabIndex={-1} aria-label={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} title={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} onClick={(event) => { event.stopPropagation(); onToggleSelection(index); }}>{multiSelected && <Check size={13} />}</span>
-    <span className={`file-icon ${directory ? "is-folder" : showImageThumb ? "is-image" : "is-file"}`}>
-      {directory ? <Folder size={48} /> : <FileText size={44} />}
+    <span className={`file-icon ${directory ? "is-folder" : showImageThumb ? "is-image" : `is-file is-${typeCue}`}`}>
+      {directory ? <Folder size={48} /> : <TypeIcon size={44} />}
       {showImageThumb && <ContentPreview variant="thumb" command={command} locale={locale === "zh-CN" ? "zh-CN" : "en"} workspaceId={workspaceId} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={title} logicalSize={hit.logical_size} />}
+      {!directory && format && <span className="result-format" aria-label={t("Filename format {{format}}", { format: format.toUpperCase() })}>{format.toUpperCase()}</span>}
       {duplicateCount > 1 && <span className="result-duplicate" title={t("Loaded content contains {{count}} entries with the same SHA-256 and length", { count: duplicateCount })}>{duplicateCount}</span>}
     </span>
     <button type="button" className="result-open-copy" tabIndex={roving ? 0 : -1} onClick={(event) => { event.stopPropagation(); onRowClick(index, event); }}><strong>{title}</strong></button>
-    {(!directory || sizeSort) && <span className="result-meta">{sizeLabel} · {formatEntryType(hit.entry_type, t)}</span>}
+    {(!directory || sizeSort) && <span className="result-meta" title={metaText}><span>{metaText}</span></span>}
     {visibleSegments.map((segment, index) => {
       const segmentKey = `${segment.semantic_segment_id || segment.source_id || segment.source_type || "segment"}-${segment.ordinal ?? index}-${index}`;
-      return <span className="result-match" title={segment.matched_text} aria-label={t("Matched segment provenance")} key={segmentKey}><b>{searchSegmentSourceLabel(segment, t)}</b>{previewUnicodeText(segment.matched_text, 72)}</span>;
+      const evidence = segment.matched_excerpt || segment.matched_text;
+      return <span className="result-match" title={segment.matched_text} aria-label={t("Matched segment provenance")} key={segmentKey}><b>{searchSegmentSourceLabel(segment, t)}</b>{previewUnicodeText(evidence, 72)}</span>;
     })}
     {visibleTags.length > 0 && <span className="result-tags" title={userTags.join(" · ")}>{visibleTags.map((value) => <span className="result-tag" key={value}><Tag size={10} />{value}</span>)}{userTags.length > visibleTags.length && <span className="result-tag more">+{userTags.length - visibleTags.length}</span>}</span>}
   </div>;

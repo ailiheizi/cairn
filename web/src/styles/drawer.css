@@ -210,10 +210,7 @@ add-source, restore, and export drawers. */
 .plan-file-mode { border-color: var(--hairline-strong); border-radius: 8px; color: var(--ink); background: var(--card-fill-quiet); }
 .export-trigger { color: var(--ink); border-color: var(--hairline-strong); }
 
-@media (prefers-color-scheme: light) {
-
-  .drawer { background: rgb(252 253 253 / 92%); box-shadow: -16px 0 48px rgb(25 48 67 / 14%); }
-}
+:root[data-appearance="light"] .drawer { background: var(--glass); box-shadow: var(--card-shadow); }
 @media (max-width: 640px) {
 
   .drawer { box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18); }
@@ -257,23 +254,24 @@ add-source, restore, and export drawers. */
 
 /* Upload mode: the bounded channel into the daemon-owned staging inbox. */
 .source-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.source-mode { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--hairline); border-radius: 7px; padding: 9px 10px; color: #b9b4c7; background: var(--card-fill-quiet); font-size: 11px; font-weight: 700; }
-.source-mode.active { border-color: rgba(167, 139, 250, 0.5); color: #eeeaff; background: rgba(167, 139, 250, 0.12); }
+.source-mode { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 9px 10px; color: var(--muted); background: var(--card-fill-quiet); font-size: 11px; font-weight: 700; }
+.source-mode.active { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
 .source-mode:disabled { opacity: 0.55; }
 .upload-zone { display: grid; gap: 10px; }
-.upload-picker { position: relative; display: grid; gap: 3px; justify-items: start; border: 1px dashed rgba(167, 139, 250, 0.4); border-radius: 8px; padding: 14px; color: #cfc9e2; background: rgba(167, 139, 250, 0.05); cursor: pointer; }
+.upload-picker { position: relative; display: grid; gap: 3px; justify-items: start; border: 1px dashed var(--accent); border-radius: 8px; padding: 14px; color: var(--ink); background: var(--accent-soft); cursor: pointer; }
 .upload-picker > svg { color: var(--primary); }
-.upload-picker > span { font-size: 12px; font-weight: 700; color: #eeeaff; }
-.upload-picker > small { color: #8d93a1; font-size: 10px; line-height: 1.4; }
+.upload-picker > span { font-size: 12px; font-weight: 700; color: var(--ink); }
+.upload-picker > small { color: var(--muted); font-size: 10px; line-height: 1.4; }
 .upload-picker input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.upload-picker:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .upload-picker:has(input:disabled) { opacity: 0.6; cursor: default; }
 .upload-rows { display: grid; gap: 6px; }
 .upload-row { display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--hairline); border-radius: 7px; padding: 8px 10px; background: var(--card-fill-quiet); }
-.upload-row > svg { flex: 0 0 auto; margin-top: 2px; color: #55d6a4; }
+.upload-row > svg { flex: 0 0 auto; margin-top: 2px; color: var(--health); }
 .upload-row.failed > svg { color: var(--gold); }
 .upload-row > div { min-width: 0; display: grid; gap: 2px; }
-.upload-row strong { overflow-wrap: anywhere; color: #e3dff0; font-size: 11px; }
-.upload-row small { overflow-wrap: anywhere; color: #8d93a1; font-size: 10px; }
-.upload-row.failed small { color: #dfc38c; }
+.upload-row strong { overflow-wrap: anywhere; color: var(--ink); font-size: 11px; }
+.upload-row small { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; }
+.upload-row.failed small { color: var(--gold); }
 .upload-handoff { display: grid; gap: 8px; justify-items: start; }
 .upload-error { display: flex; align-items: center; gap: 8px; }
