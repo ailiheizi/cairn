@@ -100,7 +100,7 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
     : semanticBundleRestartRequired
       ? "BGE installed. Restart the service to activate it."
       : semanticBundleOperatorProvided
-        ? "This local embedding profile is supplied by the operator. RestoreWeave does not download or verify it here."
+        ? "This local embedding profile is supplied by the operator. Cairn does not download or verify it here."
         : bundleInstalled
         ? "The verified local BGE bundle is installed. Semantic search becomes ready after a compatible index is opened or rebuilt."
         : "The local BGE bundle is missing or failed verification. Keyword search and exact recovery remain available.";
@@ -241,7 +241,7 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
             </section>}
             {activeSection === "service" && <section className="config-section"><ConfigHeading eyebrow={t("DAEMON")} title={t("Service")} copy={t("Control the bounded HTTP adapter used by this browser. Authentication tokens remain environment-only and are never written here.")} />
               <ConfigGroup title={t("Web API")} copy={t("Configure the loopback adapter used by this browser client.")}><div className="form-grid two"><ConfigToggle label={t("Enable Web API")} copy={t("Required for this browser client after the next restart.")} checked={Boolean(config.api?.enabled)} onChange={(value) => settings.setConfigField("api", "enabled", value)} /><ConfigInput label={t("Listen address")} value={config.api?.listen} onChange={(value) => settings.setConfigField("api", "listen", value)} disabled={!config.api?.enabled} /></div></ConfigGroup>
-              <details className="config-advanced identity-disclosure"><summary>{t("Runtime identity")}<ChevronRight size={15} /></summary><p>{t("Inspect the active and persisted configuration without exposing credentials.")}</p><div className="form-grid two"><ConfigReadonly label={t("Configuration file")} value={configData?.config_path} t={t} wide /><ConfigReadonly label={t("Running digest")} value={configData?.running_config_digest} t={t} mono /><ConfigReadonly label={t("Persisted digest")} value={configData?.config_digest} t={t} mono /><ConfigReadonly label={t("Workspace")} value={workspaceID || t("Not created")} t={t} /><ConfigReadonly label={t("Service socket")} value={statusData?.listen || t("Loopback")} t={t} /></div></details>
+              <details className="config-advanced identity-disclosure"><summary>{t("Runtime identity")}<ChevronRight size={15} /></summary><p>{t("Inspect the active and persisted configuration without exposing credentials.")}</p><div className="form-grid two"><ConfigReadonly label={t("Configuration file")} value={configData?.config_path} t={t} wide /><ConfigReadonly label={t("Running digest")} value={configData?.running_config_digest} t={t} mono /><ConfigReadonly label={t("Persisted digest")} value={configData?.config_digest} t={t} mono /><ConfigReadonly label={t("Content scope")} value={workspaceID || t("Not created")} t={t} /><ConfigReadonly label={t("Service socket")} value={statusData?.listen || t("Loopback")} t={t} /></div></details>
               <ConfigNotice><KeyRound size={15} />{t("API tokens are supplied with RESTOREWEAVE_API_TOKEN or --api-token; the WebUI never stores plaintext credentials.")}</ConfigNotice>
             </section>}
           </>}

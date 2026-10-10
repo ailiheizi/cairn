@@ -12,7 +12,7 @@
 
 **Audience:** one self-hosted operator using a NAS or home storage for their
 own content. This is a selected direction, not validated market demand. Keep
-RestoreWeave as the working name; brand and traffic hypotheses remain
+Cairn as the working name; brand and traffic hypotheses remain
 unvalidated.
 
 **Product target: a self-hosted personal-content platform. Keep readable
@@ -31,7 +31,7 @@ playback, URL capture, or application-state capture.
 
 ## Product shape
 
-RestoreWeave targets one content foundation with professional domain experiences.
+Cairn targets one content foundation with professional domain experiences.
 Shared identity, tags, the single Notes surface, search, and export apply across
 views. Existing media lenses are projections over the same content, not
 complete photo/music applications. Complete domain targets and pending scope
@@ -165,7 +165,7 @@ The operator-supplied [Bilibili visual reference](https://www.bilibili.com/video
 is visual inspiration and demo reference only; this records the supplied links,
 not a claim that they were viewed or that their code is adopted. The client
 should develop an original visual language and must not reproduce protected IP
-assets. The reference's popularity is not evidence of RestoreWeave demand.
+assets. The reference's popularity is not evidence of Cairn demand.
 Promotion should demonstrate mixed-file intake → retrieval
 from familiar clues → original export. Value, appeal, and retention require
 feedback from real users; traffic success must not be claimed in advance.

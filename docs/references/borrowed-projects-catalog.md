@@ -1,11 +1,11 @@
 # Borrowed Projects Catalog
 
-> **Catalog status:** This is the companion quick-reference to [Open-Source Adoption and Code Borrowing](open-source-adoption-and-code-borrowing.md), completed on 2026-08-12. It lists every external project RestoreWeave plans to borrow from, with the concrete role, the exact thing to borrow, the integration mode, the applicable license, and the pinned version or commit. Decisions, gates, and rationale live in the adoption document; this file is a lookup table, not a replacement for it.
+> **Catalog status:** This is the companion quick-reference to [Open-Source Adoption and Code Borrowing](open-source-adoption-and-code-borrowing.md), completed on 2026-08-12. It lists every external project Cairn plans to borrow from, with the concrete role, the exact thing to borrow, the integration mode, the applicable license, and the pinned version or commit. Decisions, gates, and rationale live in the adoption document; this file is a lookup table, not a replacement for it.
 
 ## How this catalog is used
 
 1. **Repository-engine entries are `qualification pending` until the spike passes.** Kopia, Restic, Borg, and Plakar remain unselected. No repository engine is adopted, and no repository-dependent milestone is treated as complete, until the Kopia-led qualification spike (nine proof items, [open-source-adoption-and-code-borrowing.md:159-175](open-source-adoption-and-code-borrowing.md#4-kopia-qualification-spike)) passes and the control corpus comparison is finished.
-2. **Every selectively borrowed fragment carries full provenance.** Any code taken from Perkeep, pathrs, Kopia, Restic, or rclone must record the source repository, exact commit, source path, applicable license, retained notices, local destination, substantive modifications, and the tests that establish independent RestoreWeave behavior ([open-source-adoption-and-code-borrowing.md:126](open-source-adoption-and-code-borrowing.md#35-selective-code-borrowing)). A fragment without this record is not admitted.
+2. **Every selectively borrowed fragment carries full provenance.** Any code taken from Perkeep, pathrs, Kopia, Restic, or rclone must record the source repository, exact commit, source path, applicable license, retained notices, local destination, substantive modifications, and the tests that establish independent Cairn behavior ([open-source-adoption-and-code-borrowing.md:126](open-source-adoption-and-code-borrowing.md#35-selective-code-borrowing)). A fragment without this record is not admitted.
 3. **Status is a gate, not a label.** `frozen` means the decision is recorded and the work is authorized after the stated qualifications; `qualification pending` means a decision-changing gate is still open; `new` means the entry was added by external research on 2026-08-12 and has no prior decision history.
 4. **Licenses are recorded for the stated version only.** The project will open-source and is not license-constrained, but every pin must still be recorded honestly and rechecked at the exact release, binary, and transitive-dependency level before distribution ([open-source-adoption-and-code-borrowing.md:278-296](open-source-adoption-and-code-borrowing.md#9-license-and-supply-chain-policy)).
 
@@ -20,7 +20,7 @@
 - **License:** Apache-2.0
 - **Version or pin:** v0.23.1
 - **Role in five seams:** `RepositoryDriver` (leading candidate)
-- **What to borrow:** The whole repository engine as a planned direct dependency — object model, storage abstractions, verification mechanisms, and maintenance/repair behavior. Do not inherit Kopia's repository or namespace model as RestoreWeave ABI.
+- **What to borrow:** The whole repository engine as a planned direct dependency — object model, storage abstractions, verification mechanisms, and maintenance/repair behavior. Do not inherit Kopia's repository or namespace model as Cairn ABI.
 - **How to integrate:** Direct dependency (library) inside a narrow reference adapter, after the qualification spike. Disable unneeded server and external-SSH surfaces; keep Kopia types private.
 - **Status:** Qualification pending
 - **Notes:** The spike must prove all nine items — root/GC safety, crash reconciliation, bounded reads, independent SHA-256 readback, catalog-independent recovery, corruption behavior, maintenance compatibility, deployment performance, and reader closure ([open-source-adoption-and-code-borrowing.md:163-173](open-source-adoption-and-code-borrowing.md#4-kopia-qualification-spike)). Pin at least v0.23.1; [GHSA-2q4c-3mrw-63c3](https://github.com/kopia/kopia/security/advisories/GHSA-2q4c-3mrw-63c3) affects versions through v0.22.3.
@@ -44,7 +44,7 @@
 - **License:** BSD-3-Clause
 - **Version or pin:** 1.4.5
 - **Role in five seams:** `RepositoryDriver` (bounded local/SSH benchmark only)
-- **What to borrow:** Calibration data for compression, maintenance, and mounted-read expectations. Its CLI boundary is less natural for RestoreWeave and repair may discard damaged data, so it is not a leading adapter ([open-source-adoption-and-code-borrowing.md:64](open-source-adoption-and-code-borrowing.md#32-qualification-candidates)).
+- **What to borrow:** Calibration data for compression, maintenance, and mounted-read expectations. Its CLI boundary is less natural for Cairn and repair may discard damaged data, so it is not a leading adapter ([open-source-adoption-and-code-borrowing.md:64](open-source-adoption-and-code-borrowing.md#32-qualification-candidates)).
 - **How to integrate:** Subprocess benchmark harness, and design reference.
 - **Status:** Qualification pending
 - **Notes:** Use only where local or SSH comparisons add information ([open-source-adoption-and-code-borrowing.md:175](open-source-adoption-and-code-borrowing.md#4-kopia-qualification-spike)).
@@ -57,16 +57,16 @@
 - **Version or pin:** None pinned yet (tracking upstream `main` and releases)
 - **Role in five seams:** `RepositoryDriver` (added qualification-spike comparison and possible same-language in-process library candidate); chunking/verification design reference
 - **What to borrow:** Confirmed by external research on 2026-08-12: content-addressed deduplicating snapshots, the Kloset chunking engine, Web UI/API snapshot browsing, and verifiable-recovery claims. Borrow the verification and chunking designs as an in-language counterpoint to the Kopia/Restic spike, and evaluate Plakar itself as an in-process library candidate for `RepositoryDriver`.
-- **How to integrate:** Design reference first; direct dependency (in-process Go library) only if it passes the same qualification gates as Kopia. Do not adopt Plakar's object identity, repository layout, or chunking parameters as RestoreWeave ABI.
+- **How to integrate:** Design reference first; direct dependency (in-process Go library) only if it passes the same qualification gates as Kopia. Do not adopt Plakar's object identity, repository layout, or chunking parameters as Cairn ABI.
 - **Status:** New
-- **Notes:** New entry added 2026-08-12. Because it is in the same language as RestoreWeave, it offers a lower-boundary alternative to a subprocess-driven engine; its claims (verifiability, Web browsing) must be proven against the same spike corpus, not taken from the README.
+- **Notes:** New entry added 2026-08-12. Because it is in the same language as Cairn, it offers a lower-boundary alternative to a subprocess-driven engine; its claims (verifiability, Web browsing) must be proven against the same spike corpus, not taken from the README.
 
 ### 5. go-fuse — rejected product dependency
 
 - **Project:** go-fuse (Go)
 - **URL:** https://github.com/hanwen/go-fuse
 - **Role:** Historical research reference only
-- **Decision:** Do not adopt. RestoreWeave exposes export manifests and bounded file reads; operators choose external mount or sharing tools.
+- **Decision:** Do not adopt. Cairn exposes export manifests and bounded file reads; operators choose external mount or sharing tools.
 - **Status:** Rejected 2026-08-17
 
 ### 6. modernc.org/sqlite — bundled SQLite driver and FTS5 provider basis
@@ -76,7 +76,7 @@
 - **License:** MIT
 - **Version or pin:** v1.55.0 (already in `go.mod`)
 - **Role in five seams:** `IndexProvider` and `QueryProvider` (bundled SQLite FTS5 implementation for `RW-MVP-1`)
-- **What to borrow:** The SQLite driver plus FTS5-backed lexical search. One physically separate disposable database per immutable `IndexGenerationRef`; the schema, row IDs, token tables, and query syntax are never durable RestoreWeave ABI.
+- **What to borrow:** The SQLite driver plus FTS5-backed lexical search. One physically separate disposable database per immutable `IndexGenerationRef`; the schema, row IDs, token tables, and query syntax are never durable Cairn ABI.
 - **How to integrate:** Direct dependency (already present in the Go module).
 - **Status:** Frozen
 - **Notes:** FTS5 availability is asserted during startup qualification. SQLite itself is public domain; wrappers, generated builds, and extensions are audited separately ([open-source-adoption-and-code-borrowing.md:49](open-source-adoption-and-code-borrowing.md#31-planned-direct-dependencies-and-bundled-implementation-choices), [open-source-adoption-and-code-borrowing.md:238-251](open-source-adoption-and-code-borrowing.md#7-sqlite-fts5-generation-model)).
@@ -127,7 +127,7 @@
 - **What to borrow:** Exactly three reviewed areas: [`pkg/blobserver`](https://github.com/perkeep/perkeep/tree/9406ea272705d1f8f63c9b2ed31274962c30e3e1/pkg/blobserver) for small storage interfaces and adapter conformance-test patterns; [`pkg/schema/filewriter.go`](https://github.com/perkeep/perkeep/blob/9406ea272705d1f8f63c9b2ed31274962c30e3e1/pkg/schema/filewriter.go) for chunk-tree construction ideas; [`pkg/schema/filereader.go`](https://github.com/perkeep/perkeep/blob/9406ea272705d1f8f63c9b2ed31274962c30e3e1/pkg/schema/filereader.go) for range reads and reconstruction patterns.
 - **How to integrate:** Selective code copying with full provenance (source repo, commit, path, license, notices, local destination, substantive modifications, independent tests — [open-source-adoption-and-code-borrowing.md:126](open-source-adoption-and-code-borrowing.md#35-selective-code-borrowing)).
 - **Status:** Frozen
-- **Notes:** RestoreWeave does not inherit Perkeep's SHA-224 defaults, schema language, object identity, publication model, or recovery format. SHA-256 content identity, `RepositoryDriver` receipts, portable publication records, and catalog-independent recovery semantics remain RestoreWeave-owned ([open-source-adoption-and-code-borrowing.md:124](open-source-adoption-and-code-borrowing.md#35-selective-code-borrowing)).
+- **Notes:** Cairn does not inherit Perkeep's SHA-224 defaults, schema language, object identity, publication model, or recovery format. SHA-256 content identity, `RepositoryDriver` receipts, portable publication records, and catalog-independent recovery semantics remain Cairn-owned ([open-source-adoption-and-code-borrowing.md:124](open-source-adoption-and-code-borrowing.md#35-selective-code-borrowing)).
 
 ### 11. pathrs / libpathrs — root-confined resolution
 
@@ -151,7 +151,7 @@
 - **What to borrow:** The concept of making restore verification an automated, operator-friendly workflow, confirmed by external research on 2026-08-12. This is UX and workflow vocabulary only; no code is copied or linked.
 - **How to integrate:** Design reference (independent implementation).
 - **Status:** New
-- **Notes:** New entry added 2026-08-12. RestoreWeave's own verification semantics (immutable plans, `PUBLICATION_COMMIT`, readback evidence, exact restore check — [README.md:158](../../README.md)) remain authoritative; Homebutler informs how those facts are presented to an operator.
+- **Notes:** New entry added 2026-08-12. Cairn's own verification semantics (immutable plans, `PUBLICATION_COMMIT`, readback evidence, exact restore check — [README.md:158](../../README.md)) remain authoritative; Homebutler informs how those facts are presented to an operator.
 
 ---
 

@@ -112,7 +112,7 @@ export function selectionReportFilename(generatedAt: Date): string {
 }
 
 /** The log name the report is written under; also the document's title. */
-export const SELECTION_REPORT_TITLE = "RestoreWeave selection report";
+export const SELECTION_REPORT_TITLE = "Cairn selection report";
 
 /** The digest and the logical length are reported as two independent facts. */
 function identityText(subject: ReportSubject, t: Translator): string {

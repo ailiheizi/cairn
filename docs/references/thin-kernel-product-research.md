@@ -1,14 +1,14 @@
 # Thin-Core Product Research Audit
 
-> **Historical decision note (superseded 2026-08-19):** This audit preserves the evidence and reasoning available when it was written. Its bundled-FUSE and embedding-optional recommendations are not current product requirements. [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md) now requires explicit export materialization with no RestoreWeave mount API, plus a bundled local ONNX/BGE and in-process zvec semantic profile for the default experience.
+> **Historical decision note (superseded 2026-08-19):** This audit preserves the evidence and reasoning available when it was written. Its bundled-FUSE and embedding-optional recommendations are not current product requirements. [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md) now requires explicit export materialization with no Cairn mount API, plus a bundled local ONNX/BGE and in-process zvec semantic profile for the default experience.
 
 ## 1. Conclusion
 
-RestoreWeave should be delivered as a small authoritative core plus an opinionated self-hosted NAS distribution. It should not be delivered as a Mac backup utility, a generic storage SDK, an embedded AI agent, or a marketplace of empty interfaces.
+Cairn should be delivered as a small authoritative core plus an opinionated self-hosted NAS distribution. It should not be delivered as a Mac backup utility, a generic storage SDK, an embedded AI agent, or a marketplace of empty interfaces.
 
 The product statement is:
 
-> RestoreWeave is a self-hosted, NAS-first content-aware managed data layer that converts heterogeneous file trees into verified, space-efficient representations, preserves a directly browsable and restorable filesystem namespace, and lets operators upgrade processing, repository, and discovery implementations without changing durable data meaning.
+> Cairn is a self-hosted, NAS-first content-aware managed data layer that converts heterogeneous file trees into verified, space-efficient representations, preserves a directly browsable and restorable filesystem namespace, and lets operators upgrade processing, repository, and discovery implementations without changing durable data meaning.
 
 The product promise is:
 
@@ -28,9 +28,9 @@ The first product must therefore prove one complete loop with strong defaults. I
 
 This audit was reframed on 2026-08-12 from sources already inspected through the repository, Siftline, canonical repositories, and primary documentation. No new external request was made for this rewrite.
 
-- **Observed:** inspected in the local RestoreWeave repository.
+- **Observed:** inspected in the local Cairn repository.
 - **Documented:** stated by a previously reviewed primary project source.
-- **Inferred:** a RestoreWeave product or architecture conclusion.
+- **Inferred:** a Cairn product or architecture conclusion.
 - **Unverified:** current behavior, performance, licensing, demand, or willingness to pay still requires a fresh test.
 
 The former Mac/APFS-first conclusion is superseded. APFS is one optional capture profile. Its entitlement, packaging, and compatibility work may block that profile, but it must not block the Linux/NAS product.
@@ -67,7 +67,7 @@ Planning remains necessary because storage treatment can change cost and recover
 
 “Intelligent data fabric” is a useful architecture description but a weak product category. “Self-hosted NAS managed archive and search system” is more concrete for the first profile; “content-aware managed data layer” describes the broader architecture without claiming writable-primary-NAS behavior now.
 
-RestoreWeave should expose three explicit modes:
+Cairn should expose three explicit modes:
 
 ### 4.1 Observe mode
 
@@ -96,12 +96,12 @@ This is a substantially larger product and remains later. A read-only managed ar
 
 ## 5. Primary evidence and architecture lessons
 
-| Primary source retained by the prior audit | Documented mechanism | RestoreWeave implication |
+| Primary source retained by the prior audit | Documented mechanism | Cairn implication |
 | --- | --- | --- |
 | [Linux stable userspace API guidance](https://docs.kernel.org/process/stable-api-nonsense.html) | Linux distinguishes stable user-facing interfaces from changeable internal implementation APIs. | Stabilize records, commands, and read semantics; do not freeze internal Go packages, SQL tables, worker topology, or plugin supervisors. |
 | [OCI Runtime Specification](https://github.com/opencontainers/runtime-spec) | Bundles, lifecycle, configuration, and runtime behavior allow several implementations to interoperate. | Versioned specifications can create an ecosystem, but each public contract becomes long-lived maintenance work. |
 | [libfuse](https://github.com/libfuse/libfuse) | A narrow request/response boundary lets userspace implement file access. | One namespace and content-read contract can support CLI, restore, read-only mounts, and later gateways. |
-| [Model Context Protocol](https://github.com/modelcontextprotocol/modelcontextprotocol) | External model-driven clients can call bounded tools and read resources through a published protocol. | RestoreWeave needs CLI and MCP operations, not an embedded agent runtime. |
+| [Model Context Protocol](https://github.com/modelcontextprotocol/modelcontextprotocol) | External model-driven clients can call bounded tools and read resources through a published protocol. | Cairn needs CLI and MCP operations, not an embedded agent runtime. |
 | [Restic](https://github.com/restic/restic), [Kopia](https://github.com/kopia/kopia), and [Borg](https://github.com/borgbackup/borg) | Mature encrypted, deduplicated, compressed repository engines already provide snapshots, checks, browse or mount behavior, and restore. | Reuse one engine in the first distribution and benchmark it for interactive archive access. Do not make one engine the product identity. |
 | [borgmatic](https://github.com/borgmatic-collective/borgmatic), [resticprofile](https://github.com/creativeprojects/resticprofile), and [Backrest](https://github.com/garethgeorge/backrest) | Opinionated configuration, scheduling, checks, onboarding, UI, browse, and restore can create product value above a mature engine. | A thin core still requires complete first-run, recurring, verification, and recovery experiences. |
 | [Immich](https://github.com/immich-app/immich), [PhotoPrism](https://github.com/photoprism/photoprism), and [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) | Strong defaults, asynchronous processors, metadata, OCR, thumbnails, tags, and semantic search create recurring catalog value. | Search and enrichment may be rebuildable, but a useful reference implementation is required in the product. |
@@ -140,7 +140,7 @@ The author wants a bounded way to add a detector, extractor, codec, validator, i
 
 ## 7. Why users would adopt it
 
-RestoreWeave should layer onto an existing NAS before asking to replace it.
+Cairn should layer onto an existing NAS before asking to replace it.
 
 Ordinary NAS systems provide files, permissions, and storage pools. Backup engines provide efficient exact snapshots. Vertical catalogs provide excellent experiences for one content class. Search stacks provide connectors, parsers, indexes, and ranking. Workflow frameworks provide replaceable processors.
 
@@ -230,7 +230,7 @@ AI has two valid roles:
 1. An ordinary processor that classifies, extracts, fingerprints, embeds, transforms, or validates bounded content.
 2. An external harness that calls typed CLI or MCP operations.
 
-RestoreWeave does not need an embedded prompt loop, agent memory, model marketplace, or A2A runtime.
+Cairn does not need an embedded prompt loop, agent memory, model marketplace, or A2A runtime.
 
 Search has a different product status from AI:
 
@@ -296,7 +296,7 @@ The MVP passes only when it demonstrates all of the following on a representativ
 
 1. Every managed file restores byte-for-byte through its original path.
 2. The managed physical footprint is reported honestly and is lower than raw logical input on the target corpus after index and dependency overhead.
-3. The report separates engine-provided savings from any RestoreWeave-specific additional savings.
+3. The report separates engine-provided savings from any Cairn-specific additional savings.
 4. Content and duplicate search materially outperform filename-only search on a fixed task set.
 5. Deleting the catalog and search index does not prevent namespace reconstruction and exact restore.
 6. Upgrading an extractor or indexer rebuilds a new generation without rewriting payload bytes or changing durable subject identity.
@@ -312,7 +312,7 @@ connect existing NAS read-only
 -> select one cold collection
 -> preview actual managed footprint
 -> ingest and verify exact bytes
--> browse and search through RestoreWeave
+-> browse and search through Cairn
 -> restore onto an empty target
 -> only later consider broader migration
 ```
@@ -331,9 +331,9 @@ The first-run report should make five facts visible:
 
 ### 14.1 Storage economics
 
-Run the same representative corpora through raw storage, the selected repository engine directly, and RestoreWeave. Include all metadata, indexes, temporary amplification, model weights, dictionaries, and decoder dependencies.
+Run the same representative corpora through raw storage, the selected repository engine directly, and Cairn. Include all metadata, indexes, temporary amplification, model weights, dictionaries, and decoder dependencies.
 
-Failure condition: RestoreWeave claims unique storage savings that are actually supplied entirely by the underlying engine, or its derivative overhead erases the benefit.
+Failure condition: Cairn claims unique storage savings that are actually supplied entirely by the underlying engine, or its derivative overhead erases the benefit.
 
 ### 14.2 Discovery value
 
@@ -357,7 +357,7 @@ Failure condition: an algorithm change silently rewrites historical meaning, or 
 
 Run the product for at least 30 days on self-hosted hardware. Measure failed jobs, manual interventions, update friction, index rebuild time, memory, disk amplification, and operator time.
 
-Failure condition: RestoreWeave adds more ongoing labor than the tools it replaces.
+Failure condition: Cairn adds more ongoing labor than the tools it replaces.
 
 ### 14.6 Security and hostile inputs
 
@@ -373,7 +373,7 @@ Failure condition: users like the idea but do not migrate data, return to search
 
 ## 15. Strongest counterevidence and reversal condition
 
-The strongest argument against RestoreWeave is that focused tools may already be better:
+The strongest argument against Cairn is that focused tools may already be better:
 
 - Restic, Kopia, or Borg may supply nearly all safe storage reduction.
 - Immich, PhotoPrism, Paperless-ngx, Nextcloud, and sist2 may provide better specialized discovery.
@@ -385,9 +385,9 @@ The strongest argument against RestoreWeave is that focused tools may already be
 
 The smallest reversal observation is:
 
-> Representative operators achieve little net managed-storage benefit, rarely use unified discovery, or find RestoreWeave harder to run than their existing focused applications plus an exact repository engine.
+> Representative operators achieve little net managed-storage benefit, rarely use unified discovery, or find Cairn harder to run than their existing focused applications plus an exact repository engine.
 
-If that occurs, RestoreWeave should narrow to a portable manifest, processor contract, namespace bridge, and recovery-verification layer rather than claim a new NAS storage category.
+If that occurs, Cairn should narrow to a portable manifest, processor contract, namespace bridge, and recovery-verification layer rather than claim a new NAS storage category.
 
 ## 16. Platform-specific capture boundary
 

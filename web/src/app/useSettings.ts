@@ -78,7 +78,7 @@ export function useSettings({ t, settingsOpen, workspaceID, semanticInstallAvail
     try {
       const response = await command(operations.config.update, { expected_config_digest: configData.config_digest, config: configDraft });
       setConfigData(response.data); setConfigDraft(structuredClone(response.data?.config ?? {}));
-      notify({ kind: "success", text: response.data?.restart_required ? t("Settings saved. Restart RestoreWeave to apply them.") : t("Settings saved.") });
+      notify({ kind: "success", text: response.data?.restart_required ? t("Settings saved. Restart Cairn to apply them.") : t("Settings saved.") });
     } catch (error) {
       notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not save settings") });
     } finally { setConfigLoading(false); }

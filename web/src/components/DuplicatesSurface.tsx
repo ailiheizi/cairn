@@ -351,7 +351,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
         if (subjectRef && !protectionBySubject[subjectRef]) protectionBySubject[subjectRef] = PROTECTION_OUTCOMES[index];
       }
     }
-    if (!protectionAnswered) protectionReason ||= t("the daemon did not report a protection generation for this workspace");
+    if (!protectionAnswered) protectionReason ||= t("the daemon did not report a protection generation for the content here");
     return {
       status: "READY",
       confirmation,
@@ -455,7 +455,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     if (!isCurrent()) return;
     if (!resolved.workspaceID) {
       setSurfaceState("BLOCKED");
-      setBlockedReason(resolved.error || t("No published workspace is reported by this service in this browser yet."));
+      setBlockedReason(resolved.error || t("This service has not reported any published content in this browser yet."));
       return;
     }
     setWorkspaceID(resolved.workspaceID);
@@ -609,7 +609,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
   >
     <div className="workspace-heading">
       <div>
-        <p className="eyebrow">{t("WORKSPACE")}</p>
+        <p className="eyebrow">{t("CONTENT")}</p>
         <h1>{t("Duplicate groups")}</h1>
       </div>
       <div className="heading-actions">
@@ -617,15 +617,15 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
         <button type="button" className="icon-button" data-action="refresh" title={t("Refresh duplicate groups")} aria-label={t("Refresh duplicate groups")} onClick={() => void loadSurface()}><RefreshCw size={15} /></button>
       </div>
     </div>
-    <p className="duplicates-note">{t("Groups are computed in this browser from the workspace listing the daemon returned. The daemon's duplicate-group filter can answer one group's members, but this build cannot enumerate duplicate groups catalog-wide.")}</p>
+    <p className="duplicates-note">{t("Groups are computed in this browser from the content listing the daemon returned. The daemon's duplicate-group filter can answer one group's members, but this build cannot enumerate duplicate groups catalog-wide.")}</p>
     <p className="duplicates-note duplicates-contract">{t("Each member is a separate subject that happens to share the same exact bytes: the same SHA-256 content identity and the same logical length. Removing one subject does not touch the bytes the other members point at, and this view cannot delete, move, or merge anything.")}</p>
     <p className="duplicates-note duplicates-contract">{t("This review offers selection, tags, notes, and path copying only. It has no delete, no move, no merge, and no keep-one action.")}</p>
-    <p className="duplicates-note">{t("Duplicate groups are read from the workspace listing this service returns; no grouping is ever inferred from similarity.")}</p>
+    <p className="duplicates-note">{t("Duplicate groups are read from the content listing this service returns; no grouping is ever inferred from similarity.")}</p>
 
     {blocked
       ? <div className="duplicates-blocked" data-state="BLOCKED" role="alert"><AlertCircle size={16} /><div><strong>{t("Duplicate groups are not readable right now")}</strong><small data-blocked-reason={blockedReason}>{blockedReason}</small></div></div>
       : surfaceState === "LOADING" || surfaceState === "IDLE"
-        ? <p className="duplicates-loading" data-state="LOADING" role="status">{t("Reading the workspace listing…")}</p>
+        ? <p className="duplicates-loading" data-state="LOADING" role="status">{t("Reading the content listing…")}</p>
         : <>
           {partial && <div className="duplicates-partial" data-state="PARTIAL" role="alert"><AlertCircle size={16} /><div><strong>{t("Some member facts could not be read")}</strong><small>{t("Partial listing: {{count}} member fact reads failed; each affected fact shows UNKNOWN with its own reason.", { count: partialReadCount })}</small>{annotationUnavailable && <small>{annotationUnavailable}</small>}</div></div>}
           {!partial && annotationUnavailable && <p className="duplicates-partial duplicates-annotation-warning" role="status">{annotationUnavailable}</p>}
@@ -633,7 +633,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
             ? <div className="empty-state duplicates-empty" data-empty="true">
               <span className="vault-sigil"><Copy size={35} /></span>
               <h2>{t("No duplicate groups over {{count}} loaded subjects", { count: listedSubjects })}</h2>
-              <p>{t("This is not proof that no duplicates exist catalog-wide. The listing the daemon returned for this workspace contains {{count}} subjects and no exact-identity group of two or more was found among them.", { count: listedSubjects })}</p>
+              <p>{t("This is not proof that no duplicates exist catalog-wide. The listing the daemon returned here contains {{count}} subjects and no exact-identity group of two or more was found among them.", { count: listedSubjects })}</p>
             </div>
             : <>
               {selection.length > 0 && <section className="duplicates-selection" role="region" aria-label={t("Tag for the selected members")} data-selected-count={selection.length}>
@@ -681,7 +681,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
             t={t}
             onRun={(kind) => void runSimilarity(kind)}
           />
-          <p className="duplicates-read-at" data-read-at={readAt || ""}>{readAt ? t("Listing read at {{time}} (this browser)", { time: new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("The workspace listing has not been read in this browser yet")}</p>
+          <p className="duplicates-read-at" data-read-at={readAt || ""}>{readAt ? t("Listing read at {{time}} (this browser)", { time: new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("The content listing has not been read in this browser yet")}</p>
         </>}
   </section>;
 }
@@ -721,7 +721,7 @@ function SimilarityReview({ similarity, busy, workspaceReady, t, onRun }: {
           <div><h3>{headings[kind]}</h3><p className="muted">{descriptions[kind]}</p></div>
           <button type="button" className="secondary-button compact" data-action={`similarity-run-${kind}`} disabled={!workspaceReady || busy !== ""} onClick={() => onRun(kind)}>{busy === kind ? t("Working…") : runLabels[kind]}</button>
         </div>
-        {!workspaceReady && <p className="muted" role="status">{t("Read the workspace listing before running a similarity review.")}</p>}
+        {!workspaceReady && <p className="muted" role="status">{t("Read the content listing before running a similarity review.")}</p>}
         {read.status === "LOADING" && <p className="muted" role="status">{t("Reading the candidate groups…")}</p>}
         {read.status === "UNAVAILABLE" && <p className="muted" role="status" data-similarity-unavailable={kind}>{t("The similarity review is unavailable: {{reason}}", { reason: read.reason || t("reason not reported") })}</p>}
         {read.status === "READY" && data && <>

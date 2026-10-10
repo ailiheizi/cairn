@@ -35,7 +35,7 @@ export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sou
   tagsRef?: RefObject<HTMLButtonElement | null>;
   notesRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  return <aside className="workspace-sidebar" aria-label={t("Workspace navigation")}>
+  return <aside className="workspace-sidebar" aria-label={t("Navigation")}>
     <div className="workspace-sidebar-group">
       <p className="workspace-sidebar-label">{t("ORGANIZE")}</p>
       <button type="button" className={`workspace-nav-item ${["content", "search", "tag"].includes(viewMode) || libraryPageForMode(viewMode as ViewMode) ? "active" : ""}`} onClick={onLibrary}><Home size={16} /><span>{t("Library")}</span><small>{libraryCount || 0}</small></button>
@@ -64,9 +64,9 @@ export function WorkspaceRailPanel({ t, onClose, children }: { t: Translator; on
   // shell's drawer effect returns focus to the button that opened the panel
   // on this path as well as on Escape.
   return <div className="rail-backdrop" onMouseDown={(event) => { if (event.target !== event.currentTarget) return; event.preventDefault(); onClose(); }}>
-    <aside className="rail-panel" role="dialog" aria-modal="true" aria-label={t("Workspace navigation")}>
+    <aside className="rail-panel" role="dialog" aria-modal="true" aria-label={t("Navigation")}>
       <div className="rail-panel-head">
-        <button type="button" className="icon-button rail-panel-close" aria-label={t("Close workspace navigation")} title={t("Close workspace navigation")} onClick={onClose}><X size={17} aria-hidden="true" /></button>
+        <button type="button" className="icon-button rail-panel-close" aria-label={t("Close navigation")} title={t("Close navigation")} onClick={onClose}><X size={17} aria-hidden="true" /></button>
       </div>
       <div className="rail-panel-scroll">{children}</div>
     </aside>

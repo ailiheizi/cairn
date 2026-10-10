@@ -27,7 +27,7 @@
 
 ## 1. What We Are Building
 
-The first useful RestoreWeave core is one operator loop:
+The first useful Cairn core is one operator loop:
 
 ```text
 configure data location, storage profile, and embedding profile
@@ -493,7 +493,7 @@ Only after phases 0-6 pass:
 
 These are not blockers for the core plan and must not be pulled forward:
 
-- FUSE or any RestoreWeave mount service;
+- FUSE or any Cairn mount service;
 - SMB/WebDAV/NFS/S3 gateways;
 - embedded players/readers or domain-specific UI;
 - automatic source deletion, destructive GC, or writable synchronization;

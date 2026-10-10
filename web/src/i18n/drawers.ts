@@ -104,7 +104,7 @@ export const drawers: Record<string, string> = {
   "Close export": "关闭导出",
   "Select a result or save the last submitted keyword query, freeze the membership, then write and verify it in an explicit server directory.": "选择结果或保存最近一次已提交的关键词查询，冻结成员关系，再将内容写入明确的服务器目录并校验。",
   "Server directory output": "服务器目录输出",
-  "The daemon writes to a path on the RestoreWeave host. This browser does not download or upload files.": "服务进程会写入 RestoreWeave 主机上的路径。此浏览器不会下载或上传文件。",
+  "The daemon writes to a path on the Cairn host. This browser does not download or upload files.": "服务进程会写入 Cairn 主机上的路径。此浏览器不会下载或上传文件。",
   "Output files are placed directly in this directory. Original folders are not recreated; files that would share a name get a numeric suffix.": "导出文件会直接放在这个目录中，不会自动恢复原来的文件夹层级；重名文件会自动加序号区分。",
   "Export selection": "导出选择",
   "What should be frozen?": "冻结什么内容？",
@@ -123,7 +123,7 @@ export const drawers: Record<string, string> = {
   "Query saved as a dynamic view. Save it before freezing the export.": "查询已保存为动态视图。请先保存，再冻结导出。",
   "Server output directory": "服务器输出目录",
   "/data/exports/my-selection": "/data/exports/my-selection",
-  "Use an empty directory on the RestoreWeave host. Existing files, collisions, and symlink destinations are rejected.": "请输入 RestoreWeave 主机上的空目录。已有文件、路径冲突和符号链接目标都会被拒绝。",
+  "Use an empty directory on the Cairn host. Existing files, collisions, and symlink destinations are rejected.": "请输入 Cairn 主机上的空目录。已有文件、路径冲突和符号链接目标都会被拒绝。",
   "Preview frozen export": "预览冻结导出",
   "Export manifest frozen. Review the files before writing to the server directory.": "导出清单已冻结。写入服务器目录前请检查文件。",
   "Export source changed. Preview a new frozen manifest.": "导出依据已改变，请重新预览冻结清单。",
@@ -193,5 +193,5 @@ export const drawers: Record<string, string> = {
   // a convenience for this browser only: no plan, no manifest, and no durable
   // default is created from them, and the daemon stores nothing from it. The
   // wording stays truthful when only one of the two fields was remembered.
-  "This browser pre-filled what it remembered from this workspace's last export. It is browser-local only; the daemon stores nothing from it.": "已按此浏览器记住的该工作区上次导出预填。这仅是浏览器本地记录，服务进程不会存储它。",
+  "This browser pre-filled what it remembered from this library's last export. It is browser-local only; the daemon stores nothing from it.": "已按此浏览器记住的该内容库上次导出预填。这仅是浏览器本地记录，服务进程不会存储它。",
 };

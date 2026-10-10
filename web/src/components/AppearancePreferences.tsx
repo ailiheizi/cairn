@@ -102,6 +102,6 @@ export function AppearancePreferences({ preference, onChange, onReset, t }: {
       </div>
     </details>
 
-    <p className="appearance-storage-note">{t("This preference is stored in this browser only. It does not change RestoreWeave service settings or your content.")}</p>
+    <p className="appearance-storage-note">{t("This preference is stored in this browser only. It does not change Cairn service settings or your content.")}</p>
   </section>;
 }

@@ -320,7 +320,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
       setAnnotations([]);
       setItems([]);
       setSurfaceState("BLOCKED");
-      setBlockedReason(resolved.error || t("No published workspace is reported by this service in this browser yet."));
+      setBlockedReason(resolved.error || t("This service has not reported any published content in this browser yet."));
       return;
     }
     setWorkspaceID(resolved.workspaceID);
@@ -347,7 +347,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
       // subject rows still exist (they are durable records) but every listing
       // fact says UNKNOWN with this reason.
       setItems([]);
-      setListingError(t("The workspace listing could not be read, so names and provenance paths are shown as UNKNOWN: {{message}}", { message: messageOf(listingResult.reason) }));
+      setListingError(t("The content listing could not be read, so names and provenance paths are shown as UNKNOWN: {{message}}", { message: messageOf(listingResult.reason) }));
     }
     setSurfaceState("READY");
     setReadAt(Date.now());
@@ -380,7 +380,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
         if (subjectRef && !bySubject[subjectRef]) bySubject[subjectRef] = outcome;
       }
     });
-    if (!answered) reason ||= t("the daemon did not report a protection generation for this workspace");
+    if (!answered) reason ||= t("the daemon did not report a protection generation for the content here");
     setProtection((current) => ({ ...current, [name]: { status: "READY", bySubject, reason: answered ? "" : reason } }));
   }
 
@@ -664,7 +664,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
   >
     <div className="workspace-heading">
       <div>
-        <p className="eyebrow">{t("WORKSPACE")}</p>
+        <p className="eyebrow">{t("CONTENT")}</p>
         <h1>{t("Tags")}</h1>
       </div>
       <div className="heading-actions">
@@ -672,7 +672,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
         <button type="button" className="icon-button" data-action="refresh" title={t("Refresh tag vocabulary")} aria-label={t("Refresh tag vocabulary")} onClick={() => void loadSurface()}><RefreshCw size={15} /></button>
       </div>
     </div>
-    <p className="tags-note">{t("Every row here is a durable TAG annotation record the daemon returned for this workspace. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.")}</p>
+    <p className="tags-note">{t("Every row here is a durable TAG annotation record the daemon returned here. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.")}</p>
     <p className="tags-note tags-contract">{t("A rename or merge is one service operation pair: the service plans every affected subject and the exact changes, and only the confirmed, digest-bound apply writes. The service adds the new name before tombstoning the old record, so an interruption leaves both names rather than neither.")}</p>
 
     {blocked
@@ -682,7 +682,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
         : tagRows.length === 0
           ? <div className="empty-state tags-empty" data-empty="true">
             <span className="vault-sigil"><TagsIcon size={35} /></span>
-            <h2>{t("No live tag is recorded in this workspace yet")}</h2>
+            <h2>{t("No live tag is recorded here yet")}</h2>
             <p>{t("This list reads the daemon's live TAG annotation records only: a name appears while at least one subject carries it, and a deleted tag is tombstoned instead of being kept as an empty row. Adding a tag to a subject in the library inspector, in the duplicate review, or in this surface's per-subject controls creates the first record.")}</p>
           </div>
           : <div className="tags-layout">

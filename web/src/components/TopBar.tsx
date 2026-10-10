@@ -52,7 +52,7 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
   const showOperators = parsed.predicates.length > 0 || Boolean(error);
   return <>
     <header className="topbar">
-      <a className="brand" href="/" aria-label={t("RestoreWeave home")} onClick={(event) => { if (!canLeaveSettings()) event.preventDefault(); }}><span className="brand-mark"><ShieldCheck size={19} /></span><span>RestoreWeave</span></a>
+      <a className="brand" href="/" aria-label={t("Cairn home")} onClick={(event) => { if (!canLeaveSettings()) event.preventDefault(); }}><span className="brand-mark"><ShieldCheck size={19} /></span><span>Cairn</span></a>
       <form className="global-search" onSubmit={search.runSearch} onFocus={(event) => { search.handleSearchFieldFocus(event.target); }} onBlur={(event) => { search.handleSearchFieldBlur(event.currentTarget.contains(event.relatedTarget as Node | null)); }} onKeyDown={search.handleSearchFieldKeyDown}>
         <Search size={17} aria-hidden="true" />
         <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="restoreweave-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
@@ -97,7 +97,7 @@ export function TopBar({ t, query, busy, status, statusData, capabilities, isCon
         {!error && plan.limits.length === 0 && <p className="search-ops-hint">{t("Operators available: {{operators}}. Select a predicate to edit it, or remove it to rewrite the search text.", { operators: SEARCH_OPERATOR_NAMES.map((name) => `${name}:`).join(" ") })}</p>}
       </div>}
       <div className="top-actions">
-        {compact && <button type="button" ref={railTriggerRef} className="icon-button rail-trigger" aria-label={t("Open workspace navigation")} title={t("Open workspace navigation")} aria-haspopup="dialog" onClick={(event) => onOpenRail?.(event.currentTarget)}><PanelLeft size={17} aria-hidden="true" /></button>}
+        {compact && <button type="button" ref={railTriggerRef} className="icon-button rail-trigger" aria-label={t("Open navigation")} title={t("Open navigation")} aria-haspopup="dialog" onClick={(event) => onOpenRail?.(event.currentTarget)}><PanelLeft size={17} aria-hidden="true" /></button>}
         <span className={`connection ${isConnected ? "ok" : "bad"}`} aria-label={t(status)}>{status === "Checking service" ? <LoaderCircle className="spin" size={15} /> : isConnected ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}<span>{t(status)}</span></span>
         <button className="secondary-button restore-button" aria-label={t("Restore latest snapshot")} title={t("Restore latest snapshot")} onClick={(event) => onOpenRestore(event.currentTarget)} disabled={!snapshotRef || !isConnected || !coreStorageReady}><ArchiveRestore size={16} /><span>{t("Restore")}</span></button>
         <button className="primary-button add-button" aria-label={t("Add content")} title={t("Add content")} onClick={(event) => onOpenAdd(undefined, event.currentTarget)} disabled={!isConnected || !coreStorageReady}><Plus size={16} /><span>{t("Add content")}</span></button>

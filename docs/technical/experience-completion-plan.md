@@ -31,13 +31,13 @@ Present:
 - IDs on the facade are `SubjectRef`. The facade calls the command ABI only. No fourth public REST catalog.
 - Inbox item page streams exact bytes and writes `PROGRESS`. Item JSON includes display path, `snapshot_ref`, representations, and annotations. Delete the page and CLI recovery still works.
 - D5 pin: this host’s Supersonic 0.22.1 method sequence is harness-covered (`TestD5PinnedSupersonicCallSequence`). XML artist/album lists emit Subsonic attributes (`name="…"`).
-- Namespace records carry source mtime/uid/gid. RestoreWeave does not own a FUSE server; foreign tools may mount a restored tree.
+- Namespace records carry source mtime/uid/gid. Cairn does not own a FUSE server; foreign tools may mount a restored tree.
 - Raw development CAS and the local-zstd candidate are the in-tree drivers. Release repository qualification is a separate gate, not an experience-path hole.
 
 Operator-only, not remaining product engineering:
 
 - Someone may point the installed Supersonic 0.22.1 GUI at the loopback facade and click login. The methods that GUI issues are already harness-green. Do not write a Feishin substitute.
-- No KOReader/DSub install on this host. KOReader’s private progress-sync protocol is not implemented; D2 ships RestoreWeave JSON progress, not that protocol.
+- No KOReader/DSub install on this host. KOReader’s private progress-sync protocol is not implemented; D2 ships Cairn JSON progress, not that protocol.
 
 Later (not D1–D6):
 
@@ -53,7 +53,7 @@ D2  OPDS adapter contract                      adapter-harness-complete; mainten
 D3  Thin Inbox shell                           implemented; no drop/attach/import workflow
 D4  Item-page preview/progress                 adapter-harness-complete; not a client product
 D5  Pinned request-sequence replay             adapter-harness-complete; live client not qualified
-D6  RestoreWeave FUSE                          closed non-goal
+D6  Cairn FUSE                          closed non-goal
 D7  Isolated processors and remaining repository gates   later
 D8  Later video / release packaging            later
 ```
@@ -64,7 +64,7 @@ Status (2026-08-19): **adapter-harness-complete; maintenance-only**. Implemented
 
 **Why first.** Feishin, DSub, and similar clients fail closed on missing search, cover, user, and playlist endpoints even when stream works.
 
-| Method | RestoreWeave meaning | Exit |
+| Method | Cairn meaning | Exit |
 | --- | --- | --- |
 | `search2` / `search3` | `search.query` plus in-memory filter of `audio.list` | Query by title/artist/album returns the same `SubjectRef` as `audio.list` |
 | `getCoverArt` | Deterministic placeholder until a later isolated cover processor exists | Clients receive an image; no APIC parser in-process |
@@ -81,14 +81,14 @@ Still out of D1: transcoding, multi-workspace, non-loopback bind, cover extracti
 
 Status (2026-08-19): **adapter-harness-complete; maintenance-only**. `/opds/search`, `start`/`count` pagination with `rel=next`, acquire, and `POST /opds/progress` JSON (`subject_ref`, `position_ms`, `completed`) write `PROGRESS` with `source=opds`. Covered by `TestExperienceSurfacesOverCommandABI`; no pinned live reader is qualified.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | `/opds/search` | `books.list` filter plus `search.query` | Title/author query returns acquisition links |
 | Pagination | `start` / `count` over works | Feeds stay bounded |
 | Acquire | Existing `content.*` loop | Bytes match restore SHA-256 |
-| Progress | RestoreWeave JSON write-back on `/opds/progress` | Do not invent a private KOReader sync protocol in D2 |
+| Progress | Cairn JSON write-back on `/opds/progress` | Do not invent a private KOReader sync protocol in D2 |
 
-KOReader’s built-in progress sync is not OPDS. D2 ships acquire and a documented RestoreWeave progress POST. A KOReader-specific sync adapter is a later experiment, not a second catalog.
+KOReader’s built-in progress sync is not OPDS. D2 ships acquire and a documented Cairn progress POST. A KOReader-specific sync adapter is a later experiment, not a second catalog.
 
 ### D3 — Thin Inbox shell
 
@@ -116,15 +116,15 @@ Replay evidence (all green):
 
 1. Browse + stream/acquire a fixture library — harness green for the pinned OpenSubsonic method sequence.
 2. Star or bookmark returns on a second client or via `annotation.list` — harness green for star → `annotation.list`.
-3. No second recovery authority (client DB loss does not lose RestoreWeave identity).
+3. No second recovery authority (client DB loss does not lose Cairn identity).
 
 Keep the replay as regression coverage only. Do not turn live GUI qualification into core work and do not write a Feishin substitute. If a later adapter profile claims live-client support, it must define a separate qualification matrix rather than relabel this replay.
 
-### D6 — File egress, not a RestoreWeave FUSE
+### D6 — File egress, not a Cairn FUSE
 
-Status (2026-08-15): **closed**. Not a RestoreWeave product job. Source `mod_time` / `uid` / `gid` already project into `NamespaceEntry` for our own records. We do not need a live `/dev/fuse` adapter, a VM, or macFUSE.
+Status (2026-08-15): **closed**. Not a Cairn product job. Source `mod_time` / `uid` / `gid` already project into `NamespaceEntry` for our own records. We do not need a live `/dev/fuse` adapter, a VM, or macFUSE.
 
-Operators who want a mount use other tools (rclone, sshfs, the NAS SMB share, WebDAV helpers) against a restored directory or against exact `FileAccess` / `content.*` bytes. RestoreWeave owns identity, catalog, annotations, verify, and restore. It does not own the kernel filesystem illusion.
+Operators who want a mount use other tools (rclone, sshfs, the NAS SMB share, WebDAV helpers) against a restored directory or against exact `FileAccess` / `content.*` bytes. Cairn owns identity, catalog, annotations, verify, and restore. It does not own the kernel filesystem illusion.
 
 The former in-tree go-fuse adapter, command ABI, CLI verbs, and dependency have been removed. Same-UID “point a media server at a mount” is not a catalog proof.
 
@@ -144,7 +144,7 @@ Status (2026-08-14): **not started**. Jellyfin-style APIs, video transcode, game
 | D3 Inbox | `RW-CATALOG-1` visible acceptance; not an MVP restore dependency |
 | D1 + D4 music | Catalog slice toward `RW-AUDIO-1`, still not a player product |
 | D2 books | Catalog slice toward `RW-BOOK-1`, still not a reader product |
-| D6 | Closed: not a RestoreWeave FUSE job; see remaining-work-and-closed-decisions.md |
+| D6 | Closed: not a Cairn FUSE job; see remaining-work-and-closed-decisions.md |
 | D7 | Completion plan Phase B + adoption default pack |
 | D8 | Completion plan Phase C items 4–5 |
 | Discovery beyond lexical | [Index Dimension Plan](index-dimension-plan.md) I1–I9 path is in tree. Facades stay on `search.query` |

@@ -2,7 +2,7 @@
 
 ## 1. Product and implementation decision
 
-RestoreWeave is a self-hosted, NAS-first content-aware managed data layer. It coordinates efficient exact storage, heterogeneous processing, intelligent discovery, file-shaped access, and verified recovery without binding durable meaning to one operating system, repository engine, model, or index. `RW-MVP-1` is its first read-only managed-archive profile.
+Cairn is a self-hosted, NAS-first content-aware managed data layer. It coordinates efficient exact storage, heterogeneous processing, intelligent discovery, file-shaped access, and verified recovery without binding durable meaning to one operating system, repository engine, model, or index. `RW-MVP-1` is its first read-only managed-archive profile.
 
 The core product loop is:
 
@@ -29,7 +29,7 @@ The reference distribution MUST ship a useful default path rather than an empty 
 
 Linux snapshots, ZFS snapshots, Btrfs snapshots, SMB shares, NFS mounts, object stores, live directory scans, and other platform integrations are capture or storage profiles. None defines the product or its durable identity model.
 
-RestoreWeave does not embed a general AI harness, agent loop, model router, vector database, or workflow engine. An AI model may be an optional processor, and an external harness may call the same typed commands as any other client.
+Cairn does not embed a general AI harness, agent loop, model router, vector database, or workflow engine. An AI model may be an optional processor, and an external harness may call the same typed commands as any other client.
 
 Related normative boundaries are defined in:
 
@@ -96,7 +96,7 @@ The following remain private and unstable:
 - Index schemas, vector dimensions, tokenizer choices, ranking algorithms, and model-serving APIs.
 - Human-readable CLI layout and diagnostic prose.
 
-No integration may require importing an `internal/` package, reading RestoreWeave SQLite tables, or decoding a repository's private pack layout.
+No integration may require importing an `internal/` package, reading Cairn SQLite tables, or decoding a repository's private pack layout.
 
 ## 4. Runtime topology
 
@@ -108,7 +108,7 @@ flowchart TB
     CLI --> ABI
     MCP --> ABI
 
-    ABI --> Kernel["RestoreWeave storage kernel"]
+    ABI --> Kernel["Cairn storage kernel"]
     Kernel --> Planner["Deterministic planner"]
     Kernel --> Journal["Finite operation journal"]
     Kernel --> Records["Authenticated RRF store"]
@@ -328,7 +328,7 @@ A `RepositoryDriver` owns its physical implementation:
 - Repository-native checks and repair.
 - Physical compaction and garbage collection.
 
-RestoreWeave owns:
+Cairn owns:
 
 - Logical snapshot, namespace, file-version, content, and representation identities.
 - The plan and accepted recovery contract.
@@ -404,7 +404,7 @@ Metadata-only changes create new file-version or namespace records without dupli
 
 Source disappearance in a successor capture means the entry is absent from the new namespace generation. It does not erase the entry from historical snapshots and does not immediately delete stored bytes.
 
-RestoreWeave distinguishes:
+Cairn distinguishes:
 
 - Source deletion observed in a new capture.
 - Snapshot retirement under retention policy.
@@ -472,7 +472,7 @@ One implementation MAY implement both `IndexProvider` and `QueryProvider`, but t
 
 ### 13.3 No embedded harness
 
-RestoreWeave supplies typed processor, index-feed, query, CLI, and MCP boundaries. It does not own prompt memory, autonomous loops, model selection, or multi-agent orchestration. External harnesses compose these interfaces as clients.
+Cairn supplies typed processor, index-feed, query, CLI, and MCP boundaries. It does not own prompt memory, autonomous loops, model selection, or multi-agent orchestration. External harnesses compose these interfaces as clients.
 
 ## 14. Reference userland
 

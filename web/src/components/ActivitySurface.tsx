@@ -122,7 +122,7 @@ export function ActivitySurface({ t, locale, workspaceID, isConnected, statusDat
     const rowWorkspaceID = job?.workspace_id?.trim() || workspaceID.trim();
     setLogs((current) => ({ ...current, [jobID]: { status: "LOADING", events: [], nextSequence: 0, terminal: false, jobState: "", error: "" } }));
     if (!rowWorkspaceID) {
-      setLogs((current) => ({ ...current, [jobID]: { status: "FAILED", events: [], nextSequence: 0, terminal: false, jobState: "", error: t("This job row reports no workspace, so its retained log cannot be read.") } }));
+      setLogs((current) => ({ ...current, [jobID]: { status: "FAILED", events: [], nextSequence: 0, terminal: false, jobState: "", error: t("This job row does not say which content it belongs to, so its retained log cannot be read.") } }));
       return;
     }
     let cancelled = false;
@@ -190,7 +190,7 @@ export function ActivitySurface({ t, locale, workspaceID, isConnected, statusDat
     const planID = job.plan_id?.trim() ?? "";
     const rowWorkspaceID = job.workspace_id?.trim() || workspaceID.trim();
     if (!planID || !rowWorkspaceID) {
-      setPlanReads((current) => ({ ...current, [jobID]: { status: "FAILED", error: t("This job row reports no plan or workspace, so no recorded plan can be read.") } }));
+      setPlanReads((current) => ({ ...current, [jobID]: { status: "FAILED", error: t("This job row does not say which plan or which content it belongs to, so no recorded plan can be read.") } }));
       return;
     }
     setPlanReads((current) => ({ ...current, [jobID]: { status: "LOADING", error: "" } }));
@@ -253,7 +253,7 @@ export function ActivitySurface({ t, locale, workspaceID, isConnected, statusDat
   return <section className="content-column activity-surface" aria-label={t("Activity")} data-view="activity" data-connection={isConnected ? "CONNECTED" : "UNAVAILABLE"} onKeyDown={handleRowsKeyDown}>
     <div className="workspace-heading">
       <div>
-        <p className="eyebrow">{t("WORKSPACE")}</p>
+        <p className="eyebrow">{t("CONTENT")}</p>
         <h1>{t("Activity")}</h1>
       </div>
       <div className="heading-actions">

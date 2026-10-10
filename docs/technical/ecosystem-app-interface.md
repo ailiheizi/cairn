@@ -1,13 +1,13 @@
 # Ecosystem Application Interface and Content Access Contract
 
-> **Profile status:** This is a later northbound/catalog contract above `RW-MVP-1`. It defines how domain packs and focused clients can share RestoreWeave's identity, access, search, annotation, and recovery semantics. It does not make a media player, book reader, launcher, downloader, WebUI, or AI service part of the authoritative storage kernel.
+> **Profile status:** This is a later northbound/catalog contract above `RW-MVP-1`. It defines how domain packs and focused clients can share Cairn's identity, access, search, annotation, and recovery semantics. It does not make a media player, book reader, launcher, downloader, WebUI, or AI service part of the authoritative storage kernel.
 
 ## 1. Purpose and product boundary
 
-RestoreWeave can support a family of useful applications over one managed data plane: a universal Inbox, music player, video player, book or novel reader, photo browser, document workspace, application/game inventory, and later approved retrieval clients. The correct shape is **one data plane, several bounded experiences**:
+Cairn can support a family of useful applications over one managed data plane: a universal Inbox, music player, video player, book or novel reader, photo browser, document workspace, application/game inventory, and later approved retrieval clients. The correct shape is **one data plane, several bounded experiences**:
 
 ```text
-RestoreWeave Core
+Cairn Core
   -> universal catalog and Inbox
   -> domain packs (audio, video, books, images, documents, games, ...)
   -> clients (catalog UI, players, readers, CLI, MCP, export consumers, ...)
@@ -98,7 +98,7 @@ For a time segment, the segment is a logical selection, not proof that the bytes
 
 ### 3.4 Representations and renditions
 
-RestoreWeave MUST retain `RepresentationRef` as the only canonical representation identity. `RepresentationId` is the identifier carried by that reference. Client terminology such as “rendition,” “proxy,” “stream,” “preview,” or “download” is a delivery purpose over a representation, not another identity class.
+Cairn MUST retain `RepresentationRef` as the only canonical representation identity. `RepresentationId` is the identifier carried by that reference. Client terminology such as “rendition,” “proxy,” “stream,” “preview,” or “download” is a delivery purpose over a representation, not another identity class.
 
 An app-facing `RepresentationCandidate` may include:
 

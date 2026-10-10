@@ -393,7 +393,7 @@ function dimensionFact(t: Translator, { id, label, states, capability, serviceDo
   // that describe a generation some other workspace already serves.
   const absentDetail = capability.state === "NOT_BUILT" && capability.notes
     ? capability.notes
-    : t("no index generation is published for this workspace");
+    : t("no index generation is published for the content here");
   const absent = `${label("NOT_BUILT")} · ${absentDetail}`;
   if (!states.length) return ["UNKNOWN", absent];
   const unique = [...new Set(states)];

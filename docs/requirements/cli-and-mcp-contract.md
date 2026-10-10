@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-RestoreWeave exposes one stable automation contract for a self-hosted, content-first managed data layer. People, scripts, NAS integrations, WebUIs, and external AI harnesses use the same typed operations to inspect sources, plan storage, publish snapshots, search derived indexes, save dynamic views, freeze and materialize export manifests, read content, verify recovery, and restore data.
+Cairn exposes one stable automation contract for a self-hosted, content-first managed data layer. People, scripts, NAS integrations, WebUIs, and external AI harnesses use the same typed operations to inspect sources, plan storage, publish snapshots, search derived indexes, save dynamic views, freeze and materialize export manifests, read content, verify recovery, and restore data.
 
 The content/view/export defaults in [Content Store, Views, and Export Requirements](content-store-views-and-exports.md) are authoritative. The command ABI has no mount/unmount family; the default user-facing output is an explicit frozen export manifest.
 
@@ -22,7 +22,7 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
 ## 2. Product boundary
 
-RestoreWeave owns:
+Cairn owns:
 
 - Typed source, capture, plan, job, snapshot, namespace, file-version, content, representation, placement, and verification identities.
 - Deterministic planning and explicit recovery-policy decisions.
@@ -437,7 +437,7 @@ Every plan and snapshot result exposes one versioned `StorageAccounting` waterfa
 - Compression effect reported by the repository when available.
 - Pack, encryption, parity, and repository metadata overhead.
 - Actual repository growth when observable.
-- RestoreWeave catalog, annotation, and index growth.
+- Cairn catalog, annotation, and index growth.
 - Temporary peak working-space growth.
 - Source bytes still retained.
 - Whole-system net footprint change.

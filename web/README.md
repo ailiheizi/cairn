@@ -1,4 +1,4 @@
-# RestoreWeave browser client
+# Cairn browser client
 
 This directory is part of the unreleased core preview on `main` after
 `v0.1.0-prealpha.1`.

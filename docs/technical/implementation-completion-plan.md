@@ -2,7 +2,7 @@
 
 > **Superseded for core ordering:** The single dependency-ordered path is now [Core MVP Execution Plan](core-mvp-execution-plan.md). This document remains a host-specific record for Darwin/Linux and repository qualification observations; it must not be used to reorder the content-core phases.
 
-This plan is the remaining coding path for the frozen content/recovery slice. It does not add product requirements or select a release repository engine. Darwin is Unix and can run CLI probes. RestoreWeave does not own a mount service; see [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md). Isolated processors may later need Linux bubblewrap.
+This plan is the remaining coding path for the frozen content/recovery slice. It does not add product requirements or select a release repository engine. Darwin is Unix and can run CLI probes. Cairn does not own a mount service; see [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md). Isolated processors may later need Linux bubblewrap.
 
 The only current product order is [Core MVP Execution Plan](core-mvp-execution-plan.md): configuration and protection -> plan/apply -> recovery closure -> descriptions/default discovery plus qualified storage -> views/exports -> release. Inbox, OpenSubsonic, OPDS, music, and reader slices below are historical adapter exercises and are maintenance-only; they cannot move ahead of or add completion credit to that order.
 
@@ -38,7 +38,7 @@ Closed on this Darwin checkout:
 
 1. Independent SHA-256 readback at the blob driver (`repository/qualify.DriverGates`) and at the snapshot (`snapshot.verify`). Default verify is `full-bytes`. Declared modes are `authenticated-metadata`, `sampled-content`, `full-bytes`, `restore-drill` (destination required; only this mode may set `restore_verified`), and `clean-recovery` (catalog-free full-bytes). Sampled work is never relabeled as full-bytes.
 2. `annotation.import` takes an explicit conflict policy: `fail` (default), `keep-local`, or `keep-imported`. `keep-imported` revises a live local row; it does not rewrite a tombstone or transplant a foreign revision number.
-3. RestoreWeave does not ship or qualify a mount server. File-shaped access is `plan.restore`, export materialization, and `FileAccess`. Foreign tools may consume those outputs.
+3. Cairn does not ship or qualify a mount server. File-shaped access is `plan.restore`, export materialization, and `FileAccess`. Foreign tools may consume those outputs.
 
 Still later, not this Darwin session:
 
@@ -48,11 +48,11 @@ Still later, not this Darwin session:
 
 ## Phase C — later experiences and release
 
-Introduce experience UIs as separate clients over RestoreWeave-owned surfaces, not as code inside `restoreweaved`. The long sequence is [Experience Completion Plan](experience-completion-plan.md). Named discovery dimensions are [Index Dimension Plan](index-dimension-plan.md). See [Whole-Architecture Open-Source Reference](architecture-open-source-reference.md). Product proof and engineering gates stay on separate tracks.
+Introduce experience UIs as separate clients over Cairn-owned surfaces, not as code inside `restoreweaved`. The long sequence is [Experience Completion Plan](experience-completion-plan.md). Named discovery dimensions are [Index Dimension Plan](index-dimension-plan.md). See [Whole-Architecture Open-Source Reference](architecture-open-source-reference.md). Product proof and engineering gates stay on separate tracks.
 
 1. Keep the command ABI as the only catalog/read/annotation path. A thin Inbox shell now binds that ABI at `/inbox` when the loopback facade is enabled; it is not an `RW-MVP-1` restore dependency.
 2. Protocol facades first: loopback OpenSubsonic for Subsonic clients and OPDS for KOReader-class clients. Song IDs are `SubjectRef`. `scrobble` writes a `PROGRESS` annotation. Do not embed a player or media server.
-3. Do not grow a RestoreWeave mount daemon. If someone wants a folder, they restore or export it and use their own tool.
+3. Do not grow a Cairn mount daemon. If someone wants a folder, they restore or export it and use their own tool.
 4. Video browse/subtitles after isolated ffprobe. Application/game inventory stays read-only.
 5. Source retirement, Docker, and installable release after `RW-MVP-1` acceptance.
 

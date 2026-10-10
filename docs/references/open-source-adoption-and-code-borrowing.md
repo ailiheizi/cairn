@@ -4,7 +4,7 @@
 
 ## 1. Conclusion
 
-RestoreWeave should be assembled from mature components around a small authority-owning core. It should not rebuild repository compression, general file parsers, a search engine, a workflow runtime, or filesystem/network presentation services.
+Cairn should be assembled from mature components around a small authority-owning core. It should not rebuild repository compression, general file parsers, a search engine, a workflow runtime, or filesystem/network presentation services.
 
 The practical reference stack is:
 
@@ -18,9 +18,9 @@ The practical reference stack is:
 | Safe Linux capture | Qualify the handle APIs in [pathrs-lite](https://github.com/openSUSE/libpathrs/tree/main/contrib/bindings/go/pathrs-lite) for retained-root, component-relative resolution. If MPL-2.0 review or behavior fails, implement a narrow private [`openat2(2)`](https://man7.org/linux/man-pages/man2/openat2.2.html) layer with `golang.org/x/sys/unix`; never use the legacy string-returning `SecureJoin` API as a security boundary. |
 | Change hints | Use [fsnotify v1.10.1](https://github.com/fsnotify/fsnotify/releases/tag/v1.10.1) only as an optional local hint provider. Overflow, reset, non-recursive coverage, NFS, SMB, FUSE, or uncertain continuity forces a complete scan. Borrow recrawl and poison-state concepts from [Watchman](https://github.com/facebook/watchman) without making it the default dependency. |
 | Snapshot capture | Use the installed, version-qualified official ZFS or Btrfs command interfaces behind optional `CaptureDriver` profiles. ZFS uses atomic snapshots plus holds; Btrfs uses explicit read-only snapshots, identity evidence, privilege separation, and pre-consumer revalidation. |
-| File-shaped egress | Ship export-manifest materialization and bounded `FileAccess`. Operators choose external mount or sharing tools; no mount library is a RestoreWeave dependency. |
+| File-shaped egress | Ship export-manifest materialization and bounded `FileAccess`. Operators choose external mount or sharing tools; no mount library is a Cairn dependency. |
 | CLI and AI access | Keep CLI as the mutation surface and use the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) for the local read-only MCP adapter after pinning one license-stable revision. MCP is not an internal bus. |
-| Selective code borrowing | Use [Perkeep](https://github.com/perkeep/perkeep) as the primary Apache-2.0 source for storage-driver conformance-test patterns and chunk-tree/range-read ideas. Preserve RestoreWeave identity and recovery formats. |
+| Selective code borrowing | Use [Perkeep](https://github.com/perkeep/perkeep) as the primary Apache-2.0 source for storage-driver conformance-test patterns and chunk-tree/range-read ideas. Preserve Cairn identity and recovery formats. |
 | Later semantic search | Qualify Tantivy for larger lexical indexes, LanceDB for local semantic indexing, Qdrant for a service profile, and OpenSearch for enterprise external search only when measured need appears. |
 | P2P | Defer it. If later required, prefer narrow [Boxo](https://github.com/ipfs/boxo) modules over embedding all of Kubo. |
 
@@ -30,15 +30,15 @@ How each layer should consume those projects — and which local shortcuts would
 
 ## 2. Adoption categories
 
-RestoreWeave uses five distinct categories. They must not be collapsed into one “supported project” list.
+Cairn uses five distinct categories. They must not be collapsed into one “supported project” list.
 
 | Category | Meaning |
 | --- | --- |
 | **Planned direct dependency** | A library used inside a narrow reference adapter. Its types remain private and the release pins an exact version. |
-| **Isolated processor or sidecar** | A separately sandboxed executable or worker reached through RestoreWeave handles and typed results. It receives no ambient source, repository, credential, signing, or network authority. |
+| **Isolated processor or sidecar** | A separately sandboxed executable or worker reached through Cairn handles and typed results. It receives no ambient source, repository, credential, signing, or network authority. |
 | **Qualification candidate** | A leading implementation that still has a decision-changing correctness, performance, compatibility, or operational gate. |
-| **Selective code borrowing** | Specific code or tests may be adapted after license and dependency review, with source provenance retained. RestoreWeave does not inherit the source project’s identities or durable format. |
-| **Design or competitor reference only** | Architectural lessons may be implemented independently. No code is copied or linked into the core unless RestoreWeave deliberately selects a compatible project license and accepts the dependency’s obligations. |
+| **Selective code borrowing** | Specific code or tests may be adapted after license and dependency review, with source provenance retained. Cairn does not inherit the source project’s identities or durable format. |
+| **Design or competitor reference only** | Architectural lessons may be implemented independently. No code is copied or linked into the core unless Cairn deliberately selects a compatible project license and accepts the dependency’s obligations. |
 
 An out-of-process boundary is not automatically a licensing or security safe harbor. The integration must still be arm’s-length, least-privileged, version-pinned, and reviewed.
 
@@ -46,9 +46,9 @@ An out-of-process boundary is not automatically a licensing or security safe har
 
 ### 3.1 Planned direct dependencies and bundled implementation choices
 
-| Project | RestoreWeave role | Decision and boundary | License evidence |
+| Project | Cairn role | Decision and boundary | License evidence |
 | --- | --- | --- | --- |
-| [SQLite FTS5](https://www.sqlite.org/fts5.html) through the existing `modernc.org/sqlite` dependency | Bundled lexical `IndexProvider` and `QueryProvider` for `RW-MVP-1` | **Freeze for the MVP implementation.** Create one physically separate disposable database per immutable generation. The SQLite schema, row IDs, token tables, and query syntax are never durable RestoreWeave ABI. Assert FTS5 availability during startup qualification. | SQLite is [public domain](https://github.com/sqlite/sqlite/blob/da7dc33fb2075dc9a9376679889f6843c33d6cb9/LICENSE.md); separately audit wrappers, generated builds, and extensions. |
+| [SQLite FTS5](https://www.sqlite.org/fts5.html) through the existing `modernc.org/sqlite` dependency | Bundled lexical `IndexProvider` and `QueryProvider` for `RW-MVP-1` | **Freeze for the MVP implementation.** Create one physically separate disposable database per immutable generation. The SQLite schema, row IDs, token tables, and query syntax are never durable Cairn ABI. Assert FTS5 availability during startup qualification. | SQLite is [public domain](https://github.com/sqlite/sqlite/blob/da7dc33fb2075dc9a9376679889f6843c33d6cb9/LICENSE.md); separately audit wrappers, generated builds, and extensions. |
 | [file/libmagic](https://github.com/file/file) | Bounded magic-byte evidence after suffix inspection | **Adopt and bundle.** Pin the compiled magic database digest. Disable compressed inspection, decompressor forking, device access, symlink following, and unnecessary deep parsers. A tiny isolated helper is preferred where native-code containment is practical. | Permissive [BSD-style terms](https://github.com/file/file/blob/711ccc264519cdc5073ccb26651c0a9bafc3b47a/COPYING). |
 | [Protocol Buffers](https://github.com/protocolbuffers/protobuf) and [grpc-go](https://github.com/grpc/grpc-go) | Processor control-plane schemas and local RPC | **Adopt as implementation plumbing**, not yet as a frozen public ABI. Use Unix-domain sockets and keep large payloads outside messages. Exact release pins follow the first cross-version conformance spike. | Permissive upstream licenses; exact release and transitive review remain release work. |
 | [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) | Local read-only MCP adapter | **Adopt after pinning one revision whose license transition is complete and reproducible.** MCP exposes northbound inspection operations only; it is not storage, scheduling, or processor transport. | The repository is transitioning between Apache and MIT terms; capture the exact applicable license at the selected revision. |
@@ -60,20 +60,20 @@ No privileged mount helper or mount protocol library is bundled. External tools 
 
 | Project | Candidate role | Decision-changing gate | License |
 | --- | --- | --- | --- |
-| [Kopia v0.23.1](https://github.com/kopia/kopia/releases/tag/v0.23.1) | Leading `RepositoryDriver` implementation | Prove that RestoreWeave objects are rooted safely under Kopia’s snapshot-centric garbage collection; then prove crash reconciliation, bounded reads, complete SHA-256 readback, catalog-independent recovery, corruption behavior, and NAS performance. Pin at least v0.23.1 and disable unneeded server and external-SSH surfaces; [GHSA-2q4c-3mrw-63c3](https://github.com/kopia/kopia/security/advisories/GHSA-2q4c-3mrw-63c3) affects versions through v0.22.3. | [Apache-2.0](https://github.com/kopia/kopia/blob/b361d0f4100898ce3ad479755f104ff2c5a35e01/LICENSE) |
+| [Kopia v0.23.1](https://github.com/kopia/kopia/releases/tag/v0.23.1) | Leading `RepositoryDriver` implementation | Prove that Cairn objects are rooted safely under Kopia’s snapshot-centric garbage collection; then prove crash reconciliation, bounded reads, complete SHA-256 readback, catalog-independent recovery, corruption behavior, and NAS performance. Pin at least v0.23.1 and disable unneeded server and external-SSH surfaces; [GHSA-2q4c-3mrw-63c3](https://github.com/kopia/kopia/security/advisories/GHSA-2q4c-3mrw-63c3) affects versions through v0.22.3. | [Apache-2.0](https://github.com/kopia/kopia/blob/b361d0f4100898ce3ad479755f104ff2c5a35e01/LICENSE) |
 | [Restic v0.19.1](https://github.com/restic/restic/releases/tag/v0.19.1) | Control benchmark and possible subprocess driver | Upstream explicitly treats Restic as a CLI rather than a supported library. Benchmark exact footprint, ingest, range reads, mount behavior, verification, restore, and operating burden through a process boundary. | [BSD-2-Clause](https://github.com/restic/restic/blob/a80be1478a4c537f8396e0db2b05120aa78f11e0/LICENSE) |
-| [Borg 1.4.5](https://github.com/borgbackup/borg/releases/tag/1.4.5) | Bounded local/SSH benchmark and design reference | Its CLI boundary is less natural for RestoreWeave, and repair may discard damaged data. Use it to calibrate compression, maintenance, and mounted-read expectations, not as the leading adapter. | [BSD-3-Clause](https://github.com/borgbackup/borg/blob/1.4.5/LICENSE) |
+| [Borg 1.4.5](https://github.com/borgbackup/borg/releases/tag/1.4.5) | Bounded local/SSH benchmark and design reference | Its CLI boundary is less natural for Cairn, and repair may discard damaged data. Use it to calibrate compression, maintenance, and mounted-read expectations, not as the leading adapter. | [BSD-3-Clause](https://github.com/borgbackup/borg/blob/1.4.5/LICENSE) |
 | [Siegfried v1.11.6](https://github.com/richardlehane/siegfried/releases/tag/v1.11.6) with PRONOM v124 | Optional deeper identification Processor | Pin the signature file and disable online update, server mode, directory walking, and uncontrolled archive recursion. Its result remains evidence, not parseability or exact-identity proof. | [Apache-2.0](https://github.com/richardlehane/siegfried/blob/v1.11.6/LICENSE) |
 
 [rustic v0.11.3](https://github.com/rustic-rs/rustic/tree/v0.11.3) is track-only. Its reusable Rust structure is attractive, but upstream still discourages production use and lacks enough stability evidence for authoritative recovery.
 
-Safe path resolution remains a qualification candidate rather than an adopted dependency. [pathrs-lite](https://github.com/openSUSE/libpathrs/tree/main/contrib/bindings/go/pathrs-lite) exposes handle-oriented APIs and opportunistically uses Linux `openat2`, but its applicable code is primarily [MPL-2.0](https://github.com/openSUSE/libpathrs/blob/main/LICENSE). RestoreWeave must review file-level copyleft obligations, confirm root-handle lifetime and fallback behavior, and use only the handle API. Upstream maintenance is active, but sampled scheduled workflows were not uniformly green; RestoreWeave therefore relies on its own Linux race and mount-substitution qualification rather than a generic upstream-CI claim. Upstream explicitly describes the older string-returning [`SecureJoin`](https://github.com/cyphar/filepath-securejoin#legacy-api) pattern as vulnerable to time-of-check/time-of-use attacks; it is rejected for authoritative capture. If pathrs-lite is unsuitable, the reference implementation should keep a narrow private `golang.org/x/sys/unix` `openat2` resolver rather than expose Linux syscall structures in public contracts.
+Safe path resolution remains a qualification candidate rather than an adopted dependency. [pathrs-lite](https://github.com/openSUSE/libpathrs/tree/main/contrib/bindings/go/pathrs-lite) exposes handle-oriented APIs and opportunistically uses Linux `openat2`, but its applicable code is primarily [MPL-2.0](https://github.com/openSUSE/libpathrs/blob/main/LICENSE). Cairn must review file-level copyleft obligations, confirm root-handle lifetime and fallback behavior, and use only the handle API. Upstream maintenance is active, but sampled scheduled workflows were not uniformly green; Cairn therefore relies on its own Linux race and mount-substitution qualification rather than a generic upstream-CI claim. Upstream explicitly describes the older string-returning [`SecureJoin`](https://github.com/cyphar/filepath-securejoin#legacy-api) pattern as vulnerable to time-of-check/time-of-use attacks; it is rejected for authoritative capture. If pathrs-lite is unsuitable, the reference implementation should keep a narrow private `golang.org/x/sys/unix` `openat2` resolver rather than expose Linux syscall structures in public contracts.
 
 ### 3.3 Isolated Processor pack
 
 | Project | Exact role | Integration decision | License and packaging boundary |
 | --- | --- | --- | --- |
-| [Apache Tika](https://github.com/apache/tika) | Office, PDF, email, ebook, document metadata/text extraction, and embedded-object enumeration | Use as a private `PARSE`/`EXTRACT` sidecar with RMETA-like per-object output. RestoreWeave owns input staging, routing, output admission, and publication. Do not expose Tika Server or gRPC as a public untrusted endpoint. Select and qualify one pinned stable release; do not follow `main` or a prerelease automatically. | Core is [Apache-2.0](https://github.com/apache/tika/blob/787d9ffe4e3b31fa715eea4690ee6b1febfaee0c/LICENSE.txt), but full distributions contain [NOTICE-listed CDDL and CDDL/LGPL dependencies](https://github.com/apache/tika/blob/787d9ffe4e3b31fa715eea4690ee6b1febfaee0c/NOTICE.txt). Retain the exact NOTICE and SBOM. |
+| [Apache Tika](https://github.com/apache/tika) | Office, PDF, email, ebook, document metadata/text extraction, and embedded-object enumeration | Use as a private `PARSE`/`EXTRACT` sidecar with RMETA-like per-object output. Cairn owns input staging, routing, output admission, and publication. Do not expose Tika Server or gRPC as a public untrusted endpoint. Select and qualify one pinned stable release; do not follow `main` or a prerelease automatically. | Core is [Apache-2.0](https://github.com/apache/tika/blob/787d9ffe4e3b31fa715eea4690ee6b1febfaee0c/LICENSE.txt), but full distributions contain [NOTICE-listed CDDL and CDDL/LGPL dependencies](https://github.com/apache/tika/blob/787d9ffe4e3b31fa715eea4690ee6b1febfaee0c/NOTICE.txt). Retain the exact NOTICE and SBOM. |
 | [libarchive](https://github.com/libarchive/libarchive) | Archive structure enumeration and bounded virtual-member streaming | Run in a separate archive `PARSE` worker. Use callback reads and stream selected members to host staging. Never extract an uncontrolled tree. Enforce format, filter, entry-count, nesting, expanded-byte, ratio, sparse-extent, filename, and time budgets. | Predominantly permissive [BSD-style terms with per-file exceptions](https://github.com/libarchive/libarchive/blob/master/COPYING). |
 | [ffprobe/FFmpeg](https://github.com/FFmpeg/FFmpeg) | Media container, stream, codec, duration, chapter, timing, and tag metadata | Bundle a controlled external media worker. Whitelist local file or pipe protocols, disable network access, select output fields, and bound probe bytes, analysis duration, process time, memory, and output. | [LGPL-2.1-or-later by default](https://github.com/FFmpeg/FFmpeg/blob/a681001244b697e33fb94557dfd3f924250edb8c/LICENSE.md); `--enable-gpl` changes the binary to GPL and `--enable-nonfree` makes it unredistributable. Record the complete build configuration, linked libraries, codec review, and SBOM. |
 | [ExifTool](https://github.com/exiftool/exiftool) | Optional rich camera, image, audio, video, document, application, and maker-note metadata | Begin as a single-shot read-only subprocess. Accept only sandbox staging paths, request bounded JSON, suppress binary blobs, and recycle or quarantine any later persistent worker. Do not copy its parser implementation into the core. | Upstream evidence describes Perl/Artistic-or-GPL terms while the root license contains GPLv3 text. Reconcile the exact selected distribution before bundling. |
@@ -114,7 +114,7 @@ Embedding, CLIP, audio-language, OCR, ASR, caption, and code-understanding model
 
 ### 3.5 Selective code borrowing
 
-[Perkeep](https://github.com/perkeep/perkeep) is the strongest code-borrowing source because its applicable code is Apache-2.0 and several mechanisms align with RestoreWeave without defining the product.
+[Perkeep](https://github.com/perkeep/perkeep) is the strongest code-borrowing source because its applicable code is Apache-2.0 and several mechanisms align with Cairn without defining the product.
 
 Review these exact areas before implementation:
 
@@ -122,9 +122,9 @@ Review these exact areas before implementation:
 - [`pkg/schema/filewriter.go`](https://github.com/perkeep/perkeep/blob/9406ea272705d1f8f63c9b2ed31274962c30e3e1/pkg/schema/filewriter.go) for chunk-tree construction ideas.
 - [`pkg/schema/filereader.go`](https://github.com/perkeep/perkeep/blob/9406ea272705d1f8f63c9b2ed31274962c30e3e1/pkg/schema/filereader.go) for range reads and reconstruction patterns.
 
-Do not inherit Perkeep’s SHA-224 defaults, schema language, object identity, publication model, or recovery format. RestoreWeave retains SHA-256 content identity, `RepositoryDriver` receipts, portable publication records, and catalog-independent recovery semantics.
+Do not inherit Perkeep’s SHA-224 defaults, schema language, object identity, publication model, or recovery format. Cairn retains SHA-256 content identity, `RepositoryDriver` receipts, portable publication records, and catalog-independent recovery semantics.
 
-Every borrowed fragment must record the source repository, exact commit, source path, applicable license, retained notices, local destination, substantive modifications, and the tests that establish independent RestoreWeave behavior.
+Every borrowed fragment must record the source repository, exact commit, source path, applicable license, retained notices, local destination, substantive modifications, and the tests that establish independent Cairn behavior.
 
 ### 3.6 Design and competitor reference only
 
@@ -132,14 +132,14 @@ Every borrowed fragment must record the source repository, exact commit, source 
 | --- | --- | --- |
 | [Spacedrive](https://github.com/spacedriveapp/spacedrive) | Separate path identity, content identity, user metadata, sidecars, full-text/vector search, and a headless API. | Current code uses [FSL-1.1-ALv2](https://github.com/spacedriveapp/spacedrive/blob/6dfeccf2113039e35f2ce735f945e70dc3e4ea45/LICENSE) with explicit competing-use restrictions. Use independent design analysis only. Its sampled/truncated large-file hash must not become exact recovery identity. |
 | [Seafile Server](https://github.com/haiwen/seafile-server) and [Seafile core/client](https://github.com/haiwen/seafile) | Git-like commits, trees, blocks, virtual repositories, versioning, and drive projection. | The server is [AGPL-3.0 plus an OpenSSL exception](https://github.com/haiwen/seafile-server/blob/8c47d5f5810e71d75778eb02577ef9ad69013d76/LICENSE.txt); core/client is [GPLv2 plus an OpenSSL exception](https://github.com/haiwen/seafile/blob/2ebf6ac8b0755c9a88d5ed9295f50e7c6c9a3255/LICENSE.txt). |
-| [sist2](https://github.com/sist2app/sist2) | Heterogeneous parser routing, bounded extraction, index-document preparation, SQLite/Elasticsearch choices, and optional embedding hooks. | [GPL-3.0](https://github.com/sist2app/sist2/blob/fc8dce64457c927b1d193dea585cef81deabc618/LICENSE). It may later run as an independently installed external Processor, but code is not copied or linked into the core unless RestoreWeave deliberately accepts GPL obligations. |
+| [sist2](https://github.com/sist2app/sist2) | Heterogeneous parser routing, bounded extraction, index-document preparation, SQLite/Elasticsearch choices, and optional embedding hooks. | [GPL-3.0](https://github.com/sist2app/sist2/blob/fc8dce64457c927b1d193dea585cef81deabc618/LICENSE). It may later run as an independently installed external Processor, but code is not copied or linked into the core unless Cairn deliberately accepts GPL obligations. |
 | [Immich](https://github.com/immich-app/immich) | Asynchronous media processing, an external ML service, ACL-aware search, and resource isolation. | [AGPL-3.0](https://github.com/immich-app/immich/blob/199723261c6ffa897fec8ccdaea6359e39c37cc3/LICENSE). It is a vertical media product and not recovery authority. |
-| [rclone v1.75.0](https://github.com/rclone/rclone/releases/tag/v1.75.0) | Directory caching, read-ahead, bounded cache behavior, mount metrics, and representative VFS workloads. | Its broad remote and mutable VFS model should not own RestoreWeave namespace semantics. Borrow patterns and benchmark cases only, and never reuse older path-validation assumptions: [GHSA-45pq-889g-fcgh](https://github.com/rclone/rclone/security/advisories/GHSA-45pq-889g-fcgh) affects releases through v1.74.4. MIT licensed. |
-| [Kopia](https://github.com/kopia/kopia/tree/v0.23.1/fs) FUSE adapter | A thin go-fuse adapter structure and historical large-directory qualification evidence. [Issue #1135](https://github.com/kopia/kopia/issues/1135) documents a `READDIRPLUS`-related quadratic behavior that was fixed; retain it as a regression case, not a claim about current Kopia performance. | Borrow adapter structure and tests only. Kopia is Apache-2.0, but its repository and namespace models do not become RestoreWeave ABI. |
+| [rclone v1.75.0](https://github.com/rclone/rclone/releases/tag/v1.75.0) | Directory caching, read-ahead, bounded cache behavior, mount metrics, and representative VFS workloads. | Its broad remote and mutable VFS model should not own Cairn namespace semantics. Borrow patterns and benchmark cases only, and never reuse older path-validation assumptions: [GHSA-45pq-889g-fcgh](https://github.com/rclone/rclone/security/advisories/GHSA-45pq-889g-fcgh) affects releases through v1.74.4. MIT licensed. |
+| [Kopia](https://github.com/kopia/kopia/tree/v0.23.1/fs) FUSE adapter | A thin go-fuse adapter structure and historical large-directory qualification evidence. [Issue #1135](https://github.com/kopia/kopia/issues/1135) documents a `READDIRPLUS`-related quadratic behavior that was fixed; retain it as a regression case, not a claim about current Kopia performance. | Borrow adapter structure and tests only. Kopia is Apache-2.0, but its repository and namespace models do not become Cairn ABI. |
 | [Restic FUSE](https://github.com/restic/restic/tree/v0.19.1/internal/fuse) | Chunk-offset lookup, blob caching, and concurrent offset reads. [Issue #3828](https://github.com/restic/restic/issues/3828) reports mounted access around 8x and, in another workload, 25x slower than restore. | Borrow BSD-2-Clause read-path patterns and use the issue as performance counterevidence; do not assume a repository-backed mount is automatically interactive. |
 | [rclone mount2](https://github.com/rclone/rclone/tree/v1.75.0/cmd/mount2) and [`vfs`](https://github.com/rclone/rclone/tree/v1.75.0/vfs) | Thin `ReadAt` handle style plus chunk-growth, stream-count, read-ahead-range, cache, transfer-accounting, retry, metrics, mount-option, and `READDIRPLUS` qualification vocabulary. | Borrow MIT-licensed vocabulary, bounded design patterns, and tests rather than the subsystems wholesale; they are coupled to rclone's writable remote VFS and global configuration model. |
 | [Watchman](https://github.com/facebook/watchman) | Recrawl, overflow, synchronization, and poison-state concepts for lossy filesystem observation. | Design and test-pattern reference only. Its daemon and operational footprint are too large for the default watcher dependency. MIT licensed. |
-| [zrepl](https://github.com/zrepl/zrepl) | ZFS snapshot lifecycle, holds, pruning safety, and platform-test patterns. | Borrow MIT-licensed lifecycle and test ideas only; do not embed the daemon or adopt its replication policy as RestoreWeave authority. |
+| [zrepl](https://github.com/zrepl/zrepl) | ZFS snapshot lifecycle, holds, pruning safety, and platform-test patterns. | Borrow MIT-licensed lifecycle and test ideas only; do not embed the daemon or adopt its replication policy as Cairn authority. |
 | [Temporal](https://github.com/temporalio/temporal), [Apache NiFi](https://github.com/apache/nifi), [containerd](https://github.com/containerd/containerd), and [Google ByteStream](https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto) | Durable activity concepts, provenance/backpressure, content lifecycle, and resumable byte-transfer patterns. | Do not embed these broad runtimes into the MVP. Reimplement only the narrow storage-specific semantics required by the operation journal and Processor handles. |
 
 ### 3.7 Rejected or deferred for the MVP
@@ -153,20 +153,20 @@ Every borrowed fragment must record the source repository, exact commit, source 
 - Do not adopt rustic as a production recovery engine while upstream still discourages production use.
 - Do not adopt the legacy string-returning `SecureJoin` API, final-component-only no-follow wrappers, or silent fallback from `openat2` to ambient absolute-path traversal for authoritative capture.
 - Do not make Watchman the default watcher service; use its failure semantics as a design reference.
-- Do not adopt go-fuse, bazil/fuse, jacobsa/fuse, libfuse, cgofuse, or WinFsp. Mounting is outside the RestoreWeave product boundary.
+- Do not adopt go-fuse, bazil/fuse, jacobsa/fuse, libfuse, cgofuse, or WinFsp. Mounting is outside the Cairn product boundary.
 - Do not copy `btrfs-progs` or OpenZFS implementation code into a permissive core. Integrate their installed, version-qualified command interfaces and retain exact command/output compatibility evidence.
-- Do not copy FSL, GPL, or AGPL implementation text into the core under the label “reference only.” Any such adoption requires an explicit RestoreWeave licensing and distribution decision.
+- Do not copy FSL, GPL, or AGPL implementation text into the core under the label “reference only.” Any such adoption requires an explicit Cairn licensing and distribution decision.
 
 ## 4. Kopia qualification spike
 
-Kopia leads because its Go repository APIs, object reads, storage abstractions, and verification mechanisms fit `RepositoryDriver` better than a CLI-only engine. The selection can still fail on the most important question: whether RestoreWeave’s portable objects remain live under Kopia maintenance.
+Kopia leads because its Go repository APIs, object reads, storage abstractions, and verification mechanisms fit `RepositoryDriver` better than a CLI-only engine. The selection can still fail on the most important question: whether Cairn’s portable objects remain live under Kopia maintenance.
 
 The spike must prove all of the following against Kopia v0.23.1:
 
-1. **Root and garbage-collection safety:** every payload, prepared closure, publication commit, and retained recovery dependency is reachable through a documented root model. Stock or supported maintenance cannot collect arbitrary RestoreWeave objects.
+1. **Root and garbage-collection safety:** every payload, prepared closure, publication commit, and retained recovery dependency is reachable through a documented root model. Stock or supported maintenance cannot collect arbitrary Cairn objects.
 2. **Crash reconciliation:** interruption before and after every physical write, logical receipt, and publication boundary yields no false published state and can be reconciled idempotently.
 3. **Bounded and random reads:** `FileAccess` can serve first-byte, sequential, and random-range workloads without pathological read amplification.
-4. **Independent exact verification:** RestoreWeave can read complete bytes through the driver and compute its own SHA-256 rather than accepting repository metadata as sufficient proof.
+4. **Independent exact verification:** Cairn can read complete bytes through the driver and compute its own SHA-256 rather than accepting repository metadata as sufficient proof.
 5. **Catalog-independent recovery:** a clean installation can locate and authenticate the portable publication closure and restore without the operational SQLite catalog or search index.
 6. **Corruption behavior:** injected missing, truncated, reordered, or modified storage objects produce explicit failures and never a healthy recovery claim.
 7. **Maintenance compatibility:** connect, upgrade, repair, compaction, and garbage collection preserve the published recovery contract or fail closed.
@@ -200,7 +200,7 @@ The qualification suite must replace every ancestor and selected entry with syml
 
 `fsnotify` can reduce reconciliation work on ordinary supported local filesystems, but it cannot establish completeness. Each provider declares recursion, filesystem support, overflow behavior, journal epoch, reset behavior, and event-loss limitations. NFS, SMB, FUSE, non-recursive watches, overflow, reset, rollback, or uncertain continuity invalidates the checkpoint and requires a complete baseline. Watcher events may enqueue or prioritize work; they never directly mutate the durable namespace or prove a deletion.
 
-Watchman is valuable counterevidence and a pattern source: mature watcher systems need explicit recrawl, synchronization, and poisoned-state behavior. RestoreWeave should borrow those state-machine ideas while keeping the default dependency small.
+Watchman is valuable counterevidence and a pattern source: mature watcher systems need explicit recrawl, synchronization, and poisoned-state behavior. Cairn should borrow those state-machine ideas while keeping the default dependency small.
 
 ### 5.3 Optional ZFS and Btrfs profiles
 
@@ -253,7 +253,7 @@ Every result contains stable `SubjectRef` values. The host reauthorizes those su
 
 ## 8. External presentation boundary
 
-RestoreWeave qualifies `ExportManifest`, materialized output, and bounded `FileAccess` through exact byte comparison, authorization tests, pagination tests, and clean-install recovery. It does not qualify a kernel mount, mount cache, inode mapping, directory cookies, or unmount behavior. Those belong to whichever external tool the operator selects.
+Cairn qualifies `ExportManifest`, materialized output, and bounded `FileAccess` through exact byte comparison, authorization tests, pagination tests, and clean-install recovery. It does not qualify a kernel mount, mount cache, inode mapping, directory cookies, or unmount behavior. Those belong to whichever external tool the operator selects.
 
 ## 9. License and supply-chain policy
 
@@ -266,13 +266,13 @@ The release process must:
 3. Produce a separate SBOM for every Processor image or executable bundle.
 4. Permit MIT, BSD, Apache, and public-domain code in-process only after transitive-license and provenance review.
 5. Prefer LGPL components as separately replaceable executables or dynamically linked libraries. Static linking requires explicit compliance artifacts.
-6. Keep GPL, AGPL, and FSL code out of the core and default bundle unless the project deliberately selects a compatible RestoreWeave license and accepts the corresponding distribution obligations and business restrictions.
+6. Keep GPL, AGPL, and FSL code out of the core and default bundle unless the project deliberately selects a compatible Cairn license and accepts the corresponding distribution obligations and business restrictions.
 7. Treat a subprocess or container as an engineering boundary, not automatic legal immunity. Use standard arm’s-length protocols and independent lifecycle/configuration.
 8. Record FFmpeg configure flags and block `--enable-gpl` or `--enable-nonfree` unless explicitly authorized. Review codec patents separately from copyright licensing.
 9. Treat model code, weights, tokenizer, preprocessing, datasets, model card, acceptable-use terms, and weight license as distinct artifacts. A library license does not license its weights.
 10. Quarantine and requalify an installed version after unexpected license, dependency, signer, digest, CVE, build-flag, or provenance drift.
 11. Run automated dependency, vulnerability, and SBOM scans plus manual review for every custom, copyleft, `NOASSERTION`, model-weight, codec, and generated-data license.
-12. Preserve source provenance for every selectively borrowed fragment and independently test the resulting RestoreWeave behavior.
+12. Preserve source provenance for every selectively borrowed fragment and independently test the resulting Cairn behavior.
 
 These rules complement the normative [Release Qualification and Traceability](../requirements/release-qualification-and-traceability.md) requirements.
 

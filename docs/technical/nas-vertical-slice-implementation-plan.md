@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-This plan turns RestoreWeave from a broad research design into one implementable self-hosted NAS data-layer slice.
+This plan turns Cairn from a broad research design into one implementable self-hosted NAS data-layer slice.
 
 The slice must prove four product outcomes together:
 

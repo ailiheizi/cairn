@@ -2,13 +2,13 @@
 
 > **Status:** Informative enumeration, 2026-08-16. This is not a requirement document and does not expand `RW-MVP-1`. It does not authorize a sticker manager, anime downloader, reader, note app, or media server inside `restoreweaved`. Authority stays in [Ecosystem and Vertical Applications](../requirements/ecosystem-and-vertical-apps.md). Closed product decisions stay in [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md).
 
-The question was: a cross-platform sticker manager, 追番 / 美剧 libraries, novels, and quote / memory vaults all look like separate products. Which of those jobs can sit on RestoreWeave, and which would make us become the app?
+The question was: a cross-platform sticker manager, 追番 / 美剧 libraries, novels, and quote / memory vaults all look like separate products. Which of those jobs can sit on Cairn, and which would make us become the app?
 
-**Answer:** almost every “keep my stuff and find it later” job can sit on one mixed Inbox. The plane already promised that. The apps the user saw are **foreign clients or later domain lenses**, not new RestoreWeave products.
+**Answer:** almost every “keep my stuff and find it later” job can sit on one mixed Inbox. The plane already promised that. The apps the user saw are **foreign clients or later domain lenses**, not new Cairn products.
 
 ## 0. How to read the grades
 
-RestoreWeave owns exact bytes (`ContentIdentity` / SHA-256), `SubjectRef`, snapshots, catalog, `TAG` / `NOTE` / `PROGRESS`, disposable search generations, bounded `content.*` reads, verify, and restore. Public attach points today: OpenSubsonic `/rest/*`, OPDS `/opds`, Inbox `/inbox/api/*`. After restore, a folder is just a folder.
+Cairn owns exact bytes (`ContentIdentity` / SHA-256), `SubjectRef`, snapshots, catalog, `TAG` / `NOTE` / `PROGRESS`, disposable search generations, bounded `content.*` reads, verify, and restore. Public attach points today: OpenSubsonic `/rest/*`, OPDS `/opds`, Inbox `/inbox/api/*`. After restore, a folder is just a folder.
 
 | Grade | Meaning |
 | --- | --- |
@@ -182,9 +182,9 @@ Jobs that look popular but fail Occam (restored folder + foreign tool already do
 
 Repeated because every seed above has a C/D twin:
 
-- No RestoreWeave sticker / meme / emoji product.
-- No RestoreWeave 追番 / Sonarr / BitTorrent product.
-- No RestoreWeave Flomo / Obsidian / 语录 editor.
+- No Cairn sticker / meme / emoji product.
+- No Cairn 追番 / Sonarr / BitTorrent product.
+- No Cairn Flomo / Obsidian / 语录 editor.
 - No embedded player, reader, or media server in `restoreweaved`.
 - No fourth public REST catalog.
 - No FUSE/SMB/WebDAV server so those apps can mount us.

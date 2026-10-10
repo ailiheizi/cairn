@@ -52,7 +52,7 @@ const DURABLE_WRITE_PATTERN = /^(annotation\.(upsert|delete|tag_apply|tag_plan)|
 // The action set every rendered button of the surface must belong to.
 const SURFACE_ACTIONS = ["refresh", "open-subject", "toggle-description"];
 
-const EMPTY_TITLE = /No notes in this workspace yet|此工作区暂无备注/;
+const EMPTY_TITLE = /No notes here yet|此处暂无备注/;
 const EMPTY_READS = /live NOTE annotation records|存续 NOTE 注释记录/;
 const EMPTY_NOT_CATALOG = /not a claim that the catalog holds no notes|并不代表目录中没有备注/;
 const PARTIAL_COPY = /description list is partial|描述列表不完整/;

@@ -2,11 +2,11 @@
 
 > **Review status:** This review was reframed on 2026-08-12 around the corrected self-hosted NAS product. It distinguishes implemented foundations, documented design, inferred product value, and unverified market claims. A large requirements archive is not treated as a complete product.
 
-> **Historical decision note (superseded 2026-08-19):** Bundled-FUSE and embedding-optional gates below are retained only to explain the earlier completeness assessment. The current MVP contract instead requires explicit export materialization, no RestoreWeave mount API, and a bundled local ONNX/BGE plus in-process zvec semantic profile; see [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
+> **Historical decision note (superseded 2026-08-19):** Bundled-FUSE and embedding-optional gates below are retained only to explain the earlier completeness assessment. The current MVP contract instead requires explicit export materialization, no Cairn mount API, and a bundled local ONNX/BGE plus in-process zvec semantic profile; see [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
 
 ## 1. Conclusion
 
-RestoreWeave is not currently a complete storage, catalog, backup, or NAS product. It is a substantial design archive plus early Go foundations for filesystem observation, extension capability modeling, namespace access, representation records, and a rebuildable SQLite projection.
+Cairn is not currently a complete storage, catalog, backup, or NAS product. It is a substantial design archive plus early Go foundations for filesystem observation, extension capability modeling, namespace access, representation records, and a rebuildable SQLite projection.
 
 The corrected product is:
 
@@ -217,7 +217,7 @@ The MVP is complete only when all six proofs pass:
 
 1. Every managed file restores exactly through its original path.
 2. Physical managed bytes are reported with all index and dependency overhead and are lower than raw logical input on the qualification corpus.
-3. Direct-engine savings are separated from RestoreWeave-specific savings.
+3. Direct-engine savings are separated from Cairn-specific savings.
 4. Baseline content discovery materially beats filename-only search on a fixed task set.
 5. Loss of the operational database and every rebuildable index does not prevent namespace reconstruction and restore.
 6. One extractor or indexer upgrade rebuilds safely without payload rewrite or durable-identity change.
@@ -251,13 +251,13 @@ The product has stronger long-term power than the former Mac backup wedge, but o
 - Detailed recovery ceremony can overwhelm the daily storage and search job.
 - Technical early adopters may not represent a paying market.
 
-If these dominate in representative pilots, RestoreWeave should narrow to portable manifests, namespace mapping, processor contracts, and recovery verification rather than claim a complete intelligent NAS layer.
+If these dominate in representative pilots, Cairn should narrow to portable manifests, namespace mapping, processor contracts, and recovery verification rather than claim a complete intelligent NAS layer.
 
 ## 11. Deferred profiles
 
 ### 11.1 Platform-specific capture
 
-Snapshot and application-consistency drivers may be valuable for individual source platforms. Their entitlement, privilege, packaging, and compatibility work gates only the named `CaptureDriver` profile and never defines the RestoreWeave product category.
+Snapshot and application-consistency drivers may be valuable for individual source platforms. Their entitlement, privilege, packaging, and compatibility work gates only the named `CaptureDriver` profile and never defines the Cairn product category.
 
 ### 11.2 P2P and magnets
 
@@ -274,7 +274,7 @@ Multitenancy, legal hold, enterprise RBAC, high availability, remote workers, wr
 ## 12. Next decision gates
 
 1. **Reference pipeline:** complete mandatory exact lane, suffix-to-magic classification branch, one processor pack, one repository engine, durable annotations, generation-pinned baseline search, bundled read-only FUSE, namespace access, and exact restore.
-2. **Storage benchmark:** compare raw, direct-engine, and RestoreWeave footprints with every index and dependency included.
+2. **Storage benchmark:** compare raw, direct-engine, and Cairn footprints with every index and dependency included.
 3. **Discovery benchmark:** prove content search changes successful retrieval beyond filename search.
 4. **Portable recovery:** rebuild namespace and restore after deleting SQLite and search indexes.
 5. **Processor lifecycle:** upgrade and cut over one extractor or indexer generation without payload rewrite.

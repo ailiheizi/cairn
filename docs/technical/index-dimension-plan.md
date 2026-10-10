@@ -22,7 +22,7 @@ A phase is done only when the listed exit test is green. “Sounds like modern s
 
 **Own.** Dimension identity, generation identity, query-provider compatibility, result resolution to `SubjectRef`, construct-axis names, and the rule that a missing later dimension is `UNAVAILABLE` rather than a fake hit.
 
-**Do not own in this fixture plan.** The required local text embedding and zvec runtime must be implemented and qualified under Core Phase 4, not by extending I1–I9 fixtures. Chromaprint/Shazam services, CLIP, alternate embedding spaces, graph stores, or a RestoreWeave player remain later processors or foreign tools. Their features, if added, attach to the same `SubjectRef` and never become `ContentIdentity`.
+**Do not own in this fixture plan.** The required local text embedding and zvec runtime must be implemented and qualified under Core Phase 4, not by extending I1–I9 fixtures. Chromaprint/Shazam services, CLIP, alternate embedding spaces, graph stores, or a Cairn player remain later processors or foreign tools. Their features, if added, attach to the same `SubjectRef` and never become `ContentIdentity`.
 
 **Occam.** Do not add a fourth public catalog. Do not add an `rw identify-song` product. Do not put ffmpeg/Tika on the identity path. Do not select or promote a release repository in this plan. Do not expand `RW-MVP-1`.
 
@@ -82,7 +82,7 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 `server/internal/search` declares every dimension in the table above. `capability.list` emits `kind=index-dimension` rows. Lexical is `AVAILABLE` only when this build has a search indexer. Later dimensions are declared and `UNAVAILABLE`, with notes that name the missing isolated processor.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Dimension IDs | Stable strings, not SQLite table names | `capability.list` contains all five IDs |
 | Lexical state | Follows whether `search.Indexer` is wired | Exact-lane daemon: lexical `AVAILABLE`; catalog-only daemon: lexical `UNAVAILABLE` |
@@ -94,7 +94,7 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 Every successful or degraded lexical result names `dimension`, `query_provider_ref`, `index_generation_ref`, `score_semantics`, and the construct axes in force. Hits still resolve to catalog `SubjectRef`. OpenSubsonic/OPDS/Inbox ignore unknown JSON fields and keep the old wire format.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Provenance | One provider, one generation, one dimension | After ingest, `search.query` returns `lexical-metadata-fts` / `query.lexical.fts5.v1` / a non-empty generation |
 | Authorization | Catalog entry must still exist | Deleted namespace rows do not appear as hits |
@@ -106,7 +106,7 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 `search.query` accepts `dimension` (top-level or inside the query object). Unknown IDs are invalid input. Known later IDs return `degraded` + `unavailable` and zero hits. They do not fall back to lexical in disguise. They do not invent a fingerprint match.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Unknown dimension | Contract error | `dimension=not-a-dimension` is invalid input |
 | Acoustic / semantic / … | Declared, not shipped | `dimension=acoustic-fingerprint` is degraded; namespace/verify/restore still succeed |
@@ -118,7 +118,7 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 `construct_axes` restricts the live FTS5 query to named columns. Hits report which axes actually contained a query token. This is multi-dimension *construction* of the lexical generation, not a vector index.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Axis filter | `tags:reviewed` does not hit a path-only token | Query `unique` on `construct_axes=["tags"]` misses a file whose only match is extracted text |
 | Axis report | Hit lists matched axes | A tag query reports `tags` on the hit |
@@ -130,7 +130,7 @@ Status (2026-08-15): **fixture-contract-complete**, not a Chromaprint or listen-
 
 An opt-in `fingerprint.audio.fixture.v1` processor emits a provider-neutral `REBUILDABLE_DERIVATIVE` artifact attached to `SubjectRef`. Default ingest does not register it. The acoustic `IndexProvider` builds a disposable generation from those artifacts. `search.query` with `dimension=acoustic-fingerprint` does exact fixture lookup (`query.acoustic.fixture.v1`, score `fixture-exact`).
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Opt-in processor | Not in `DefaultProcessors()` | Default MP3 ingest still admits only `extract.audio.tags.v1` |
 | Artifact | `not_content_identity=true`; algorithm `fixture-v1` | Fingerprint string is not the file SHA-256 |
@@ -146,7 +146,7 @@ Status (2026-08-15): **fixture-contract-complete**, not embedding or CLIP produc
 
 Opt-in `embed.text.fixture.v1` and `embed.clip.fixture.v1` emit `REBUILDABLE_DERIVATIVE` artifacts attached to `SubjectRef`. Default ingest does not register them. Each owns a disposable generation. `search.query` accepts raw text or a `sem1:` / `clip1:` token and does exact fixture lookup.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Text embed | Normalized UTF-8 sketch, prefix `sem1:` | Query the source sentence; hit the text `SubjectRef` |
 | CLIP fixture | Title+artist joint string, prefix `clip1:` | Query `ClipQueryText(title, artist)`; hit the same subject as `audio.list` |
@@ -161,7 +161,7 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 `search.query` accepts `fuse` as two or more declared dimension IDs. The broker invokes one `QueryProvider` per dimension, each against that dimension’s latest generation. Hits are unioned by `SubjectRef`. Each component keeps its own provider, generation, score semantics, and status. The broker provider is `query.broker.fuse.v1` with score semantics `component-union`. It does not invent a hybrid numeric score.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Two dimensions | `fuse=["lexical-metadata-fts","semantic-embedding"]` | Components array has both; a shared subject lists both IDs |
 | No hybrid score | `score_semantics=component-union` | Result has no invented fused rank field |
@@ -174,9 +174,9 @@ Status (2026-08-15): **fixture-contract-complete**.
 
 Status (2026-08-15): **adapter-harness-complete**. There is no standard OpenSubsonic “identify this clip” method in the pinned client sequence.
 
-Inbox `/inbox/api/search?dimension=acoustic-fingerprint&q=<fingerprint>` forwards to `search.query` and does **not** overlay `audio.list` / `books.list` title filters. OpenSubsonic `search2` / `search3` stay lexical. `/rest/identify.view` is rejected as an unimplemented OpenSubsonic method. Do not invent a RestoreWeave-only identify API.
+Inbox `/inbox/api/search?dimension=acoustic-fingerprint&q=<fingerprint>` forwards to `search.query` and does **not** overlay `audio.list` / `books.list` title filters. OpenSubsonic `search2` / `search3` stay lexical. `/rest/identify.view` is rejected as an unimplemented OpenSubsonic method. Do not invent a Cairn-only identify API.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Inbox passthrough | `dimension` or `fuse` query params | Acoustic fixture fingerprint returns the song `SubjectRef` |
 | Old search | `search3?query=Nightfall` | Still lexical + in-memory `audio.list` |
@@ -190,7 +190,7 @@ Status (2026-08-15): **fixture-contract-complete** as a disposable projection of
 
 `query.graph.catalog.v1` rebuilds one generation from namespace `ParentID` (`contains`), file `ContentID` (`same_content`), live TAG annotations (`tagged`), and extracted string labels (`artist` / `album` from `extract.audio.tags.v1`, `author` from `extract.book.meta.v1`). Queries are `relation:value` or `{"relation":"artist","value":"Example Artist"}`. Unknown relations are invalid input, not a lexical disguise. Score semantics are `relation-exact`.
 
-| Piece | RestoreWeave meaning | Exit |
+| Piece | Cairn meaning | Exit |
 | --- | --- | --- |
 | Artist label | String on the track subject, not a new catalog node | `artist:Example Artist` hits the same `SubjectRef` as `audio.list` |
 | Tag edge | Live TAG body | `tagged:reviewed` hits the tagged file |

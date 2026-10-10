@@ -29,7 +29,7 @@ design](single-operator-experience-pack-design.md) defines proposed contribution
 boundaries and conflict handling; it does not activate a plugin runtime or
 change the implementation order.
 
-RestoreWeave remains the working name, executable identity, and configuration
+Cairn remains the working name, executable identity, and configuration
 identity. The name carries a recovery-first implication, while the public
 product story should begin with keeping and using personal content. “Weave” is
 also used by an [App Store application](https://apps.apple.com/us/app/weave-save-search-videos/id6801379247).
@@ -93,15 +93,15 @@ re-hosting are not implied by “use it.”
 The following public evidence informs workflow analogies and individual needs.
 It is deliberately small and qualitative: no interviews, usage telemetry,
 retention, payment-intent, market-size, or adoption measurements were collected.
-It does not establish that one combined product is preferred or that RestoreWeave
+It does not establish that one combined product is preferred or that Cairn
 has a unique position. Descriptions below paraphrase the cited material; they
 are observations about those sources, not population-level claims.
 
 | Evidence | Observed material | Relation to direction | What it does not establish |
 | --- | --- | --- | --- |
-| [Immich search documentation](https://docs.immich.app/features/searching/) | Search supports dates, tags, locations, filters, and contextual queries. | Analogy: familiar facets can help find personal media. | Does not support adopting CLIP as a default, merging products, or demand for RestoreWeave. |
+| [Immich search documentation](https://docs.immich.app/features/searching/) | Search supports dates, tags, locations, filters, and contextual queries. | Analogy: familiar facets can help find personal media. | Does not support adopting CLIP as a default, merging products, or demand for Cairn. |
 | [Eagle organization documentation](https://en.eagle.cool/support/desktop/organize) | Tags and smart folders organize a personal asset library. | Analogy: shared user labels and saved criteria are understandable. | Does not validate NAS workflows or a specific implementation. |
-| [Navidrome overview](https://navidrome.org/docs/overview/) | A self-hosted music server browses and plays music using curated metadata and queues. | Analogy and boundary: useful music browsing can depend on metadata work. | Does not establish that RestoreWeave should become a music server or require curated metadata. |
+| [Navidrome overview](https://navidrome.org/docs/overview/) | A self-hosted music server browses and plays music using curated metadata and queues. | Analogy and boundary: useful music browsing can depend on metadata work. | Does not establish that Cairn should become a music server or require curated metadata. |
 | [Jellyfin transcoding documentation](https://jellyfin.org/docs/general/post-install/transcoding/) | Playback may direct-play, remux, or transcode according to client and available resources. | Boundary: playback compatibility is a declared client/resource problem. | Does not justify promising arbitrary playback or adding transcoding now. |
 | [V2EX NAS search discussion](https://www.v2ex.com/t/1153487) | One operator described building a global NAS search tool and using it over time. | Direct individual need: cross-folder discovery can motivate a personal workaround. | A single workaround is not scale, adoption, or willingness-to-pay evidence. |
 | [V2EX photos, files, and backup discussion](https://www.v2ex.com/t/1030250) and [original-retention concern](https://v2ex.com/t/1055548) | Posters expressed interest in photo/file workflows alongside backup and concern about losing originals. | Direct individual needs: combine discovery with confidence in retained originals. | The first page of the former source is incomplete; no later unseen reply is used. These posts do not validate a market segment. |

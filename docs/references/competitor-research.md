@@ -1,16 +1,16 @@
 # Competitor and Component Research
 
-> **Research status:** This synthesis was updated on 2026-08-12 from the current RestoreWeave repository, a bounded Siftline run, and a fresh primary-source competitor scan. `Observed` means inspected in current project or primary-source material, `Documented` means stated by a project source, `Inferred` means a RestoreWeave design conclusion, and `Unverified` means that behavior, performance, licensing, or demand still requires a dedicated check.
+> **Research status:** This synthesis was updated on 2026-08-12 from the current Cairn repository, a bounded Siftline run, and a fresh primary-source competitor scan. `Observed` means inspected in current project or primary-source material, `Documented` means stated by a project source, `Inferred` means a Cairn design conclusion, and `Unverified` means that behavior, performance, licensing, or demand still requires a dedicated check.
 
-> **Historical decision note (superseded 2026-08-19):** The competitor evidence remains useful, but bundled-FUSE and embedding-optional RestoreWeave recommendations below are no longer active. The current profile uses explicit export materialization, exposes no RestoreWeave mount API, and requires the bundled local ONNX/BGE plus in-process zvec semantic default defined in [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
+> **Historical decision note (superseded 2026-08-19):** The competitor evidence remains useful, but bundled-FUSE and embedding-optional Cairn recommendations below are no longer active. The current profile uses explicit export materialization, exposes no Cairn mount API, and requires the bundled local ONNX/BGE plus in-process zvec semantic default defined in [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
 
 ## 1. Conclusion
 
-RestoreWeave has a credible but unproven product position as a self-hosted, content-aware storage layer for NAS systems and heterogeneous collections.
+Cairn has a credible but unproven product position as a self-hosted, content-aware storage layer for NAS systems and heterogeneous collections.
 
 The corrected product statement is:
 
-> RestoreWeave turns heterogeneous file trees into verified, space-efficient representations, preserves a browsable and restorable filesystem namespace, and allows processing and discovery algorithms to evolve without changing durable data meaning.
+> Cairn turns heterogeneous file trees into verified, space-efficient representations, preserves a browsable and restorable filesystem namespace, and allows processing and discovery algorithms to evolve without changing durable data meaning.
 
 Spacedrive is the closest direct competitor found and materially narrows the novelty claim. No reviewed project nevertheless established all four of these properties under one qualified recovery contract:
 
@@ -21,7 +21,7 @@ Spacedrive is the closest direct competitor found and materially narrows the nov
 
 That gap is an opportunity, not proof of demand. Adjacent categories support **medium plausibility**, but direct demand and willingness to pay for the unified product are **unverified**. Empty-framework and self-hosted operating-complexity risks remain **high**.
 
-RestoreWeave should therefore reuse mature components while owning the durable semantics that those components do not share:
+Cairn should therefore reuse mature components while owning the durable semantics that those components do not share:
 
 - Content, namespace, file-version, representation, placement, and index-generation identity.
 - Recovery and fidelity contracts.
@@ -36,7 +36,7 @@ Mac and APFS are not the market boundary. Time Machine and Arq remain useful pla
 
 ## 2. Competitive category map
 
-RestoreWeave crosses several established categories. Each validates part of the mechanism, but none validates the complete product or its economics.
+Cairn crosses several established categories. Each validates part of the mechanism, but none validates the complete product or its economics.
 
 | Category | Strong references | What the category proves | What remains missing |
 | --- | --- | --- | --- |
@@ -54,9 +54,9 @@ The competitive position is not “a better Restic,” “a larger Immich,” �
 
 ### 2.1 Direct and near-direct competitors
 
-| Project | Verified primary-source mechanism | Boundary versus RestoreWeave | License and adoption caution |
+| Project | Verified primary-source mechanism | Boundary versus Cairn | License and adoption caution |
 | --- | --- | --- | --- |
-| [Spacedrive](https://github.com/spacedriveapp/spacedrive) | VDFS over local disks, NAS, and cloud locations; content identity, full-text and vector search, OCR, metadata and thumbnails, a headless server, typed APIs, adapters, and an extension runtime are present in the current project tree. | Closest direct product competitor. The reviewed sources did not establish mandatory full-byte identity for every file, a release-qualified exact archive repository, or catalog-independent clean restore. Its v2 line remains alpha. RestoreWeave cannot claim AI readiness, VDFS, content hashing, APIs, or extensibility as unique. | The current [FSL-1.1-ALv2 license](https://github.com/spacedriveapp/spacedrive/blob/6dfeccf2113039e35f2ce735f945e70dc3e4ea45/LICENSE) explicitly restricts competing commercial data-management, hosting, storage, and AI services before version-specific conversion. Design and competitor reference only; do not copy or depend on current code. |
+| [Spacedrive](https://github.com/spacedriveapp/spacedrive) | VDFS over local disks, NAS, and cloud locations; content identity, full-text and vector search, OCR, metadata and thumbnails, a headless server, typed APIs, adapters, and an extension runtime are present in the current project tree. | Closest direct product competitor. The reviewed sources did not establish mandatory full-byte identity for every file, a release-qualified exact archive repository, or catalog-independent clean restore. Its v2 line remains alpha. Cairn cannot claim AI readiness, VDFS, content hashing, APIs, or extensibility as unique. | The current [FSL-1.1-ALv2 license](https://github.com/spacedriveapp/spacedrive/blob/6dfeccf2113039e35f2ce735f945e70dc3e4ea45/LICENSE) explicitly restricts competing commercial data-management, hosting, storage, and AI services before version-specific conversion. Design and competitor reference only; do not copy or depend on current code. |
 | [Perkeep](https://github.com/perkeep/perkeep) | Immutable content-addressed blobs, universal object schemas, rebuildable indexes, structured search, Web UI, CLI, and FUSE. Its [overview](https://github.com/perkeep/perkeep/blob/master/doc/overview.md) explicitly combines storage, backup, search, and synthesized filesystems. | Architecturally close, but centered on a custom personal-object model rather than a qualified arbitrary-NAS archive contract. Its long development history is counterevidence that architectural breadth alone creates product power. | [Apache-2.0](https://github.com/perkeep/perkeep/blob/master/COPYING); current release and maintenance facts require verification at adoption time. |
 | [Seafile](https://github.com/haiwen/seafile-server) | Git-like Repo, Commit, FS, and Block objects, content-defined chunking, snapshot history, between-version deduplication, virtual repositories, virtual-drive access, and documented [Office/PDF full-text search](https://github.com/haiwen/seafile-admin-docs/blob/master/manual/config/details_about_file_search.md). | Strong integrated storage-and-namespace substitute, primarily a sync/share library product. The reviewed sources did not establish global cross-library minimization or portable recovery independent of the Seafile catalog, and full-text search is a Pro feature. | [Seafile Server is AGPL-3.0 with an OpenSSL exception](https://github.com/haiwen/seafile-server/blob/8c47d5f5810e71d75778eb02577ef9ad69013d76/LICENSE.txt); the separate [Seafile core/client is GPLv2 with an OpenSSL exception](https://github.com/haiwen/seafile/blob/2ebf6ac8b0755c9a88d5ed9295f50e7c6c9a3255/LICENSE.txt). Design reference only unless the project intentionally accepts the applicable copyleft. |
 
@@ -64,10 +64,10 @@ The competitive position is not “a better Restic,” “a larger Immich,” �
 
 ### 3.1 Exact repository engines
 
-| Project | Previously documented mechanism | RestoreWeave implication | License status from prior review |
+| Project | Previously documented mechanism | Cairn implication | License status from prior review |
 | --- | --- | --- | --- |
 | [Restic v0.19.1](https://github.com/restic/restic/releases/tag/v0.19.1) | Content-defined chunking, SHA-256 content IDs, authenticated encryption, snapshots, checks, restore, mount, and broad backends. | Control benchmark and possible subprocess driver. Upstream explicitly presents Restic as a CLI rather than a supported embeddable library; interactive range-read and mounted-archive behavior still require measurement. | [BSD-2-Clause](https://github.com/restic/restic/blob/a80be1478a4c537f8396e0db2b05120aa78f11e0/LICENSE) |
-| [Kopia v0.23.1](https://github.com/kopia/kopia/releases/tag/v0.23.1) | Layered content-addressed storage, repository APIs, policies, maintenance, verification, cloud backends, and optional Reed-Solomon support. | Leading qualification-spike target, not adopted. Its snapshot-centric garbage collection must be proven safe for every RestoreWeave payload and portable publication object before selection. | [Apache-2.0](https://github.com/kopia/kopia/blob/b361d0f4100898ce3ad479755f104ff2c5a35e01/LICENSE) |
+| [Kopia v0.23.1](https://github.com/kopia/kopia/releases/tag/v0.23.1) | Layered content-addressed storage, repository APIs, policies, maintenance, verification, cloud backends, and optional Reed-Solomon support. | Leading qualification-spike target, not adopted. Its snapshot-centric garbage collection must be proven safe for every Cairn payload and portable publication object before selection. | [Apache-2.0](https://github.com/kopia/kopia/blob/b361d0f4100898ce3ad479755f104ff2c5a35e01/LICENSE) |
 | [Borg 1.4.5](https://github.com/borgbackup/borg/releases/tag/1.4.5) | Keyed content IDs, chunking, authenticated encryption, staged checks, compression selection, and mounted archives. | Bounded local/SSH benchmark and conservative repository-maintenance reference. CLI integration is less natural, and repair may discard damaged data. | [BSD-3-Clause](https://github.com/borgbackup/borg/blob/1.4.5/LICENSE) |
 | [rustic v0.11.3](https://github.com/rustic-rs/rustic/tree/v0.11.3) | Restic-format interoperability and reusable Rust components. | Track only. The library structure is attractive, but upstream still discourages production use, so it is not an authoritative recovery substrate. | [Apache-2.0 OR MIT](https://github.com/rustic-rs/rustic#license) |
 | [Bupstash](https://github.com/andrewchambers/bupstash) | BLAKE3-addressed encrypted data, offline decryption keys, restricted remote keys, and append-only patterns. | Useful credential and append-only design reference. | [MIT](https://github.com/andrewchambers/bupstash/blob/master/LICENSE) |
@@ -114,7 +114,7 @@ The implementation plan starts with a Kopia-led spike, retains Restic as the con
 | [Khoj](https://github.com/khoj-ai/khoj) | Self-hosted semantic indexing across personal documents and knowledge sources. | Semantic retrieval can remain a replaceable product service over stable subjects. | Search relevance does not justify data omission. AGPL-3.0. |
 | [AIOS-LSFS](https://github.com/agiresearch/AIOS-LSFS) | Semantic file search with rollback and version-restoration concepts. | Useful architecture analogue for binding search results to versions. | Previously reviewed repository evidence demonstrates a research implementation, not production demand. MIT. |
 
-Enterprise-search-style systems are optimized around connectors, parsers, ACL filtering, index generations, and query ranking. RestoreWeave should borrow those boundaries, but it must not become another search platform that ignores physical storage and recovery. Conversely, search can be rebuildable and non-authoritative while still being mandatory in the first useful distribution.
+Enterprise-search-style systems are optimized around connectors, parsers, ACL filtering, index generations, and query ranking. Cairn should borrow those boundaries, but it must not become another search platform that ignores physical storage and recovery. Conversely, search can be rebuildable and non-authoritative while still being mandatory in the first useful distribution.
 
 ### 4.3 Model and index components
 
@@ -131,7 +131,7 @@ The baseline product should ship path, metadata, type, checksum, duplicate, and 
 
 ## 5. File identification and processor frameworks
 
-| Project | Previously documented mechanism | RestoreWeave role | Boundary |
+| Project | Previously documented mechanism | Cairn role | Boundary |
 | --- | --- | --- | --- |
 | [file/libmagic](https://github.com/file/file) | Deterministic byte signatures and magic rules. | Default early format evidence. | Signatures can be ambiguous, incomplete, or wrong for containers and polyglots. |
 | [Magika](https://github.com/google/magika) | Learned content-type classification from bytes. | Optional advisory evidence for unknown or conflicting cases. | Confidence does not prove parseability, complete coverage, or safe storage treatment. Apache-2.0. |
@@ -139,7 +139,7 @@ The baseline product should ship path, metadata, type, checksum, duplicate, and 
 | [libarchive](https://github.com/libarchive/libarchive) | Archive inspection across many formats. | Virtual member inventory. | Requires cumulative recursion, expansion, CPU, memory, and output limits. |
 | [ffprobe](https://ffmpeg.org/ffprobe.html) | Container, stream, codec, timing, tag, and media metadata inspection. | Qualified external media `PARSE`/`EXTRACT` Processor candidate. | Record the exact FFmpeg binary, configure flags, linked libraries, notices, codec review, and SBOM. GPL flags change the binary license; nonfree flags make it unredistributable. |
 | [Tree-sitter](https://github.com/tree-sitter/tree-sitter) | Incremental parsers and syntax trees. | Code symbols and structural chunks. | Syntax does not prove build, dependency, or runtime closure. MIT. |
-| [Apache NiFi](https://github.com/apache/nifi) | Content/metadata separation, replaceable processors, queues, provenance, backpressure, and revision-aware control. | Strong processor-contract and scheduling reference. | Too broad and operationally heavy to become RestoreWeave Core. Apache-2.0. |
+| [Apache NiFi](https://github.com/apache/nifi) | Content/metadata separation, replaceable processors, queues, provenance, backpressure, and revision-aware control. | Strong processor-contract and scheduling reference. | Too broad and operationally heavy to become Cairn Core. Apache-2.0. |
 
 The evidence sequence should remain:
 
@@ -189,7 +189,7 @@ They also provide counterevidence to over-pluginization:
 - Users must understand backpressure, retries, state, secrets, upgrades, and partial results.
 - A graph editor shifts complexity to the operator rather than removing it.
 
-RestoreWeave should ship policy presets and class-aware default routes. An expert graph or pipeline inspector may be added later, but the durable plan, operation journal, representation graph, and recovery semantics remain host-owned.
+Cairn should ship policy presets and class-aware default routes. An expert graph or pipeline inspector may be added later, but the durable plan, operation journal, representation graph, and recovery semantics remain host-owned.
 
 ## 8. P2P and decentralized storage boundary
 
@@ -205,7 +205,7 @@ None demonstrates direct demand for torrent-aware NAS recovery. Discoverability,
 
 The platform-boundary implication is:
 
-- RestoreWeave should not compete as an operating-system-specific backup application.
+- Cairn should not compete as an operating-system-specific backup application.
 - Filesystem-specific entitlement, privilege, packaging, and compatibility work belongs to independently qualified `CaptureDriver` profiles.
 - Failure to ship any optional driver must not block another qualified Linux/NAS deployment.
 - Time Machine and Arq are useful examples for one source platform, not the primary category definition.
@@ -237,7 +237,7 @@ The strongest first distribution is therefore:
 - Controlled through CLI and an initial local read-only MCP subset, with optional REST, WebUI, and alternate gateway adapters.
 - Extensible through a small versioned processor surface rather than a marketplace of micro-plugins.
 
-## 11. What RestoreWeave should not rebuild
+## 11. What Cairn should not rebuild
 
 - Content-defined chunking and standard cryptographic hashing.
 - A new encrypted repository before a mature engine fails a measured need.
@@ -247,7 +247,7 @@ The strongest first distribution is therefore:
 - A universal learned or VAE storage format.
 - A writable multi-protocol NAS in the first release.
 
-RestoreWeave should concentrate on the shared identities, policies, representation lifecycle, portable namespace, verified access, and one complete default experience.
+Cairn should concentrate on the shared identities, policies, representation lifecycle, portable namespace, verified access, and one complete default experience.
 
 ## 12. Coverage and limitations
 
@@ -263,4 +263,4 @@ Important limitations:
 - Performance and footprint claims from project READMEs remain unverified until reproduced.
 - Proprietary NAS products, authenticated communities, customer interviews, pricing tests, and longitudinal pilots were not covered.
 
-The smallest reversal test is direct: if representative NAS operators obtain little net storage reduction, rarely use unified discovery, or find the system harder to operate than their existing catalogs plus Restic or Kopia, RestoreWeave should narrow to a manifest, processor-contract, and recovery-verification layer.
+The smallest reversal test is direct: if representative NAS operators obtain little net storage reduction, rarely use unified discovery, or find the system harder to operate than their existing catalogs plus Restic or Kopia, Cairn should narrow to a manifest, processor-contract, and recovery-verification layer.

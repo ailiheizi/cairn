@@ -16,7 +16,7 @@ change durable formats, or close any of this profile's qualification gates.
 
 ## 2. One complete product job
 
-RestoreWeave MVP performs one complete job:
+Cairn MVP performs one complete job:
 
 > Connect a heterogeneous local or NAS-mounted tree, identify and process its contents through strong defaults, minimize exact storage, search it through lexical, structured, and local semantic dimensions, keep related files in minimal link groups, freeze export manifests, and prove selected content can be restored on a fresh installation.
 
@@ -51,7 +51,7 @@ Exact ingest, verification, and restore must continue without an AI model or sem
 
 ### 2.1 Managed-archive boundary
 
-`RW-MVP-1` qualifies managed archive mode, not a writable primary NAS replacement. The source is read-only from RestoreWeave's perspective. The published original-path namespace is also read-only.
+`RW-MVP-1` qualifies managed archive mode, not a writable primary NAS replacement. The source is read-only from Cairn's perspective. The published original-path namespace is also read-only.
 
 The MVP reports repository storage reduction and index overhead precisely. It MUST NOT describe logical duplicate bytes as released NAS capacity while the original source still exists. Releasing source capacity requires a separate migration and retirement profile with explicit human authority, verified exact recovery, placement sufficiency, rollback rules, and post-retirement recovery testing. Automatic source deletion is disabled in `RW-MVP-1`.
 
@@ -160,7 +160,7 @@ The MVP storage value comes from safe, measurable mechanisms:
 - Completed exact content identity groups byte-identical files.
 - Every original path remains a distinct namespace entry even when content is shared.
 - The reference repository owns chunking, compression, encryption, pack layout, and physical deduplication.
-- RestoreWeave records logical source bytes, exact duplicate bytes, estimated repository bytes, actual physical repository growth where observable, index overhead, and transfer bytes separately.
+- Cairn records logical source bytes, exact duplicate bytes, estimated repository bytes, actual physical repository growth where observable, index overhead, and transfer bytes separately.
 - Incremental runs reuse unchanged content and valid derived artifacts.
 
 The plan must never combine these categories into one misleading savings number. Logical duplicate savings, repository compression, existing-backend reuse, explicit exclusion, and future alternate representations have different recovery consequences.
@@ -202,7 +202,7 @@ The baseline supports:
 - Hard-link and symlink reconstruction where the source and destination profiles support them.
 - Explicit metadata degradation for unsupported ownership, permissions, names, sparse regions, extended attributes, or other filesystem features.
 
-Repository-private packs, chunks, object keys, and deduplication layout are never the user namespace. `RW-MVP-1` materializes a frozen `ExportManifest` through `SnapshotTree` and `FileAccess` to an explicit destination. RestoreWeave does not implement mount, SMB, NFS, WebDAV, S3, media-server, or alternate filesystem gateways.
+Repository-private packs, chunks, object keys, and deduplication layout are never the user namespace. `RW-MVP-1` materializes a frozen `ExportManifest` through `SnapshotTree` and `FileAccess` to an explicit destination. Cairn does not implement mount, SMB, NFS, WebDAV, S3, media-server, or alternate filesystem gateways.
 
 An explicitly unprotected entry may remain visible as a decision record, but it has no payload and is never presented as readable or recoverable.
 
@@ -300,7 +300,7 @@ Incremental behavior must preserve historical meaning:
 
 ## 11. Repository and publication contract
 
-`RW-MVP-1` requires one qualified exact repository, not two. This requirements profile does not preselect the engine. Each release MUST name and qualify the exact engine, version, reader dependencies, and backend profile it ships, and the private format never becomes RestoreWeave namespace or content identity.
+`RW-MVP-1` requires one qualified exact repository, not two. This requirements profile does not preselect the engine. Each release MUST name and qualify the exact engine, version, reader dependencies, and backend profile it ships, and the private format never becomes Cairn namespace or content identity.
 
 One repository may support the full baseline flow and may be reported as:
 
@@ -310,7 +310,7 @@ One repository may support the full baseline flow and may be reported as:
 
 It must not be reported as redundant, provider-independent, or resilient to repository loss. A target in the same failure domain as the source is explicitly at risk. A separate machine or remote target is the onboarding recommendation, while multiple failure-independent placements belong to a later profile.
 
-The repository driver provides storage, lookup, readback, verification, restore access, durable receipts, and reconciliation. RestoreWeave owns logical snapshot publication and recovery meaning.
+The repository driver provides storage, lookup, readback, verification, restore access, durable receipts, and reconciliation. Cairn owns logical snapshot publication and recovery meaning.
 
 The portable publication sequence is:
 
@@ -349,9 +349,9 @@ Every successful publication must make an authenticated Recovery Record Format c
 - Protected, explicitly unprotected, and blocked entries.
 - Content digests, representation records, dependencies, and repository receipts.
 - Filesystem fidelity and capture-consistency claims.
-- RestoreWeave, driver, repository, processor-schema, and reader compatibility information.
+- Cairn, driver, repository, processor-schema, and reader compatibility information.
 
-A clean-install restore may require only a compatible RestoreWeave reader, repository target, scoped credential source, independent trust anchor, signed publication record, and supported destination. It must not require the original source, catalog, search index, processor binaries, plugin registry, AI harness, model registry, MCP client, REST service, or WebUI.
+A clean-install restore may require only a compatible Cairn reader, repository target, scoped credential source, independent trust anchor, signed publication record, and supported destination. It must not require the original source, catalog, search index, processor binaries, plugin registry, AI harness, model registry, MCP client, REST service, or WebUI.
 
 Only a completed restore with exact post-restore digest comparison may report `RESTORE_VERIFIED`. Upload completion alone cannot report verified recovery.
 
@@ -391,7 +391,7 @@ Every non-raw-content command supports `--format human|json|jsonl`. Human output
 - `search` queries the generation-pinned baseline lexical, structured, and local-semantic indexes and returns subject and namespace references; if the semantic generation is unavailable, it reports the degraded state while lexical and structured search remain usable.
 - `tag` and `note` mutate durable subject-bound annotation records through optimistic revision checks; they do not write disposable index rows directly.
 - `browse` and `cat` use the authenticated snapshot namespace rather than repository-private paths.
-- `export` materializes a frozen `ExportManifest` to an explicit destination. RestoreWeave provides no mount adapter; external mounting or sharing is outside the MVP command contract.
+- `export` materializes a frozen `ExportManifest` to an explicit destination. Cairn provides no mount adapter; external mounting or sharing is outside the MVP command contract.
 - `verify` records the selected evidence level without relabeling sampled work as full verification.
 - `recovery export` produces an independently retainable recovery reference without plaintext credentials or private signing keys.
 - `restore` creates and applies an exact restore plan; non-interactive and machine clients retain explicit plan/apply separation.
@@ -405,7 +405,7 @@ The qualified MCP profile exposes bounded read operations for health, status, ex
 
 It does not expose repository mutation, restore-destination mutation, source deletion, policy mutation, processor installation, arbitrary job control, ambient credentials, arbitrary shell text, or unrestricted filesystem reads.
 
-External automation or AI harnesses can inspect existing subjects and plans and may construct proposals outside RestoreWeave. The initial MCP profile cannot create, revise, approve, abandon, or apply a plan, mutate an annotation, cancel a job, initialize or prune a repository, restore a destination, or invoke an arbitrary processor. Mutation remains a CLI or future separately qualified and explicitly granted operation. RestoreWeave contains no embedded general AI harness.
+External automation or AI harnesses can inspect existing subjects and plans and may construct proposals outside Cairn. The initial MCP profile cannot create, revise, approve, abandon, or apply a plan, mutate an annotation, cancel a job, initialize or prune a repository, restore a destination, or invoke an arbitrary processor. Mutation remains a CLI or future separately qualified and explicitly granted operation. Cairn contains no embedded general AI harness.
 
 ## 14. Explicitly staged capabilities
 
@@ -426,7 +426,7 @@ The following are important product directions but not dependencies of the first
 - Writable NAS behavior, synchronization, source deletion, automatic pruning, and destructive garbage collection.
 - High availability, multitenancy, enterprise RBAC, legal hold, or compliance operation.
 
-Staged semantic capabilities must use the same subjects, processor provenance, index generations, and namespace resolution defined by the MVP. They do not create a separate AI product inside RestoreWeave.
+Staged semantic capabilities must use the same subjects, processor provenance, index generations, and namespace resolution defined by the MVP. They do not create a separate AI product inside Cairn.
 
 ## 15. Acceptance tests
 

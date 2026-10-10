@@ -20,7 +20,7 @@ trust-anchor hash, and restored SHA-256 and byte length. Generated content is
 regression QA, not a representative corpus.
 
 Prerequisites are Python 3.11 or newer, `jq`, `shasum`, and a Darwin arm64 Mac.
-The smoke clears ambient RestoreWeave path and bundle overrides for its child
+The smoke clears ambient Cairn path and bundle overrides for its child
 processes and confirms all effective persisted locations resolve beneath its
 own temporary root. It also clears ambient `ZVEC_LIBRARY_PATH`; after the
 offline bundle is installed, the daemon's digest-admitted binding supplies the
@@ -69,7 +69,7 @@ SHA-256
 digests. The run injected ambient config/storage/model/vector and
 `ZVEC_LIBRARY_PATH` overrides; it confirmed effective config paths stayed under
 the temporary root and the sentinel override directory was never created. The
-smoke leaves `ZVEC_LIBRARY_PATH` unset for both daemon starts; RestoreWeave
+smoke leaves `ZVEC_LIBRARY_PATH` unset for both daemon starts; Cairn
 loads the admitted library from the persisted bundle binding.
 
 `bash -n` passed. Safety probes rejected a bad outer digest before extraction,
@@ -132,12 +132,12 @@ client from the current checkout. Use the supplied-package workflow below when
 the trial must bind to a specific candidate artifact and hash.
 
 ```sh
-mkdir -p "$HOME/RestoreWeave-Preview/data"
+mkdir -p "$HOME/Cairn-Preview/data"
 env -u RESTOREWEAVE_CONFIG -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY \
   -u RESTOREWEAVE_VECTORS -u RESTOREWEAVE_MODELS -u RESTOREWEAVE_RECOVERY_RECORDS \
   -u RESTOREWEAVE_SEMANTIC_BUNDLE -u RESTOREWEAVE_IMAGE_BUNDLE -u ZVEC_LIBRARY_PATH \
   sh scripts/run-local.sh \
-  --data-dir "$HOME/RestoreWeave-Preview/data" \
+  --data-dir "$HOME/Cairn-Preview/data" \
   --listen 127.0.0.1:4538
 ```
 
@@ -154,7 +154,7 @@ binaries and WebUI:
 
 ```sh
 PACKAGE="$PWD/dist/extracted/restoreweave-candidate-darwin-arm64"
-DATA="$HOME/RestoreWeave-Candidate/data"
+DATA="$HOME/Cairn-Candidate/data"
 mkdir -p "$DATA"
 XDG_DATA_HOME="$DATA" "$PACKAGE/bin/rw" config init --path "$DATA/config.toml"
 env -u RESTOREWEAVE_CONFIG -u RESTOREWEAVE_CATALOG -u RESTOREWEAVE_REPOSITORY \

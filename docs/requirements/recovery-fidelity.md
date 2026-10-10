@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave supports recovery outcomes that are not always byte-identical. This document defines how exact, source, normalized-content, perceptual, functional, semantic, and discovery-only relations are represented without conflation.
+Cairn supports recovery outcomes that are not always byte-identical. This document defines how exact, source, normalized-content, perceptual, functional, semantic, and discovery-only relations are represented without conflation.
 
 The central rule is:
 

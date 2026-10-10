@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-RestoreWeave presents stored data as an authenticated, file-shaped namespace even when the physical bytes are deduplicated, chunked, compressed, encrypted, packed with unrelated files, transformed into another representation, or distributed across several repositories.
+Cairn presents stored data as an authenticated, file-shaped namespace even when the physical bytes are deduplicated, chunked, compressed, encrypted, packed with unrelated files, transformed into another representation, or distributed across several repositories.
 
 This is the stable data-access promise:
 
@@ -405,7 +405,7 @@ Physical GC requires a reachability analysis over:
 - Active plans and in-flight publications.
 - Pinned representations, retention locks, and supported holds.
 
-The resulting immutable candidate plan identifies representations and placements that are no longer reachable. A qualified `RepositoryDriver` performs physical collection under a lease and fence, then returns a reconciled receipt. RestoreWeave rechecks retained snapshot health after destructive collection.
+The resulting immutable candidate plan identifies representations and placements that are no longer reachable. A qualified `RepositoryDriver` performs physical collection under a lease and fence, then returns a reconciled receipt. Cairn rechecks retained snapshot health after destructive collection.
 
 Index rows, thumbnails, embeddings, and caches have their own derivative retention. Their deletion cannot substitute for repository GC, and their continued presence cannot make retired authoritative bytes recoverable.
 
@@ -457,7 +457,7 @@ Only a valid `PUBLICATION_COMMIT` establishes logical publication. Local current
 
 A clean recovery process:
 
-1. Enumerates only candidates tagged as RestoreWeave publication commits.
+1. Enumerates only candidates tagged as Cairn publication commits.
 2. Authenticates the selected commit against an independently supplied trust anchor.
 3. Verifies every bound receipt and digest.
 4. Loads the exact prepared closure and required schemas or readers.
@@ -579,8 +579,8 @@ Traverse large immutable directories through CLI, MCP, `SnapshotTree`, and an ex
 
 ### NA-AT-017: External presentation boundary
 
-Verify that an external mount or sharing tool can consume a materialized export or bounded `FileAccess` without repository-private credentials or a second catalog. RestoreWeave qualifies the bytes and authorization at its boundary; the external tool's kernel, cache, and unmount behavior are outside the RestoreWeave release gate.
+Verify that an external mount or sharing tool can consume a materialized export or bounded `FileAccess` without repository-private credentials or a second catalog. Cairn qualifies the bytes and authorization at its boundary; the external tool's kernel, cache, and unmount behavior are outside the Cairn release gate.
 
 ## 19. Implementation decision
 
-RestoreWeave will treat the authenticated file-shaped namespace, not a repository tree or search index, as the stable access standard. Repository engines are free to optimize physical storage aggressively. Processors are free to add better representations. Indexes are free to improve discovery. The core preserves the mapping that turns all of them back into an exact, verifiable, original directory view.
+Cairn will treat the authenticated file-shaped namespace, not a repository tree or search index, as the stable access standard. Repository engines are free to optimize physical storage aggressively. Processors are free to add better representations. Indexes are free to improve discovery. The core preserves the mapping that turns all of them back into an exact, verifiable, original directory view.

@@ -181,7 +181,7 @@ export function useRestore({ t, snapshotRef, isConnected, coreStorageReady, core
       ? (restorePlanReason || t("Restore is not executable."))
       : restoreBarState === "DONE"
         ? restoreOutcomeText
-        : restorePlanError || (isUnavailable ? t("RestoreWeave service is unavailable") : !coreStorageReady ? coreStorageMessage : "");
+        : restorePlanError || (isUnavailable ? t("Cairn service is unavailable") : !coreStorageReady ? coreStorageMessage : "");
   const restoreBusy = busy;
   const restorePreviewDisabled = restoreBusy || !coreStorageReady || !restoreDestination.trim();
   const restoreApplyDisabled = restoreBusy || !coreStorageReady;

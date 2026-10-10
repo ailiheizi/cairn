@@ -150,14 +150,14 @@ export async function assertResponsiveLayout(ctx) {
 // asserted by the responsive loop above.
 export async function assertMobileWorkspacePanel(ctx) {
   const { page } = ctx;
-  const trigger = page.getByRole("button", { name: /打开工作区导航|Open workspace navigation/ });
+  const trigger = page.getByRole("button", { name: /^(打开导航|Open navigation)$/ });
   await trigger.waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await page.locator(".workspace > .workspace-sidebar").count(), 0, "the rail must not be rendered inline on a phone");
   const triggerBox = await trigger.boundingBox();
   assert.ok(triggerBox && triggerBox.width >= 32 && triggerBox.height >= 32, `the workspace button must keep a 32px hit target: ${JSON.stringify(triggerBox)}`);
 
   await trigger.click();
-  const panel = page.getByRole("dialog", { name: /工作区导航|Workspace navigation/ });
+  const panel = page.getByRole("dialog", { name: /^(导航|Navigation)$/ });
   await panel.waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await page.evaluate(() => document.body.classList.contains("drawer-open")), true, "the workspace panel must lock the page like the other drawers");
 

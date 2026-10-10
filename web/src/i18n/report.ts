@@ -15,7 +15,7 @@
 // failed verification", "No authoritative exact copy reported", "Untitled
 // subject", "revision {{revision}}", "Not accepted", "Body unavailable" in the
 // library partial; "yes" in verification; "Saved" in settings; and
-// "No published workspace is reported by this service in this browser yet."
+// "This service has not reported any published content in this browser yet."
 // in duplicates). `scripts/web-i18n-check.mjs` fails on a duplicate key, so
 // this partial must not redefine them.
 
@@ -29,7 +29,7 @@ export const report: Record<string, string> = {
   "Could not build the selection report: {{message}}": "无法生成选择报告：{{message}}",
 
   // --- the document header --------------------------------------------------
-  "RestoreWeave selection report": "RestoreWeave 选择报告",
+  "Cairn selection report": "Cairn 选择报告",
   "Generated: {{local}} ({{utc}})": "生成时间：{{local}}（{{utc}}）",
   "Selection source: {{source}}": "选择来源：{{source}}",
   "search.query results for \"{{query}}\"": "“{{query}}”的 search.query 结果",

@@ -476,8 +476,8 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
               {entry === "full-bytes" && <em>{t("expensive")}</em>}
             </button>
           </li>)}</ul>
-          {destinationRequired && <label className="verification-destination">{t("Restore destination on the RestoreWeave host")}
-            <input aria-label={t("Restore destination on the RestoreWeave host")} value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={"/data/verify-drill"} disabled={running} />
+          {destinationRequired && <label className="verification-destination">{t("Restore destination on the Cairn host")}
+            <input aria-label={t("Restore destination on the Cairn host")} value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={"/data/verify-drill"} disabled={running} />
             <small>{t("restore-drill writes the restored members to this directory; it never writes to the repository.")}</small>
           </label>}
           <div className="verification-run-controls">
@@ -491,7 +491,7 @@ export function VerificationDrawer({ t, snapshotRef, isConnected, coreStorageRea
               </div>
               : <button type="button" className="primary-button verification-run-button" onClick={() => { if (mode === "full-bytes") setConfirmFullBytes(true); else void runVerify(mode); }} disabled={!canRun}>{running ? <LoaderCircle className="spin" size={15} /> : <ShieldCheck size={15} />}{t("Run {{mode}} verification", { mode })}</button>}
             {disabledReason && <small className="verification-disabled-reason">{t("Verification runs are unavailable: {{reason}}", { reason: disabledReason })}</small>}
-            {destinationRequired && !destination.trim() && <small className="verification-disabled-reason">{t("restore-drill requires a destination on the RestoreWeave host")}</small>}
+            {destinationRequired && !destination.trim() && <small className="verification-disabled-reason">{t("restore-drill requires a destination on the Cairn host")}</small>}
           </div>
           {activeRun && activeRun.phase === "RUNNING" && <div className="verification-run" role="status" data-session-state="RUNNING" data-mode={activeRun.mode}>
             <p className="verification-run-line"><LoaderCircle className="spin" size={14} />{t("Running {{mode}} verification ({{cost}}) · elapsed {{elapsed}}", { mode: activeRun.mode, cost: t(runCost(activeRun.mode)), elapsed: elapsedLabel(now - activeRun.startedAt) })}</p>

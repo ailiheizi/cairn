@@ -17,7 +17,7 @@ export async function command(operation: string, input: unknown): Promise<Result
   try {
     response = await fetch(endpoints.command, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation, input }) });
   } catch {
-    throw new Error(clientMessage("Could not connect to RestoreWeave service. Start the service, then refresh."));
+    throw new Error(clientMessage("Could not connect to Cairn service. Start the service, then refresh."));
   }
   const raw = await response.text();
   let payload: Result = {};
@@ -25,14 +25,14 @@ export async function command(operation: string, input: unknown): Promise<Result
     try {
       payload = JSON.parse(raw) as Result;
     } catch {
-      throw new Error(clientMessage(response.ok ? "RestoreWeave returned an invalid response." : "Could not connect to RestoreWeave service. Start the service, then refresh."));
+      throw new Error(clientMessage(response.ok ? "Cairn returned an invalid response." : "Could not connect to Cairn service. Start the service, then refresh."));
     }
   }
   if (!response.ok || !payload.status || !["SUCCEEDED", "DEGRADED"].includes(payload.status)) {
     const reason = payload.reasons?.[0]?.message;
     if (reason) throw new Error(reason);
-    if (!response.ok) throw new Error(clientMessage("Could not connect to RestoreWeave service. Start the service, then refresh."));
-    throw new Error(clientMessage("RestoreWeave returned an invalid response."));
+    if (!response.ok) throw new Error(clientMessage("Could not connect to Cairn service. Start the service, then refresh."));
+    throw new Error(clientMessage("Cairn returned an invalid response."));
   }
   return payload;
 }
@@ -53,7 +53,7 @@ export async function uploadFiles(files: File[]): Promise<UploadOutcome> {
   try {
     response = await fetch(endpoints.upload, { method: "POST", body: form });
   } catch {
-    throw new Error(clientMessage("Could not connect to RestoreWeave service. Start the service, then refresh."));
+    throw new Error(clientMessage("Could not connect to Cairn service. Start the service, then refresh."));
   }
   const raw = await response.text();
   let payload: UploadOutcome = {};
@@ -61,11 +61,11 @@ export async function uploadFiles(files: File[]): Promise<UploadOutcome> {
     try {
       payload = JSON.parse(raw) as UploadOutcome;
     } catch {
-      throw new Error(clientMessage("RestoreWeave returned an invalid response."));
+      throw new Error(clientMessage("Cairn returned an invalid response."));
     }
   }
   if (Object.keys(payload).length === 0) {
-    throw new Error(clientMessage(response.ok ? "RestoreWeave returned an invalid response." : "Could not connect to RestoreWeave service. Start the service, then refresh."));
+    throw new Error(clientMessage(response.ok ? "Cairn returned an invalid response." : "Could not connect to Cairn service. Start the service, then refresh."));
   }
   if (!response.ok) {
     // Request-level refusals arrive as {error, reason}; a refused-but-parsed

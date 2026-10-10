@@ -1,13 +1,13 @@
 # Capability reference
 
-This page is an operator-oriented reference for the current RestoreWeave
+This page is an operator-oriented reference for the current Cairn
 development profile. It explains what a capability means in everyday use; it
 does not replace the [MVP and Operator Contract](../requirements/mvp-and-operator-contract.md)
 or the [Content Store, Views, and Export Requirements](../requirements/content-store-views-and-exports.md).
 
 ## Configuration and paths
 
-RestoreWeave uses one persisted configuration for the content repository,
+Cairn uses one persisted configuration for the content repository,
 SQLite catalog, search/index locations, protection defaults, compression, and
 semantic-search profile. Paths are resolved to absolute effective paths; the
 process working directory is not used implicitly. A supplied `.` is an input
@@ -43,7 +43,7 @@ deletion. Readable but unclassified or processor-failed content follows the
 exact-preservation fallback.
 
 Logical duplicate savings, repository compression, and physical capacity are
-different measurements. RestoreWeave does not report duplicate bytes as freed
+different measurements. Cairn does not report duplicate bytes as freed
 source capacity, and automatic source deletion or destructive garbage
 collection is disabled. The full identity and storage rules are in [content
 store requirements](../requirements/content-store-views-and-exports.md#4-identity-and-exactness).
@@ -104,7 +104,7 @@ in the [semantic qualification report](../technical/semantic-qualification-resul
 ## Capacity and coverage
 
 Repository capacity is a read-only optional report. If the backend cannot
-provide a trustworthy value, RestoreWeave reports `UNKNOWN` (with a reason when
+provide a trustworthy value, Cairn reports `UNKNOWN` (with a reason when
 available) rather than blocking an exact save. Per-file tag, lexical, and
 semantic coverage are calculated projections, not another durable state store
 and not user tags. They may say that a field is missing or an index is

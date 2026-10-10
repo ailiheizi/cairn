@@ -1,4 +1,4 @@
-# RestoreWeave
+# Cairn
 
 [中文](README.md) · [English](README.en.md)
 
@@ -13,10 +13,10 @@
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26-79c2ff?style=flat-square" alt="Go 1.26"></a>
 </p>
 
-> RestoreWeave is for NAS and home-storage hobbyists, with the proposition “a self-hosted home for your personal content.” Keep it in your space. Find it, use it, take it with you. Current `main` is an unreleased development preview after `v0.1.0-prealpha.1`, not a production release. A supported installer, production repository qualification, LinkGroup, and complete multi-platform guarantees remain open.
+> Cairn is for NAS and home-storage hobbyists, with the proposition “a self-hosted home for your personal content.” Keep it in your space. Find it, use it, take it with you. Current `main` is an unreleased development preview after `v0.1.0-prealpha.1`, not a production release. A supported installer, production repository qualification, LinkGroup, and complete multi-platform guarantees remain open.
 
 <p align="center">
-  <img src="docs/assets/screenshots/unreleased/library-en.png" alt="RestoreWeave content-first library with search, tags, Notes, protection, and index status" width="1100">
+  <img src="docs/assets/screenshots/unreleased/library-en.png" alt="Cairn content-first library with search, tags, Notes, protection, and index status" width="1100">
 </p>
 <p align="center"><sub>The development WebUI populated with sanitized demo data built from this repository's documents.</sub></p>
 
@@ -30,7 +30,7 @@
 - **Take originals with you:** preview supported content, download original files, or export and verify their bytes.
 - **Reduce duplicates:** SHA-256 of the complete content plus logical length identifies exact matches, so duplicate content is stored once.
 
-The product direction brings photos, audio, video, documents, and other readable files into one library with shared identity, search, tags, Notes, access, export, and recovery, with a suitable way to browse each kind. RestoreWeave remains a content, discovery, export, and recovery plane. It is not a cloud-drive filesystem, mount service, or OpenList fork. Unknown formats can be preserved within the declared capture scope without a promise of parsing or playback.
+The product direction brings photos, audio, video, documents, and other readable files into one library with shared identity, search, tags, Notes, access, export, and recovery, with a suitable way to browse each kind. Cairn remains a content, discovery, export, and recovery plane. It is not a cloud-drive filesystem, mount service, or OpenList fork. Unknown formats can be preserved within the declared capture scope without a promise of parsing or playback.
 
 ## One complete workflow
 

@@ -4,17 +4,17 @@
 
 ## 1. Purpose
 
-RestoreWeave may use BitTorrent and magnet links through later profiles mapped onto the approved extension seams:
+Cairn may use BitTorrent and magnet links through later profiles mapped onto the approved extension seams:
 
 - A BitTorrent `RetrieverDriver` profile may reacquire an externally available pinned artifact.
-- A swarm-capable `RepositoryDriver` profile may place RestoreWeave-managed encrypted immutable packs across trusted or approved peers.
+- A swarm-capable `RepositoryDriver` profile may place Cairn-managed encrypted immutable packs across trusted or approved peers.
 - A recovery-artifact package may use a `RepositoryDriver` placement capability for publication and a separate `RetrieverDriver` capability for reacquisition. One package may implement both, but their authority, receipts, and qualification remain independent.
 
 These capabilities share protocol components but have different trust, privacy, legal, availability, and lifecycle requirements.
 
 The governing rule is:
 
-> RestoreWeave owns identity, encryption, policy, and recovery correctness. BitTorrent supplies discovery, distribution, locality, and piece-level repair.
+> Cairn owns identity, encryption, policy, and recovery correctness. BitTorrent supplies discovery, distribution, locality, and piece-level repair.
 
 ## 2. Non-goals
 
@@ -36,7 +36,7 @@ The system must distinguish:
 
 | Identity | Meaning |
 | --- | --- |
-| RestoreWeave whole-file or object hash | Protocol-independent expected plaintext identity. |
+| Cairn whole-file or object hash | Protocol-independent expected plaintext identity. |
 | Signed snapshot and manifest root | Paths, metadata, dependencies, policy, and requested claims. |
 | Encrypted pack hash | Exact ciphertext object distributed by a controlled swarm. |
 | Torrent v1 or v2 infohash | Identity of the encoded torrent information dictionary and piece layout. |
@@ -52,7 +52,7 @@ magnet topic and metainfo validation
 -> torrent piece or Merkle validation
 -> complete downloaded file or encrypted-pack hash
 -> authenticated decryption where applicable
--> RestoreWeave whole-file or object hash
+-> Cairn whole-file or object hash
 -> signed snapshot and recovery contract
 ~~~
 
@@ -72,7 +72,7 @@ The design must support:
 - BEP 47 file attributes and padding.
 - BEP 53 select-only file hints.
 
-The first P2P retrieval phase should prefer v2 or hybrid torrents while retaining an independent RestoreWeave whole-file SHA-256.
+The first P2P retrieval phase should prefer v2 or hybrid torrents while retaining an independent Cairn whole-file SHA-256.
 
 ## 5. Magnet parsing
 
@@ -118,7 +118,7 @@ BEP 46 channels require a 32-byte Ed25519 public key, 64-byte signature, salt no
 
 A magnet alone is not a durable reference. BEP 9 obtains the information dictionary from peers, but future metadata-serving peers may disappear.
 
-For reference-only treatment, RestoreWeave should retain:
+For reference-only treatment, Cairn should retain:
 
 - Original torrent-file bytes.
 - Torrent-file SHA-256.
@@ -151,7 +151,7 @@ Every selected file records:
 - Raw torrent path components.
 - Safe display path.
 - Torrent-native index.
-- RestoreWeave logical destination.
+- Cairn logical destination.
 - Length.
 - Selected state.
 - Required adjacent files and sidecars.
@@ -308,13 +308,13 @@ Controls include:
 - Log redaction and retention.
 - Automatic stop and resume-state behavior.
 
-RestoreWeave must not claim anonymity. Trackers, DHT nodes, peers, DNS operators, and network providers may observe IP addresses and torrent identities.
+Cairn must not claim anonymity. Trackers, DHT nodes, peers, DNS operators, and network providers may observe IP addresses and torrent identities.
 
 For a private torrent, tracker failover must disconnect all existing peers before contacting the next allowed tracker. A client that cannot enforce tracker-only peer provenance is rejected for the private profile.
 
 Every P2P job runs in a fresh broker-owned session and network namespace per workspace and immutable network-profile version, or under an equivalently proven state-separation mechanism. DHT routing tables, peer caches, PEX and local-discovery state, tracker state, resume peers, NAT mappings, and credentials must not cross workspace, swarm, or profile boundaries. Source provenance selects the privacy mode before first contact. Private-source jobs use `PRIVATE_TRACKER` from the first packet, with magnet and metainfo web seeds disabled unless individually allowlisted. Discovering `private=1` after prohibited public contact terminates and quarantines the job and emits a privacy-incident event.
 
-Download-only means zero payload-piece upload and zero content-derived metadata upload, not zero outbound control bytes. It may send explicitly approved tracker scrapes, DHT lookups with announcement disabled, handshakes, metadata requests, web-seed requests, and direct-peer requests, but it must not serve the raw information dictionary, piece layers, metadata responses, payload pieces, or derived swarm metadata. RestoreWeave must enforce this through a capable client and the mandatory P2P Network Broker, optionally reinforced by an independent external egress boundary, and verify it through packet capture or equivalent flow evidence. A stock client label or upload-rate setting is insufficient; an implementation that cannot enforce both zero-upload guarantees is blocked, and any profile that permits metadata serving is not `DOWNLOAD_ONLY`.
+Download-only means zero payload-piece upload and zero content-derived metadata upload, not zero outbound control bytes. It may send explicitly approved tracker scrapes, DHT lookups with announcement disabled, handshakes, metadata requests, web-seed requests, and direct-peer requests, but it must not serve the raw information dictionary, piece layers, metadata responses, payload pieces, or derived swarm metadata. Cairn must enforce this through a capable client and the mandatory P2P Network Broker, optionally reinforced by an independent external egress boundary, and verify it through packet capture or equivalent flow evidence. A stock client label or upload-rate setting is insufficient; an implementation that cannot enforce both zero-upload guarantees is blocked, and any profile that permits metadata serving is not `DOWNLOAD_ONLY`.
 
 Content-derived protocol egress includes the raw information dictionary, piece layers, metadata responses, payload pieces, and derived swarm metadata. `NETWORK_OPERATION` permits transport but grants no distribution authority. Metadata egress requires a current `VERIFIED` signed `SOURCE_DISTRIBUTION_AUTHORITY` determination scoped to metadata class, recipients or publicity, territory, and duration; otherwise the broker enforces `NO_METADATA_EGRESS`. Payload-piece upload additionally requires `SEED_UPLOAD`, and public advertising additionally requires `PUBLIC_ANNOUNCEMENT`.
 
@@ -356,7 +356,7 @@ Allocate lazily inside a quota-controlled volume. Do not automatically extract a
 
 ## 14. Swarm storage design
 
-A swarm-capable `RepositoryDriver` publishes encrypted immutable RestoreWeave packs, not raw files or individual content-defined chunks.
+A swarm-capable `RepositoryDriver` publishes encrypted immutable Cairn packs, not raw files or individual content-defined chunks.
 
 Recommended pack size is approximately 64 to 512 MiB, configurable by workload.
 
@@ -594,7 +594,7 @@ Required BitTorrent-specific states include:
 - Encrypted-pack public distribution when explicitly authorized.
 - Optional parity shards.
 - Signed mutable pointers only as convenience locators, never snapshot authority.
-- Prefer a RestoreWeave-signed mutable feed for durable full v2 or hybrid update history if measured demand justifies it; do not extend BEP 46 beyond its 20-byte v1 identity boundary.
+- Prefer a Cairn-signed mutable feed for durable full v2 or hybrid update history if measured demand justifies it; do not extend BEP 46 beyond its 20-byte v1 identity boundary.
 
 Public seeding and public DHT-only critical recovery remain outside the first P2P release.
 

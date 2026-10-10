@@ -237,21 +237,21 @@ than claiming React component boundaries provide security.
 These examples inform design vocabulary only. They are not code, framework,
 ABI, security proof, or dependency decisions:
 
-| Reference | Useful analogy | Limit for RestoreWeave |
+| Reference | Useful analogy | Limit for Cairn |
 | --- | --- | --- |
 | [DeepSeek Harness architecture](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md) and [service guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/service.md) | Layered profiles, injected services, reversible effects, and dependent cleanup on provider removal. | Separate service instances are lifecycle boundaries, not a sandbox, authorization model, or tenant boundary; internal APIs may not be public or stable. |
 | [Cordis](https://github.com/cordiverse/cordis) | Service injection and lifecycle mechanisms are possible implementation patterns. | Its API is explicitly unstable; DeepSeek's vendored pinned version is not evidence that upstream main is identical or a safe dependency choice. |
 | [VS Code contribution points](https://code.visualstudio.com/api/references/contribution-points) and [Workspace Trust](https://code.visualstudio.com/docs/editing/workspaces/workspace-trust) | Declarative contributions and unique setting/color IDs help control collisions; trust warnings clarify limits. | Workspace Trust does not prevent a malicious extension from ignoring restrictions; declarations are not sandbox enforcement. |
-| [Backstage frontend extensions](https://backstage.io/docs/frontend-system/architecture/extensions) | Typed inputs, outputs, attachments, and explicit singleton versus multiple slots clarify composition. | Backstage permits override or error behavior; RestoreWeave should reject duplicates by default and require explicit reviewed replacement. |
+| [Backstage frontend extensions](https://backstage.io/docs/frontend-system/architecture/extensions) | Typed inputs, outputs, attachments, and explicit singleton versus multiple slots clarify composition. | Backstage permits override or error behavior; Cairn should reject duplicates by default and require explicit reviewed replacement. |
 | [Grafana frontend sandbox](https://grafana.com/docs/grafana/latest/administration/plugin-management/plugin-frontend-sandbox/) | A separate JS context is an explicit isolation feature with its own tradeoffs. | It is documented as public preview; do not copy its mechanism or claim equivalent isolation here. |
-| [DeepSeek Harness styling](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.md) | A token owner, semantic aliases, and feature-level token consumption support coherent themes. | Adopt the separation principle only; keep RestoreWeave's current token/style system and do not mandate a rewrite. |
+| [DeepSeek Harness styling](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.md) | A token owner, semantic aliases, and feature-level token consumption support coherent themes. | Adopt the separation principle only; keep Cairn's current token/style system and do not mandate a rewrite. |
 | [JupyterLab extension development](https://jupyterlab.readthedocs.io/en/stable/extension/extension_dev.html?highlight=override) | Theme CSS variables, fonts/graphics, separate theme stylesheets, and load/unload lifecycle are documented. | Separate stylesheets do not prove CSS isolation; extension API/version compatibility still matters. Unload behavior does not prove durable-data preservation. |
 | [Obsidian theme guide](https://github.com/obsidianmd/obsidian-developer-docs/blob/main/en/Themes/App%20themes/Build%20a%20theme.md) and [developer policies](https://docs.obsidian.md/community-directory/developer-policies) | Light/dark CSS variable selectors and community restrictions on obfuscation, telemetry, self-update, and theme network resources are documented. | Policies are not a sandbox or proof of host-enforced network isolation. |
 | [Obsidian sample-plugin CSS-collision report](https://github.com/obsidianmd/obsidian-sample-plugin/issues/112) | A historical community concern raised the potential for global CSS class conflicts and discussed prefixing CSS classes. | The issue does not show a reproduced collision or a fix qualification; it is not a platform-wide finding. |
 
 The [single-operator plugin and theme research report](../research/single-operator-plugins-and-themes-20261006.md)
 retains the source evidence and scan limits. Host-owned annotations and content
-surviving module removal follow RestoreWeave's existing authority/recovery
+surviving module removal follow Cairn's existing authority/recovery
 contracts; none of the external unload examples proves that guarantee.
 
 ## Authorization and single-operator scope

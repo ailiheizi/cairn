@@ -23,7 +23,7 @@ export function validateInterfaces(definitions: readonly InterfaceDefinition[]):
 }
 
 export const interfaceCatalog: readonly InterfaceDefinition[] = [
-  { id: "workspace", renderSlot: "shell.restoreweave.workspace", label: "Workspace interface", description: "Keep search, results, and details together for focused work.", preview: "workspace" },
+  { id: "workspace", renderSlot: "shell.restoreweave.workspace", label: "Standard interface", description: "Keep search, results, and details together for focused work.", preview: "workspace" },
   { id: "showcase", renderSlot: "shell.restoreweave.showcase", label: "Content showcase", description: "Give saved content more room with a visual, browse-first layout.", preview: "showcase" },
 ];
 validateInterfaces(interfaceCatalog);

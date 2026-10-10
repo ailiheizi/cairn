@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-RestoreWeave is a self-hosted, NAS-first content-aware managed data layer. Its extension system exists so content algorithms and storage integrations can improve without changing the meaning of a file, a published namespace, an ingest plan, or verification evidence. The first qualified product profile is a read-only managed archive and search system.
+Cairn is a self-hosted, NAS-first content-aware managed data layer. Its extension system exists so content algorithms and storage integrations can improve without changing the meaning of a file, a published namespace, an ingest plan, or verification evidence. The first qualified product profile is a read-only managed archive and search system.
 
 The product is not an empty plugin framework. The reference distribution MUST provide a useful path for ordinary heterogeneous files before any optional extension is installed:
 
@@ -24,7 +24,7 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** ar
 
 ## 2. Extension boundary
 
-RestoreWeave exposes extension seams only where implementations are expected to vary materially:
+Cairn exposes extension seams only where implementations are expected to vary materially:
 
 | Extension role | Responsibility | Initial expectation |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ The following remain core-owned and are not replaceable plugins:
 - Namespace projection, exact-content access, authorization, and audit semantics.
 - Index-generation activation and authorization of query results.
 
-RestoreWeave MUST NOT create a separate privileged plugin family for every media type or algorithm. OCR, ASR, captioning, parsing, learned classification, fingerprinting, transcoding, compression, neural encoding, and embedding generation are processor capabilities. Full-text, vector, graph, and multimodal systems are index-provider or query-provider implementations.
+Cairn MUST NOT create a separate privileged plugin family for every media type or algorithm. OCR, ASR, captioning, parsing, learned classification, fingerprinting, transcoding, compression, neural encoding, and embedding generation are processor capabilities. Full-text, vector, graph, and multimodal systems are index-provider or query-provider implementations.
 
 ## 3. Typed processing routes
 
@@ -195,7 +195,7 @@ An extension MUST NOT:
 
 ## 10. External automation
 
-RestoreWeave exposes the full authorized typed operation set through CLI and a bounded local read-only MCP subset for scripts and external AI harnesses. These adapters operate above the extension system. They MUST NOT expose arbitrary plugin invocation, package installation, shell execution, or raw database access.
+Cairn exposes the full authorized typed operation set through CLI and a bounded local read-only MCP subset for scripts and external AI harnesses. These adapters operate above the extension system. They MUST NOT expose arbitrary plugin invocation, package installation, shell execution, or raw database access.
 
 Through the initial MCP profile, an external harness may inspect inventory, status, capabilities, processing coverage, annotations, snapshots, namespace entries, bounded content, search results, verification evidence, and existing plans. It may produce an external proposal, but it cannot create or revise a plan, mutate annotations, apply work, restore a destination, cancel a job, initialize or prune a repository, install an extension, or request another mutation. A later mutation-capable adapter, if qualified, receives no additional authority because it is an AI client and remains bound to the same plan digest, principal, policy, revision, idempotency, and explicit authorization used by other clients.
 

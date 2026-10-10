@@ -204,7 +204,7 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
       setTruncated(false);
       setListing([]);
       setSurfaceState("BLOCKED");
-      setBlockedReason(t("This browser has not recorded a published workspace yet, so there is nothing to read here."));
+      setBlockedReason(t("This browser has not recorded any published content yet, so there is nothing to read here."));
       return;
     }
     const [notesResult, descriptionResult, listingResult] = await Promise.allSettled([
@@ -245,7 +245,7 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
       // row still exists (it is a daemon record) but says UNKNOWN with the
       // daemon's reason.
       setListing([]);
-      setListingError(t("The workspace listing could not be read, so every subject name is shown as UNKNOWN: {{message}}", { message: messageOf(listingResult.reason) }));
+      setListingError(t("The content listing could not be read, so every subject name is shown as UNKNOWN: {{message}}", { message: messageOf(listingResult.reason) }));
     }
     setSurfaceState("READY");
     setReadAt(Date.now());
@@ -328,7 +328,7 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
   }
 
   const blocked = surfaceState === "BLOCKED";
-  const scopeLabel = t("{{notes}} user notes and {{descriptions}} current description leaves were returned for this workspace", { notes: userNoteCount, descriptions: descriptionCount });
+  const scopeLabel = t("{{notes}} user notes and {{descriptions}} current description leaves were returned here", { notes: userNoteCount, descriptions: descriptionCount });
 
   return <section
     className="content-column notes-surface"
@@ -344,7 +344,7 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
   >
     <div className="workspace-heading">
       <div>
-        <p className="eyebrow">{t("WORKSPACE")}</p>
+        <p className="eyebrow">{t("CONTENT")}</p>
         <h1>{t("Notes")}</h1>
       </div>
       <div className="heading-actions">
@@ -352,7 +352,7 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
         <button type="button" className="icon-button" data-action="refresh" title={t("Refresh notes")} aria-label={t("Refresh notes")} onClick={() => void loadSurface()}><RefreshCw size={15} /></button>
       </div>
     </div>
-    <p className="notes-note">{t("This list shows the live NOTE annotation records and the current description leaves the daemon returned for this workspace, each row with its source label. It is a read-only view: nothing here creates, edits, or deletes a note, and it does not claim to list every note ever written.")}</p>
+    <p className="notes-note">{t("This list shows the live NOTE annotation records and the current description leaves the daemon returned here, each row with its source label. It is a read-only view: nothing here creates, edits, or deletes a note, and it does not claim to list every note ever written.")}</p>
     <p className="notes-note notes-contract">{t("A row opens its subject's details, which is where a note is written; this list never copies a note into a second durable record.")}</p>
     {truncated && <p className="notes-partial" data-partial="true" role="status">{t("The description list is partial: the daemon returned {{count}} description records, and older description records are not shown here.", { count: descriptionCount })}</p>}
     {descriptionError && <p className="notes-warning" data-read="description.list" role="status">{descriptionError}</p>}
@@ -361,12 +361,12 @@ export function NotesSurface({ t, locale, workspaceID, onOpenSubject }: NotesSur
     {blocked
       ? <div className="notes-blocked" data-state="BLOCKED" role="alert"><AlertCircle size={16} /><div><strong>{t("Notes are not readable right now")}</strong><small data-blocked-reason={blockedReason}>{blockedReason}</small></div></div>
       : surfaceState === "LOADING" || surfaceState === "IDLE"
-        ? <p className="notes-loading" data-state="LOADING" role="status">{t("Reading the notes the daemon recorded for this workspace…")}</p>
+        ? <p className="notes-loading" data-state="LOADING" role="status">{t("Reading the notes the daemon recorded here…")}</p>
         : rows.length === 0
           ? <div className="empty-state notes-empty" data-empty="true">
             <span className="vault-sigil"><StickyNote size={35} /></span>
-            <h2>{t("No notes in this workspace yet")}</h2>
-            <p>{t("This list reads the daemon's live NOTE annotation records and its current description documents only. A row appears once a note or a description is recorded on a subject in this workspace; an empty list is what the daemon returned here, not a claim that the catalog holds no notes.")}</p>
+            <h2>{t("No notes here yet")}</h2>
+            <p>{t("This list reads the daemon's live NOTE annotation records and its current description documents only. A row appears once a note or a description is recorded on a subject here; an empty list is what the daemon returned here, not a claim that the catalog holds no notes.")}</p>
           </div>
           : <div className="notes-body">
             <label className="notes-filter">

@@ -47,7 +47,7 @@ const SURFACE_WRITE_OPERATIONS = ["annotation.upsert", "annotation.delete", "ann
 // The action set every rendered button must belong to.
 const SURFACE_ACTIONS = ["refresh", "select-tag", "toggle-subject", "open-in-library", "remove-subject-tag", "add-tag-subject", "preview-rename", "apply-rename", "discard-preview", "prepare-reverse"];
 
-const EMPTY_TITLE = /No live tag is recorded in this workspace yet|此工作区尚未记录任何存续标签/;
+const EMPTY_TITLE = /No live tag is recorded here yet|此处尚未记录任何存续标签/;
 const EMPTY_LIVE_ONLY = /live TAG annotation records only|只读取服务的存续 TAG 注释记录/;
 const EMPTY_TOMBSTONE = /tombstoned instead of being kept as an empty row|被删除的标签会置为墓碑/;
 const EMPTY_CREATES = /creates the first record|就会创建第一条记录/;

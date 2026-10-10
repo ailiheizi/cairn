@@ -2,7 +2,7 @@
 export const appearance: Record<string, string> = {
   "Appearance": "外观",
   "Interface": "界面方案",
-  "Workspace interface": "工作台",
+  "Standard interface": "标准界面",
   "Choose your interface": "选择界面方案",
   "Choose your interface. Changes apply immediately in this browser.": "选择界面方案。更改会立即在此浏览器中生效。",
   "Content showcase": "内容展厅",
@@ -22,10 +22,10 @@ export const appearance: Record<string, string> = {
   "Neutral and clear": "中性清晰",
   "Warm and soft": "温暖柔和",
   "Deep and calm": "深沉宁静",
-  "This preference is stored in this browser only. It does not change RestoreWeave service settings or your content.": "此偏好仅保存在当前浏览器中，不会更改 RestoreWeave 服务设置或您的内容。",
+  "This preference is stored in this browser only. It does not change Cairn service settings or your content.": "此偏好仅保存在当前浏览器中，不会更改 Cairn 服务设置或您的内容。",
   "Interface unavailable": "界面暂不可用",
-  "The workspace interface could not be displayed. Your search, selection, and Notes draft are still held by the app.": "工作台界面无法显示。应用仍保留您的搜索、选择和 Notes 草稿。",
-  "The selected interface failed. RestoreWeave switched to the workspace interface; review your settings before trying another layout.": "所选界面发生错误。RestoreWeave 已切换到工作台界面；尝试其他布局前请检查设置。",
+  "The standard interface could not be displayed. Your search, selection, and Notes draft are still held by the app.": "标准界面无法显示。应用仍保留您的搜索、选择和 Notes 草稿。",
+  "The selected interface failed. Cairn switched to the standard interface; review your settings before trying another layout.": "所选界面发生错误。Cairn 已切换到标准界面；尝试其他布局前请检查设置。",
   "Retry selected interface": "重试所选界面",
   "Dismiss": "关闭",
 };

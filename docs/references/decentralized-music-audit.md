@@ -63,7 +63,7 @@ Sources:
 
 The repository does not contain the real-music dataset, model weights, or generated catalog required to reproduce those measurements. No committed benchmark establishes a safe threshold for recovery decisions.
 
-## 4. Role in RestoreWeave
+## 4. Role in Cairn
 
 Recommended role:
 
@@ -86,7 +86,7 @@ The vector may help find candidates. A separate validator profile must determine
 
 ## 5. Audio evidence hierarchy
 
-| Evidence | Claim supported | RestoreWeave role |
+| Evidence | Claim supported | Cairn role |
 | --- | --- | --- |
 | SHA-256 plus length | Exact byte identity | Authoritative for ORIGINAL_BIT_EXACT |
 | Complete canonical PCM hashes | Exact decoded audio under a pinned decoder and alignment policy | NORMALIZED_CONTENT_EQUIVALENT |
@@ -171,6 +171,6 @@ The DAC vector remains advisory until a declared corpus establishes its candidat
 
 No repository-level LICENSE, COPYING, or NOTICE file was observed at the audited commit, and repository metadata reported no license.
 
-On 2026-08-11, the RestoreWeave project owner stated that decentralized-music is their own project and authorized its reuse for RestoreWeave. RestoreWeave may therefore refactor the audited implementation into an internal or separately versioned plugin, while retaining the exact source commit, model and weight licenses, dependency notices, and provenance.
+On 2026-08-11, the Cairn project owner stated that decentralized-music is their own project and authorized its reuse for Cairn. Cairn may therefore refactor the audited implementation into an internal or separately versioned plugin, while retaining the exact source commit, model and weight licenses, dependency notices, and provenance.
 
 Before distributing that code to third parties or accepting outside contributions against it, the owner should add an explicit repository license or an equivalent signed grant that defines redistribution and contribution terms. Authorization for the repository's original code does not replace the separate license terms of the upstream DAC model, weights, or dependencies.

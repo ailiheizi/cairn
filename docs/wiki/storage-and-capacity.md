@@ -33,7 +33,7 @@ When a backend can measure it, a scheme should report:
 
 - total filesystem capacity;
 - free capacity;
-- RestoreWeave's physical bytes, when measurable;
+- Cairn's physical bytes, when measurable;
 - measurement time and health.
 
 If a backend cannot provide a reliable value, the UI says **unknown**. An

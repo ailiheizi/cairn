@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave distinguishes data that is locally authoritative from data that may be reacquired from an external source. A URL, repository revision, package coordinate, model revision, torrent identity, or semantic match is a source candidate, not recovery proof.
+Cairn distinguishes data that is locally authoritative from data that may be reacquired from an external source. A URL, repository revision, package coordinate, model revision, torrent identity, or semantic match is a source candidate, not recovery proof.
 
 This protocol-neutral contract applies to later `RetrieverDriver` implementations for HTTP, Git, software registries, model registries, publisher catalogs, BitTorrent, removable media, and future origins.
 
@@ -98,7 +98,7 @@ External discovery declares:
 
 Discovery outputs `source_candidate_id` records with provenance and ranking evidence. An LLM, embedding, fingerprint, title, popularity signal, package name, or provider search rank may propose a candidate only. Candidate generation and final acceptance must not be the same learned system without an independent verifier.
 
-RestoreWeave does not ship a default public piracy-index or arbitrary web-search integration.
+Cairn does not ship a default public piracy-index or arbitrary web-search integration.
 
 ## 7. Acquisition and quarantine
 
@@ -117,7 +117,7 @@ Retrieved payloads:
 - Land beneath a fresh isolated root.
 - Are never executed, installed, mounted, imported, indexed, previewed with privileged decoders, or published automatically.
 - Pass protocol-native integrity checks where available.
-- Then pass independent RestoreWeave whole-file or object hashing.
+- Then pass independent Cairn whole-file or object hashing.
 - Then pass signature, edition, component, fidelity, malware, and policy checks.
 - Remain quarantined when any required result is missing, stale, conflicting, or weaker than requested.
 

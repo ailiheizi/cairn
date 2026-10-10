@@ -2,9 +2,9 @@
 
 ## 1. Status and purpose
 
-This document is normative for RestoreWeave's durable content model, storage defaults, deduplication claims, discovery derivatives, saved views, exports, and garbage-collection authority. It narrows the product around one principle:
+This document is normative for Cairn's durable content model, storage defaults, deduplication claims, discovery derivatives, saved views, exports, and garbage-collection authority. It narrows the product around one principle:
 
-> RestoreWeave stores immutable content and facts about it, then materializes the set a user asks for. A source path is provenance and recovery information; it is not the primary organization of the stored collection.
+> Cairn stores immutable content and facts about it, then materializes the set a user asks for. A source path is provenance and recovery information; it is not the primary organization of the stored collection.
 
 When an informative implementation plan conflicts with this document, this document wins. Product scope remains owned by [Product Requirements](product-requirements.md), and exact recovery evidence remains owned by [Restore Manifest](restore-manifest.md) and [Recovery Fidelity](recovery-fidelity.md).
 
@@ -34,7 +34,7 @@ The following decisions are frozen for `RW-MVP-1`. Changing one requires an expl
 | Description generation | Description storage and indexing are core; model-generated descriptions are explicit, on-demand work through a selected `DESCRIBE_SUBJECT` profile, not an automatic ingest dependency or a second bundled model hidden behind the embedding choice |
 | Online models | Explicit replacement profiles with egress and credential policy; never required for the personal-use default |
 | Output | A dynamic `SavedView` freezes into an immutable `ExportManifest`, which is materialized or streamed on demand |
-| Filesystem presentation | RestoreWeave ships no FUSE, SMB, NFS, WebDAV, S3 gateway, or mount API; external tools may consume exports or authorized reads |
+| Filesystem presentation | Cairn ships no FUSE, SMB, NFS, WebDAV, S3 gateway, or mount API; external tools may consume exports or authorized reads |
 | OpenList | May be studied or used externally, but is not a core dependency, storage engine, catalog authority, or codebase to fork for `RW-MVP-1` |
 | Neural/RWKV codec | Disabled by default and deferred until simple lossless storage and complete recovery are qualified |
 
@@ -52,7 +52,7 @@ The words “complete”, “default”, and “available” MUST be qualified b
 
 ## 2. Product model
 
-RestoreWeave is a content, annotation, discovery, and recovery plane. Its canonical flow is:
+Cairn is a content, annotation, discovery, and recovery plane. Its canonical flow is:
 
 The personal platform may present dedicated Photos and Music clients under
 [RW-PERSONAL-UX-1](first-party-client-experiences.md). They resolve the same
@@ -98,14 +98,14 @@ explicit preview-and-confirm operation: it records its producer/profile, does
 not silently remove user tags, and has no authority over content identity,
 deduplication, recovery, or garbage collection.
 
-RestoreWeave therefore resembles a Nix-style store in four limited ways:
+Cairn therefore resembles a Nix-style store in four limited ways:
 
 - admitted bytes and representations are immutable;
 - plans bind inputs, algorithms, configuration, and outputs;
 - user-facing outputs are materialized from immutable records;
 - garbage collection follows explicit roots rather than current path reachability.
 
-RestoreWeave is not a package manager, a POSIX filesystem, or a writable synchronization engine.
+Cairn is not a package manager, a POSIX filesystem, or a writable synchronization engine.
 
 ## 3. Authoritative data layers
 
@@ -304,7 +304,7 @@ An installer MAY ask for one convenience `data_root`, but `restoreweave.config.v
 | implementation staging | Temporary placement, processor, export, and import objects | Not authoritative; collect only after leases/fences prove no active operation needs them |
 | upload inbox (implementation staging instance) | The bounded loopback upload channel lands operator files in `<data-root>/inbox/<session>/` before any plan exists | Staged bytes carry no protection record until an ingest plan is reviewed and applied; the inbox is a projection, never a captured source; cleaning never-ingested scratch is not destructive GC |
 | implementation locks | Single-writer, lease, and fencing state | Runtime coordination only; never use a stale lock file as publication proof |
-| source path | User-owned input observed through a capture profile | Outside the RestoreWeave data root; never inferred from any storage path |
+| source path | User-owned input observed through a capture profile | Outside the Cairn data root; never inferred from any storage path |
 
 Configured paths MUST be non-overlapping after resolution. A repository may own private `tmp`, index, pack, or lock paths required by its adapter, but their layout is not a portable API. The controller reports the effective absolute local paths or backend URI and the selected profile; it never derives them from the client `pwd`.
 
@@ -450,7 +450,7 @@ External Qdrant, Milvus, remote model serving, and distributed repository servic
 
 ## 6. Deduplication and storage reduction
 
-RestoreWeave MUST report each mechanism separately.
+Cairn MUST report each mechanism separately.
 
 | Mechanism | Default | Exactness | Owner |
 | --- | --- | --- | --- |
@@ -598,7 +598,7 @@ An `ExportManifest` freezes one evaluation of a LinkGroup's current mapping, one
 
 The manifest, not a live query, is the unit of plan, review, apply, retry, verify, and reproduction. Materializing the same manifest to a directory, archive, object prefix, WebDAV surface, OPDS feed, OpenSubsonic facade, or other adapter MUST preserve subject and representation identity even when presentation names differ.
 
-Path-shaped output is therefore a materialization result, not the primary catalog. RestoreWeave MUST NOT implement a mount API or kernel-filesystem adapter. External tools MAY mount or share a restored directory or separately consume authorized export/read contracts, but that behavior is outside the product.
+Path-shaped output is therefore a materialization result, not the primary catalog. Cairn MUST NOT implement a mount API or kernel-filesystem adapter. External tools MAY mount or share a restored directory or separately consume authorized export/read contracts, but that behavior is outside the product.
 
 ### 7.4 Output integration boundary
 
@@ -614,7 +614,7 @@ Directory and archive materializers MAY run in the reference process. Protocol f
 
 ## 8. Descriptions and semantic source material
 
-File names and extracted bytes are necessary but not sufficient for the catalog. RestoreWeave MUST be able to retain namespaced facts and long-form information about a subject without confusing either with the original file. A `MetadataBundle` contains typed key/value facts such as duration, language, platform, edition, dimensions, checksum evidence, or user-defined fields. Every field records its namespace, source, confidence/authority, and provenance. A `DescriptionDocument` is a durable, versioned document attached to a `Subject` and records:
+File names and extracted bytes are necessary but not sufficient for the catalog. Cairn MUST be able to retain namespaced facts and long-form information about a subject without confusing either with the original file. A `MetadataBundle` contains typed key/value facts such as duration, language, platform, edition, dimensions, checksum evidence, or user-defined fields. Every field records its namespace, source, confidence/authority, and provenance. A `DescriptionDocument` is a durable, versioned document attached to a `Subject` and records:
 
 - document kind: `USER`, `IMPORTED`, `EXTRACTED`, `AI_SUMMARY`, or `AI_ANALYSIS`;
 - language, title, body, body digest, visibility, and author/producer;

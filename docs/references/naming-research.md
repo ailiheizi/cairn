@@ -2,7 +2,7 @@
 
 ## 1. Current recommendation
 
-Use **RestoreWeave** as the working product name while validating the NAS-first product with operators.
+Use **Cairn** as the working product name while validating the NAS-first product with operators.
 
 Recommended descriptor:
 
@@ -16,11 +16,11 @@ Optional short tagline:
 
 > Store less. Find more. Restore with proof.
 
-The name may remain, but product language should lead with storage reduction, intelligent discovery, replaceable processing, and recoverable namespace access. It should not present RestoreWeave as a Mac or APFS backup tool.
+The name may remain, but product language should lead with storage reduction, intelligent discovery, replaceable processing, and recoverable namespace access. It should not present Cairn as a Mac or APFS backup tool.
 
 ## 2. Current product meaning
 
-RestoreWeave is a cross-platform self-hosted storage layer with a stable authoritative core and replaceable algorithms. It combines:
+Cairn is a cross-platform self-hosted storage layer with a stable authoritative core and replaceable algorithms. It combines:
 
 - Exact content identity, deduplication, and lossless compression.
 - Original-directory browsing and restore over packed or distributed storage.
@@ -80,8 +80,8 @@ These alternatives were evaluated under earlier recovery-oriented framing. They 
 
 The following engineering-level checks were performed on 2026-08-10:
 
-- Siftline GitHub repository search for RestoreWeave: no exact repository result.
-- Siftline Hacker News search for RestoreWeave and “Restore Weave”: no result.
+- Siftline GitHub repository search for Cairn: no exact repository result.
+- Siftline Hacker News search for Cairn and “Restore Weave”: no result.
 - GitHub user lookup for `restoreweave`: not found.
 - npm package lookup for `restoreweave`: not found.
 - PyPI JSON endpoint for `restoreweave`: not found.
@@ -101,7 +101,7 @@ The name was retained because it described recovery meaning and representation l
 
 ### 7.2 Current NAS-first re-evaluation
 
-The current architecture makes RestoreWeave a self-hosted content-aware storage and discovery layer. The name remains workable because:
+The current architecture makes Cairn a self-hosted content-aware storage and discovery layer. The name remains workable because:
 
 - Recovery remains the trust anchor behind storage reduction and representation replacement.
 - Weave describes shared chunks, multiple representations, semantic derivatives, placements, indexes, and provenance.
@@ -113,9 +113,9 @@ The name is less perfect as a direct description of daily discovery and active s
 
 ## 8. AI and extension naming boundary
 
-RestoreWeave should not be branded as an AI runtime. Learned file detection, embeddings, CLIP-like search, OCR, ASR, media understanding, and neural representations are replaceable extensions behind stable subject and stage contracts.
+Cairn should not be branded as an AI runtime. Learned file detection, embeddings, CLIP-like search, OCR, ASR, media understanding, and neural representations are replaceable extensions behind stable subject and stage contracts.
 
-Likewise, broad plugin support does not make RestoreWeave a general capability platform. Its fixed domain remains content storage, namespace access, processing provenance, discovery, verification, placement, and recovery. A general-purpose agent or capability platform should remain a separate product.
+Likewise, broad plugin support does not make Cairn a general capability platform. Its fixed domain remains content storage, namespace access, processing provenance, discovery, verification, placement, and recovery. A general-purpose agent or capability platform should remain a separate product.
 
 ## 9. Legal and launch boundary
 
@@ -130,4 +130,4 @@ Before public commercial use:
 - Review confusingly similar names across NAS, storage, backup, data management, media, search, and AI categories.
 - Evaluate pronunciation, translation, and confusion risk in target languages.
 
-The documentation and local project folder may continue to use RestoreWeave as the working name until those checks and operator-positioning tests justify a change.
+The documentation and local project folder may continue to use Cairn as the working name until those checks and operator-positioning tests justify a change.

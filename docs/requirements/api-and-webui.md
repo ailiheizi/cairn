@@ -2,7 +2,7 @@
 
 ## 1. Product position
 
-RestoreWeave's personal platform includes first-party domain experiences over
+Cairn's personal platform includes first-party domain experiences over
 its self-hosted content-aware kernel. Canonical data behavior remains the
 transport-neutral command, result, reason, plan, event, namespace, content,
 processor, index, and query contracts.
@@ -39,7 +39,7 @@ flowchart TB
     UI["Optional WebUI"] --> REST
     Harness["External AI harness"] --> MCP
 
-    ABI --> Core["RestoreWeave core"]
+    ABI --> Core["Cairn core"]
     Core --> Journal["Operation journal"]
     Core --> Records["Authoritative records"]
     Core --> Namespace["Namespace and content access"]
@@ -48,7 +48,7 @@ flowchart TB
 
 The WebUI SHOULD use the REST adapter when remote browser access is needed. A local desktop or server-rendered UI MAY bind the command dispatcher directly, but it must preserve the same serialized operation semantics and conformance tests.
 
-HTTP resources and status codes are transport concerns. The structured RestoreWeave result is the domain outcome. A `200`, successful upload, completed browser request, or rendered search result is not proof of durable placement, publication, verification, or recoverability.
+HTTP resources and status codes are transport concerns. The structured Cairn result is the domain outcome. A `200`, successful upload, completed browser request, or rendered search result is not proof of durable placement, publication, verification, or recoverability.
 
 ### 2.1 Current local adapter
 

@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must optimize the smallest recoverable set only after it has compiled one explicit protection objective for every protected component. Recovery fidelity alone is insufficient: the planner also needs time, history, availability, independence, immutability, cost, and drill requirements.
+Cairn must optimize the smallest recoverable set only after it has compiled one explicit protection objective for every protected component. Recovery fidelity alone is insufficient: the planner also needs time, history, availability, independence, immutability, cost, and drill requirements.
 
 This document defines:
 
@@ -149,7 +149,7 @@ Watcher and change-journal cursors are source-identity and journal-epoch scoped.
 
 ## 7. Asset and entity identity resolution
 
-RestoreWeave keeps these identities separate:
+Cairn keeps these identities separate:
 
 - `observation_id`: one path and filesystem-object observation in one scan generation.
 - `content_id`: immutable digest-and-length identity of exact plaintext bytes.

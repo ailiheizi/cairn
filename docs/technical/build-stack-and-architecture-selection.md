@@ -18,7 +18,7 @@ Status: **informative implementation guidance**. Normative authority remains wit
 
 ### 2.1 Kernel and userland are confirmed
 
-RestoreWeave is built as a small authoritative kernel plus replaceable, versioned userland. The kernel owns identities, accepted decisions, provenance, transactions, verification meaning, namespace meaning, and recovery semantics (system-architecture.md:38-52; core-kernel-and-interface.md:36-48). The userland is exactly the seam set declared in system-architecture.md:56-63 and driver-and-processor-interfaces.md:58-68:
+Cairn is built as a small authoritative kernel plus replaceable, versioned userland. The kernel owns identities, accepted decisions, provenance, transactions, verification meaning, namespace meaning, and recovery semantics (system-architecture.md:38-52; core-kernel-and-interface.md:36-48). The userland is exactly the seam set declared in system-architecture.md:56-63 and driver-and-processor-interfaces.md:58-68:
 
 - `CaptureDriver`
 - capability-oriented `Processor`
@@ -27,7 +27,7 @@ RestoreWeave is built as a small authoritative kernel plus replaceable, versione
 - `QueryProvider`
 - a later reserved `RetrieverDriver`
 
-Conceptual `Processor` roles (`CLASSIFY_LEARNED`, `PARSE`, `EXTRACT`, `ENRICH`, `FINGERPRINT`, `TRANSFORM`, `VALIDATE`, `INDEX_PREPARE`) are capability roles inside one interface, not separate public wire ABIs (system-architecture.md:219-232). Presentation bindings (CLI, MCP, and later REST/WebUI) are northbound adapters, not storage-algorithm seams. RestoreWeave does not implement filesystem mounts (system-architecture.md:69-72).
+Conceptual `Processor` roles (`CLASSIFY_LEARNED`, `PARSE`, `EXTRACT`, `ENRICH`, `FINGERPRINT`, `TRANSFORM`, `VALIDATE`, `INDEX_PREPARE`) are capability roles inside one interface, not separate public wire ABIs (system-architecture.md:219-232). Presentation bindings (CLI, MCP, and later REST/WebUI) are northbound adapters, not storage-algorithm seams. Cairn does not implement filesystem mounts (system-architecture.md:69-72).
 
 The kernel is not an empty framework: the reference distribution must ship a complete default pipeline that ingests, deduplicates, compresses, places, verifies, searches, browses, and restores without any optional plugin or WebUI (system-architecture.md:76-78; core-kernel-and-interface.md:81-83).
 
@@ -88,7 +88,7 @@ Fallback position: if dependency discipline ultimately outweighs ergonomics, std
 ### 4.1 Principles
 
 - Everything under `internal/` is an unstable implementation detail (core-kernel-and-interface.md:173); this layout is a direction, not a public package promise (core-protocol-and-reference-userland.md:528).
-- Package boundaries follow the seams: host packages own the seam contracts; adapter packages implement them. No adapter package may bypass the host package for a seam (mirrors the "no integration may import `internal/` or read RestoreWeave SQLite" rule at core-protocol-and-reference-userland.md:98, applied inward).
+- Package boundaries follow the seams: host packages own the seam contracts; adapter packages implement them. No adapter package may bypass the host package for a seam (mirrors the "no integration may import `internal/` or read Cairn SQLite" rule at core-protocol-and-reference-userland.md:98, applied inward).
 - The existing packages stay where they are and are reused: `internal/scanner`, `internal/readsvc`, `internal/store/sqlite`. `internal/plugin` is legacy and retires (section 4.3).
 
 ### 4.2 Proposed tree
@@ -201,7 +201,7 @@ Recovery truth: clean recovery begins from a valid publication marker, authentic
 
 ## 7. Borrowing and adoption map
 
-This table maps every meaningful upstream into the seam it serves and the exact borrow point. "Borrow" follows the adoption-audit categories: planned direct dependency, isolated processor, qualification candidate, selective code borrowing, or design reference (adoption doc §2, lines 31-41). Per the audit, borrows preserve RestoreWeave identity and recovery formats (adoption doc line 124).
+This table maps every meaningful upstream into the seam it serves and the exact borrow point. "Borrow" follows the adoption-audit categories: planned direct dependency, isolated processor, qualification candidate, selective code borrowing, or design reference (adoption doc §2, lines 31-41). Per the audit, borrows preserve Cairn identity and recovery formats (adoption doc line 124).
 
 | Upstream | Seam / package | Borrow point and role | License / status |
 | --- | --- | --- | --- |
@@ -218,8 +218,8 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 
 - **Status:** Proposed; qualification spike pending.
 - **Context:** `RepositoryDriver` must place, read, verify, reconcile, and restore admitted representations (driver-and-processor-interfaces.md:325-341). Kopia exposes Go repository APIs; Restic is a documented CLI; Borg is CLI-native; Plakar is a Go library with a verify-oriented design.
-- **Decision:** Prefer **in-process library integration (Kopia)** so receipts, bounded reads, and reconciliation are typed Go calls under the host's control. Keep Restic as the subprocess control and Plakar as a second Go-native library control. **No engine enters the release binary until the spike passes** (adoption doc lines 159-175): root/GC safety for RestoreWeave's portable objects is the first and most decision-changing gate.
-- **Consequences:** If Kopia's snapshot-centric GC cannot root RestoreWeave objects safely, Plakar becomes the in-process alternative and Restic the subprocess fallback. Library integration means `internal/repository` must pin the exact engine version and hide all engine types behind the seam; no Kopia/Plakar type may reach portable records.
+- **Decision:** Prefer **in-process library integration (Kopia)** so receipts, bounded reads, and reconciliation are typed Go calls under the host's control. Keep Restic as the subprocess control and Plakar as a second Go-native library control. **No engine enters the release binary until the spike passes** (adoption doc lines 159-175): root/GC safety for Cairn's portable objects is the first and most decision-changing gate.
+- **Consequences:** If Kopia's snapshot-centric GC cannot root Cairn objects safely, Plakar becomes the in-process alternative and Restic the subprocess fallback. Library integration means `internal/repository` must pin the exact engine version and hide all engine types behind the seam; no Kopia/Plakar type may reach portable records.
 
 - **2026-10-07 accounting clarification:** Keep optional physical telemetry
   separate from exact digest-and-length readback. Placement receipts explicitly
@@ -240,11 +240,11 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 - **Decision:** SQLite FTS5 remains the bundled lexical/structured `IndexProvider`/`QueryProvider`; the reference local semantic generation is in-process zvec v0.6.x through `zvec-go`, one disposable collection directory per immutable `IndexGenerationRef`, with schemas kept private. Qdrant/Milvus remain service profiles; alternate stores require measured conformance.
 - **Consequences:** Deleting every index degrades search only; namespace access, tags/notes, exact reads, verification, and restore stay intact, and a new generation rebuilds from durable records (nas-vertical-slice-implementation-plan.md:191).
 
-### ADR-003: Mounting is outside RestoreWeave
+### ADR-003: Mounting is outside Cairn
 
 - **Status:** Accepted (closed).
 - **Context:** Kernel filesystems add platform, cache, revocation, privilege, and lifecycle obligations unrelated to the content/annotation/recovery plane.
-- **Decision:** RestoreWeave exposes `ExportManifest`, `SnapshotTree`, `FileAccess`, and restore operations only. It has no mount command, mount ABI, or kernel-filesystem dependency.
+- **Decision:** Cairn exposes `ExportManifest`, `SnapshotTree`, `FileAccess`, and restore operations only. It has no mount command, mount ABI, or kernel-filesystem dependency.
 - **Consequences:** Operators may use external tools against a restored directory, materialized export, or separately authorized byte stream. Those tools do not become recovery authority.
 
 ### ADR-004: Retire the legacy `internal/plugin` prototype
@@ -316,7 +316,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   future scheme picker affects new placements only; it never silently moves
   old data or falls back to another backend. Restic/Kopia/Plakar and media
   indexes stay qualification candidates until their respective gates pass.
-  The short explanation is maintained in the [RestoreWeave Wiki](../wiki/README.md).
+  The short explanation is maintained in the [Cairn Wiki](../wiki/README.md).
 - **Rejected alternative:** Exposing arbitrary engine/algorithm toggles or
   storing “unindexed” as a user tag would allow combinations that have not
   passed recovery tests and would mix transient system state with the user's
@@ -426,7 +426,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 - **Status:** Accepted (2026-09-28). This authorizes a file-reception endpoint
   only. It adds no policy, job, catalog, or recovery state machine.
 - **Context:** The add-source flow can only scan a host directory, so a user
-  holding a file in a browser has no way in. RestoreWeave is a self-hosted
+  holding a file in a browser has no way in. Cairn is a self-hosted
   open-source product, not a service, so there is no multi-tenant capacity to
   defend. A tokenless endpoint would nonetheless be reachable by any local
   process and, once the listener is exposed, from off-host.
@@ -456,11 +456,11 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 - **Status:** Accepted (2026-09-28).
 - **Context:** An adjacent on-device photo application has its own platform
   photo library, on-device models, and its own database schema. Its feature set
-  overlaps RestoreWeave's photo experience, and merging it into the core was
+  overlaps Cairn's photo experience, and merging it into the core was
   considered.
-- **Decision:** That product stays separate and may consume RestoreWeave's
+- **Decision:** That product stays separate and may consume Cairn's
   typed API as a client. Its platform photo library, on-device model stack, and
-  database schema are not merged into the Go core, and RestoreWeave does not
+  database schema are not merged into the Go core, and Cairn does not
   adopt a second durable metadata store to mirror them. Shared meaning travels
   through subjects, tags, the single Notes surface, relations, and export
   manifests — never by copying rows between products.
@@ -607,7 +607,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   together while preserving one shared identity, search, tags, Notes, access,
   export, and recovery path. This choice is user direction; adoption and market
   demand remain unverified.
-- **Decision:** Keep RestoreWeave as the working name and use the public
+- **Decision:** Keep Cairn as the working name and use the public
   descriptor **“A self-hosted home for your personal content”** with the
   Chinese slogan **“存进自己的空间，找得到、用得上、带得走”**. Position
   specialized gallery, audio, video, and document experiences as a future
@@ -644,7 +644,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   in a URL. Acceptance must exercise real declared-format samples through
   play, pause, seek, cancel, authorization failure, and integrity failure.
   These are planning criteria, not an API design or current implementation.
-- **Name:** RestoreWeave remains the working name and existing code/config
+- **Name:** Cairn remains the working name and existing code/config
   identity. “Weave” is also used by an App Store application
   ([listing](https://apps.apple.com/us/app/weave-save-search-videos/id6801379247));
   this record makes no trademark-clearance claim.
@@ -692,7 +692,7 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   lifecycle and injection concepts but its upstream API is unstable and a
   service instance is not a security boundary. A Backstage-like typed registry
   offers useful slot/cardinality ideas but its configurable duplicate override
-  behavior is not selected; RestoreWeave rejects duplicates except explicit
+  behavior is not selected; Cairn rejects duplicates except explicit
   reviewed replacement. A VS Code-style contribution manifest is a useful
   declaration analogy, but workspace trust does not constrain malicious code.
   Isolated browser execution would add a separate security and compatibility

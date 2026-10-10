@@ -2,7 +2,7 @@
 
 ## 1. Status and purpose
 
-This document defines the normative product boundary for RestoreWeave as a self-hosted, content-first managed data layer. It specifies which semantics remain authoritative and stable, which algorithms are replaceable, what the reference distribution must deliver, and how stored data remains exportable, verifiable, searchable, and recoverable across implementation changes. `RW-MVP-1` is the first read-only managed-archive and multi-dimensional discovery profile over that broader data layer. The durable store/view/export model is defined by [Content Store, Views, and Export Requirements](content-store-views-and-exports.md).
+This document defines the normative product boundary for Cairn as a self-hosted, content-first managed data layer. It specifies which semantics remain authoritative and stable, which algorithms are replaceable, what the reference distribution must deliver, and how stored data remains exportable, verifiable, searchable, and recoverable across implementation changes. `RW-MVP-1` is the first read-only managed-archive and multi-dimensional discovery profile over that broader data layer. The durable store/view/export model is defined by [Content Store, Views, and Export Requirements](content-store-views-and-exports.md).
 
 The [RW-PERSONAL-UX-1 local client profile](first-party-client-experiences.md)
 adds first-party domain presentation and bounded transient playback above
@@ -16,7 +16,7 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** ar
 
 ## 2. Product promise
 
-RestoreWeave helps operators store large heterogeneous file collections with fewer redundant bytes, discover their contents more intelligently than path-only storage, and retain a verifiable filesystem view that can be browsed and restored independently of the internal packing layout.
+Cairn helps operators store large heterogeneous file collections with fewer redundant bytes, discover their contents more intelligently than path-only storage, and retain a verifiable filesystem view that can be browsed and restored independently of the internal packing layout.
 
 The minimum product promise is:
 
@@ -39,7 +39,7 @@ The reference experience SHOULD make good default decisions automatically and ex
 
 ### 3.1 Authoritative core
 
-RestoreWeave core owns the following stable semantics:
+Cairn core owns the following stable semantics:
 
 - Logical identity for sources, source views, namespace entries, file versions, exact content, chunks, representations, LinkGroups, snapshots, operations, plans, policies, placements, and index generations.
 - Immutable accepted decisions, including classification decisions that drive dispatch and fidelity decisions that select a representation.
@@ -83,7 +83,7 @@ The core is not:
 - A repository-specific pack or chunk implementation.
 - A general-purpose distributed workflow marketplace.
 
-RestoreWeave exposes CLI and MCP operations that external harnesses can call. It does not embed a privileged autonomous agent loop.
+Cairn exposes CLI and MCP operations that external harnesses can call. It does not embed a privileged autonomous agent loop.
 
 ### 3.4 A useful reference userland is mandatory
 
@@ -168,7 +168,7 @@ Every implementation and binding MUST preserve these invariants:
 
 ## 6. Public and private interfaces
 
-RestoreWeave guarantees a deliberately small public surface.
+Cairn guarantees a deliberately small public surface.
 
 | Interface | Stability expectation |
 | --- | --- |
@@ -216,7 +216,7 @@ RestoreWeave guarantees a deliberately small public surface.
 
 ### 7.1 Purpose
 
-The Recovery Record Format, abbreviated **RRF**, is the authenticated portable description of what RestoreWeave observed, decided, stored, derived, verified, indexed, and can recover. It is the durable control and identity graph, not a replacement for every payload repository format.
+The Recovery Record Format, abbreviated **RRF**, is the authenticated portable description of what Cairn observed, decided, stored, derived, verified, indexed, and can recover. It is the durable control and identity graph, not a replacement for every payload repository format.
 
 RRF MUST be sufficient to reconstruct the committed logical namespace, locate and decode selected representations, verify trust and placement evidence, and execute a supported restore path without the original operational database, WebUI, search index, MCP client, model service, or external harness.
 
@@ -333,7 +333,7 @@ Readable bytes that are not successfully handled by an optional specialized `Pro
 
 ### 9.1 Stable seam inventory
 
-RestoreWeave exposes exactly these storage-domain extension seams:
+Cairn exposes exactly these storage-domain extension seams:
 
 | Interface | Responsibility | Availability |
 | --- | --- | --- |
@@ -412,7 +412,7 @@ The core MUST verify an exact reversible `TRANSFORM` result by decoding or by a 
 
 A `RepositoryDriver` stores, locates, reads back, verifies, restores, and reconciles admitted immutable representations or portable records. It returns durable receipts and describes achieved durability, availability, encryption, failure-domain, and reader requirements.
 
-The storage engine may own private chunking, compression, packing, object naming, transport, repair, and physical garbage collection. RestoreWeave owns logical identities, selected representations, path bindings, policy, and acceptance of the receipt.
+The storage engine may own private chunking, compression, packing, object naming, transport, repair, and physical garbage collection. Cairn owns logical identities, selected representations, path bindings, policy, and acceptance of the receipt.
 
 #### `IndexProvider`
 
@@ -532,7 +532,7 @@ Machine-generated captions, transcripts, embeddings, thumbnails, summaries, and 
 
 ## 12. Transaction coordinator and publication protocol
 
-RestoreWeave owns a finite operation coordinator because source retention, transformation, placement, verification, restore mutation, migration, and garbage collection must survive crashes and ambiguous external outcomes. It is not a general agent workflow engine.
+Cairn owns a finite operation coordinator because source retention, transformation, placement, verification, restore mutation, migration, and garbage collection must survive crashes and ambiguous external outcomes. It is not a general agent workflow engine.
 
 The coordinator MUST provide:
 
@@ -671,4 +671,4 @@ The first conforming product MUST satisfy all of the following:
 
 The default semantic profile requires the pinned local text-embedding `Processor`, a zvec `IndexProvider` generation, and a `QueryProvider` invoked against that exact `IndexGenerationRef` only after compatibility is validated. None becomes a recovery dependency. Additional CLIP-like and multimodal profiles are later release gates.
 
-These criteria define RestoreWeave as a strong NAS storage and search product with a stable kernel, not an empty plugin framework. Advanced media representations, multimodal search, additional platforms, retrieval, and enterprise coordination extend this base without redefining its durable semantics.
+These criteria define Cairn as a strong NAS storage and search product with a stable kernel, not an empty plugin framework. Advanced media representations, multimodal search, additional platforms, retrieval, and enterprise coordination extend this base without redefining its durable semantics.

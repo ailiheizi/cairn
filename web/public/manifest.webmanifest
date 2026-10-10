@@ -1,6 +1,6 @@
 {
-  "name": "RestoreWeave",
-  "short_name": "RestoreWeave",
+  "name": "Cairn",
+  "short_name": "Cairn",
   "description": "Self-hosted content-aware storage, discovery, and recovery.",
   "start_url": "/",
   "display": "standalone",

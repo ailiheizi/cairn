@@ -150,12 +150,12 @@ function App() {
     !repositoryHealthy ? t("Repository unavailable") : "",
   ].filter(Boolean).join("; ");
   const coreStorageMessage = !isConnected
-    ? t("Could not connect to RestoreWeave service. Start the service, then refresh.")
+    ? t("Could not connect to Cairn service. Start the service, then refresh.")
     : !statusData
       ? t("Core storage status unavailable")
       : t("Service connected, but core storage is unavailable: {{component}}", { component: coreStorageComponent || t("Core storage status unavailable") });
   const catalogStorageMessage = !isConnected
-    ? t("Could not connect to RestoreWeave service. Start the service, then refresh.")
+    ? t("Could not connect to Cairn service. Start the service, then refresh.")
     : !statusData
       ? t("Core storage status unavailable")
       : t("Service connected, but catalog is unavailable.");
@@ -533,7 +533,7 @@ function App() {
     });
     if (directory) { setNotice({ kind: "warning", text: t("Folder drops are not supported. Choose individual files or use a server folder.") }); return; }
     if (!event.dataTransfer.files.length) return;
-    if (isUnavailable) { setNotice({ kind: "error", text: t("Start the RestoreWeave service before previewing this source.") }); return; }
+    if (isUnavailable) { setNotice({ kind: "error", text: t("Start the Cairn service before previewing this source.") }); return; }
     if (!coreStorageReady) { setNotice({ kind: "error", text: coreStorageMessage }); return; }
     if (drawerOpen || settingsOpen || busy || sources.planAction !== "IDLE" || sources.planCheckBusy) {
       setNotice({ kind: "warning", text: t("Finish the current source operation before uploading files.") });

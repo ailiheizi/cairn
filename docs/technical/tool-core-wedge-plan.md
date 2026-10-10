@@ -2,7 +2,7 @@
 
 > **Status:** Informative plan, 2026-08-16. This does not add product requirements, does not expand `RW-MVP-1`, and does **not** implement any new adapter. It records a wedge: start as a text-shaped tool, then sit under novels / memories / quotes, then under video files. Authority stays in [Ecosystem and Vertical Applications](../requirements/ecosystem-and-vertical-apps.md). Jobs stay in [Foreign App Jobs](foreign-app-jobs.md). Closed decisions stay in [Remaining Work and Closed Decisions](remaining-work-and-closed-decisions.md).
 
-**Answer:** RestoreWeave should stay a **small tool** that other programs call. The first useful wedge is exact text. Novels, 语录, and 回忆 are the same tool with more files. Video is still the same tool — a file plus `PROGRESS` — until a later isolated processor is registered. Do not fill those sockets now.
+**Answer:** Cairn should stay a **small tool** that other programs call. The first useful wedge is exact text. Novels, 语录, and 回忆 are the same tool with more files. Video is still the same tool — a file plus `PROGRESS` — until a later isolated processor is registered. Do not fill those sockets now.
 
 ## 0. Seed fingerprint
 

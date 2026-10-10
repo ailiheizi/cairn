@@ -1,6 +1,6 @@
 # Recovery and boundaries
 
-RestoreWeave keeps the physical core small:
+Cairn keeps the physical core small:
 
 - one configured SQLite catalog for durable metadata and rebuildable
   projections;

@@ -228,7 +228,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     if (!root) return;
     if (!coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
     if (looksLikeRemoteLocator(root)) {
-      notify({ kind: "warning", text: t("Web addresses are not supported here. Mount remote storage on the RestoreWeave host, then enter its server path.") });
+      notify({ kind: "warning", text: t("Web addresses are not supported here. Mount remote storage on the Cairn host, then enter its server path.") });
       return;
     }
     if (planAction === "INSPECTING" || planAction === "PROTECTING") return;

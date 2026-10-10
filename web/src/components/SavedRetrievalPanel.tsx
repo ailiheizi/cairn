@@ -101,15 +101,15 @@ export function SavedRetrievalPanel({ flow, query, fields, unsupportedConditions
       return <li key={view.view_id ?? view.name}>
         <div className="saved-retrieval-view"><strong>{view.name || t("Unnamed saved view")}</strong><small>{view.query || t("No saved query text")} · {t("revision {{revision}}", { revision: view.revision ?? 0 })}</small></div>
         <div className="saved-retrieval-view-actions">
-          {foreignScope && <em className="saved-retrieval-scope-flag" title={t("This saved view was stored for another workspace. Its results came from that stored scope, not from the workspace open here.")}>{t("Other workspace")}</em>}
+          {foreignScope && <em className="saved-retrieval-scope-flag" title={t("This saved view was stored for content other than what is open here. Its results came from that stored scope, not from the content open here.")}>{t("Other content")}</em>}
           <button type="button" className="secondary-button compact" onClick={() => void flow.recallSavedView(view)} disabled={busy || !view.view_id}><Search size={14} />{t("Open in library")}</button>
         </div>
       </li>;
     })}</ul>
     {flow.recalledView && <p className={`saved-retrieval-outcome ${flow.recalledView.state.toLowerCase()}`} role={flow.recalledView.state === "DEGRADED" ? "alert" : "status"}>
-      {flow.recalledView.state === "EMPTY" ? t("This saved view currently matches no content.") : flow.recalledView.state === "DEGRADED" ? flow.recalledView.message || t("Saved view evaluation is degraded.") : flow.recalledView.foreignScope ? t("Opened {{name}}. Its results came from that view's stored scope, not from the workspace open here.", { name: flow.recalledView.name }) : t("Opened {{name}} with current lexical results.", { name: flow.recalledView.name })}
+      {flow.recalledView.state === "EMPTY" ? t("This saved view currently matches no content.") : flow.recalledView.state === "DEGRADED" ? flow.recalledView.message || t("Saved view evaluation is degraded.") : flow.recalledView.foreignScope ? t("Opened {{name}}. Its results came from that view's stored scope, not from the content open here.", { name: flow.recalledView.name }) : t("Opened {{name}} with current lexical results.", { name: flow.recalledView.name })}
     </p>}
-    {flow.recalledView?.foreignScope && <p className="saved-retrieval-scope-note" role="status">{t("This saved view was stored for another workspace. Its results came from that stored scope, not from the workspace open here.")}</p>}
+    {flow.recalledView?.foreignScope && <p className="saved-retrieval-scope-note" role="status">{t("This saved view was stored for content other than what is open here. Its results came from that stored scope, not from the content open here.")}</p>}
     {flow.recalledView && !recalledActive && <p className="saved-retrieval-outcome stale" role="status">{t("The library no longer shows this saved view's evaluation. Open it again to re-evaluate it.")}</p>}
   </section>;
 }

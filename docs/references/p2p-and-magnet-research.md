@@ -5,7 +5,7 @@
 P2P and magnet support has two plausible optional product roles and one useful supplementary distribution role:
 
 - Reacquire an authorized external artifact through a later BitTorrent `RetrieverDriver` profile.
-- Replicate RestoreWeave-managed encrypted immutable pack cohorts through a swarm-capable `RepositoryDriver` profile.
+- Replicate Cairn-managed encrypted immutable pack cohorts through a swarm-capable `RepositoryDriver` profile.
 - Deliver an encrypted, independently signed portable recovery package or large bootstrap closure through separate `RepositoryDriver` placement and `RetrieverDriver` reacquisition capabilities.
 
 The third role is a transport and mirror, not a recovery trust root. P2P is not a semantic search system, a durability guarantee, or demonstrated user demand.
@@ -34,7 +34,7 @@ Protocol and implementation claims below were verified from primary sources as o
 
 ## 2. Primary protocol evidence
 
-| Reference | Observed guarantee | RestoreWeave boundary |
+| Reference | Observed guarantee | Cairn boundary |
 | --- | --- | --- |
 | [BEP 3](https://www.bittorrent.org/beps/bep_0003.html), Final | The v1 infohash is SHA-1 over the raw bencoded `info` dictionary. Pieces have SHA-1 hashes. Multi-file torrents concatenate files into one piece space, and `name` is advisory. The base protocol is designed for downloaders to upload to one another; tracker announces report the infohash, peer ID, listening port, uploaded bytes, downloaded bytes, and bytes left, and tracker responses disclose peer IP addresses and ports. | Preserve the raw `info` bytes. A v1 multi-file torrent lacks a convenient canonical per-file hash because pieces can cross file boundaries; retain an independent whole-file SHA-256/BLAKE3. Normal client behavior has redistribution and privacy effects, so `DOWNLOAD_ONLY` and public-announcement prohibition require technical enforcement rather than an assumed client default. |
 | [BEP 5](https://www.bittorrent.org/beps/bep_0005.html), Accepted | DHT `get_peers` finds peers for an already-known infohash. `announce_peer` stores the announcing peer's observed IP address and port under that infohash. | DHT is not title or semantic search. A peer result is temporary location evidence, not proof that all pieces exist. A DHT lookup exposes interest to contacted nodes, while an announcement additionally advertises participation; account for and authorize these as distinct network effects. |
@@ -51,17 +51,17 @@ Protocol and implementation claims below were verified from primary sources as o
 
 Three adjacent primary sources materially constrain the proposed storage and recovery-package roles:
 
-| Reference | Primary relation | Observed mechanism | RestoreWeave decision |
+| Reference | Primary relation | Observed mechanism | Cairn decision |
 | --- | --- | --- | --- |
 | [The Update Framework specification](https://theupdateframework.github.io/specification/latest/) | Security boundary | Offline threshold root keys establish trust. Signed target metadata binds target length and hashes; snapshot and timestamp metadata address mix-and-match, rollback, and indefinite-freeze attacks. Mirrors are not trusted for content authenticity, and the threat model explicitly leaves denial of service possible when no good mirror is reachable. | Authenticate a portable recovery package independently of every torrent, tracker, peer, web seed, and mutable locator. The offline Bootstrap Seed and current RecoveryHeadWitness remain authoritative; a swarm can improve delivery but cannot establish the canonical newest head or availability. |
-| [RFC 5854 Metalink](https://www.rfc-editor.org/rfc/rfc5854.html) | Combination | A download description can bind size and whole-file or piece hashes while listing multiple HTTP, FTP, and P2P sources, including a BitTorrent metainfo URL. It can also carry file signatures. | The multi-source pattern supports treating a torrent as one transport for the same signed `RWPORT-1` target. Do not adopt Metalink's optional XML-signature behavior as the trust model; use RestoreWeave's mandatory canonical signatures and verification policy. |
+| [RFC 5854 Metalink](https://www.rfc-editor.org/rfc/rfc5854.html) | Combination | A download description can bind size and whole-file or piece hashes while listing multiple HTTP, FTP, and P2P sources, including a BitTorrent metainfo URL. It can also carry file signatures. | The multi-source pattern supports treating a torrent as one transport for the same signed `RWPORT-1` target. Do not adopt Metalink's optional XML-signature behavior as the trust model; use Cairn's mandatory canonical signatures and verification policy. |
 | [Restic repository format](https://restic.readthedocs.io/en/latest/100_references.html#repository-format) | Implementation | Repository objects are named by the SHA-256 of their stored bytes, written once, and not modified; prune removes objects. Pack contents and headers are independently encrypted and authenticated, while indexes and snapshots complete the reference graph. Restic code is [BSD-2-Clause](https://github.com/restic/restic/blob/master/LICENSE). | If Restic becomes one release-qualified repository-engine candidate, its pack files are credible controlled-swarm payloads, but torrenting only `data/` packs is not a recoverable repository. Publish sealed object cohorts only after commit, preserve repository config, keys, indexes, snapshots, and reader closure through ordinary protected placements, and coordinate prune with signed placement reachability. |
 
 The combined evidence supports a third *distribution* role, not a third trust system. It also favors a protocol-neutral signed target descriptor so HTTP, object storage, removable media, and BitTorrent can carry the same authenticated package.
 
 ## 3. Candidate, edition, and exact-source binding
 
-RestoreWeave should use explicit source states:
+Cairn should use explicit source states:
 
 ~~~text
 TORRENT_CANDIDATE
@@ -165,7 +165,7 @@ Torrent recovery should default to a bundle, not one attractive filename.
 
 ### 6.3 Keep semantic discovery separate
 
-DHT lookup requires an infohash. Human-title or semantic discovery needs an authorized catalog, local index, or user-provided source list. RestoreWeave should not ship a default piracy-index integration.
+DHT lookup requires an infohash. Human-title or semantic discovery needs an authorized catalog, local index, or user-provided source list. Cairn should not ship a default piracy-index integration.
 
 Torrent metadata normally provides names, paths, sizes, and source hints, not decoded multimodal embeddings. Content-level semantic validation requires acquiring the candidate or using a separately trusted catalog.
 
@@ -194,7 +194,7 @@ Required controls:
 - Per-source authorization and entitlement records.
 - Independent fields for user reproduction authority and source distribution authority.
 - No inference that matching bytes, an infohash, ownership of another copy, or prior possession establishes either authority.
-- Jurisdiction- and contract-specific review where required; RestoreWeave documentation should state that it is not legal advice.
+- Jurisdiction- and contract-specific review where required; Cairn documentation should state that it is not legal advice.
 
 ### 6.6 Use immutable pack cohorts for swarm storage
 
@@ -282,7 +282,7 @@ This is most valuable for large portable exports and reusable Capsule Cores. Tor
 - Torrent-aware recovery may be associated with workflows the target market does not want to expose or manage.
 - No retained demand evidence currently shows that magnet integration changes purchase, retention, or migration behavior.
 
-The strongest evidence against prioritizing P2P is that RestoreWeave's core value can be delivered using authenticated HTTP, package registries, Git, object storage, and existing backup repositories. P2P should remain a plugin until authorized-source prevalence and recovery value are measured.
+The strongest evidence against prioritizing P2P is that Cairn's core value can be delivered using authenticated HTTP, package registries, Git, object storage, and existing backup repositories. P2P should remain a plugin until authorized-source prevalence and recovery value are measured.
 
 ## 9. Open questions
 
@@ -291,7 +291,7 @@ The strongest evidence against prioritizing P2P is that RestoreWeave's core valu
 3. Is public DHT participation or piece upload acceptable for desktop, NAS, and team deployments?
 4. Should the first adapter support only metadata resolution and prevalidated exact sources?
 5. Are private tracker credentials and ratio obligations compatible with unattended restore drills?
-6. Is BEP 46 needed, or should RestoreWeave use its own signed feed that supports v2 identities and durable retention?
+6. Is BEP 46 needed, or should Cairn use its own signed feed that supports v2 identities and durable retention?
 7. What complete-retrieval schedule provides meaningful assurance without excessive bandwidth or network exposure?
 8. Which sidecars and alternate streams must be automatically grouped for each media collection?
 9. Can libtorrent be isolated and updated safely across supported platforms, or is a separate resolver service preferable?

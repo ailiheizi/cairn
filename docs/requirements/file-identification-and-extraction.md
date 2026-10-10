@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must understand heterogeneous data well enough to choose useful storage, extraction, validation, and discovery algorithms without making any one detector or media stack part of the trusted core.
+Cairn must understand heterogeneous data well enough to choose useful storage, extraction, validation, and discovery algorithms without making any one detector or media stack part of the trusted core.
 
 The required exact and classification paths are:
 
@@ -35,7 +35,7 @@ The classification branch runs beside the unconditional host-owned exact lane. C
 
 ## 3. Distinct type dimensions
 
-RestoreWeave MUST NOT collapse every meaning into one MIME string. A **ClassificationRecord** may contain several independent dimensions:
+Cairn MUST NOT collapse every meaning into one MIME string. A **ClassificationRecord** may contain several independent dimensions:
 
 | Dimension | Examples |
 | --- | --- |

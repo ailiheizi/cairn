@@ -1,7 +1,7 @@
 // Catalog partial: The shared chrome vocabulary.
 //
 // Owner: strings reused by more than one surface (generic actions, the
-// topbar's own labels, and the workspace navigation). A string that only one
+// topbar's own labels, and the navigation rail). A string that only one
 // surface renders belongs in that surface's partial, not here.
 //
 // Keys are the English message; values are the zh-CN translation. Every key
@@ -13,7 +13,7 @@ export const common: Record<string, string> = {
   "Request failed": "请求失败",
   "Not built": "未建立",
   "Retry": "重试",
-  "RestoreWeave home": "RestoreWeave 首页",
+  "Cairn home": "Cairn 首页",
   "Search protected content": "搜索受保护内容",
   "Search names, notes, tags, or facts": "搜索名称、备注、标签或信息",
   "Search": "搜索",
@@ -28,10 +28,10 @@ export const common: Record<string, string> = {
   "Unknown": "未知",
   "Cancel": "取消",
   "Save": "保存",
-  "Workspace navigation": "工作区导航",
-  "Open workspace navigation": "打开工作区导航",
-  "Close workspace navigation": "关闭工作区导航",
-  "WORKSPACE": "工作区",
+  "Navigation": "导航",
+  "Open navigation": "打开导航",
+  "Close navigation": "关闭导航",
+  "CONTENT": "内容",
   "OPERATIONS": "操作",
   "Library": "内容库",
   "Catalog": "目录",

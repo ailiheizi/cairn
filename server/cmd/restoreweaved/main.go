@@ -47,7 +47,7 @@ func run() error {
 		trustAnchorPath = flag.String("trust-anchor", "",
 			"independently retained public trust anchor for --recovery-reader")
 		configPath = flag.String("config", "",
-			"persisted RestoreWeave config path (overrides RESTOREWEAVE_CONFIG)")
+			"persisted Cairn config path (overrides RESTOREWEAVE_CONFIG)")
 		catalogPath = flag.String("catalog", "",
 			"SQLite catalog path (overrides persisted config and RESTOREWEAVE_CATALOG)")
 		repositoryPath = flag.String("repository", "",

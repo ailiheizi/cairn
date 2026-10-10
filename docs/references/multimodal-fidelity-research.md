@@ -150,7 +150,7 @@ Relevant families:
 - [CompressAI](https://github.com/InterDigitalInc/CompressAI)
 - [EnCodec](https://arxiv.org/abs/2210.13438)
 
-Appropriate RestoreWeave uses:
+Appropriate Cairn uses:
 
 - Preview and streaming representations.
 - Search and clustering.
@@ -236,7 +236,7 @@ A system that silently accepts any near-miss as exact or hides missing component
 
 ## 12. Primary-source summary
 
-| Source | Relation to RestoreWeave |
+| Source | Relation to Cairn |
 | --- | --- |
 | [SSIM](https://ece.uwaterloo.ca/~z70wang/publications/ssim.pdf) | Structural image and video distortion evidence. |
 | [LPIPS](https://arxiv.org/abs/1801.03924) | Learned perceptual image-distance evidence. |

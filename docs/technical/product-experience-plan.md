@@ -231,7 +231,7 @@ gate.
 - **In.** Client-side, ephemeral room and presence state over a user-deployed
   synchronisation service, coordinating playback position and drift only.
 - **Out.** Room state in the daemon; any durable room, catalog, or recovery
-  state machine; turning RestoreWeave into a streaming service.
+  state machine; turning Cairn into a streaming service.
 - **Exit test.** Two clients stay within a stated drift bound; stopping the sync
   service leaves local playback correct; no durable row and no core command is
   added.

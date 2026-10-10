@@ -4,7 +4,7 @@
 
 ## 1. Security objective and profile boundary
 
-Across its possible profiles, RestoreWeave may process hostile files, media, archives, models, manifests, plugins, network sources, and AI output while holding access to important local data and recovery systems. `RW-MVP-1` deliberately has a narrower attack surface: it inventories one local or NAS-mounted tree, runs bounded default identification and metadata/text processors, preserves readable unknown content exactly, builds a rebuildable baseline search index, and writes exact protected bytes to one qualified repository engine.
+Across its possible profiles, Cairn may process hostile files, media, archives, models, manifests, plugins, network sources, and AI output while holding access to important local data and recovery systems. `RW-MVP-1` deliberately has a narrower attack surface: it inventories one local or NAS-mounted tree, runs bounded default identification and metadata/text processors, preserves readable unknown content exactly, builds a rebuildable baseline search index, and writes exact protected bytes to one qualified repository engine.
 
 The security objective is:
 
@@ -181,7 +181,7 @@ Threats:
 - Model hallucination presented as fact.
 - Agent-generated policy broadening.
 - Same model generating and approving a candidate.
-- Agent-framework memory or task state presented as durable RestoreWeave truth.
+- Agent-framework memory or task state presented as durable Cairn truth.
 - MCP tool annotations, A2A task state, or client confirmations presented as approvals.
 - AI or external metadata overwriting user-authored semantics.
 - Stale vector indexes leaking newly restricted content.
@@ -199,7 +199,7 @@ Requirements:
 - Require independent approval for semantic invariants and weaker recovery.
 - Store every AI or external assertion in a provenance class separate from user annotations and observed source facts.
 - Treat every agent output as a proposal bound to exact input revisions; deterministic validation and simulation are required before a policy draft or job can be created.
-- Do not accept protocol-level confirmation, tool annotations, agent task completion, or framework voting as action-specific RestoreWeave approval.
+- Do not accept protocol-level confirmation, tool annotations, agent task completion, or framework voting as action-specific Cairn approval.
 - Apply query-time authorization after lexical or vector candidate retrieval and resolve every hit through a host-owned durable subject.
 
 ## 9. Command, repository-initialization, and publication threats
@@ -215,7 +215,7 @@ MVP threats:
 - A crash during repository initialization leaving a partial repository, ownership marker, or ambiguous external outcome.
 - A target acquiring an existing repository, conflicting identity, or unrelated data between planning and application.
 - Blindly retrying ambiguous initialization or placement creation and creating conflicting effects.
-- A payload snapshot or orphan `PREPARED_CLOSURE` being presented as a published logical RestoreWeave snapshot.
+- A payload snapshot or orphan `PREPARED_CLOSURE` being presented as a published logical Cairn snapshot.
 - A forged, replayed, stale-generation, wrong-repository, or mismatched `PUBLICATION_COMMIT` being accepted.
 - A local publication pointer being treated as authority even when the portable commit chain does not validate.
 
@@ -302,12 +302,12 @@ Requirements:
 
 For `RW-MVP-1`:
 
-- The selected mature repository engine owns payload encryption, compression, chunking, deduplication, and private pack or object layout. RestoreWeave must not add a second convergent-encryption, neural-codec, or encrypted-pack layer around the MVP payload.
+- The selected mature repository engine owns payload encryption, compression, chunking, deduplication, and private pack or object layout. Cairn must not add a second convergent-encryption, neural-codec, or encrypted-pack layer around the MVP payload.
 - Separate the local publication-signing identity from the repository credential source. Keep the signing private key and plaintext repository credential out of plans, events, repository metadata, RRF, prepared closures, commit records, recovery references, and MCP results.
 - Export an independently retainable public trust anchor or authenticated root in the recovery reference. A verification key learned only from the `PUBLICATION_COMMIT`, prepared closure, payload repository, or companion metadata being authenticated is not independent trust.
 - Verify the signature, signer identity, publication generation or fence, repository binding, and complete payload/closure binding of every `PUBLICATION_COMMIT` before clean-machine discovery treats it as authoritative.
 - Report recovery readiness as degraded until the independently retained recovery reference, scoped credential source, independent trust anchor, and current clean-install drill have been proven together. A credential available only on the source host does not satisfy independent recovery readiness.
-- Separate keys by purpose. Any RestoreWeave-owned authenticated encryption must provide crash- and retry-safe nonce uniqueness. A retry either reuses already committed identical ciphertext or advances to a new key and nonce generation; it never encrypts different plaintext or associated data under the same key and nonce.
+- Separate keys by purpose. Any Cairn-owned authenticated encryption must provide crash- and retry-safe nonce uniqueness. A retry either reuses already committed identical ciphertext or advances to a new key and nonce generation; it never encrypts different plaintext or associated data under the same key and nonce.
 - Support documented signing-key and credential rotation or replacement without rewriting historical truth, and retain the compatible reader and verification instructions needed for qualified restores.
 
 Later enterprise and cold-media custody profiles additionally require as applicable:
@@ -383,7 +383,7 @@ Every network mechanism is independently controlled:
 - Payload-piece upload.
 - Torrent-metadata responses and other content-derived egress.
 
-RestoreWeave must not claim anonymity.
+Cairn must not claim anonymity.
 
 Download-only guarantees zero payload-piece upload and zero content-derived metadata upload, not zero outbound control bytes. It may issue explicitly approved requests but must not serve torrent metadata, piece layers, derived swarm metadata, or payload pieces. Enforcement by the mandatory P2P Network Broker, optionally reinforced by an independent external egress boundary, plus packet-capture or equivalent flow verification is required; unsupported clients are blocked, and any profile that permits metadata serving is not download-only. Private torrents announce to one selected tracker at a time, connect only to peers returned by it, disable DHT, PEX, local discovery, `x.pe`, manual/direct hints, and non-tracker resume peers, and disconnect existing peers before tracker failover.
 
@@ -405,7 +405,7 @@ Content-derived metadata distribution and payload distribution are separately sc
 
 Torrent piece validation proves correspondence to torrent metadata, not correctness relative to the user's original.
 
-Final exact recovery requires the independent RestoreWeave whole-file hash. A valid but wrong-edition or malicious torrent remains quarantined.
+Final exact recovery requires the independent Cairn whole-file hash. A valid but wrong-edition or malicious torrent remains quarantined.
 
 ### 13.7 Availability
 
@@ -450,7 +450,7 @@ Signed rights determinations distinguish `USER_REPRODUCTION_AUTHORITY` from `SOU
 
 Rights are jurisdiction-scoped, time-bound, and separate from fidelity. In a later retrieval or substitution profile, unknown required authority blocks reference-only treatment and triggers exact preservation or promotion of the original while it remains available.
 
-RestoreWeave does not determine legality automatically. Rights evidence and a signed rights determination are separate from operational approval. Policy may block, require review, or allow an action based on configured authority, but no operational approval or break-glass issuance mode creates or replaces legal authority.
+Cairn does not determine legality automatically. Rights evidence and a signed rights determination are separate from operational approval. Policy may block, require review, or allow an action based on configured authority, but no operational approval or break-glass issuance mode creates or replaces legal authority.
 
 Later enterprise profiles represent legal holds as signed immutable resources with scope, authority, jurisdiction, review, expiry or indefinite state, and separately signed release. Holds override retention, garbage collection, source omission, privacy deletion, placement retirement, and crypto-erasure.
 
@@ -513,12 +513,12 @@ Required responses:
 16. On a clean qualified installation with no original catalog, index, source host, processors, plugin registry, AI service, MCP client, REST service, or WebUI, use only the selected repository, independently retained recovery reference, separately available scoped credential source, independent trust anchor, and supported reader. Discover the valid commit, reconstruct the namespace, restore to an empty destination, and verify every regular-file digest and declared metadata contract.
 17. Omit the recovery reference, independent trust anchor, or separately available credential source one at a time. Confirm recovery readiness is degraded or blocked and a credential available only on the original host cannot satisfy clean-install readiness.
 18. Corrupt the commit marker, prepared closure, payload, placement receipt, or sampled file content. Confirm authenticated-metadata, sampled-content, full-byte, and restore verification remain distinct and the affected claim fails without an override path.
-19. Lose or withhold the sole repository. Confirm RestoreWeave reports loss of recoverability and never reports redundancy, provider independence, a repair source, or survival of repository loss. A same-failure-domain repository remains test-only and visibly at risk.
+19. Lose or withhold the sole repository. Confirm Cairn reports loss of recoverability and never reports redundancy, provider independence, a repair source, or survival of repository loss. A same-failure-domain repository remains test-only and visibly at risk.
 20. Attempt to make the qualified MCP adapter open a listener, initialize or write a repository, mutate or apply a plan, restore a destination, access a credential or arbitrary live path, install a processor, run a shell command, or invoke arbitrary processing. Confirm every attempt is unavailable or denied.
 21. Replay commands and idempotency keys across operators, workspaces, operations, plans, captures, repositories, or attempt fences. Confirm a superseded attempt cannot commit an initialization, placement, restore, index publication, or recovery publication side effect.
 22. Restore executable content and confirm no application, game, script, or recovered binary executes automatically. Crash or cancel restoration and confirm the isolated partial destination cannot be reported as verified success.
 23. Inspect CLI output, MCP results, search results, events, logs, RRF records, prepared closures, commit markers, and recovery references. Confirm they contain no plaintext repository password, access token, private signing key, reusable secret, or unrestricted path capability.
-24. For any RestoreWeave-owned encrypted state, crash after encryption but before checkpoint at every boundary and prove that no key and nonce pair is reused with different plaintext or associated data.
+24. For any Cairn-owned encrypted state, crash after encryption but before checkpoint at every boundary and prove that no key and nonce pair is reused with different plaintext or associated data.
 
 ### 18.2 Conditional later-profile tests
 

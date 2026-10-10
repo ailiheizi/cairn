@@ -128,7 +128,7 @@ export function StagingCard({ staging, t, busy, coreStorageReady, onIngest, onCl
     <div className="source-card-stats">
       <div><span>{t("Files")}</span><strong>{String(files)}</strong><small>{t("staged files")}</small></div>
       <div><span>{t("Bytes hashed")}</span><strong>{formatBytes(Number(staging.bytes ?? 0))}</strong><small>{t("staged bytes")}</small></div>
-      <div><span>{t("Staging path")}</span><strong className="staging-path" title={path}>{path}</strong><small>{t("on the RestoreWeave host")}</small></div>
+      <div><span>{t("Staging path")}</span><strong className="staging-path" title={path}>{path}</strong><small>{t("on the Cairn host")}</small></div>
       <div><span>{t("After saving")}</span><strong>{t("Stays until cleaned")}</strong><small>{t("Saving copies the bytes into the repository; it never deletes this staging area.")}</small></div>
     </div>
     <p className="muted">{t("Review the staged files, then confirm to save exact bytes. Until then they have no protection record.")}</p>

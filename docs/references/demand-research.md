@@ -4,7 +4,7 @@
 
 ## 1. Conclusion
 
-There is credible demand for reducing storage and operating effort across large self-hosted file collections while retaining reliable access and recovery. Evidence is strongest for the underlying jobs and costly workarounds, not for RestoreWeave as a named unified product.
+There is credible demand for reducing storage and operating effort across large self-hosted file collections while retaining reliable access and recovery. Evidence is strongest for the underlying jobs and costly workarounds, not for Cairn as a named unified product.
 
 Current confidence is:
 
@@ -16,7 +16,7 @@ Current confidence is:
 - **Low-medium** for user-approved perceptual representations in narrow disposable-media collections.
 - **Weak or negative** for automatic lossy replacement or autonomous LLM omission.
 - **Unverified** for magnet or P2P integration as a user requirement.
-- **Unverified** for willingness to pay for RestoreWeave rather than operate existing tools.
+- **Unverified** for willingness to pay for Cairn rather than operate existing tools.
 
 The broad product is strongest when framed as:
 
@@ -99,7 +99,7 @@ The following project categories show that self-hosted users value parts of the 
 
 These are adjacent signals, not proof that users want one combined product. They also form the strongest counterexample: a technical user may prefer several focused tools over one more daemon with its own database, processor lifecycle, and failure modes.
 
-RestoreWeave wins only if one installation materially reduces total operating effort while preserving interoperability with those components.
+Cairn wins only if one installation materially reduces total operating effort while preserving interoperability with those components.
 
 ## 6. Demand matrix
 
@@ -119,11 +119,11 @@ RestoreWeave wins only if one installation materially reduces total operating ef
 | P2P or magnet retrieval | Unverified demand | Keep outside the core roadmap until simpler retrieval sources prove insufficient. |
 | Automatic source deletion | Negative by default | Requires a separate reviewed release workflow and stronger adoption evidence. |
 | Fully autonomous LLM storage decisions | Weak or negative | Existing evidence favors proposals, previews, scoped tools, and human authority. |
-| Willingness to pay for RestoreWeave | Unverified | Spending on disks, cloud storage, or existing tools does not prove a new budget. |
+| Willingness to pay for Cairn | Unverified | Spending on disks, cloud storage, or existing tools does not prove a new budget. |
 
 ## 7. Product modes and demand implications
 
-RestoreWeave should test three modes separately:
+Cairn should test three modes separately:
 
 1. **Observe mode:** scan and search an existing NAS tree without changing storage. This minimizes adoption risk and tests discovery demand, but it cannot claim net storage savings.
 2. **Managed archive mode:** ingest selected collections into verified compressed and deduplicated storage, then expose a read-only namespace. This is the strongest MVP because it can prove savings, search, and recovery together.
@@ -133,7 +133,7 @@ Demand for one mode does not prove demand for another. A popular search sidecar 
 
 ## 8. Strongest counterevidence
 
-1. Existing storage engines may already deliver nearly all safe byte reduction. RestoreWeave-specific indexes and models can increase total footprint.
+1. Existing storage engines may already deliver nearly all safe byte reduction. Cairn-specific indexes and models can increase total footprint.
 2. Existing combinations of Nextcloud, Immich, Paperless-ngx, sist2, and Restic or Kopia may be good enough.
 3. Another controller, catalog, processor runtime, and update surface may increase rather than reduce self-hosted labor.
 4. Search may become the real product while representation optimization sees little use.
@@ -143,7 +143,7 @@ Demand for one mode does not prove demand for another. A popular search sidecar 
 8. Technical forums overrepresent operators willing to maintain complex systems.
 9. A read-only sidecar creates discovery value but no net source-volume savings; product reporting must not blur those outcomes.
 
-The product should not claim additional storage efficiency over Restic, Kopia, or Borg until the same corpus and storage target are benchmarked with all RestoreWeave metadata, indexes, models, and decoder dependencies included.
+The product should not claim additional storage efficiency over Restic, Kopia, or Borg until the same corpus and storage target are benchmarked with all Cairn metadata, indexes, models, and decoder dependencies included.
 
 ## 9. Validation plan
 
@@ -169,7 +169,7 @@ scan
 -> show exact storage treatment and estimated footprint
 -> ingest and verify
 -> publish the original namespace
--> search and read through RestoreWeave
+-> search and read through Cairn
 -> restore onto an empty target
 ```
 
@@ -177,7 +177,7 @@ Compare:
 
 - Raw source size.
 - Direct storage through the selected repository engine.
-- RestoreWeave-managed physical bytes including catalog and index overhead.
+- Cairn-managed physical bytes including catalog and index overhead.
 - Random-read and directory-restore latency.
 - Operator trust before and after an exact restore.
 
@@ -207,7 +207,7 @@ Upgrade one detector, extractor, and indexer generation. Prove that:
 Offer a concierge pilot, paid pilot, or explicit deployment commitment. Measure:
 
 - One-command installation and upgrade success.
-- Time spent maintaining RestoreWeave versus the displaced stack.
+- Time spent maintaining Cairn versus the displaced stack.
 - Weekly or monthly search and browse use.
 - Repeat ingest and verification behavior.
 - Data migrated into managed archive mode.

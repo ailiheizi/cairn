@@ -2,7 +2,7 @@
 
 ## 1. Design objective
 
-RestoreWeave runs a replaceable content-processing and discovery pipeline around a small authoritative storage core. It is designed for a self-hosted NAS or server that may contain documents, photos, music, video, archives, games, applications, source trees, datasets, databases, and unfamiliar future formats.
+Cairn runs a replaceable content-processing and discovery pipeline around a small authoritative storage core. It is designed for a self-hosted NAS or server that may contain documents, photos, music, video, archives, games, applications, source trees, datasets, databases, and unfamiliar future formats.
 
 The runtime has three goals:
 
@@ -10,7 +10,7 @@ The runtime has three goals:
 2. Make the collection more discoverable than a conventional filename-only NAS.
 3. Allow processors, index implementations, and query algorithms to be upgraded without rewriting recovery truth.
 
-It is not a general agent runtime. RestoreWeave does not own prompt memory, conversations, autonomous loops, model routing, or multi-agent orchestration. An external harness may call typed CLI or MCP operations, and a bounded processor may use a model, but neither becomes kernel authority.
+It is not a general agent runtime. Cairn does not own prompt memory, conversations, autonomous loops, model routing, or multi-agent orchestration. An external harness may call typed CLI or MCP operations, and a bounded processor may use a model, but neither becomes kernel authority.
 
 The extension policy is defined by [Extension System Requirements](../requirements/plugin-system.md). Core ownership is defined by [Core Kernel and Interface Requirements](../requirements/core-kernel-and-interface.md).
 
@@ -300,7 +300,7 @@ The CLI exposes the full authorized product operation set. The initial MCP adapt
 
 The harness does not receive an internal scheduler, prompt store, hidden memory, arbitrary plugin call, or database handle. It cannot mint human authority or convert a processor claim into a durable decision. Plan creation, annotation mutation, apply, restore, cancellation, and other writes use an independently authorized CLI workflow in the initial release. Any later MCP mutation profile uses the same immutable plan digest where applicable, scoped grant, expected revision, idempotency, and audit rules as other clients.
 
-AI inference needed inside data processing is implemented as a bounded processor or external service adapter. RestoreWeave owns the interface, provenance, policy, and validation around it, not the general model-serving or agent platform.
+AI inference needed inside data processing is implemented as a bounded processor or external service adapter. Cairn owns the interface, provenance, policy, and validation around it, not the general model-serving or agent platform.
 
 ## 13. Failure and degraded modes
 

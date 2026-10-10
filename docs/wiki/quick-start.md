@@ -11,7 +11,7 @@ configure
 → verify or restore when needed
 ```
 
-The current browser flow accepts a path visible to the RestoreWeave host. A
+The current browser flow accepts a path visible to the Cairn host. A
 future browser-upload flow may add a temporary upload stage, but it is not the
 same thing as accepting a URL and it does not change the recovery model.
 
@@ -21,7 +21,7 @@ same thing as accepting a URL and it does not change the recovery model.
 2. Review the file count, logical bytes, exact duplicates, and any blocked
    entries.
 3. Confirm the plan.
-4. RestoreWeave stores or reuses the exact content and keeps the original path
+4. Cairn stores or reuses the exact content and keeps the original path
    as provenance.
 
 Optional analysis can run after the exact save. A model or index failure leaves

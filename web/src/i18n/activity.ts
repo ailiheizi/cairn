@@ -73,7 +73,7 @@ export const activity: Record<string, string> = {
   "APPLIED": "已应用",
   "NOT APPLIED": "未应用",
   "The recorded plan could not be read: {{message}}": "无法读取已记录的方案：{{message}}",
-  "This job row reports no plan or workspace, so no recorded plan can be read.": "此作业行没有报告方案或工作区，因此无法读取已记录的方案。",
+  "This job row does not say which plan or which content it belongs to, so no recorded plan can be read.": "此作业行未说明它属于哪个方案或哪部分内容，因此无法读取已记录的方案。",
 
   // The retained run log.
   "Retained run log": "保留的运行日志",
@@ -83,6 +83,6 @@ export const activity: Record<string, string> = {
   "No run-log event is recorded for this job yet.": "此作业尚未记录任何运行日志事件。",
   "Next event sequence: {{sequence}} · waiting for the daemon to report the next page": "下一个事件序号：{{sequence}} · 正在等待服务报告下一页",
   "This run is terminal; no further log pages are read.": "本次运行已终止；不再读取后续日志页。",
-  "This job row reports no workspace, so its retained log cannot be read.": "此作业行没有报告工作区，因此无法读取保留的日志。",
+  "This job row does not say which content it belongs to, so its retained log cannot be read.": "此作业行未说明它属于哪部分内容，因此无法读取保留的日志。",
   "Use the arrow keys to move between job rows, Enter to expand the retained run log, and Escape to return to the navigation rail.": "使用方向键在作业行之间移动，按 Enter 展开保留的运行日志，按 Escape 返回导航栏。",
 };

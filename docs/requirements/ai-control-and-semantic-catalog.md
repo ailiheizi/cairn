@@ -2,7 +2,7 @@
 
 ## 1. Product decision
 
-RestoreWeave provides intelligent discovery and typed automation without becoming an AI platform. It contains no required embedded LLM, prompt loop, conversation store, agent memory, model router, autonomous planner, A2A runtime, or multi-agent harness.
+Cairn provides intelligent discovery and typed automation without becoming an AI platform. It contains no required embedded LLM, prompt loop, conversation store, agent memory, model router, autonomous planner, A2A runtime, or multi-agent harness.
 
 AI participates through two ordinary boundaries:
 
@@ -19,7 +19,7 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** ar
 
 ## 2. Layered discovery model
 
-RestoreWeave discovery has three layers with different durability:
+Cairn discovery has three layers with different durability:
 
 | Layer | Examples | Authority and lifecycle |
 | --- | --- | --- |

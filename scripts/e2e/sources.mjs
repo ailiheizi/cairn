@@ -478,11 +478,11 @@ export async function assertSourcesView(ctx) {
   await page.setViewportSize({ width: 640, height: 900 });
   await page.waitForTimeout(150);
   assert.equal(await page.locator(".workspace-sidebar").isVisible(), false, "the navigation rail must stay hidden on phones");
-  assert.equal(await page.locator(".sources-entry").isVisible(), false, "the phone layout must not duplicate Sources above the library; it stays available in workspace navigation");
-  const railTrigger = page.getByRole("button", { name: /打开工作区导航|Open workspace navigation/ });
+  assert.equal(await page.locator(".sources-entry").isVisible(), false, "the phone layout must not duplicate Sources above the library; it stays available in the navigation panel");
+  const railTrigger = page.getByRole("button", { name: /^(打开导航|Open navigation)$/ });
   await railTrigger.waitFor({ state: "visible", timeout: 10000 });
   await railTrigger.click();
-  const railPanel = page.getByRole("dialog", { name: /工作区导航|Workspace navigation/ });
+  const railPanel = page.getByRole("dialog", { name: /^(导航|Navigation)$/ });
   await railPanel.waitFor({ state: "visible", timeout: 10000 });
   await railPanel.locator("button.workspace-nav-item").filter({ hasText: /^(来源|Sources)/ }).click();
   await railPanel.waitFor({ state: "hidden", timeout: 10000 });

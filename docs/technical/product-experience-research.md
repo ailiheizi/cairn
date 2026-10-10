@@ -11,7 +11,7 @@
 **Method.** Fourteen parallel research agents studied one product or product
 family each, using official documentation, source, issue trackers, and — where
 a public demo existed — a driven browser session with captured screenshots. The
-RestoreWeave side was inventoried by deploying the current build and walking all
+Cairn side was inventoried by deploying the current build and walking all
 fourteen surfaces. Evidence strengths differ per product and are recorded with
 each finding; anything unverified is marked as such in the per-product notes.
 

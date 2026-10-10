@@ -71,8 +71,8 @@ export const verification: Record<string, string> = {
   "It can take a long time on a large repository, and this browser shows no progress percentage. Continue only when you want the read to happen now.": "在较大的仓库上这可能耗时很久，而且此浏览器不显示进度百分比。只有在你希望现在就执行这次读取时才继续。",
   "Yes, read every repository byte": "确认读取整个仓库字节",
   "Full-bytes confirmation": "full-bytes 确认",
-  "Restore destination on the RestoreWeave host": "RestoreWeave 主机上的恢复目标目录",
-  "restore-drill requires a destination on the RestoreWeave host": "restore-drill 需要 RestoreWeave 主机上的目标目录",
+  "Restore destination on the Cairn host": "Cairn 主机上的恢复目标目录",
+  "restore-drill requires a destination on the Cairn host": "restore-drill 需要 Cairn 主机上的目标目录",
   "restore-drill writes the restored members to this directory; it never writes to the repository.": "restore-drill 会把恢复出来的成员写入此目录；它绝不会写入仓库。",
 
   // --- the running and session-result states -----------------------------

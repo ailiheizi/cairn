@@ -2,14 +2,14 @@
 //
 // Owner: components/DuplicatesSurface.tsx and scripts/e2e/duplicates.mjs. The
 // keys are exactly the strings that surface renders: the scope label that
-// bounds the grouping to the loaded workspace listing, the per-member facts
+// bounds the grouping to the loaded content listing, the per-member facts
 // (path, logical size, entry type, protection outcome, representation,
 // placement), the non-destructive review controls (selection, tag, note, copy
 // path), and the loading/empty/blocked/partial states.
 //
 // A few chrome strings intentionally stay in other partials and are only
 // referenced here, because they name an action another surface owns and a key
-// may live in exactly one partial: "WORKSPACE" (common), "Original path",
+// may live in exactly one partial: "CONTENT" (common), "Original path",
 // "Logical size", "Protection", "Tags", "Notes", "{{count}} selected",
 // "Deselect {{name}}", "Add tag", "Add note" (library), and the
 // "UNAVAILABLE" state label "Unavailable" (status).
@@ -20,16 +20,16 @@ export const duplicates: Record<string, string> = {
   // --- surface chrome and the scope label -----------------------------------
   "Duplicate groups": "重复分组",
   "Duplicate groups over {{count}} loaded subjects": "已加载 {{count}} 个主题中的重复分组",
-  "Groups are computed in this browser from the workspace listing the daemon returned. The daemon's duplicate-group filter can answer one group's members, but this build cannot enumerate duplicate groups catalog-wide.": "分组是本浏览器根据服务返回的工作区列表计算得出的。服务的 duplicate-group 过滤器可以回答某一组的成员，但此构建无法列出全目录范围的重复分组。",
+  "Groups are computed in this browser from the content listing the daemon returned. The daemon's duplicate-group filter can answer one group's members, but this build cannot enumerate duplicate groups catalog-wide.": "分组是本浏览器根据服务返回的内容列表计算得出的。服务的 duplicate-group 过滤器可以回答某一组的成员，但此构建无法列出全目录范围的重复分组。",
   "Listing read at {{time}} (this browser)": "列表读取于 {{time}}（本浏览器）",
-  "The workspace listing has not been read in this browser yet": "本浏览器尚未读取工作区列表",
+  "The content listing has not been read in this browser yet": "本浏览器尚未读取内容列表",
   "Refresh duplicate groups": "刷新重复分组",
-  "Reading the workspace listing…": "正在读取工作区列表……",
+  "Reading the content listing…": "正在读取内容列表……",
 
   // --- the review contract --------------------------------------------------
   "Each member is a separate subject that happens to share the same exact bytes: the same SHA-256 content identity and the same logical length. Removing one subject does not touch the bytes the other members point at, and this view cannot delete, move, or merge anything.": "每个成员都是各自独立的主题，只是恰好共享相同的精确字节：相同的 SHA-256 内容身份和相同的逻辑长度。移除其中一个主题不会触及其他成员所指向的字节，而本视图也无法删除、移动或合并任何内容。",
   "This review offers selection, tags, notes, and path copying only. It has no delete, no move, no merge, and no keep-one action.": "此审阅只提供选择、标签、备注和复制路径。它没有删除、没有移动、没有合并，也没有“保留其中一个”的操作。",
-  "Duplicate groups are read from the workspace listing this service returns; no grouping is ever inferred from similarity.": "重复分组读取自服务返回的工作区列表；任何分组都不会依据相似度来推断。",
+  "Duplicate groups are read from the content listing this service returns; no grouping is ever inferred from similarity.": "重复分组读取自服务返回的内容列表；任何分组都不会依据相似度来推断。",
 
   // --- one group ------------------------------------------------------------
   "Exact identity {{digest}} · logical length {{bytes}}": "精确身份 {{digest}} · 逻辑长度 {{bytes}}",
@@ -78,7 +78,7 @@ export const duplicates: Record<string, string> = {
   "Blocked": "已阻止",
   "Not claimed by the daemon's protection axis": "服务的保护轴未声明",
   "The protection axis could not be read: {{reason}}": "无法读取保护轴：{{reason}}",
-  "the daemon did not report a protection generation for this workspace": "服务没有为此工作区报告保护代",
+  "the daemon did not report a protection generation for the content here": "服务没有为此处内容报告保护代",
   "Placement: {{label}} ({{token}})": "放置：{{label}}（{{token}}）",
   "Present in the repository": "存在于仓库中",
   "Missing from the repository": "在仓库中缺失",
@@ -91,9 +91,9 @@ export const duplicates: Record<string, string> = {
 
   // --- empty and blocked ----------------------------------------------------
   "No duplicate groups over {{count}} loaded subjects": "已加载 {{count}} 个主题中没有重复分组",
-  "This is not proof that no duplicates exist catalog-wide. The listing the daemon returned for this workspace contains {{count}} subjects and no exact-identity group of two or more was found among them.": "这不能证明全目录不存在重复。服务为此工作区返回的列表包含 {{count}} 个主题，其中没有找到两个或以上的精确身份分组。",
+  "This is not proof that no duplicates exist catalog-wide. The listing the daemon returned here contains {{count}} subjects and no exact-identity group of two or more was found among them.": "这不能证明全目录不存在重复。服务在此处返回的列表包含 {{count}} 个主题，其中没有找到两个或以上的精确身份分组。",
   "Duplicate groups are not readable right now": "当前无法读取重复分组",
-  "No published workspace is reported by this service in this browser yet.": "此服务尚未在本浏览器中报告任何已发布的工作区。",
+  "This service has not reported any published content in this browser yet.": "此服务尚未在本浏览器中报告任何已发布内容。",
   // Similar-candidates review: every string restates the frozen rule that
   // similarity is evidence, never identity and never deletion authority.
   "{{scanned}} scanned · {{unscanned}} not scanned · {{ungrouped}} without a candidate group": "已扫描 {{scanned}} · 未扫描 {{unscanned}} · 未形成候选组 {{ungrouped}}",
@@ -106,7 +106,7 @@ export const duplicates: Record<string, string> = {
   "Not scanned (never grouped): {{names}}": "未扫描（绝不分组）：{{names}}",
   "Perceptual-hash evidence": "感知哈希证据",
   "Read declared-track candidates": "读取声明同曲候选",
-  "Read the workspace listing before running a similarity review.": "请先读取工作区列表，再运行相似度审查。",
+  "Read the content listing before running a similarity review.": "请先读取内容列表，再运行相似度审查。",
   "Reading the candidate groups…": "正在读取候选组……",
   "REVIEW EVIDENCE": "审查证据",
   "Scan similar images": "扫描相似图片",

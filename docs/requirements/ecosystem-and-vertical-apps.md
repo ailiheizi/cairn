@@ -1,17 +1,17 @@
 # Ecosystem and Vertical Application Requirements
 
-> **Authority:** This is the normative product requirement for the RestoreWeave ecosystem and vertical-application profile. It governs the shared catalog, Inbox, experience-pack boundary, client strategy, and staged domain experiences. The companion [Universal Catalog and Experience Pack Overview](universal-catalog-and-experience-packs.md) is non-normative and summarizes this document for orientation. The technical contracts refine these requirements but must not weaken their recovery and authority rules.
+> **Authority:** This is the normative product requirement for the Cairn ecosystem and vertical-application profile. It governs the shared catalog, Inbox, experience-pack boundary, client strategy, and staged domain experiences. The companion [Universal Catalog and Experience Pack Overview](universal-catalog-and-experience-packs.md) is non-normative and summarizes this document for orientation. The technical contracts refine these requirements but must not weaken their recovery and authority rules.
 
-> **Profile status:** This document defines the product shape above `RW-MVP-1`. The bundled local text-semantic profile is already an `RW-MVP-1` requirement; this document does not promote additional semantic or multimodal processing, media players, readers, or game retrieval into the core release. It explains how later experiences can share one RestoreWeave data plane without turning the authoritative core into a media server, launcher, workflow engine, or download manager.
+> **Profile status:** This document defines the product shape above `RW-MVP-1`. The bundled local text-semantic profile is already an `RW-MVP-1` requirement; this document does not promote additional semantic or multimodal processing, media players, readers, or game retrieval into the core release. It explains how later experiences can share one Cairn data plane without turning the authoritative core into a media server, launcher, workflow engine, or download manager.
 
 ## 1. Product decision
 
-RestoreWeave should support an ecosystem of focused applications over one content and recovery layer. The common layer owns identity, exact storage, namespace, provenance, annotations, access, verification, and typed search. Domain applications add interpretation and presentation for music, video, books, photographs, documents, software, games, datasets, and unfamiliar files.
+Cairn should support an ecosystem of focused applications over one content and recovery layer. The common layer owns identity, exact storage, namespace, provenance, annotations, access, verification, and typed search. Domain applications add interpretation and presentation for music, video, books, photographs, documents, software, games, datasets, and unfamiliar files.
 
 The product must therefore be **one data plane, several bounded experiences**:
 
 ```text
-RestoreWeave Core
+Cairn Core
   -> Universal Catalog and Inbox
   -> Domain Packs (audio, video, books, images, documents, games, ...)
   -> Clients (CLI, local MCP, export consumers, later WebUI and focused applications)
@@ -20,11 +20,11 @@ RestoreWeave Core
 The public product hierarchy is intentionally layered rather than a set of separate storage silos:
 
 ```text
-RestoreWeave Core        identity, namespace, storage, recovery, authorization
-RestoreWeave Catalog     heterogeneous metadata, annotations, collections, baseline search
-RestoreWeave Experiences Music, Books, Video, Photos, Documents, Games, and other views
-RestoreWeave Retrieval   explicitly qualified external acquisition connectors (later profile)
-RestoreWeave Clients     universal UI, CLI, MCP, export consumers, and third-party applications
+Cairn Core        identity, namespace, storage, recovery, authorization
+Cairn Catalog     heterogeneous metadata, annotations, collections, baseline search
+Cairn Experiences Music, Books, Video, Photos, Documents, Games, and other views
+Cairn Retrieval   explicitly qualified external acquisition connectors (later profile)
+Cairn Clients     universal UI, CLI, MCP, export consumers, and third-party applications
 ```
 
 The shared catalog has four durability layers:
@@ -149,7 +149,7 @@ The catalog must not collapse a human concept into a byte identity. Domain packs
 | **Work** | The abstract intellectual or creative work | A novel, composition, film, game, or software product |
 | **Edition** | A materially distinct editorial, regional, platform, language, or mastering form | A translated novel, remaster, director's cut, or platform edition |
 | **Release** | One distributed publication/build/package of an edition | EPUB release, album pressing, Blu-ray release, game build/depot |
-| **Content identity** | One exact byte sequence observed or admitted by RestoreWeave | SHA-256 plus exact length for a specific file/blob |
+| **Content identity** | One exact byte sequence observed or admitted by Cairn | SHA-256 plus exact length for a specific file/blob |
 
 `Work`, `Edition`, and `Release` are domain/catalog identities supported by evidence and provenance. They can group several exact files and may be corrected or disputed without changing recovery records. `ContentIdentity` is immutable byte truth: two releases with the same title are not exact matches, and two different container files may belong to the same work without being interchangeable. An `AssetRef` may provide user-facing continuity across accepted revisions, but it never proves byte equality or authorizes replacement.
 
@@ -445,7 +445,7 @@ If operators still maintain separate catalogs or custom glue for ordinary tasks,
 
 ## 12. Anti-monolith rules
 
-RestoreWeave must not become a single process that embeds every player and external service. The following rules apply:
+Cairn must not become a single process that embeds every player and external service. The following rules apply:
 
 1. The core can operate headlessly with all domain packs disabled.
 2. A domain pack can be removed without invalidating exact content or generic browse/restore.
@@ -477,4 +477,4 @@ The design is successful when:
 
 Build the universal Inbox/catalog and exact file-shaped access as the shared foundation, then prove the ecosystem with music and books before tackling video and application retrieval. The goal is not to ship ten disconnected applications. The goal is to make one content layer useful every day, while allowing focused clients to grow around it.
 
-RestoreWeave should remain the product name. Use product-level labels such as `RestoreWeave Catalog`, `RestoreWeave Audio`, and `RestoreWeave Books` for bundles or clients, without renaming the authoritative core.
+Cairn should remain the product name. Use product-level labels such as `Cairn Catalog`, `Cairn Audio`, and `Cairn Books` for bundles or clients, without renaming the authoritative core.

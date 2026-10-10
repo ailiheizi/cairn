@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must not describe a capability as supported merely because code, configuration, or documentation for it exists. A supported capability requires a reproducible chain from the governing requirement to implementation, tests, retained evidence, a declared compatibility profile, and a signed release decision.
+Cairn must not describe a capability as supported merely because code, configuration, or documentation for it exists. A supported capability requires a reproducible chain from the governing requirement to implementation, tests, retained evidence, a declared compatibility profile, and a signed release decision.
 
 This document defines that chain. It applies independently to exact storage, external retrieval, P2P, search, semantic annotations, enrichment providers, AI proposal and automation surfaces, MCP and A2A adapters, media validation, application-aware capture, codecs, `RepositoryDriver` implementations, and every later optional capability.
 
@@ -54,7 +54,7 @@ A signed `CompatibilityProfile` binds:
 - RRF, portable `PublicationCommitRecord`, recovery-reference, and compatible reader versions. Capsule, Seed, Envelope, Witness, and portable-package versions apply only to later profiles that activate them.
 - Network profile, privacy mode, and protocol features where retrieval or P2P applies.
 - Northbound protocol and specification revision, tool catalog, authentication mapping, and canonical Core Command equivalence where an external client applies. `RW-MVP-1` qualifies CLI and read-only MCP only; mutation grants, REST, and agent lifecycle are later or experimental.
-- Export-manifest and `FileAccess` implementation, principal and export-root binding, raw-name and sparse-file semantics, cache and revocation profile, and the external-tool boundary. RestoreWeave has no bundled mount service.
+- Export-manifest and `FileAccess` implementation, principal and export-root binding, raw-name and sparse-file semantics, cache and revocation profile, and the external-tool boundary. Cairn has no bundled mount service.
 - Default processor profiles, lexical/structured and local-semantic index backends and generations, extraction and semantic coverage, subject/segment resolution, rebuild behavior, authorization mapping, the MVP tag/note/description schema, and authenticated portable annotation/description records. Alternate embedding spaces, distributed vector services, multimodal indexes, and their purge behavior apply only to later profiles.
 - Maximum tested files, bytes, path depth, container expansion, concurrent jobs, and restore scale.
 - Requested and achievable recovery, filesystem, and capture-consistency claims.
@@ -125,7 +125,7 @@ Each capability declares the applicable test classes and why any class is not ap
 - Rights, legal-hold, and non-waivable policy-path tests where distribution or deletion applies.
 - Capture-provider, source-transition, journal-reset, deterministic change-anomaly, and anomaly-preservation-hold tests.
 - Capture-root and ancestor substitution, root or mount replacement, remount, snapshot-handle substitution, nested-mount policy, retained-handle lifetime, safe FIFO and device-like type pinning, and watcher overflow, rollback, truncation, reset, non-recursive coverage, and uncertain-continuity tests.
-- Export and `FileAccess` qualification covering raw names, hard links, sparse files, symlinks, exact byte identity, authorization expiry, and clean-install materialization. Mount, kernel-cache, and unmount behavior belong to the external tool and are not RestoreWeave release gates.
+- Export and `FileAccess` qualification covering raw names, hard links, sparse files, symlinks, exact byte identity, authorization expiry, and clean-install materialization. Mount, kernel-cache, and unmount behavior belong to the external tool and are not Cairn release gates.
 - Scoped repository credential recovery, independent trust-anchor, and secret-non-disclosure tests for `RW-MVP-1`; key-share, custodian, and threshold tests only where a later custody profile applies.
 - Service-SLO, telemetry-loss, notification-delivery, independent dead-man, and health-watermark replay or rollback tests only where those managed-service capabilities are claimed.
 - Automated and manual WCAG 2.2 AA tests for every later supported WebUI critical workflow.

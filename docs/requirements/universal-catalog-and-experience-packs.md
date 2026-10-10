@@ -4,10 +4,10 @@
 
 ## What this means
 
-RestoreWeave is one content and recovery data plane with many bounded ways to use it:
+Cairn is one content and recovery data plane with many bounded ways to use it:
 
 ```text
-RestoreWeave Core
+Cairn Core
   -> Universal Catalog and Inbox
   -> Music, Books, Video, Photos, Documents, Games, and other experience packs
   -> CLI, MCP, universal UI, export consumers, and third-party clients
@@ -76,7 +76,7 @@ These are views and clients over the same content plane, not separate libraries 
 5. `RW-COLLECTION-1`: read-only application/game resolution and restore planning.
 6. `RW-RETRIEVE-1` and richer semantic or multimodal profiles, always opt-in and separately qualified.
 
-The first compelling demonstration is a mixed Inbox followed by a small music slice. It proves that RestoreWeave can become a daily discovery tool without waiting for every media domain or AI model.
+The first compelling demonstration is a mixed Inbox followed by a small music slice. It proves that Cairn can become a daily discovery tool without waiting for every media domain or AI model.
 
 ## Read next
 
@@ -87,4 +87,4 @@ The first compelling demonstration is a mixed Inbox followed by a small music sl
 - [CLI and MCP Contract](cli-and-mcp-contract.md) — the preferred automation and AI integration surface.
 - [Ecosystem Application and Adapter References](../references/ecosystem-application-adapters.md) — verified open-source projects that can be integrated or used as reference clients.
 
-RestoreWeave remains the product name. Product-level bundles or clients may use labels such as `RestoreWeave Catalog`, `RestoreWeave Audio`, and `RestoreWeave Books`; they do not create new storage authorities.
+Cairn remains the product name. Product-level bundles or clients may use labels such as `Cairn Catalog`, `Cairn Audio`, and `Cairn Books`; they do not create new storage authorities.

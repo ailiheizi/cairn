@@ -1,4 +1,4 @@
-/* RestoreWeave WebUI stylesheet entry point.
+/* Cairn WebUI stylesheet entry point.
  *
  * The stylesheet is one file per surface. `main.tsx` imports only this file, so
  * the cascade below is the single place that decides rule order:

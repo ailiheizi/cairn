@@ -1,6 +1,6 @@
 # Index status and search
 
-RestoreWeave treats analysis as an optional enhancement to exact storage.
+Cairn treats analysis as an optional enhancement to exact storage.
 
 ## The small baseline
 

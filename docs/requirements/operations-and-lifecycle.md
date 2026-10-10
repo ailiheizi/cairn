@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must remain correct after years of upgrades, migrations, partial failures, expired credentials, offline sources, codec retirement, database loss, and human policy changes.
+Cairn must remain correct after years of upgrades, migrations, partial failures, expired credentials, offline sources, codec retirement, database loss, and human policy changes.
 
 This document defines the operational state machines and transaction boundaries that are not visible in a static recovery contract.
 
@@ -25,7 +25,7 @@ An external backup engine owns:
 - Repository pack layout.
 - Internal object identifiers.
 
-RestoreWeave owns:
+Cairn owns:
 
 - Logical observations and recovery contracts.
 - Stable representation identities.
@@ -45,11 +45,11 @@ RestoreWeave owns:
 - Export authoritative content to a documented raw or open representation.
 - Report whether internal object IDs are stable or implementation-private.
 
-RestoreWeave manifests must not expose an engine pack ID as the permanent logical content identity.
+Cairn manifests must not expose an engine pack ID as the permanent logical content identity.
 
-### 2.2 Deferred RestoreWeave-managed packs
+### 2.2 Deferred Cairn-managed packs
 
-In this deferred model, a host-managed-pack `RepositoryDriver` owns or coordinates chunking, compression, pack assembly, encryption, content identities, representation records, placement, readback, verification, reconciliation, restore, and pack-object identities. Any lower-level filesystem, object-store, or swarm transport client is private to that implementation rather than a public RestoreWeave seam.
+In this deferred model, a host-managed-pack `RepositoryDriver` owns or coordinates chunking, compression, pack assembly, encryption, content identities, representation records, placement, readback, verification, reconciliation, restore, and pack-object identities. Any lower-level filesystem, object-store, or swarm transport client is private to that implementation rather than a public Cairn seam.
 
 This model is appropriate for:
 
@@ -68,7 +68,7 @@ The data model must keep three identities separate:
 - **Content ID:** immutable digest-and-length identity for one exact plaintext byte sequence.
 - **Representation ID:** immutable identity for one representation graph node, including its transformation class, output content ID, and dependency/provenance binding.
 
-Namespace reconstruction and physical placement are also separate. A signed namespace record set maps assets and entries to raw and normalized paths, link topology, filesystem metadata, and versioned rename/move/tombstone history; it contains no backend locator. A signed physical placement ledger maps representations and content to engine receipts or RestoreWeave pack locations; it contains no authority over the user-visible namespace.
+Namespace reconstruction and physical placement are also separate. A signed namespace record set maps assets and entries to raw and normalized paths, link topology, filesystem metadata, and versioned rename/move/tombstone history; it contains no backend locator. A signed physical placement ledger maps representations and content to engine receipts or Cairn pack locations; it contains no authority over the user-visible namespace.
 
 Backend movement preserves the representation ID; byte-changing source replacement creates a new content ID; a codec or transformation change creates a new representation ID linked through lineage.
 
@@ -102,7 +102,7 @@ Requirements for RW-MVP-1:
 
 - Staged payload data and prepared recovery closure data are invisible to normal restore discovery until a portable commit marker exists.
 - `READY_TO_COMMIT` produces an immutable RRF root and a signed `PREPARED_CLOSURE` that bind the exact plan, declared capture or applied-inventory basis, payload snapshot receipt, authenticated-metadata verification evidence, target identity, and publication generation without claiming that publication completed.
-- After the prepared closure is stored and reconciled as a `RECOVERY_CLOSURE` placement, RestoreWeave creates a signed `PublicationCommitRecord`. It binds the RRF root, payload receipt, prepared-closure receipt, plan and capture digests, authenticated-metadata evidence, publication generation, and fencing identity.
+- After the prepared closure is stored and reconciled as a `RECOVERY_CLOSURE` placement, Cairn creates a signed `PublicationCommitRecord`. It binds the RRF root, payload receipt, prepared-closure receipt, plan and capture digests, authenticated-metadata evidence, publication generation, and fencing identity.
 - The commit record is stored and reconciled as a second small `RECOVERY_CLOSURE` placement. It does not contain its own placement receipt; recovery validates the record bytes and the surrounding repository evidence instead of creating a digest cycle.
 - The payload and both recovery-closure roles live inside the same product-level repository placement; they do not constitute redundant or multiple-placement protection.
 - A valid portable `PublicationCommitRecord` is the logical commit point. Local SQLite heads, caches, and UI state are rebuildable projections and cannot make a snapshot committed by themselves.
@@ -179,7 +179,7 @@ Incremental watcher or journal state is an authenticated `SourceJournalCheckpoin
 
 ### 6.2 Change anomaly and preservation hold
 
-RestoreWeave records deterministic source-change anomalies before any retention reduction or destructive lifecycle action. A `ChangeAnomalyRecord` binds the compared complete scan generations, source identity, detector and configuration digest, baseline window, observed counts and bytes, affected selectors, reason codes, severity, evidence, and state.
+Cairn records deterministic source-change anomalies before any retention reduction or destructive lifecycle action. A `ChangeAnomalyRecord` binds the compared complete scan generations, source identity, detector and configuration digest, baseline window, observed counts and bytes, affected selectors, reason codes, severity, evidence, and state.
 
 Required signal families include:
 
@@ -321,7 +321,7 @@ Requirements:
 
 ### 9.1 KeyRecoveryPolicy and ceremonies
 
-Every key or credential required for offline recovery is covered by an immutable signed `KeyRecoveryPolicy`. This includes RestoreWeave encryption and signing roots, approval and recovery-authority roots, each repository password or repository-key bootstrap, backend endpoint and account-recovery dependencies, SFTP host-authentication material where applicable, and any key needed to authenticate the Recovery Bootstrap Seed, RecoveryHeadWitness, Recovery Bootstrap Envelope, manifest, or placement ledger.
+Every key or credential required for offline recovery is covered by an immutable signed `KeyRecoveryPolicy`. This includes Cairn encryption and signing roots, approval and recovery-authority roots, each repository password or repository-key bootstrap, backend endpoint and account-recovery dependencies, SFTP host-authentication material where applicable, and any key needed to authenticate the Recovery Bootstrap Seed, RecoveryHeadWitness, Recovery Bootstrap Envelope, manifest, or placement ledger.
 
 The policy records:
 
@@ -382,7 +382,7 @@ Each generation binds its predecessor, publication domain, consistency point, RP
 
 ### 10.3 Recovery Bootstrap Envelope
 
-After snapshot publication, RestoreWeave creates a separately signed **Recovery Bootstrap Envelope** that points one way to:
+After snapshot publication, Cairn creates a separately signed **Recovery Bootstrap Envelope** that points one way to:
 
 - The committed `SnapshotPublicationRecord` and candidate-manifest digest.
 - The signed placement-ledger checkpoint.
@@ -395,15 +395,15 @@ The publication record and manifest do not reference the envelope that names the
 
 Every ControlPlaneRecoverySet and Capsule Core required by the declared offline path must be embedded in the envelope bundle or present at a verified offline-capable `RecoveryArtifactPlacement`. An externally reacquired-only core may support an optional online path but cannot satisfy minimum offline recovery closure.
 
-Before retiring any placement or representation referenced by a retained Recovery Bootstrap Envelope, Recovery Bootstrap Seed, ControlPlaneRecoverySet, Capsule Core, decoder, or validator, RestoreWeave must publish, independently replicate, and cold-verify the complete successor set for the same committed snapshot: physical-placement checkpoint, Recovery Bootstrap Envelope, RecoveryHeadWitness, Recovery Bootstrap Seed, BootstrapSeedSuccessorRecord, ControlPlaneRecoverySet when changed, and required RecoveryArtifactPlacement records. The old path remains a recovery and payload-liveness root until successor discovery, signatures, witness freshness, key bootstrap, control-plane recovery, Capsule Core resolution, and a post-publication bootstrap drill pass without relying on the location being retired.
+Before retiring any placement or representation referenced by a retained Recovery Bootstrap Envelope, Recovery Bootstrap Seed, ControlPlaneRecoverySet, Capsule Core, decoder, or validator, Cairn must publish, independently replicate, and cold-verify the complete successor set for the same committed snapshot: physical-placement checkpoint, Recovery Bootstrap Envelope, RecoveryHeadWitness, Recovery Bootstrap Seed, BootstrapSeedSuccessorRecord, ControlPlaneRecoverySet when changed, and required RecoveryArtifactPlacement records. The old path remains a recovery and payload-liveness root until successor discovery, signatures, witness freshness, key bootstrap, control-plane recovery, Capsule Core resolution, and a post-publication bootstrap drill pass without relying on the location being retired.
 
 Capsule Cores, ControlPlaneRecoverySets, Recovery Bootstrap Envelopes, Recovery Bootstrap Seeds, BootstrapSeedSuccessorRecords, and RecoveryHeadWitness records and transitions require independent immutable replicas and periodic clean-hardware boot and post-publication bootstrap drills.
 
 ### 10.4 Recovery Bootstrap Seed and RecoveryHeadWitness
 
-At least one independently replicated **Recovery Bootstrap Seed** uses a documented baseline format readable without a RestoreWeave repository, plugin registry, network service, or the Capsule Core it is intended to load. It contains exact signed envelope and current RecoveryHeadWitness copies, pinned trust anchors, canonical signature material, the minimum manifest and placement reader, extraction instructions, and any first-stage executable or source required to load the initial core. Its signature binds publication domain, publication-record digest, generation, predecessor-Seed digest, exact Envelope and Witness digests, inventory, and bootstrap-root policy. Required key-unwrapping material is available out of band and does not depend on that core.
+At least one independently replicated **Recovery Bootstrap Seed** uses a documented baseline format readable without a Cairn repository, plugin registry, network service, or the Capsule Core it is intended to load. It contains exact signed envelope and current RecoveryHeadWitness copies, pinned trust anchors, canonical signature material, the minimum manifest and placement reader, extraction instructions, and any first-stage executable or source required to load the initial core. Its signature binds publication domain, publication-record digest, generation, predecessor-Seed digest, exact Envelope and Witness digests, inventory, and bootstrap-root policy. Required key-unwrapping material is available out of band and does not depend on that core.
 
-After each snapshot publication, receipt reconciliation, protected ControlPlaneRecoverySet generation change, envelope replacement, witness-epoch transition, or authoritative physical-placement checkpoint event affecting discovery, eligibility, health, supersession, retention, quarantine, or retirement, RestoreWeave publishes a successor Envelope whenever any bound digest changes, then a monotonic signed **RecoveryHeadWitness** to a policy-defined independent witness set, then a successor Seed containing that exact Envelope and Witness. The witness binds publication, manifest, receipt, envelope, placement checkpoint, predecessor, generation, epoch, and observation time. Persisted highest-seen witness state detects rollback; conflicting valid successors produce a blocked fork state until a separately signed resolution record is published. The Seed is not complete until independent replica receipts, cold verification, and a signed BootstrapSeedSuccessorRecord bind its predecessor and successor lineage.
+After each snapshot publication, receipt reconciliation, protected ControlPlaneRecoverySet generation change, envelope replacement, witness-epoch transition, or authoritative physical-placement checkpoint event affecting discovery, eligibility, health, supersession, retention, quarantine, or retirement, Cairn publishes a successor Envelope whenever any bound digest changes, then a monotonic signed **RecoveryHeadWitness** to a policy-defined independent witness set, then a successor Seed containing that exact Envelope and Witness. The witness binds publication, manifest, receipt, envelope, placement checkpoint, predecessor, generation, epoch, and observation time. Persisted highest-seen witness state detects rollback; conflicting valid successors produce a blocked fork state until a separately signed resolution record is published. The Seed is not complete until independent replica receipts, cold verification, and a signed BootstrapSeedSuccessorRecord bind its predecessor and successor lineage.
 
 Before retiring a Seed, Envelope, Witness, ControlPlaneRecoverySet, Core, or recovery-artifact placement, publish and cold-verify the complete successor set from only the declared baseline platform assumptions and out-of-band recovery material.
 
@@ -547,8 +547,8 @@ mark and report
 
 Deletion authority is ownership-mode specific:
 
-- **ENGINE_MANAGED_OBJECTS:** RestoreWeave computes snapshot- and representation-level retention intent, submits a fenced engine snapshot deletion or retention request, and audits the engine's repository check and receipt. RestoreWeave never sweeps engine-private chunks or packs directly.
-- **RESTOREWEAVE_PACKS:** RestoreWeave computes physical reachability from authenticated roots and applies the fenced object sweep itself through the applicable `RepositoryDriver` capability.
+- **ENGINE_MANAGED_OBJECTS:** Cairn computes snapshot- and representation-level retention intent, submits a fenced engine snapshot deletion or retention request, and audits the engine's repository check and receipt. Cairn never sweeps engine-private chunks or packs directly.
+- **RESTOREWEAVE_PACKS:** Cairn computes physical reachability from authenticated roots and applies the fenced object sweep itself through the applicable `RepositoryDriver` capability.
 
 GC traverses typed `PAYLOAD_LIVENESS` and `AUTHENTICATION_EVIDENCE` edges. Retaining signed evidence does not automatically retain every historical payload location, and retiring a payload placement never makes its authentication history disappear.
 
@@ -847,7 +847,7 @@ Interoperability requirements:
 - Raw bytes plus filesystem-metadata sidecar export.
 - BagIt, OCFL, or Metalink-compatible profiles where useful.
 - Independent implementation conformance tests.
-- Full escape path from an abandoned backup engine or RestoreWeave implementation.
+- Full escape path from an abandoned backup engine or Cairn implementation.
 
 ### 24.1 RWPORT-1 portable recovery package
 

@@ -56,8 +56,8 @@ export class InterfaceRenderBoundary extends Component<Props, State> {
     if (failed) {
       return <section className="interface-recovery" role="alert" aria-live="assertive">
         <h1>{this.props.t("Interface unavailable")}</h1>
-        <p>{this.props.t("The workspace interface could not be displayed. Your search, selection, and Notes draft are still held by the app.")}</p>
-        {fallbackNotice && <p className="interface-recovery-notice" role="status">{this.props.t("The selected interface failed. RestoreWeave switched to the workspace interface; review your settings before trying another layout.")}</p>}
+        <p>{this.props.t("The standard interface could not be displayed. Your search, selection, and Notes draft are still held by the app.")}</p>
+        {fallbackNotice && <p className="interface-recovery-notice" role="status">{this.props.t("The selected interface failed. Cairn switched to the standard interface; review your settings before trying another layout.")}</p>}
         <div className="interface-recovery-actions">
           <button type="button" onClick={this.retry}>{this.props.t("Retry selected interface")}</button>
           <button type="button" className="interface-recovery-secondary" onClick={(event) => this.props.onOpenSettings(event.currentTarget)}>{this.props.t("Open settings")}</button>
@@ -67,7 +67,7 @@ export class InterfaceRenderBoundary extends Component<Props, State> {
 
     return <>
       {fallbackNotice && <div className="interface-recovery-notice" role="status">
-        <span>{this.props.t("The selected interface failed. RestoreWeave switched to the workspace interface; review your settings before trying another layout.")}</span>
+        <span>{this.props.t("The selected interface failed. Cairn switched to the standard interface; review your settings before trying another layout.")}</span>
         <button type="button" className="interface-recovery-dismiss" onClick={this.dismissFallbackNotice}>{this.props.t("Dismiss")}</button>
       </div>}
       <InterfaceFrame {...this.props} />

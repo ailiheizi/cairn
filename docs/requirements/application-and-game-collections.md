@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must treat an application or game as a versioned collection of independently protected components, not as one installation directory or one store identifier.
+Cairn must treat an application or game as a versioned collection of independently protected components, not as one installation directory or one store identifier.
 
 This document defines later-phase requirements for collection resolution, component identity, platform profiles, application-aware capture, external reacquisition, restoration, and validation. It is governed by:
 
@@ -41,7 +41,7 @@ Application and game support does not:
 
 ## 4. Collection, component, and content identity
 
-RestoreWeave reuses the common identity model:
+Cairn reuses the common identity model:
 
 - `asset_id` identifies a stable user-facing asset across path changes when policy considers it the same item.
 - `content_id` identifies one exact plaintext byte sequence by digest and length.
@@ -252,7 +252,7 @@ Requirements:
 
 ## 13. Rights, entitlement, secrets, and privacy
 
-- RestoreWeave does not determine whether a license permits copying, reacquisition, modification, export, emulation, or transfer.
+- Cairn does not determine whether a license permits copying, reacquisition, modification, export, emulation, or transfer.
 - User reproduction authority and source distribution authority remain independent records.
 - Entitlement evidence may support a decision but does not authorize network contact, bypass DRM, or prove future availability.
 - Region-, account-, subscription-, device-, and time-bound restrictions are explicit dependencies.

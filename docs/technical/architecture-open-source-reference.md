@@ -10,7 +10,7 @@ Write the authority-owning core. Consume mature open-source software for parsers
 
 Keep two proofs separate. The **recovery proof** is authenticated clean restore. The **product proof** is ingest -> fused search -> saved view -> frozen export -> materialize/verify, without internal IDs. Neither waits for a WebUI, facade, live FUSE mount, or media server.
 
-Introduce experience software as **separate processes** that read a RestoreWeave-owned surface. The file-shaped export and the annotation-capable surface are not the same thing:
+Introduce experience software as **separate processes** that read a Cairn-owned surface. The file-shaped export and the annotation-capable surface are not the same thing:
 
 ```text
 Core command ABI and FileAccess
@@ -21,9 +21,9 @@ Core command ABI and FileAccess
   -> file-shaped bytes via restore or FileAccess; other tools may mount that
 ```
 
-RestoreWeave does not own a kernel filesystem adapter. `plan.restore` writes a real directory; export materialization, `content.open`/`read`, and `FileAccess` hand out exact bytes. External tools may mount or share those outputs. That work stays outside `restoreweaved`, and no mount code or dependency remains in tree.
+Cairn does not own a kernel filesystem adapter. `plan.restore` writes a real directory; export materialization, `content.open`/`read`, and `FileAccess` hand out exact bytes. External tools may mount or share those outputs. That work stays outside `restoreweaved`, and no mount code or dependency remains in tree.
 
-Progress, bookmarks, tags, and notes remain RestoreWeave annotations bound to `SubjectRef` / `SegmentRef`. A client-private database is not recovery authority. Pointing Navidrome, Komga, or Jellyfin at a mount demonstrates that a snapshot is readable. It does not demonstrate a unified catalog.
+Progress, bookmarks, tags, and notes remain Cairn annotations bound to `SubjectRef` / `SegmentRef`. A client-private database is not recovery authority. Pointing Navidrome, Komga, or Jellyfin at a mount demonstrates that a snapshot is readable. It does not demonstrate a unified catalog.
 
 Stars, GitHub topics, and popular framework names are discovery signals for **which sidecars to test**. They are not adoption reasons and they do not justify linking a GPL/AGPL product into the core. Not checking NAS package catalogs or awesome-selfhosted is a coverage gap, not rigor.
 
@@ -37,7 +37,7 @@ Observed on 2026-08-14 in this tree:
 - A small React/Vite browser client lives under `web/` and calls only the bounded HTTP adapter; it is not a second catalog or recovery authority.
 - In-process EXTRACT for UTF-8 text, ID3/FLAC/OGG tags, and EPUB OPF. Exact ingest ignores processor failure.
 - The in-tree `RepositoryDriver` has a raw development profile and an embedded local-zstd measurement candidate. Darwin/Unix CLI probes for Restic and Kopia can pass when those binaries are present; none of these facts is an engine selection.
-- Linux bubblewrap execution remains open where isolated heavy parsers are wanted. Kernel mounting is not a RestoreWeave product surface.
+- Linux bubblewrap execution remains open where isolated heavy parsers are wanted. Kernel mounting is not a Cairn product surface.
 - An optional loopback `/api/v1/command` adapter can bind `127.0.0.1` and call the command ABI. It is disabled unless `api.enabled` or `--api-listen` is set.
 
 Tika, libarchive, ffprobe, libmagic, Siegfried, pathrs-lite, and a release repository engine are planned or qualified elsewhere. They are not present as Go module dependencies today.
@@ -48,16 +48,16 @@ Use the least-coupled mode that still preserves recovery meaning. Do not collaps
 
 | Mode | When to use | Examples |
 | --- | --- | --- |
-| **Host-owned core** | Identity, admission, snapshots, verification, restore, command ABI | RestoreWeave records and `FileAccess` |
+| **Host-owned core** | Identity, admission, snapshots, verification, restore, command ABI | Cairn records and `FileAccess` |
 | **Pinned library, types private** | Narrow adapter whose types must not enter portable records | SQLite FTS5, zvec, ONNX Runtime binding, Cobra, MCP SDK, grpc-go |
 | **Isolated sidecar** | Parsers and probes that must not hold ambient authority | Tika, libarchive, ffprobe after bubblewrap |
 | **CLI / process driver** | Engines whose supported surface is a product CLI | Restic after remaining Driver gates. Kopia qualification currently uses the binary; the adoption note still prefers the Go repository API if those gates pass. Do not treat “process boundary” as the Kopia decision. |
-| **Foreign tools** | Operator wants a folder or protocol view | Restore or export a snapshot (or read via `FileAccess`) and let external tools provide any mount/share behavior. Do not grow a RestoreWeave mount daemon. |
+| **Foreign tools** | Operator wants a folder or protocol view | Restore or export a snapshot (or read via `FileAccess`) and let external tools provide any mount/share behavior. Do not grow a Cairn mount daemon. |
 | **HTTP adapter** | Browser and remote clients need a transport boundary | `/api/v1/command` delegates to the typed dispatcher; it does not open SQLite or repository paths. |
 | **Thin command-ABI shell** | Universal Inbox browse/search/restore as the `RW-CATALOG-1` visible proof | A small read-only WebUI over commands; File Browser patterns only, never its writable job |
 | **Design reference only** | Useful UX or routing lessons, incompatible license or job | sist2, Paperless-ngx, Immich, Lutris. This is not a license to copy UI, CSS, icons, or a recognizable flow. |
 
-GPL/AGPL projects may run beside RestoreWeave. Linking them into a permissively licensed core is a separate licensing decision and is not implied by “reference.” Shipping them in the same compose file, NAS package, or installer is also a separate decision: optional containers still need corresponding source for those works, and a shared product name, unified EULA, private glue protocol, or patched binary can stop looking like mere aggregation. AGPL works (Immich, KOReader) add a network-user source obligation on modifications even when they are not linked.
+GPL/AGPL projects may run beside Cairn. Linking them into a permissively licensed core is a separate licensing decision and is not implied by “reference.” Shipping them in the same compose file, NAS package, or installer is also a separate decision: optional containers still need corresponding source for those works, and a shared product name, unified EULA, private glue protocol, or patched binary can stop looking like mere aggregation. AGPL works (Immich, KOReader) add a network-user source obligation on modifications even when they are not linked.
 
 ## 4. Layer map and retrofit traps
 
@@ -78,7 +78,7 @@ GPL/AGPL projects may run beside RestoreWeave. Linking them into a permissively 
 | Photos | Immich | Do not embed; at most consume an export/mount | Create a second photo catalog and identity |
 | Apps / games | Lutris, RomM, Pegasus (see adapter catalog) | Read-only inventory first | Become a launcher or downloader |
 
-File Browser is Apache-2.0 and is a legitimate **browse-shell** reference. Its published job includes upload, delete, preview, and edit. That job is not the `RW-MVP-1` Inbox. Borrowing its Vue shell is still an Apache-2.0 derivative and still binds to writable resource APIs unless those controls are removed. Do not take the whole repository (second auth stack, share links, command-runner/hooks). If a later UI borrows the shell, bind it to RestoreWeave commands, keep source-tree mutation off, and test the constraint.
+File Browser is Apache-2.0 and is a legitimate **browse-shell** reference. Its published job includes upload, delete, preview, and edit. That job is not the `RW-MVP-1` Inbox. Borrowing its Vue shell is still an Apache-2.0 derivative and still binds to writable resource APIs unless those controls are removed. Do not take the whole repository (second auth stack, share links, command-runner/hooks). If a later UI borrows the shell, bind it to Cairn commands, keep source-tree mutation off, and test the constraint.
 
 Paperless-ngx is a document-management Inbox, not a heterogeneous recovery plane. Use it for triage UX lessons. Do not absorb it. “Design reference” does not license copying its UI, component tree, icons, or recognizable flow.
 
@@ -90,7 +90,7 @@ Keep engineering gates and product proof on separate tracks.
 
 **Engineering (unchanged completion-plan work):**
 
-1. Finish remaining repository gates. Independent SHA-256 readback now passes for raw and local-zstd profiles; the release adapter still needs GC-root, crash, corruption, migration, reader-closure, credential, and applicable NAS/S3 evidence. Isolated processors may use Linux bubblewrap later. Do not spend further work making RestoreWeave a FUSE server.
+1. Finish remaining repository gates. Independent SHA-256 readback now passes for raw and local-zstd profiles; the release adapter still needs GC-root, crash, corruption, migration, reader-closure, credential, and applicable NAS/S3 evidence. Isolated processors may use Linux bubblewrap later. Do not spend further work making Cairn a FUSE server.
 2. Move general parsing to isolated Tika / libarchive / ffprobe. Stop expanding the in-process tag/OPF extractors. Bubblewrap failure is one reason to keep a processor out of the default pack; missing NOTICE/SBOM, a GPL FFmpeg build, or an unreconciliation of ExifTool terms is another.
 
 **Product proof (may start once the command ABI exists; must not wait for `/dev/fuse`):**
@@ -98,15 +98,15 @@ Keep engineering gates and product proof on separate tracks.
 3. Add a thin read-only Inbox shell: triage, search, item detail, verify, restore. It calls the command ABI. It does not open repository packs or SQLite files. This is the `RW-CATALOG-1` visible acceptance, not a later optional adapter.
 4. The same item page may play or read through an existing `FileAccess` / `content.open` handle and write progress as an annotation. That is catalog proof, not `RW-AUDIO-1` and not a media server.
 5. If a specialized client later needs progress tied to `SubjectRef`, add a narrow adapter over `/api/v1/command`; do not make the client or its database a recovery authority.
-6. If an operator wants a folder, restore or export the snapshot (or expose `FileAccess` bytes) and let an existing external tool attach it. Do not qualify RestoreWeave by pointing a foreign catalog at an internal service. Jellyfin stays later than music/books.
+6. If an operator wants a folder, restore or export the snapshot (or expose `FileAccess` bytes) and let an existing external tool attach it. Do not qualify Cairn by pointing a foreign catalog at an internal service. Jellyfin stays later than music/books.
 
-Do not start a full custom music, reader, or photo application in this repository to “have a frontend.” Use a protocol facade or an external tool over an explicit export; RestoreWeave does not manage mount principals or kernel permissions.
+Do not start a full custom music, reader, or photo application in this repository to “have a frontend.” Use a protocol facade or an external tool over an explicit export; Cairn does not manage mount principals or kernel permissions.
 
 ## 6. What would reverse a row
 
 - External directory consumers are **expected** not to carry play/read progress back to `SubjectRef`. Add a protocol facade or write progress from the Inbox item page. Do not implement a media server to close the gap.
 - If bubblewrap cannot isolate Tika/ffprobe, or the default pack cannot ship a complete NOTICE/SBOM and an LGPL-only FFmpeg, keep those processors out of the default pack. Do not fold them into the host process.
-- If File Browser or another Apache-2.0 shell can be constrained to RestoreWeave commands without writable source semantics, it may be reused as a shell. The constraint must be tested, not assumed. Whole-repo adoption remains refused.
+- If File Browser or another Apache-2.0 shell can be constrained to Cairn commands without writable source semantics, it may be reused as a shell. The constraint must be tested, not assumed. Whole-repo adoption remains refused.
 - GitHub topic or star counts will not reverse a license, authority, or writable-source decision. They may change which sidecar is tested first. A NAS-catalog or awesome-selfhosted check that shows a different installed-client set would change the facade order, not the core.
 - If the Kopia Go repository API fails GC, crash, or catalog-independent SHA-256 readback, keep the CLI driver. That is a gate failure, not a slogan that “engines are always processes.”
 

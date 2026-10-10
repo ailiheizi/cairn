@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-RestoreWeave is a self-hosted, NAS-first content-aware managed data layer. Its extension contracts let operators replace or upgrade content algorithms without changing namespace identity, recovery meaning, policy authority, or durable storage records. `RW-MVP-1` exercises those contracts through a read-only managed-archive and search profile.
+Cairn is a self-hosted, NAS-first content-aware managed data layer. Its extension contracts let operators replace or upgrade content algorithms without changing namespace identity, recovery meaning, policy authority, or durable storage records. `RW-MVP-1` exercises those contracts through a read-only managed-archive and search profile.
 
 The product has five current extension seams and one reserved later seam:
 
@@ -69,7 +69,7 @@ A single executable MAY implement several interfaces. In particular, one plugin 
 
 CaptureDriver examples include filesystem walks, Linux snapshot adapters, ZFS and Btrfs snapshots, NAS vendor snapshot APIs, object-store version views, and application-consistent exports. Other operating-system and filesystem integrations qualify independently and do not define the product identity, global data model, default deployment shape, or release gate.
 
-RepositoryDriver examples include a local filesystem repository, a repository engine with built-in deduplication and compression, an object store, and a remote NAS target. Backend-private chunk or pack identifiers MUST NOT become RestoreWeave content or namespace identity.
+RepositoryDriver examples include a local filesystem repository, a repository engine with built-in deduplication and compression, an object store, and a remote NAS target. Backend-private chunk or pack identifiers MUST NOT become Cairn content or namespace identity.
 
 ## 4. The classified-content processing path
 
@@ -639,7 +639,7 @@ The reference self-hosted distribution MUST ship strong defaults instead of an e
 - Common text and metadata extraction where deterministic and safe.
 - Durable whole-subject tag and note CRUD with portable export/import.
 - Hybrid lexical/structured IndexProvider and QueryProvider implementations for path, filename, type, metadata, checksum, duplicates, tags, notes, processing state, extracted text, and the default local semantic space.
-- Export-manifest materialization over `SnapshotTree` and `FileAccess`; any filesystem presentation is an external consumer, not another RestoreWeave extension seam.
+- Export-manifest materialization over `SnapshotTree` and `FileAccess`; any filesystem presentation is an external consumer, not another Cairn extension seam.
 - CLI access to the complete authorized ingest, inspect, search, browse, read, verify, reprocess, reindex, and restore operation set.
 - Initial MCP access to the bounded read-only inspection, status, search, namespace, and content subset. A mutation-capable MCP profile is separately qualified later.
 
@@ -660,4 +660,4 @@ Optional packs MAY add media parsing, OCR, ASR, acoustic fingerprints, CLIP-comp
 11. Every operation shared by CLI and the initial MCP subset produces the same route, policy, authorization, result, and audit semantics.
 12. The reference distribution remains useful with all learned and generative processors disabled.
 13. Deleting and rebuilding every index loses no durable tag or note revision.
-14. External presentation tools can consume export manifests and `FileAccess` without changing `SnapshotTree`, namespace identity, or repository layout. RestoreWeave does not define or ship a mount adapter.
+14. External presentation tools can consume export manifests and `FileAccess` without changing `SnapshotTree`, namespace identity, or repository layout. Cairn does not define or ship a mount adapter.

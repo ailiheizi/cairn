@@ -4,7 +4,7 @@
 scope, reorders no phase, weakens no normative contract, decides nothing by
 itself. Operative requirements stay in the ranked documents cited below.
 
-Question: should RestoreWeave be a notes app; if so, how far — a read-only
+Question: should Cairn be a notes app; if so, how far — a read-only
 cross-subject view, or note-taking machinery (standalone notes, notebooks,
 backlinks)?
 
@@ -79,14 +79,14 @@ queue unless the operator changes scope.
 Choose **B, and only B** — a read-mostly cross-subject Notes view built entirely
 from `annotation.list`, `description.list`, `description.get`, and the existing
 `search.query`, with no new durable record and no daemon edit — because it
-answers "can notes live inside RestoreWeave?" at the cost of one browser
+answers "can notes live inside Cairn?" at the cost of one browser
 surface, while A leaves notes unfindable except by search and C breaks frozen
 decisions. The strongest counter-argument, to weigh first: the frozen loop
 already sanctions "search lexical + structured + semantic information" as
 discovery, `Notes` already participates in that search, and a browse list is
 therefore a convenience for a workflow the loop does not require
 — so the disciplined answer is A until the operator personally misses the list.
-If what the operator wants is to write prose inside RestoreWeave rather than
+If what the operator wants is to write prose inside Cairn rather than
 find notes attached to content, B will not satisfy it, and the honest answer
 becomes C with an explicit scope change rather than a slice.
 

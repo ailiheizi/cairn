@@ -211,10 +211,10 @@ increment of 1,748,992 bytes (about 10.4% of one whole 16 MiB file).
 This demonstrates useful content-defined chunk reuse for a bounded
 large-file versioning case that whole-file deduplication cannot capture. It
 does not establish representative savings, repository compatibility, or
-release readiness. Linux/NAS behavior, the RestoreWeave RepositoryDriver
+release readiness. Linux/NAS behavior, the Cairn RepositoryDriver
 mapping, encryption credentials, portable reader closure, corruption
 isolation, migration/rollback, and non-destructive lifecycle ownership remain
-open. The generated RestoreWeave profile therefore continues to use its
+open. The generated Cairn profile therefore continues to use its
 existing whole-file development default; Restic remains a single candidate
 for a separately reviewed adapter and qualification run.
 

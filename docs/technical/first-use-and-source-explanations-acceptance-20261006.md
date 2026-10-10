@@ -526,7 +526,7 @@ The tested subset used an isolated encrypted repository to write and verify a
 binary payload, two opaque test-record roles and same-byte logical keys. It
 checked immutable repeats before close, fresh-cache cold reopen with stable
 identity, payload/record readback and wrong-password refusal. These record bytes
-were not signed RestoreWeave records. The prototype is not registered in the
+were not signed Cairn records. The prototype is not registered in the
 production provider set and does not test signed authentication,
 `exact.Service`, normal ingest, clean-reader/profile opening, unknown-flush
 reconciliation, cross-process fencing, migration, physical placement measurement

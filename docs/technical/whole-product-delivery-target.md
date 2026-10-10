@@ -18,7 +18,7 @@ files in, find them through familiar clues, use them through suitable views,
 and take out the original bytes. The same content, tags, Notes, protection,
 access, and recovery authority follows the operator through every view.
 
-The first audience is NAS and home-storage enthusiasts. RestoreWeave remains
+The first audience is NAS and home-storage enthusiasts. Cairn remains
 the working name. Product appeal should be demonstrated by ordinary tasks and
 recognizable content; demand, retention, and traffic still require actual user
 feedback. Deduplication and compression support the product's economics while

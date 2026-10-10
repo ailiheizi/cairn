@@ -26,7 +26,7 @@ const PLAYBACK_ERROR_TEXTS: Record<string, string> = {
   "empty-response": "The download returned no original data.",
   "playback-permission": "The browser blocked playback. Choose Play again to allow it.",
   "playback-failed": "This original could not be played.",
-  "workspace-mismatch": "This track belongs to a different workspace.",
+  "workspace-mismatch": "This track is from content other than what is open here.",
   "track-unavailable": "The identity, format, or size of this track does not meet the playback conditions.",
 };
 const PLAYBACK_ERROR_FALLBACK = "Playback failed. Open Details to download the original.";

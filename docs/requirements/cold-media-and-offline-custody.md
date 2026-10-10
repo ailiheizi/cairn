@@ -4,7 +4,7 @@
 
 ## 1. Purpose and boundary
 
-RestoreWeave may later manage tape, optical media, removable disks, and other physically detached media as additional recovery placements. This capability covers writing, sealing, labeling, custody, health monitoring, refresh, import, recovery, and destruction. It does not treat an offline device, a barcode, or physical possession as proof of integrity or recoverability.
+Cairn may later manage tape, optical media, removable disks, and other physically detached media as additional recovery placements. This capability covers writing, sealing, labeling, custody, health monitoring, refresh, import, recovery, and destruction. It does not treat an offline device, a barcode, or physical possession as proof of integrity or recoverability.
 
 Cold-media support is deferred from `RW-MVP-1`. It may first ship in Phase 3 or later under a separately qualified profile such as `RW-COLD-1`. `RW-MVP-1` uses one release-qualified mature exact repository selected by its applicability matrix and makes no cold-media, multi-placement, or physical-custody claim. A later cold-media placement is additive to the ingest profile that explicitly selects it; it does not retroactively turn the one MVP repository into redundant protection.
 
@@ -25,7 +25,7 @@ The design must address:
 
 ## 3. Carrier, volume, and set identity
 
-RestoreWeave must keep these identities distinct:
+Cairn must keep these identities distinct:
 
 - `media_carrier_id`: one physical cartridge, disc, or device.
 - `media_volume_id`: one recorded logical volume and format generation on a carrier.
@@ -90,7 +90,7 @@ Early removal, power loss, drive reset, failed finalization, incomplete readback
 
 ## 7. Verified import and reconciliation
 
-Import begins read-only and quarantined. Before any object is trusted, RestoreWeave must:
+Import begins read-only and quarantined. Before any object is trusted, Cairn must:
 
 - Compare scanned labels, on-media identity, set membership, and expected custody state.
 - Authenticate the volume and set seals and validate rollback or fork evidence.
@@ -186,7 +186,7 @@ Privacy destruction must distinguish:
 - Destruction of labels and invalidation of carrier and volume state.
 - Unreachable, missing, stolen, exported, or third-party copies that cannot be proven destroyed.
 
-Crypto-erasure counts only when the encryption profile remains approved and every usable key copy is proven inaccessible. Physical destruction uses a method qualified for the exact media type and records operator, witness, device or vendor, time, evidence, and certificate. RestoreWeave must not report complete erasure while an affected copy is merely missing or outside verified custody.
+Crypto-erasure counts only when the encryption profile remains approved and every usable key copy is proven inaccessible. Physical destruction uses a method qualified for the exact media type and records operator, witness, device or vendor, time, evidence, and certificate. Cairn must not report complete erasure while an affected copy is merely missing or outside verified custody.
 
 ## 16. Portable manifests and `RWPORT-1`
 
@@ -209,7 +209,7 @@ Inventory reconciliation, barcode scans, or simulated API transitions cannot sub
 
 ## 18. Later-profile API resources and operations
 
-RW-COLD-1 does not imply that RestoreWeave Core owns REST or a WebUI. If a later remote custody service exposes these projections, resource families may include:
+RW-COLD-1 does not imply that Cairn Core owns REST or a WebUI. If a later remote custody service exposes these projections, resource families may include:
 
 - `/v1/media-carriers`
 - `/v1/media-volumes`

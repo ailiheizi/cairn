@@ -8,7 +8,7 @@
 //
 // A number of keys intentionally stay in other partials and are only
 // referenced here, because the concept they name already belongs to the
-// surface that owns it and a key may live in exactly one partial: "WORKSPACE"
+// surface that owns it and a key may live in exactly one partial: "CONTENT"
 // and "Library" (common), "Tags" (library), "UNKNOWN — not reported by this
 // build" (activity), "Plan digest: {{digest}}" (activity), and the protection
 // vocabulary the duplicate review owns —
@@ -16,8 +16,8 @@
 // "Exact fallback (bytes still exact)", "External replayable",
 // "Link only, unprotected", "Explicitly unprotected", "Blocked",
 // "Unavailable", "Not claimed by the daemon's protection axis",
-// "the daemon did not report a protection generation for this workspace", and
-// "No published workspace is reported by this service in this browser yet."
+// "the daemon did not report a protection generation for the content here", and
+// "This service has not reported any published content in this browser yet."
 // `scripts/web-i18n-check.mjs` fails on a duplicate key, so this partial must
 // not redefine them.
 
@@ -28,11 +28,11 @@ export const tags: Record<string, string> = {
   "Reading the durable tag vocabulary…": "正在读取持久标签词汇表……",
   "Tag vocabulary read at {{time}} (this browser)": "标签词汇表读取于 {{time}}（本浏览器）",
   "The tag vocabulary has not been read in this browser yet": "本浏览器尚未读取标签词汇表",
-  "Every row here is a durable TAG annotation record the daemon returned for this workspace. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.": "此处的每一行都是服务为此工作区返回的持久 TAG 注释记录。名称就是存储的正文，按记录原样显示；本表面绝不规范化、转为小写或合并两个名称，也不会应用任何机器建议。",
+  "Every row here is a durable TAG annotation record the daemon returned here. The name is the stored body, shown exactly as recorded; this surface never normalizes, lowercases, or merges two names, and it applies no machine suggestion.": "此处的每一行都是服务在此处返回的持久 TAG 注释记录。名称就是存储的正文，按记录原样显示；本表面绝不规范化、转为小写或合并两个名称，也不会应用任何机器建议。",
   "A rename or merge is one service operation pair: the service plans every affected subject and the exact changes, and only the confirmed, digest-bound apply writes. The service adds the new name before tombstoning the old record, so an interruption leaves both names rather than neither.": "重命名或合并是一对服务操作：服务先规划每个受影响的主题与确切的变更，只有经过确认、以摘要绑定的应用才会写入。服务先添加新名称，再为旧记录置墓碑，因此中断会让主题同时保留两个名称，而不是两个都不剩。",
 
   // --- the empty and blocked states ----------------------------------------
-  "No live tag is recorded in this workspace yet": "此工作区尚未记录任何存续标签",
+  "No live tag is recorded here yet": "此处尚未记录任何存续标签",
   "This list reads the daemon's live TAG annotation records only: a name appears while at least one subject carries it, and a deleted tag is tombstoned instead of being kept as an empty row. Adding a tag to a subject in the library inspector, in the duplicate review, or in this surface's per-subject controls creates the first record.": "此列表只读取服务的存续 TAG 注释记录：只要至少一个主题带有某个名称，该名称就会出现；被删除的标签会置为墓碑，而不会保留为空行。在内容库检查器、重复项审阅或本表面的单主题操作中为某个主题添加标签，就会创建第一条记录。",
   "Tags are not readable right now": "当前无法读取标签",
   "The durable tag vocabulary could not be read: {{message}}": "无法读取持久标签词汇表：{{message}}",
@@ -54,7 +54,7 @@ export const tags: Record<string, string> = {
   "{{count}} subjects carry this tag": "{{count}} 个主题带有此标签",
   "This name has no live record left; the applied record below names every subject the change touched.": "此名称已不再有存续记录；下方的已应用记录列出了本次变更涉及的每个主题。",
   "This tag name is the stored body. The identity of a tag row is that exact name plus the subject's own record, so two names that differ only in case stay two separate rows.": "此标签名称就是存储的正文。标签行的身份是该确切名称加上主题自身的记录，因此仅大小写不同的两个名称保持为两行。",
-  "The workspace listing could not be read, so names and provenance paths are shown as UNKNOWN: {{message}}": "无法读取工作区列表，因此名称和出处路径显示为 UNKNOWN：{{message}}",
+  "The content listing could not be read, so names and provenance paths are shown as UNKNOWN: {{message}}": "无法读取内容列表，因此名称和出处路径显示为 UNKNOWN：{{message}}",
   "Subjects carrying {{name}}": "带有 {{name}} 的主题",
   "Subject {{name}}": "主题 {{name}}",
   "Record {{annotation_id}} · revision {{revision}}": "记录 {{annotation_id}} · 修订 {{revision}}",

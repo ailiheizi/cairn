@@ -2,7 +2,7 @@
 
 ## 1. Product decision
 
-RestoreWeave is a **single-person self-hosted personal-content platform** for NAS and home-storage hobbyists: keep readable originals in one place, find them, use them through suitable domain experiences, and take them with you. Its trusted kernel remains a content-first managed data layer for large heterogeneous collections. `RW-MVP-1` qualifies the first read-only managed archive and multi-dimensional discovery profile; later NAS and enterprise profiles qualify their own additional consistency and recovery semantics.
+Cairn is a **single-person self-hosted personal-content platform** for NAS and home-storage hobbyists: keep readable originals in one place, find them, use them through suitable domain experiences, and take them with you. Its trusted kernel remains a content-first managed data layer for large heterogeneous collections. `RW-MVP-1` qualifies the first read-only managed archive and multi-dimensional discovery profile; later NAS and enterprise profiles qualify their own additional consistency and recovery semantics.
 
 Complete Photos and Music workflows are product targets, including photo
 albums and music artist/album navigation, queues and playlists. Their first
@@ -14,11 +14,11 @@ contracts rather than silently expanding the current exact profile.
 
 For the operator, it performs one complete job: bring readable files from an explicitly attached tree into one managed library, retain their names, captured facts, and Notes, find mixed content with lexical, structured, and local semantic dimensions, materialize requested sets, and restore exact files with independent evidence. Measuring and reducing the managed footprint supports this workflow. The exact storage and recovery path remains usable if the semantic index is temporarily unavailable, but the reference distribution MUST ship the semantic profile enabled by default.
 
-Internally, RestoreWeave coordinates filesystem-shaped data, replaceable processing algorithms, storage engines, and discovery clients. It preserves a stable subject, namespace, representation, and recovery model so those implementations can change without stranding data or changing what a stored file means.
+Internally, Cairn coordinates filesystem-shaped data, replaceable processing algorithms, storage engines, and discovery clients. It preserves a stable subject, namespace, representation, and recovery model so those implementations can change without stranding data or changing what a stored file means.
 
 > Store less. Find more. Restore with proof.
 
-RestoreWeave is broader than a backup engine and narrower than a complete NAS operating system. Its durable middle layer owns:
+Cairn is broader than a backup engine and narrower than a complete NAS operating system. Its durable middle layer owns:
 
 - Content, namespace, representation, snapshot, and operation identity.
 - File identification and class-based processing orchestration.
@@ -63,7 +63,7 @@ NAS and self-hosted users accumulate source code, documents, photos, music, vide
 
 Users therefore keep too many copies, cannot explain what is unique or reproducible, struggle to find information across mixed collections, and become locked into one storage layout or processing stack.
 
-RestoreWeave addresses the combined problem through one content-aware managed-data loop: inventory heterogeneous content, minimize storage, process and index it through replaceable implementations, preserve recoverability, keep the filesystem view usable, and improve discovery without binding those outcomes to one algorithm or backend.
+Cairn addresses the combined problem through one content-aware managed-data loop: inventory heterogeneous content, minimize storage, process and index it through replaceable implementations, preserve recoverability, keep the filesystem view usable, and improve discovery without binding those outcomes to one algorithm or backend.
 
 ## 3. Target users and jobs
 
@@ -82,7 +82,7 @@ RestoreWeave addresses the combined problem through one content-aware managed-da
 
 ### 3.3 Primary jobs
 
-RestoreWeave helps an operator:
+Cairn helps an operator:
 
 1. Connect one or more heterogeneous filesystem roots without reorganizing them.
 2. Understand file identity, type, duplicates, extraction coverage, storage cost, and recovery risk.
@@ -96,7 +96,7 @@ RestoreWeave helps an operator:
 
 ## 4. Product promise
 
-RestoreWeave promises six outcomes.
+Cairn promises six outcomes.
 
 1. **Conservative storage savings.** The default profile removes physical duplication and applies mature lossless compression without weakening recoverability. More aggressive strategies are explicit, versioned, and independently validated.
 2. **A durable filesystem view.** Original paths and declared metadata remain browsable and restorable even when bytes are deduplicated, packed, transformed, placed in multiple backends, or indexed separately.
@@ -105,25 +105,25 @@ RestoreWeave promises six outcomes.
 5. **Safe automation.** The system is highly automatic, but only a human or an already-published policy can accept omission, lossiness, deletion, or another weaker recovery outcome.
 6. **Truthful recovery.** A write is not called recoverable until the required placement, publication, and verification evidence exists.
 
-The differentiated product is the combination of these outcomes. RestoreWeave must not collapse into a thin wrapper around one repository, a media catalog for one file type, or a collection of uncoordinated plugins.
+The differentiated product is the combination of these outcomes. Cairn must not collapse into a thin wrapper around one repository, a media catalog for one file type, or a collection of uncoordinated plugins.
 
 ### 4.1 Product modes and savings boundary
 
-RestoreWeave distinguishes three modes:
+Cairn distinguishes three modes:
 
 | Mode | Authoritative bytes | Product value | Storage-savings claim |
 | --- | --- | --- | --- |
 | **Observe** | Existing source remains authoritative | Inventory, duplicate analysis, metadata extraction, and discovery | No net capacity claim |
-| **Managed archive** | RestoreWeave repository is an exact managed copy with a read-only file-shaped view | Verified storage reduction, discovery, browse, and restore | Repository footprint is measured; whole-system savings require retiring another copy |
-| **Primary writable NAS** | RestoreWeave would accept authoritative writes through gateways | Unified live storage and discovery | Future profile only |
+| **Managed archive** | Cairn repository is an exact managed copy with a read-only file-shaped view | Verified storage reduction, discovery, browse, and restore | Repository footprint is measured; whole-system savings require retiring another copy |
+| **Primary writable NAS** | Cairn would accept authoritative writes through gateways | Unified live storage and discovery | Future profile only |
 
-`RW-MVP-1` qualifies managed archive mode. It does not silently count a source copy that still exists as saved capacity. A source may become eligible for retirement only after a separately reviewed migration proves exact recoverability, required placement, decoder availability, and rollback conditions. Automatic source deletion is disabled by default. RestoreWeave does not provide SMB, NFS, WebDAV, S3, or filesystem mount behavior.
+`RW-MVP-1` qualifies managed archive mode. It does not silently count a source copy that still exists as saved capacity. A source may become eligible for retirement only after a separately reviewed migration proves exact recoverability, required placement, decoder availability, and rollback conditions. Automatic source deletion is disabled by default. Cairn does not provide SMB, NFS, WebDAV, S3, or filesystem mount behavior.
 
-Managed archive mode provides file-shaped access by materializing an explicit export manifest to a destination. RestoreWeave does not supply a mount adapter; external tools may consume the resulting directory or authorized byte stream.
+Managed archive mode provides file-shaped access by materializing an explicit export manifest to a destination. Cairn does not supply a mount adapter; external tools may consume the resulting directory or authorized byte stream.
 
 ### 4.2 Product layers
 
-RestoreWeave is evaluated as three nested layers. A lower layer is not a substitute for the layer above it.
+Cairn is evaluated as three nested layers. A lower layer is not a substitute for the layer above it.
 
 | Layer | Required outcome |
 | --- | --- |
@@ -211,7 +211,7 @@ The distribution must remain useful when every optional processor is disabled. I
 
 ### 6.4 External intelligence
 
-RestoreWeave does not embed a general LLM harness, prompt loop, agent memory, or model router.
+Cairn does not embed a general LLM harness, prompt loop, agent memory, or model router.
 
 An AI implementation may:
 
@@ -387,7 +387,7 @@ Recovery must not require the original controller database, optional processors,
 
 ### FR-01: Platform-neutral source onboarding
 
-RestoreWeave must accept local or mounted filesystem roots through a `CaptureDriver`. Every capture declares source identity, root mapping, supported metadata, consistency class, read scope, and release semantics.
+Cairn must accept local or mounted filesystem roots through a `CaptureDriver`. Every capture declares source identity, root mapping, supported metadata, consistency class, read scope, and release semantics.
 
 The reference profile runs on a Linux-based NAS or server using generic local or mounted filesystem capture and does not require a particular filesystem. Native snapshot drivers for ZFS, Btrfs, LVM, vendor APIs, or other platforms are optional improvements. Failure or absence of one optional driver must not block another qualified capture profile.
 
@@ -457,7 +457,7 @@ Every published snapshot must expose one authenticated file-shaped view independ
 - Explicit representation selection without treating similarity as identity.
 - Explicit reporting of unsupported filesystem metadata.
 
-`RW-MVP-1` MUST provide explicit export-manifest materialization and exact `FileAccess` reads. RestoreWeave does not implement FUSE, SMB, NFS, WebDAV, S3, media-server, or other filesystem/network presentation services. External tools may consume the exported directory or authorized read handles.
+`RW-MVP-1` MUST provide explicit export-manifest materialization and exact `FileAccess` reads. Cairn does not implement FUSE, SMB, NFS, WebDAV, S3, media-server, or other filesystem/network presentation services. External tools may consume the exported directory or authorized read handles.
 
 ### FR-07: Discovery and semantic direction
 
@@ -499,7 +499,7 @@ operator-authored membership, tags, and notes.
 
 ### FR-08: Incremental lifecycle
 
-RestoreWeave must distinguish source mutation, new snapshot publication, representation replacement, index rebuild, and repository retention.
+Cairn must distinguish source mutation, new snapshot publication, representation replacement, index rebuild, and repository retention.
 
 - Unchanged content identities should reuse admitted representations and processor artifacts when provenance and policy still match.
 - Changed content creates a new immutable `FileVersion` and snapshot
@@ -533,7 +533,7 @@ Repository implementations remain replaceable. A repository driver must provide 
 
 The first distribution may use one mature repository engine. One repository is one placement and must never be described as redundant. Later policy may require multiple failure-independent placements or storage tiers.
 
-Repository-private chunks, packs, objects, encryption layout, and physical garbage collection remain engine concerns. RestoreWeave owns the portable logical snapshot and path-to-representation mapping.
+Repository-private chunks, packs, objects, encryption layout, and physical garbage collection remain engine concerns. Cairn owns the portable logical snapshot and path-to-representation mapping.
 
 ### FR-11: Portable publication and verification
 
@@ -576,7 +576,7 @@ Upload completion, processor success, index availability, and repository process
 
 The canonical human and scripting interface is the CLI. Every non-content command supports human, JSON, or JSONL output over the same typed command, result, reason, and event model. The first profile includes read-only namespace browse, resolve, stat, readlink, and exact-read operations, plus explicit export-manifest materialization and basic tag/note create, list, update, delete, and export commands; annotation mutation uses explicit subject references and expected revisions. It does not include a mount or unmount command; mounting or sharing a materialized result belongs to external tools.
 
-The first MCP profile uses local stdio and is read-only. It exposes bounded inspection, status, search, namespace, annotation-read, verification, processing, and existing-plan information to external harnesses without embedding a harness in RestoreWeave. It cannot create, revise, approve, abandon, or apply an ingest or restore plan; mutate a repository, restore destination, policy, annotation, or job; or request an arbitrary processor invocation.
+The first MCP profile uses local stdio and is read-only. It exposes bounded inspection, status, search, namespace, annotation-read, verification, processing, and existing-plan information to external harnesses without embedding a harness in Cairn. It cannot create, revise, approve, abandon, or apply an ingest or restore plan; mutate a repository, restore destination, policy, annotation, or job; or request an arbitrary processor invocation.
 
 MCP cannot execute arbitrary shell text, access ambient credentials, read unrestricted paths, or treat natural-language confirmation as authority. Later mutation grants remain explicit, bounded, digest-pinned, and subject to the same core checks as the CLI.
 
@@ -600,7 +600,7 @@ Exact browse and restore must work without:
 - A model registry, AI harness, WebUI, MCP client, or REST service.
 - The original plugin registry.
 
-A compatible RestoreWeave reader, repository access, portable recovery closure, required credentials, and an independent trust anchor must be sufficient for the declared exact recovery profile.
+A compatible Cairn reader, repository access, portable recovery closure, required credentials, and an independent trust anchor must be sufficient for the declared exact recovery profile.
 
 Tag and note recovery must work without the lexical index by importing a valid portable annotation bundle into a compatible catalog. The index may then be rebuilt from namespace, extracted artifacts, and authoritative annotation records.
 
@@ -697,7 +697,7 @@ Every profile must define validator thresholds, provenance, dependency closure, 
 
 ### 11.5 NAS and enterprise expansion
 
-Later external integrations may consume SMB, NFS, WebDAV, S3, media-server, or filesystem tools around exported data. RestoreWeave itself does not add those servers; multiple repositories, tiering, replication, HA, multitenancy, RBAC, audit integration, remote REST, and enterprise lifecycle policy remain separate profiles.
+Later external integrations may consume SMB, NFS, WebDAV, S3, media-server, or filesystem tools around exported data. Cairn itself does not add those servers; multiple repositories, tiering, replication, HA, multitenancy, RBAC, audit integration, remote REST, and enterprise lifecycle policy remain separate profiles.
 
 ## 12. MVP non-goals
 
@@ -753,7 +753,7 @@ These are product-level milestones, not the numbered engineering phases. The dep
 
 - Alternate or external embedding, CLIP, OCR, ASR, caption, vector, and hybrid search providers beyond the bundled local text profile.
 - Richer subject-bound Collections, nested groups, roles, ratings, relationship graphs, machine suggestions, and external enrichment beyond the minimal LinkGroup.
-- Optional external SMB, NFS, WebDAV, S3, media-server, or other presentation integrations. RestoreWeave does not ship those gateways.
+- Optional external SMB, NFS, WebDAV, S3, media-server, or other presentation integrations. Cairn does not ship those gateways.
 - Lossless class-specific transforms and tier placement.
 - Multiple failure-independent repositories.
 - Perceptual media, learned compression, VAE or RWKV-style experiments, reacquisition, and rebuild profiles.

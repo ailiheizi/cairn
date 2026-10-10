@@ -1,4 +1,4 @@
-# RestoreWeave
+# Cairn
 
 [中文](README.md) · [English](README.en.md)
 
@@ -13,10 +13,10 @@
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26-79c2ff?style=flat-square" alt="Go 1.26"></a>
 </p>
 
-> RestoreWeave 面向 NAS 与家庭存储爱好者，主张“自托管的个人内容中枢”：存进自己的空间，找得到、用得上、带得走。当前 `main` 是 `v0.1.0-prealpha.1` 之后的未发行开发预览，不是生产发行版。正式安装包、生产仓库资格、LinkGroup 和完整多平台发行保证仍在后续阶段。
+> Cairn 面向 NAS 与家庭存储爱好者，主张“自托管的个人内容中枢”：存进自己的空间，找得到、用得上、带得走。当前 `main` 是 `v0.1.0-prealpha.1` 之后的未发行开发预览，不是生产发行版。正式安装包、生产仓库资格、LinkGroup 和完整多平台发行保证仍在后续阶段。
 
 <p align="center">
-  <img src="docs/assets/screenshots/unreleased/library-zh.png" alt="RestoreWeave 内容优先主页：搜索、多标签、Notes、保护与索引状态" width="1100">
+  <img src="docs/assets/screenshots/unreleased/library-zh.png" alt="Cairn 内容优先主页：搜索、多标签、Notes、保护与索引状态" width="1100">
 </p>
 <p align="center"><sub>开发版 WebUI，使用仓库文档构造的脱敏演示数据。</sub></p>
 
@@ -30,7 +30,7 @@
 - **带走原件**：预览受支持内容，下载原始文件，或导出并校验文件字节。
 - **减少重复**：以完整内容的 SHA-256 和逻辑长度识别相同文件，重复内容只保存一份。
 
-RestoreWeave 的方向是把照片、音频、视频、文档和其他可读文件放进同一内容库，共享内容身份、搜索、标签、Notes、访问、导出和恢复。它仍是内容、发现、导出和恢复层，不是网盘文件系统、挂载服务或 OpenList fork。未知格式可以按声明范围精确保留，但不承诺解析或播放。
+Cairn 的方向是把照片、音频、视频、文档和其他可读文件放进同一内容库，共享内容身份、搜索、标签、Notes、访问、导出和恢复。它仍是内容、发现、导出和恢复层，不是网盘文件系统、挂载服务或 OpenList fork。未知格式可以按声明范围精确保留，但不承诺解析或播放。
 
 ## 一次使用流程
 

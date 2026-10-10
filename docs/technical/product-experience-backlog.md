@@ -110,7 +110,7 @@ qualification gate.
 
 ## Reader closure: keeping an old encoding readable years later
 
-The operator asked whether RestoreWeave can follow F3's encoder/decoder idea so
+The operator asked whether Cairn can follow F3's encoder/decoder idea so
 that an encoding retired years from now can still be read. The answer is that
 the shape is **already frozen** and the remaining work is narrower than it
 sounds:

@@ -2,7 +2,7 @@
 
 ## 1. Architectural objective
 
-RestoreWeave is a self-hosted, NAS-first content-aware managed data layer. It coordinates storage minimization, heterogeneous content processing, intelligent discovery, authenticated original-path access, and verified recovery through replaceable implementations. `RW-MVP-1` is its first read-only managed-archive and search profile.
+Cairn is a self-hosted, NAS-first content-aware managed data layer. It coordinates storage minimization, heterogeneous content processing, intelligent discovery, authenticated original-path access, and verified recovery through replaceable implementations. `RW-MVP-1` is its first read-only managed-archive and search profile.
 
 The reference deployment is a Linux-based NAS or server. Platform- and filesystem-specific source capture remains isolated behind independently qualified profiles; no capture mechanism defines the product-wide data model or release.
 
@@ -10,7 +10,7 @@ The architecture follows a kernel-and-userland model:
 
 - A small authoritative core owns identities, accepted decisions, provenance, transactions, verification, namespace meaning, and recovery semantics.
 - Versioned extensions own algorithms that should improve independently. The stable seams are `CaptureDriver`, capability-oriented `Processor`, `RepositoryDriver`, `IndexProvider`, `QueryProvider`, and the later `RetrieverDriver`. Learned classification, parsing, extraction, enrichment, fingerprinting, transformation, validation, and index preparation are conceptual roles within `Processor`, not separate public protocols.
-- A complete reference distribution ships strong defaults, including the pinned local semantic profile. RestoreWeave MUST remain operational for exact ingest and recovery without third-party plugins or an external automation harness, while the default discovery experience includes its bundled model and local vector store.
+- A complete reference distribution ships strong defaults, including the pinned local semantic profile. Cairn MUST remain operational for exact ingest and recovery without third-party plugins or an external automation harness, while the default discovery experience includes its bundled model and local vector store.
 
 The core MUST retain an exact, verifiable path for readable bytes when an optional processor or provider is absent, fails, or does not understand the content. Storage reduction and semantic enrichment are first-class product values, but neither may silently weaken recoverability.
 
@@ -18,7 +18,7 @@ The normative authority boundary and compatibility policy are defined in [Core K
 
 ## 2. Product shape
 
-RestoreWeave presents one authenticated original-path namespace and one durable subject model across heterogeneous sources, representations, storage targets, processing outputs, and discovery indexes. `RW-MVP-1` projects that namespace through a read-only managed-archive profile.
+Cairn presents one authenticated original-path namespace and one durable subject model across heterogeneous sources, representations, storage targets, processing outputs, and discovery indexes. `RW-MVP-1` projects that namespace through a read-only managed-archive profile.
 
 For an operator, the product provides:
 
@@ -31,7 +31,7 @@ For an operator, the product provides:
 - Exact browse, bounded reads, verification, recovery export, and clean restore even when every optional model and search derivative is unavailable.
 - CLI and local read-only MCP interfaces for humans and automation clients; optional WebUI and REST adapters may later bind the same operations.
 
-RestoreWeave does not require a visual node editor. A UI may expose presets, checkboxes, policies, and expert overrides, while the controller selects bounded processing routes. Additional placement targets, semantic providers, multimodal processing, and alternate gateways are staged capabilities over the same durable identities.
+Cairn does not require a visual node editor. A UI may expose presets, checkboxes, policies, and expert overrides, while the controller selects bounded processing routes. Additional placement targets, semantic providers, multimodal processing, and alternate gateways are staged capabilities over the same durable identities.
 
 ## 3. Authority boundary
 
@@ -56,7 +56,7 @@ These semantics remain stable even when every algorithmic implementation changes
 
 ### 3.2 Replaceable extensions and adapters
 
-RestoreWeave exposes exactly these stable logical extension seams:
+Cairn exposes exactly these stable logical extension seams:
 
 - `CaptureDriver` presents bounded source views and consistency evidence.
 - `Processor` advertises typed capabilities for learned classification, parsing, extraction, enrichment, fingerprinting, transformation, validation, and index preparation.
@@ -69,7 +69,7 @@ One executable or package MAY implement several seams. In particular, one implem
 
 Learned classification, parsing, extraction, enrichment, fingerprinting, transformation, validation, and index preparation remain useful logical pipeline stages. They are `Processor` capability roles, not separate stable public wire ABIs. Placement is performed through `RepositoryDriver`; index generation through `IndexProvider`; within-generation query planning and ranking through `QueryProvider`; cross-provider fusion through the host-owned query broker.
 
-RestoreWeave also delegates the following presentation and control concerns without making them stable storage-algorithm seams:
+Cairn also delegates the following presentation and control concerns without making them stable storage-algorithm seams:
 
 - External tools that consume export manifests or authorized `FileAccess` streams.
 - WebUI, REST, desktop, automation, and fleet-management adapters.
@@ -90,7 +90,7 @@ flowchart TB
     CLI --> Commands
     MCP --> Commands
 
-    Commands --> Core["Authoritative RestoreWeave Core"]
+    Commands --> Core["Authoritative Cairn Core"]
     Core <--> Journal["Transaction journal and decision ledger"]
     Core <--> Records["Portable RRF records"]
     Core <--> Namespace["SnapshotTree and FileAccess"]
@@ -329,7 +329,7 @@ Clean recovery begins from a valid publication marker, authenticates the bound p
 
 `FileAccess` opens the representation selected for one namespace entry. An empty or default selector means the authoritative exact representation. It never means “return something similar.” Approximate, normalized, preview, or reacquired representations require explicit selection and authorization.
 
-The reference distribution bundles export-manifest materialization over these interfaces. RestoreWeave does not implement FUSE, SMB, NFS, WebDAV, S3-compatible, media, database-like, or writable gateways. External tools may consume the resulting directory or authorized read stream; none receives repository-private object access or authority to reinterpret the namespace.
+The reference distribution bundles export-manifest materialization over these interfaces. Cairn does not implement FUSE, SMB, NFS, WebDAV, S3-compatible, media, database-like, or writable gateways. External tools may consume the resulting directory or authorized read stream; none receives repository-private object access or authority to reinterpret the namespace.
 
 ## 10. Search and semantic extensions
 
@@ -358,7 +358,7 @@ Platform-specific behavior belongs in profiles and drivers:
 - Live local, SMB, and NFS trees with explicit non-atomic consistency claims.
 - Object and repository imports.
 
-Failure of an optional snapshot driver MAY reduce the available consistency profile, but it MUST NOT be mislabeled or silently substituted. No optional platform driver defines RestoreWeave or blocks another qualified NAS/server release.
+Failure of an optional snapshot driver MAY reduce the available consistency profile, but it MUST NOT be mislabeled or silently substituted. No optional platform driver defines Cairn or blocks another qualified NAS/server release.
 
 Storage backends may include local pools, removable media, another NAS, object storage, mature backup repositories, archival tiers, or several failure-independent targets. Placement policies state achieved durability and redundancy rather than inferring them from target count.
 
@@ -404,7 +404,7 @@ Conceptual Processor-stage boundaries do not require separate public protocols o
 
 ## 15. Architectural invariants
 
-1. RestoreWeave is a self-hosted, NAS-first content-aware managed data layer; `RW-MVP-1` is its first read-only managed-archive and search profile, and no platform-specific capture profile defines the product.
+1. Cairn is a self-hosted, NAS-first content-aware managed data layer; `RW-MVP-1` is its first read-only managed-archive and search profile, and no platform-specific capture profile defines the product.
 2. The authoritative core owns identities, decisions, provenance, verification, transactions, namespace meaning, and recovery truth.
 3. The stable replaceable seams are `CaptureDriver`, capability-oriented `Processor`, `RepositoryDriver`, `IndexProvider`, `QueryProvider`, and later `RetrieverDriver`; conceptual Processor roles do not become separate public ABIs.
 4. The reference distribution ships a strong default pipeline rather than an empty plugin host.

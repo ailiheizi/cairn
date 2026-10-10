@@ -4,7 +4,7 @@
 
 ## 1. Current conclusion
 
-RestoreWeave should be built as a NAS-first managed archive and search system over a small authoritative data core, not as an operating-system-specific utility or embedded AI-agent platform.
+Cairn should be built as a NAS-first managed archive and search system over a small authoritative data core, not as an operating-system-specific utility or embedded AI-agent platform.
 
 The product combines:
 
@@ -41,7 +41,7 @@ The current direction keeps the small authoritative center while broadening the 
 
 - **Observed:** inspected in local source, tests, or a primary repository artifact.
 - **Documented:** stated by the project's own documentation but not independently proven end to end.
-- **Inferred:** a RestoreWeave design conclusion drawn from observed or documented mechanisms.
+- **Inferred:** a Cairn design conclusion drawn from observed or documented mechanisms.
 - **Historical conclusion:** a decision that informed the architecture but is no longer the current product recommendation.
 
 Attention signals such as stars and discussion counts are not treated as demand, correctness, or production-readiness evidence.
@@ -65,9 +65,9 @@ Decision-changing lesson:
 
 > An intelligent planner may choose which typed operation to request; deterministic adapters execute it and return normalized evidence.
 
-For RestoreWeave, this pattern applies to external research, metadata enrichment, learned detection, and other optional processing. The core needs typed stage and command contracts, input and output identities, provenance, idempotency, cancellation, budgets, and capability grants. It does not need to own a research brain or model-provider runtime.
+For Cairn, this pattern applies to external research, metadata enrichment, learned detection, and other optional processing. The core needs typed stage and command contracts, input and output identities, provenance, idempotency, cancellation, budgets, and capability grants. It does not need to own a research brain or model-provider runtime.
 
-Siftline is suitable as an external research client or as an implementation behind a bounded enrichment stage. It is not the RestoreWeave storage runtime or authority layer.
+Siftline is suitable as an external research client or as an implementation behind a bounded enrichment stage. It is not the Cairn storage runtime or authority layer.
 
 ### 4.2 Poiema
 
@@ -88,7 +88,7 @@ Decision-changing lesson:
 
 > The UI and intelligent behavior are projections over durable state and rules; external components may propose bounded work while deterministic host code owns effects and acceptance.
 
-RestoreWeave may borrow outcome-first interaction, durable operations, reconciliation, reviewed changes, and narrow context-adapter patterns. It should not adopt Poiema's task runtime as a storage dependency. Direct code reuse requires AGPL compatibility or separate rights; clean-room adaptation of architecture is safer for a differently licensed product.
+Cairn may borrow outcome-first interaction, durable operations, reconciliation, reviewed changes, and narrow context-adapter patterns. It should not adopt Poiema's task runtime as a storage dependency. Direct code reuse requires AGPL compatibility or separate rights; clean-room adaptation of architecture is safer for a differently licensed product.
 
 ### 4.3 Weft
 
@@ -107,27 +107,27 @@ Observed at audited commit `b91b9c7a6cf30bf54abf36b479eaafff4100d8e8`:
 
 Decision-changing lesson:
 
-RestoreWeave may borrow capability-registry, manifest, generation, verification, activation, rollback, and protocol-adapter patterns. It should not place byte, namespace, placement, verification, retention, or deletion authority inside a general package or agent runtime.
+Cairn may borrow capability-registry, manifest, generation, verification, activation, rollback, and protocol-adapter patterns. It should not place byte, namespace, placement, verification, retention, or deletion authority inside a general package or agent runtime.
 
 Weft may be:
 
 - An optional external AI control plane.
-- A client of RestoreWeave CLI or MCP.
+- A client of Cairn CLI or MCP.
 - A source of package lifecycle and capability negotiation patterns.
 - A host for non-authoritative enrichment or planning components when capability isolation is sufficient.
 
-Broad algorithm replaceability does not make RestoreWeave equivalent to Weft. RestoreWeave has a fixed storage-domain contract; Weft composes general capabilities.
+Broad algorithm replaceability does not make Cairn equivalent to Weft. Cairn has a fixed storage-domain contract; Weft composes general capabilities.
 
 ## 5. Retained product and implementation references
 
 The following references materially changed the product decision. Their mechanisms remain relevant even where the original product conclusion was superseded.
 
-| Reference | Observed or documented mechanism | Current RestoreWeave boundary |
+| Reference | Observed or documented mechanism | Current Cairn boundary |
 | --- | --- | --- |
 | Siftline | Typed deterministic sensors behind a research brain, normalized evidence, cache, and ledger | External enrichment or research client; not storage authority |
 | Poiema | Outcome-first durable tasks, reviewed outputs, typed daemon, durable effects | Borrow durable operation and review patterns; keep storage truth independent; AGPL code boundary |
 | [Weft](https://github.com/ailiheizi/weft) | Capability registry, packages, generations, rollback, MCP client, and agent runtime | Optional control plane and plugin-lifecycle reference; never storage authority |
-| [Kopia](https://github.com/kopia/kopia) | Content-addressed snapshots, deduplication, compression, policies, verification, selective restore, and mounted snapshot views | Strong reference or candidate placement implementation behind RestoreWeave identities and policy |
+| [Kopia](https://github.com/kopia/kopia) | Content-addressed snapshots, deduplication, compression, policies, verification, selective restore, and mounted snapshot views | Strong reference or candidate placement implementation behind Cairn identities and policy |
 | [Immich](https://github.com/immich-app/immich) | Media catalog, CLIP-style search, OCR, tags, metadata, and asynchronous processing | Strong semantic-stage and UX reference; model and index state remains replaceable; AGPL boundary |
 | [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) | OCR, versions, tags, custom fields, classifiers, workflows, REST, and opt-in AI metadata suggestions | Strong annotation, extraction, and suggestion-review reference; GPL boundary |
 | [AI File Sorter](https://github.com/hyperfield/ai-file-sorter) | Headless review-only planning, saved JSON plans, independent apply, dry-run, and undo | Borrow propose, review, apply, and rollback UX; AGPL boundary |
@@ -135,7 +135,7 @@ The following references materially changed the product decision. Their mechanis
 | [Magika](https://github.com/google/magika) | Learned content-type classification with confidence behavior | Optional `CLASSIFY_LEARNED` `Processor` capability after suffix and magic evidence; never identity or fidelity authority |
 | [Apache Tika](https://tika.apache.org/) | Broad document detection, metadata, and text extraction | Sandboxed `PARSE` and `EXTRACT` `Processor` capabilities; output is searchable evidence, not structural completeness or recovery proof |
 | [Model Context Protocol](https://github.com/modelcontextprotocol/modelcontextprotocol) | Standard tool and resource exposure for AI clients | Northbound adapter over Core Command ABI; annotations do not grant mutation authority |
-| [A2A](https://github.com/a2aproject/A2A) | Agent Cards, cross-service tasks, streaming, and asynchronous agent interoperability | Optional later adapter; an A2A task must map to a bounded RestoreWeave operation |
+| [A2A](https://github.com/a2aproject/A2A) | Agent Cards, cross-service tasks, streaming, and asynchronous agent interoperability | Optional later adapter; an A2A task must map to a bounded Cairn operation |
 
 Additional processor, codec, vector, workflow, and storage references remain in [Competitor and Component Research](competitor-research.md).
 
@@ -279,7 +279,7 @@ The main risks are operational complexity, plugin fragmentation, and unclear wil
 - Model changes can require expensive reprocessing and alter search behavior. Embeddings are versioned projections, not durable meaning by themselves.
 - Untrusted parsers, codecs, and models expand the security and resource-management surface of a self-hosted NAS.
 - Too many plugin interfaces can create compatibility, decoder-retention, upgrade, and support burdens.
-- Mature storage engines already provide deduplication, compression, encryption, snapshots, and verification. RestoreWeave must add clear cross-engine namespace, policy, provenance, processing, and discovery value rather than reimplementing their private formats.
+- Mature storage engines already provide deduplication, compression, encryption, snapshots, and verification. Cairn must add clear cross-engine namespace, policy, provenance, processing, and discovery value rather than reimplementing their private formats.
 - Media-specific approximate replacement can save substantial storage but introduces difficult quality, decoder, and long-term recoverability questions.
 - Traditional NAS search, photo, and document applications may already solve enough of the discovery problem for some operators.
 - No retained public source proves willingness to pay for the complete combination or willingness to entrust automatic lossy substitution and deletion.
@@ -288,7 +288,7 @@ The roadmap should narrow if field tests show weak storage savings, excessive co
 
 ## 13. Naming conclusion
 
-No immediate rename is required. **RestoreWeave** may remain the working product name while positioning language changes.
+No immediate rename is required. **Cairn** may remain the working product name while positioning language changes.
 
 The name still describes a graph that weaves source observations, exact bytes, representations, metadata, storage placements, annotations, indexes, and verification evidence into a recoverable whole. However, product copy should lead with storage reduction and intelligent discovery rather than Mac recovery.
 

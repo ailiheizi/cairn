@@ -2,11 +2,11 @@
 
 ## 1. Purpose
 
-Semantic discovery is part of RestoreWeave's product value. A self-hosted operator should be able to find data by path, metadata, text, meaning, similarity, relationship, or personal annotation while retaining a recoverable original-path projection.
+Semantic discovery is part of Cairn's product value. A self-hosted operator should be able to find data by path, metadata, text, meaning, similarity, relationship, or personal annotation while retaining a recoverable original-path projection.
 
-Concrete AI models, embedding stacks, CLIP implementations, OCR engines, speech recognizers, vector databases, and ranking algorithms remain replaceable. RestoreWeave standardizes the subject, artifact, indexing, query, provenance, authorization, and lifecycle contracts that let those implementations change safely.
+Concrete AI models, embedding stacks, CLIP implementations, OCR engines, speech recognizers, vector databases, and ranking algorithms remain replaceable. Cairn standardizes the subject, artifact, indexing, query, provenance, authorization, and lifecycle contracts that let those implementations change safely.
 
-RestoreWeave is not a general AI harness. It does not need an embedded agent loop, prompt framework, model router, conversation store, agent memory, A2A runtime, or autonomous workflow engine.
+Cairn is not a general AI harness. It does not need an embedded agent loop, prompt framework, model router, conversation store, agent memory, A2A runtime, or autonomous workflow engine.
 
 The discovery extension flow has four bounded participants:
 
@@ -57,7 +57,7 @@ No AI component becomes authority merely because it produced a confident score, 
 
 ## 3. First-class discovery capability
 
-RestoreWeave MUST expose a provider-neutral discovery contract even though its initial implementation is hybrid lexical, structured, and local semantic.
+Cairn MUST expose a provider-neutral discovery contract even though its initial implementation is hybrid lexical, structured, and local semantic.
 
 The reference distribution MUST support:
 
@@ -362,7 +362,7 @@ An external AI harness MAY:
 
 There is no AI-specific authority path. A prompt, tool description, model identity, or claimed role cannot grant permission.
 
-RestoreWeave MUST NOT require or persist:
+Cairn MUST NOT require or persist:
 
 - AgentRun or agent-memory resources.
 - Prompt or conversation state.
@@ -488,6 +488,6 @@ Experimental representations remain behind explicit recovery contracts, independ
 10. A remote model cannot receive content without an explicit bounded egress profile.
 11. Instruction-like content cannot alter tool authority, processor capabilities, query scope, network destinations, or plan policy.
 12. The CLI exposes the full authorized operation set, and operations included in the initial bounded read-only MCP subset have identical discovery, authorization, and audit semantics.
-13. An external AI harness can inspect, search, propose, and invoke authorized operations without RestoreWeave embedding a general agent runtime.
+13. An external AI harness can inspect, search, propose, and invoke authorized operations without Cairn embedding a general agent runtime.
 14. Search status distinguishes stale, partial, degraded, unavailable, and fully current provider generations.
 15. Failure of the required default local semantic branch makes the installation visibly degraded and prevents default-experience qualification; failure of an additional optional semantic branch affects only its declared discovery coverage. A profile-specific processor requirement may block only that branch, derived representation, or stronger profile claim and never the mandatory exact lane for readable bytes.

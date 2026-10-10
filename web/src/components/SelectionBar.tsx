@@ -333,7 +333,7 @@ export function SelectionBar({ count, subjects, unresolvedCount = 0, workspaceID
     if (reportBusy || subjects.length === 0) return;
     const workspace = workspaceID.trim();
     if (!workspace) {
-      setReportState({ state: "FAILED", text: t("No published workspace is reported by this service in this browser yet.") });
+      setReportState({ state: "FAILED", text: t("This service has not reported any published content in this browser yet.") });
       return;
     }
     const token = ++reportToken.current;

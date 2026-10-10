@@ -1,4 +1,4 @@
-// Browser-side domain types for the RestoreWeave client projection.
+// Browser-side domain types for the Cairn client projection.
 //
 // These are the shapes the bounded local adapter returns and the shapes the
 // surfaces render. They are declarations only: no behavior, no daemon call, no

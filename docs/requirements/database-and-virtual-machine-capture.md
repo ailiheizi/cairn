@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-RestoreWeave must treat a database or virtual machine as a versioned stateful collection whose recovery depends on coordinated state, ordered journals, configuration, keys, external dependencies, and executable validation. Copying the visible files is not sufficient evidence of application-consistent recovery.
+Cairn must treat a database or virtual machine as a versioned stateful collection whose recovery depends on coordinated state, ordered journals, configuration, keys, external dependencies, and executable validation. Copying the visible files is not sufficient evidence of application-consistent recovery.
 
 This document defines later-phase requirements for:
 
@@ -52,7 +52,7 @@ Under `RW-MVP-1`, database files, virtual disks, configuration files, and relate
 9. Capture failure must not leave a database in backup mode, a guest filesystem frozen, a VM paused, or source retention advanced without a bounded and audited recovery action.
 10. Ordinary manifests and API responses contain secret references and redacted identifiers, never plaintext database credentials, encryption keys, vTPM secrets, memory contents, or hypervisor tokens.
 11. Recovery validation is isolated from production identities, networks, storage, schedulers, replication peers, and external side effects unless each dependency is deliberately simulated or separately authorized.
-12. Source-native backup and snapshot identifiers are evidence, not permanent RestoreWeave content identities.
+12. Source-native backup and snapshot identifiers are evidence, not permanent Cairn content identities.
 
 ## 4. Common stateful-workload model
 
@@ -260,7 +260,7 @@ Profiles must define the precise inclusivity of start and end positions. Ambiguo
 
 ### 9.1 Tagged log positions
 
-RestoreWeave stores engine positions as tagged values, never as an untyped integer or timestamp. Supported profile variants may include:
+Cairn stores engine positions as tagged values, never as an untyped integer or timestamp. Supported profile variants may include:
 
 - PostgreSQL LSN plus timeline and history identity.
 - MySQL or MariaDB GTID set, binary-log file and offset, and required redo metadata.
@@ -277,7 +277,7 @@ An ordered-journal record contains:
 - Source system, timeline or incarnation, stream or thread, segment identity, and immutable content identity.
 - Native start and end positions with explicit inclusive or exclusive semantics.
 - Predecessor and successor evidence where the engine provides it.
-- Native checksum, RestoreWeave hash, length, archive time, and source location.
+- Native checksum, Cairn hash, length, archive time, and source location.
 - Compression or encryption representation, key reference, and decode dependencies.
 - Acquisition method, archive command or agent identity, retries, duplicate observations, and final durable placements.
 - Whether the segment is complete, partial, still open, synthesized, repaired, or superseded.
@@ -316,7 +316,7 @@ RPO health is derived from the latest durable and independently readable continu
 
 ### 9.5 Source retention
 
-RestoreWeave must not request source log deletion, slot advancement, archive pruning, or backup expiration until:
+Cairn must not request source log deletion, slot advancement, archive pruning, or backup expiration until:
 
 - A qualifying base backup and every required journal interval have the objective's required independent durable placements.
 - Hash, decode, ordering, and chain validation pass.
@@ -440,7 +440,7 @@ The VM configuration and disk set are one collection revision. A disk image with
 
 ### 13.2 Snapshot and delta chains
 
-For each VM disk chain, RestoreWeave must retain:
+For each VM disk chain, Cairn must retain:
 
 - Ordered node identities from a self-contained base through the selected recovery node.
 - Exact parent digest and source-native parent identity for every delta.
@@ -520,7 +520,7 @@ VM capture must independently represent:
 
 Secrets and private key material use dedicated encrypted objects or secret-store references. Hashes of unavailable keys prove neither possession nor recoverability.
 
-When device-bound state is non-exportable, the recovery contract records `BLOCKED_DEVICE_DEPENDENCY`, the exact affected components, supported manual recovery, and any weaker acceptable cold-boot outcome. RestoreWeave must not claim portability or bypass activation, Secure Boot, TPM sealing, DRM, or access controls.
+When device-bound state is non-exportable, the recovery contract records `BLOCKED_DEVICE_DEPENDENCY`, the exact affected components, supported manual recovery, and any weaker acceptable cold-boot outcome. Cairn must not claim portability or bypass activation, Secure Boot, TPM sealing, DRM, or access controls.
 
 ## 16. Attached volumes and cross-component consistency
 
@@ -559,7 +559,7 @@ A portability plan inventories and validates:
 
 Converters are versioned `Processor.TRANSFORM` capabilities with golden images, byte-coverage evidence, deterministic configuration, and independent boot and filesystem `Processor.VALIDATE` profiles. A successful conversion command is not a passing portability result.
 
-Unsupported devices or keys remain explicit blockers. RestoreWeave does not silently remove them, substitute a different firmware, reset a vTPM, change boot mode, or inject drivers unless the signed restore plan and component contract authorize that transformation.
+Unsupported devices or keys remain explicit blockers. Cairn does not silently remove them, substitute a different firmware, reset a vTPM, change boot mode, or inject drivers unless the signed restore plan and component contract authorize that transformation.
 
 ## 18. Isolated boot and application-health validation
 
@@ -598,7 +598,7 @@ Validation records preserve console logs, structured probe results, crash eviden
 
 ### 19.1 Privileged control
 
-Database and hypervisor capture often requires high-impact privileges. RestoreWeave must:
+Database and hypervisor capture often requires high-impact privileges. Cairn must:
 
 - Use short-lived, subject-scoped capability tokens and secret references.
 - Separate read-only discovery, backup, guest-quiesce, snapshot, export, restore, and destructive-retention identities.
@@ -673,7 +673,7 @@ The snapshot-chain record binds every base and delta content identity, parent re
 
 ### 20.4 Publication and portability
 
-- Manifest records bind stable RestoreWeave identities and signed placement receipts, not mutable VM inventory paths, engine backup names, or source repository paths.
+- Manifest records bind stable Cairn identities and signed placement receipts, not mutable VM inventory paths, engine backup names, or source repository paths.
 - Large database logs, disks, memory, and backup payloads remain external content-addressed representations and do not traverse the control API.
 - Every record has a schema ID, canonical digest, profile digest, producer identity, creation time, sensitivity label, and complete dependency references.
 - The portable recovery closure includes the minimum engine, log reader, hypervisor disk reader, converter, firmware, schema, extension, key instructions, validation profiles, and conformance vectors needed by the contract.
@@ -816,7 +816,7 @@ A source-resume or guest-thaw uncertainty is an operational emergency independen
 ### Phase 1: `RW-MVP-1` managed-archive exact executor
 
 - All stateful capture features in this document remain excluded from the MVP release gate.
-- Ordinary exact repository placement may preserve database and VM files under the generic filesystem profile, but RestoreWeave claims no PITR, native database consistency, guest quiesce, complete snapshot chain, VM bootability, or application health.
+- Ordinary exact repository placement may preserve database and VM files under the generic filesystem profile, but Cairn claims no PITR, native database consistency, guest quiesce, complete snapshot chain, VM bootability, or application health.
 - The API rejects stateful mutation and validation operations as unsupported by the active compatibility profile.
 
 ### Phase 2: Catalog and controlled prototypes

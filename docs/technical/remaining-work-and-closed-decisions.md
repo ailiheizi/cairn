@@ -7,7 +7,7 @@
 
 ## 1. Current product boundary
 
-RestoreWeave is a content protection, description, discovery, export, and
+Cairn is a content protection, description, discovery, export, and
 recovery plane. It is not a writable NAS, mount service, media server, OpenList
 fork, or client suite.
 
@@ -150,7 +150,7 @@ profile. They are not current release promises:
 
 The product direction for future named storage schemes is recorded in
 [ADR-009](build-stack-and-architecture-selection.md#adr-009-storage-schemes-and-derived-index-status)
-and summarized in the [RestoreWeave Wiki](../wiki/README.md). The current
+and summarized in the [Cairn Wiki](../wiki/README.md). The current
 read-only capacity and per-dimension index-status projections are implemented
 and tested; the named-scheme configuration remains deferred. This direction
 does not add a second catalog, change exact identity, or move CLIP/music
@@ -186,17 +186,17 @@ This section is informative only. It records a boundary the operator raised; it
 adds no MVP scope, reorders no phase, authorizes no LinkGroup or adapter work,
 and awards no completion credit.
 
-Operators have asked for RestoreWeave content to reach Salt Player, common NAS
+Operators have asked for Cairn content to reach Salt Player, common NAS
 playback surfaces, Kazumi, and Animeko. These are external tools, not core
 scope. [docs/README.md](../README.md) states the governing rule verbatim:
 "External tools may present a materialized export or authorized read stream;
-they are not RestoreWeave storage or plugin interface families." The excluded
+they are not Cairn storage or plugin interface families." The excluded
 surfaces already recorded in section 7 above (lines 157-158: embedded players,
 readers, or media applications; automatic external reacquisition or autonomous
 source deletion) and in the `AGENTS.md` excluded-surface list apply unchanged.
 
 Such a tool may only consume a materialized export or an authorized read
-stream. RestoreWeave MUST NOT grow a media server, DLNA/UPnP, SMB/NFS/WebDAV/S3
+stream. Cairn MUST NOT grow a media server, DLNA/UPnP, SMB/NFS/WebDAV/S3
 gateway, transcoder, embedded player, scraper, torrent, or automatic
 reacquisition surface to serve one.
 

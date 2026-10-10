@@ -571,7 +571,7 @@ selection bar, and the details inspector column. */
 }
 
 /* Ant Design supplies the settings shell primitives; keep the visual language
-   aligned with RestoreWeave while letting its desktop Layout/Menu own sizing
+   aligned with Cairn while letting its desktop Layout/Menu own sizing
    and keyboard interaction. */
 
 /* The workspace rail. The later single-column `.workspace:not(.detail-active)`

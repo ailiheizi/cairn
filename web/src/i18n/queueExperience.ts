@@ -27,6 +27,6 @@ export const queueExperience: Record<string, string> = {
   // Playback-eligibility failures. AudioPlayer.tsx maps these typed codes to the
   // English sentences before t(); keep them byte-identical to
   // PLAYBACK_ERROR_TEXTS in AudioPlayer.tsx.
-  "This track belongs to a different workspace.": "曲目不属于当前工作区。",
+  "This track is from content other than what is open here.": "曲目来自此处打开内容之外的其他内容。",
   "The identity, format, or size of this track does not meet the playback conditions.": "曲目身份、格式或大小不符合播放条件。",
 };

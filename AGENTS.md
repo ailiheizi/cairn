@@ -1,11 +1,11 @@
-# RestoreWeave Agent Guardrails
+# Cairn Agent Guardrails
 
 This file applies to the entire repository. Read it before planning, editing, or
 delegating work. Preserve unrelated worktree changes.
 
 ## Product North Star
 
-RestoreWeave is a single-person self-hosted personal-content platform. Its
+Cairn is a single-person self-hosted personal-content platform. Its
 trusted kernel is a content, description, discovery, export, and recovery
 plane. Dedicated first-party client experiences share that kernel. It is not
 a normal filesystem, mount service, media-server gateway, or OpenList fork.
@@ -41,7 +41,7 @@ Music, Overview) sell the product better than many half-finished ones.
 
 ## Convergence Phase
 
-RestoreWeave is currently in a convergence phase: finish and polish the
+Cairn is currently in a convergence phase: finish and polish the
 admitted core loop and the admitted first-party client surfaces before adding
 new scope. Prefer closing an existing gap (recovery, trust, a rough edge in an
 admitted UX surface) over starting a new surface or integration. A runtime

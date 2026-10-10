@@ -11,7 +11,7 @@ The restore manifest is the durable, authenticated contract that explains:
 - Which representations, sources, and recipes are available.
 - Which validators and approvals apply.
 - What claim was requested and achieved.
-- How recovery can proceed without the original RestoreWeave control plane.
+- How recovery can proceed without the original Cairn control plane.
 
 The manifest must never reduce exact identity, source identity, normalized content, perceptual similarity, function, and semantics to one vague equivalence field.
 
@@ -25,7 +25,7 @@ The manifest combines useful mechanisms from:
 - DataLad and Nix provenance and replayable recipes.
 - OCFL logical-path and immutable-version inventories.
 
-These influences provide useful structures but do not replace RestoreWeave's recovery contracts and validator profiles.
+These influences provide useful structures but do not replace Cairn's recovery contracts and validator profiles.
 
 ## 3. Manifest-level fields
 
@@ -224,7 +224,7 @@ Every stored representation must declare exactly one ownership mode. The record 
 
 ### 9.1 ENGINE_MANAGED_OBJECTS
 
-The external engine owns chunking, deduplication, compression, encryption, packs, physical object names, and implementation-private object IDs. RestoreWeave records:
+The external engine owns chunking, deduplication, compression, encryption, packs, physical object names, and implementation-private object IDs. Cairn records:
 
 - Stable engine storage-binding ID.
 - Engine, adapter, reader, repository-format, and configuration-schema identities and an immutable digest of format-affecting, location-independent configuration.
@@ -232,7 +232,7 @@ The external engine owns chunking, deduplication, compression, encryption, packs
 - Required Capsule Core reader, configuration-schema, and historical format-reader references.
 - One or more `physical_placement_refs` that resolve the current or historical repository instance, account, engine restore-point handle, receipts, fencing, retention, and verification state through the placement ledger.
 
-Engine-internal chunk, pack, or object IDs are optional diagnostic data and must never become permanent RestoreWeave content or representation identity.
+Engine-internal chunk, pack, or object IDs are optional diagnostic data and must never become permanent Cairn content or representation identity.
 
 Every engine restore point created from a captured source binds the exact `CaptureSetRecord` ID and canonical digest in the engine request, authenticated engine receipt, independent verification, and placement-ledger creation event. Multiple repository restore points may satisfy one `CRASH_CONSISTENT_VIEW` generation only when all of them bind the same capture-set digest.
 
@@ -240,7 +240,7 @@ Every engine restore point created from a captured source binds the exact `Captu
 
 RW-MVP-1 does not implement or qualify this ownership mode. The schema is retained for a possible later native-storage profile.
 
-RestoreWeave owns plaintext chunk identities, compression, immutable pack assembly, authenticated encryption, pack-object identity, and immutable repair-coding semantics. RestoreWeave records:
+Cairn owns plaintext chunk identities, compression, immutable pack assembly, authenticated encryption, pack-object identity, and immutable repair-coding semantics. Cairn records:
 
 - Plaintext content and chunk identities, logical and encoded lengths, codec envelope, and compression parameters.
 - Immutable pack-object ID, authenticated-encryption envelope, encoded-object digest, and authenticated index or footer digest.
@@ -443,7 +443,7 @@ Required BitTorrent rules:
 - Display name, tracker URL, search result, and file name are discovery evidence only.
 - Strictly validate bencoding and calculate each infohash over the raw encoded `info` dictionary. The raw bytes or an authenticated object containing them must be retained when policy requires deterministic offline verification.
 - The full v2 infohash must be retained. A 20-byte truncated tracker, DHT, or wire identifier is discovery evidence and cannot satisfy metainfo identity.
-- A BitTorrent infohash proves integrity binding to metainfo; it does not by itself authenticate the publisher, rights, safety, or user intent. Publisher and RestoreWeave capture attestations must be represented separately.
+- A BitTorrent infohash proves integrity binding to metainfo; it does not by itself authenticate the publisher, rights, safety, or user intent. Publisher and Cairn capture attestations must be represented separately.
 - `metainfo` is a strict tagged union. `retention_mode=RETAINED` requires non-null `retained`, null `reacquire_only`, an authenticated raw-info object reference and digest, and `storage_mode=EMBEDDED|OBJECT_REFERENCE`. Its nested `torrent_file_state` is `RETAINED` with non-null full-torrent object reference and digest, or `NOT_CAPTURED` with both null; this permits exact BEP 9 information-dictionary retention when no original root metainfo bytes were obtained. `retention_mode=REACQUIRE_ONLY` requires null `retained` and a non-null `reacquire_only` record containing an exact omission-approval reference, acquisition-profile digest, last successful cold-drill reference and time, expected metadata identities, whether required v2 piece layers must be reacquired, and next drill deadline. Fields from the variants must not be mixed.
 - Every retained torrent metainfo, raw-info, and piece-layer reference must resolve to an authenticated stored-object record covered by the signed manifest. `INTEGRITY_ONLY` means publisher authenticity is unknown; it does not permit unauthenticated local metadata.
 - The binding must set positive policy limits before parsing or network acquisition. Numeric values in the illustrative structure are examples, not universal defaults. `max_bep9_info_bytes` bounds only the BEP 9 raw `info` dictionary; `max_full_metainfo_bytes` separately bounds complete `.torrent` bytes; `max_v2_piece_layers_bytes` separately bounds the root-level v2 piece-layer dictionary. One limit must not be reused as an implicit allowance for another class.
@@ -1012,7 +1012,7 @@ The append-only authenticated physical placement ledger maps immutable represent
 
 Each placement creation is an immutable ledger event covered by `entry_set_digest`. It binds placement and event IDs, representation and content IDs, candidate manifest digest, publication domain and candidate generation, writer and fencing domain, creation generation, ownership mode, failure-independence group, initial state, immutability evidence, and exactly one ownership-mode payload. It must not contain a future `valid_through`, later readback result, or mutable current-health field.
 
-An `ENGINE_MANAGED_OBJECTS` placement creation contains engine, adapter, repository, account, engine snapshot or restore-point handle, exact CaptureSetRecord ID and digest when source capture applies, authenticated engine receipt and digest, receipt fencing token, initial engine verification, independent RestoreWeave creation-time restore-verification reference, and reader Capsule Core ref. It does not require or promote engine-private object locators.
+An `ENGINE_MANAGED_OBJECTS` placement creation contains engine, adapter, repository, account, engine snapshot or restore-point handle, exact CaptureSetRecord ID and digest when source capture applies, authenticated engine receipt and digest, receipt fencing token, initial engine verification, independent Cairn creation-time restore-verification reference, and reader Capsule Core ref. It does not require or promote engine-private object locators.
 
 A `RESTOREWEAVE_PACKS` placement creation contains `RepositoryDriver` profile and repository, account, region, immutable backend locator, pack-object ID, encoded length, encoded-object digest, authenticated-encryption and index/footer digests, storage receipt, and initial independent readback result.
 
@@ -1055,7 +1055,7 @@ A Capsule Core must not reference a snapshot manifest, publication record, place
 
 For a declared offline recovery closure, every required core and all of its executable dependencies must be embedded in the closure or stored as authenticated protected objects reachable through the physical-placement root committed by the publication or a verified signed successor lineage. `EXTERNAL_ONLY`, registry-only, DNS-only, or network-rebuild-only cores are forbidden. Reproducible rebuild is sufficient only when the complete source, toolchain, dependencies, signature-verification tooling, non-authoritative trust metadata, and build instructions are inside the offline closure. Any trust anchor that authenticates that closure must still be retained independently; a key carried only by the closure cannot establish its own trust.
 
-The closure must include at least one independently replicated Recovery Bootstrap Seed in a documented baseline format that can be extracted without a RestoreWeave-specific repository reader, codec, plugin registry, network service, or the Capsule Core it is intended to load. The seed contains exact signed envelope and current RecoveryHeadWitness copies, pinned subordinate trust anchors, canonicalization and signature-verification material, the minimum manifest and placement-checkpoint reader, object-extraction instructions, and any first-stage executable or source needed to load the initial Capsule Core. Its required decryption or key-unwrapping prerequisites must be available out of band and must not depend on that same core.
+The closure must include at least one independently replicated Recovery Bootstrap Seed in a documented baseline format that can be extracted without a Cairn-specific repository reader, codec, plugin registry, network service, or the Capsule Core it is intended to load. The seed contains exact signed envelope and current RecoveryHeadWitness copies, pinned subordinate trust anchors, canonicalization and signature-verification material, the minimum manifest and placement-checkpoint reader, object-extraction instructions, and any first-stage executable or source needed to load the initial Capsule Core. Its required decryption or key-unwrapping prerequisites must be available out of band and must not depend on that same core.
 
 Every seed is content-addressed and carries a signed canonical inventory of member path, media type, length, and digest plus the envelope, witness, reader, and Capsule Core digests. The seed-signing root fingerprint and threshold policy must be independently known out of band or established by equivalent physically authenticated media; a root supplied only inside the seed is not trusted. Seed-contained subordinate anchors are accepted only after the seed signature and inventory validate against that external root. Clean-room starting assumptions therefore include the baseline extractor, the out-of-band root fingerprint or physical-authentication procedure, threshold policy, and required key-recovery material.
 
@@ -1114,7 +1114,7 @@ The signed record binds publication domain, recovery-set generation, predecessor
 
 ### 19.3 Recovery Bootstrap Envelope
 
-After atomic snapshot publication, RestoreWeave creates a separately signed Recovery Bootstrap Envelope. It points one-way to:
+After atomic snapshot publication, Cairn creates a separately signed Recovery Bootstrap Envelope. It points one-way to:
 
 - The activated SnapshotPublicationRecord, its canonical digest, and the authenticated AtomicPublicationReceipt.
 - The signed READY_TO_COMMIT manifest and manifest digest.
@@ -1149,7 +1149,7 @@ BOOTSTRAP_PENDING
 
 `COMMITTED` and `COLD_VERIFIED` are independent facts. A committed generation below `COLD_VERIFIED` is not protection-healthy and cannot authorize source-only omission, retention reduction, placement or bootstrap-artifact retirement, garbage collection, deletion, destructive destination overwrite, or other destructive lifecycle effects. Preservation-only capture, replication, reconciliation, and bootstrap completion continue.
 
-Before retiring any location or representation needed by an existing Recovery Bootstrap Envelope, Recovery Bootstrap Seed, ControlPlaneRecoverySet, Capsule Core, decoder, or validator, RestoreWeave must publish and independently replicate a successor physical-placement checkpoint, Recovery Bootstrap Envelope, RecoveryHeadWitness, Recovery Bootstrap Seed, `BootstrapSeedSuccessorRecord`, and required `RecoveryArtifactPlacement` records, verify their lineage and cold discovery, and reach `COLD_VERIFIED` before retiring the old path. A COMMITTED snapshot is not eligible for reference-only omission of its protected original or for garbage collection of its prior offline recovery path until the complete current bootstrap set has policy-required independently verified placements.
+Before retiring any location or representation needed by an existing Recovery Bootstrap Envelope, Recovery Bootstrap Seed, ControlPlaneRecoverySet, Capsule Core, decoder, or validator, Cairn must publish and independently replicate a successor physical-placement checkpoint, Recovery Bootstrap Envelope, RecoveryHeadWitness, Recovery Bootstrap Seed, `BootstrapSeedSuccessorRecord`, and required `RecoveryArtifactPlacement` records, verify their lineage and cold discovery, and reach `COLD_VERIFIED` before retiring the old path. A COMMITTED snapshot is not eligible for reference-only omission of its protected original or for garbage collection of its prior offline recovery path until the complete current bootstrap set has policy-required independently verified placements.
 
 ## 20. Portable MVP publication and deferred distributed publication
 
@@ -1158,7 +1158,7 @@ Before retiring any location or representation needed by an existing Recovery Bo
 `RW-MVP-1` stores one exact payload restore point through a qualified mature exact repository and its `RepositoryDriver`, plus two required publication records with the `RECOVERY_CLOSURE` placement role in that repository. Post-commit RRF supplements may be stored beside them, but they are not additional publication commits. Restic may implement this profile, but the manifest contract does not depend on its private format:
 
 1. The signed `PREPARED_CLOSURE` contains or authenticates the RRF root and binds the exact payload receipt, plan digest, platform-neutral capture-set digest, policy revision, explicit exclusions, and authenticated-metadata verification evidence.
-2. After the prepared closure placement is durably observed and reconciled, RestoreWeave signs a `PublicationCommitRecord` with closure subtype `PUBLICATION_COMMIT`.
+2. After the prepared closure placement is durably observed and reconciled, Cairn signs a `PublicationCommitRecord` with closure subtype `PUBLICATION_COMMIT`.
 3. The commit record is stored and reconciled as the second recovery-closure placement. Its valid portable bytes are the logical commit point.
 
 All three roles remain inside the same product-level repository placement and do not constitute redundancy or multiple-placement protection.
@@ -1337,7 +1337,7 @@ Before compare-and-swap, the writer creates, canonically serializes, signs, stor
 }
 ~~~
 
-After the signed record is durable, RestoreWeave computes its canonical digest and validates that the digest resolves to the exact read-back bytes, the signature and signing-key state are valid, the activation intent matches the requested publication domain and pointer transition, the manifest digest resolves to the signed READY_TO_COMMIT manifest, and every committed root matches that manifest and its verified durable objects. Only then may RestoreWeave perform one fenced compare-and-swap from the expected old pointer tuple to `{generation, publication_record_digest}`.
+After the signed record is durable, Cairn computes its canonical digest and validates that the digest resolves to the exact read-back bytes, the signature and signing-key state are valid, the activation intent matches the requested publication domain and pointer transition, the manifest digest resolves to the signed READY_TO_COMMIT manifest, and every committed root matches that manifest and its verified durable objects. Only then may Cairn perform one fenced compare-and-swap from the expected old pointer tuple to `{generation, publication_record_digest}`.
 
 The CAS authority must either repeat those validations atomically or consume a short-lived, single-use signed publication-validation token bound to the exact publication-record digest, manifest digest, root set, publication domain, old pointer, new generation, writer, coordinator epoch, fencing token, and expiry. Validation and token consumption are part of the same atomic decision as the pointer update; an unvalidated, expired, replayed, mismatched, or unresolved record digest cannot become the authoritative head. A successful CAS activates the immutable record as the `COMMITTED` publication; a failed CAS leaves an unpublished candidate that has no restore or retention authority.
 
@@ -1390,7 +1390,7 @@ The manifest signature proves its READY_TO_COMMIT contents. The staged SnapshotP
 
 ### 20.5 Deferred head freshness, rollback, and fork evidence
 
-A valid signed parent chain proves ancestry but does not prove that a repository pointer or Recovery Bootstrap Envelope is the newest one ever published. After each publication, receipt reconciliation, ControlPlaneRecoverySet generation change, envelope replacement, witness-epoch transition, or authoritative physical-placement checkpoint event affecting discovery, eligibility, health, supersession, retention, quarantine, or retirement, RestoreWeave publishes a successor Recovery Bootstrap Envelope when any bound digest changes, then publishes a monotonic signed `RecoveryHeadWitness` to a policy-defined witness set outside the primary repository failure domain, then creates and independently replicates a successor Recovery Bootstrap Seed containing that exact Envelope and Witness. The Seed passes cold package readback and a `POST_PUBLICATION_BOOTSTRAP_DRILL` before the BootstrapSeedSuccessorRecord closes the lineage at `COLD_VERIFIED`.
+A valid signed parent chain proves ancestry but does not prove that a repository pointer or Recovery Bootstrap Envelope is the newest one ever published. After each publication, receipt reconciliation, ControlPlaneRecoverySet generation change, envelope replacement, witness-epoch transition, or authoritative physical-placement checkpoint event affecting discovery, eligibility, health, supersession, retention, quarantine, or retirement, Cairn publishes a successor Recovery Bootstrap Envelope when any bound digest changes, then publishes a monotonic signed `RecoveryHeadWitness` to a policy-defined witness set outside the primary repository failure domain, then creates and independently replicates a successor Recovery Bootstrap Seed containing that exact Envelope and Witness. The Seed passes cold package readback and a `POST_PUBLICATION_BOOTSTRAP_DRILL` before the BootstrapSeedSuccessorRecord closes the lineage at `COLD_VERIFIED`.
 
 ~~~json
 {

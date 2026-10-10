@@ -8,7 +8,7 @@ Neural models can participate in both exact and approximate compression, but the
 - A VAE, VQ-VAE, neural audio codec, image codec, or video tokenizer normally reconstructs an approximation.
 - A latent-variable model may participate in lossless compression only when used in a reversible coding construction such as bits-back coding or when a lossless residual reconstructs the original.
 
-RestoreWeave should expose all of these as later `Processor.TRANSFORM` capabilities, with independent `Processor.VALIDATE` evidence and distinct transformation classes and recovery claims.
+Cairn should expose all of these as later `Processor.TRANSFORM` capabilities, with independent `Processor.VALIDATE` evidence and distinct transformation classes and recovery claims.
 
 ## 2. L3TC and the RWKV memory
 
@@ -78,7 +78,7 @@ Bits-back systems remain experimental recovery dependencies and require:
 
 [CompressAI](https://github.com/InterDigitalInc/CompressAI) provides learned image and video compression models and tooling.
 
-RestoreWeave role:
+Cairn role:
 
 - Experimental lossy image and video `Processor.TRANSFORM` capabilities.
 - Benchmarking rate, distortion, compute, and decoder dependencies.
@@ -90,7 +90,7 @@ Repository license: BSD-3-Clause-Clear.
 
 [EnCodec](https://arxiv.org/abs/2210.13438) is a neural audio codec.
 
-RestoreWeave role:
+Cairn role:
 
 - Low-bitrate proxy.
 - Semantic or perceptual representation.
@@ -200,4 +200,4 @@ Before an experimental codec becomes authoritative:
 7. Define a migration path to a conventional representation.
 8. Demonstrate that plugin removal does not make historical data unreadable.
 
-Neural compression is a valuable plugin family, not the durability foundation of RestoreWeave.
+Neural compression is a valuable plugin family, not the durability foundation of Cairn.

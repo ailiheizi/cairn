@@ -4,7 +4,7 @@
 
 ## 1. Design decision
 
-RestoreWeave uses one authoritative content and recovery plane with many bounded catalog lenses and client experiences.
+Cairn uses one authoritative content and recovery plane with many bounded catalog lenses and client experiences.
 
 ```text
 capture / import

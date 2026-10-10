@@ -14,10 +14,10 @@ workflows when implementation is admitted. Treat a public third-party runtime
 as a later product requiring its own compatibility and security qualification.
 
 DSH/Cordis is a useful architecture reference, particularly for dependency
-lifetimes and visual ownership. It is not selected as a RestoreWeave dependency.
+lifetimes and visual ownership. It is not selected as a Cairn dependency.
 Ordinary feature modules remain a valid alternative if a runtime loader adds
 more work than it removes. The sources below document mechanisms; they do not
-prove that adopting those mechanisms makes RestoreWeave successful or secure.
+prove that adopting those mechanisms makes Cairn successful or secure.
 
 The detailed proposal is [Single-Operator Experience-Pack Design](../technical/single-operator-experience-pack-design.md).
 [ADR-019](../technical/build-stack-and-architecture-selection.md#adr-019-bundled-vertical-client-modules-before-a-runtime-extension-framework)
@@ -49,18 +49,18 @@ measurement or proof of a current platform-wide defect.
 
 ## 3. Retained-source and entailment ledger
 
-Every entry separates a documented observation from the proposed RestoreWeave
+Every entry separates a documented observation from the proposed Cairn
 choice. The relation is direct for the external document's stated mechanism,
 and analogy-only for its suitability here. No ecosystem adoption or causal
 success claim is retained.
 
 | ID / source URL and section | Exact observed content, paraphrased | Proposed claim / primary relation | Entailment and maximum allowed wording | Does not support |
 | --- | --- | --- | --- | --- |
-| R1 — [DSH architecture](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md), Cordis; Profiles and bundles | Services, typed events, and reversible effects are contributed through context; ordered layers compose plugin profiles. | Consider host-managed composition; architecture analogy. | Direct documented design; analogue-only fit. | Stable public access to every internal capability; qualified RestoreWeave runtime. |
+| R1 — [DSH architecture](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md), Cordis; Profiles and bundles | Services, typed events, and reversible effects are contributed through context; ordered layers compose plugin profiles. | Consider host-managed composition; architecture analogy. | Direct documented design; analogue-only fit. | Stable public access to every internal capability; qualified Cairn runtime. |
 | R2 — [DSH services](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/service.md), dependency behavior; service isolation | Required services delay activation; dependents dispose/reload with provider availability; groups can see separate service instances. | Track dependencies and lifetimes; boundary counterexample. | Direct documented semantics; analogue-only borrowing. | Service-instance scoping as untrusted-code confinement, authorization, or tenant isolation. |
 | R3 — [DSH web styling](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.md), Ownership; Component rules | Shared tokens and appearance belong to `ui-theme`; layout applies the resolved theme; feature styles consume aliases. | Central visual ownership; theme analogy. | Direct documented ownership; analogue-only application. | Arbitrary global CSS as a supported public theme ABI. |
 | R4 — [Cordis repository](https://github.com/cordiverse/cordis), README | Upstream declares active development and an unstable API. | Defer dependency adoption until a bounded comparison; compatibility caution. | Direct upstream statement at retrieval. | Upstream main matching DSH's pinned/vendored version or all future releases. |
-| R5 — [VS Code contribution points](https://code.visualstudio.com/api/references/contribution-points), introduction; configuration; colors | Contributions are declared in the manifest; settings have unique IDs; colors declare appearance-specific defaults. | Named contributions and token defaults; contract analogy. | Direct documented surface; analogue-only suitability. | That declarations enforce runtime security or that RestoreWeave needs the full API. |
+| R5 — [VS Code contribution points](https://code.visualstudio.com/api/references/contribution-points), introduction; configuration; colors | Contributions are declared in the manifest; settings have unique IDs; colors declare appearance-specific defaults. | Named contributions and token defaults; contract analogy. | Direct documented surface; analogue-only suitability. | That declarations enforce runtime security or that Cairn needs the full API. |
 | R6 — [VS Code workspace trust](https://code.visualstudio.com/docs/editing/workspaces/workspace-trust), Restricted Mode caution | Workspace Trust cannot prevent a malicious extension from ignoring Restricted Mode. | Separate user consent from code confinement; explicit counterevidence. | Direct documented limitation. | A trust prompt or declared permission alone making executable plugins safe. |
 | R7 — [Backstage extensions](https://backstage.io/docs/frontend-system/architecture/extensions/), ID; Inputs; Attachment point; Extension Inputs | Typed attachments, unique IDs, singleton inputs, and internal-only inputs restrict composition. Duplicate IDs may error or override. | Typed slots and declared cardinality; composition analogy. | Direct documented mechanisms; analogue-only policy. | Our stricter conflict rejection being Backstage's universal default or a sandbox. |
 | R8 — [Grafana frontend sandbox](https://grafana.com/docs/grafana/latest/administration/plugin-management/plugin-frontend-sandbox/), overview; compatibility | A separate JavaScript context protects designated UI boundaries; the feature is described as public preview. | Evaluate confinement separately from a registry; security-boundary analogy. | Direct documented feature/status at retrieval. | A sandbox already existing here, production qualification, or copying Grafana's mechanism. |
@@ -173,7 +173,7 @@ degraded transport fallbacks.
 
 The sources were retrieved from moving documentation/main branches on the
 recorded date. They establish no frozen upstream revision or tested
-cross-framework compatibility tuple. The proposed RestoreWeave standard must
+cross-framework compatibility tuple. The proposed Cairn standard must
 be versioned through its own reviewed contract before implementation.
 
 The next useful checks, after implementation is admitted, are a real same-library

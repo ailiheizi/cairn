@@ -1,6 +1,6 @@
-# RestoreWeave Wiki
+# Cairn Wiki
 
-This is the short, plain-language guide to RestoreWeave. It explains the
+This is the short, plain-language guide to Cairn. It explains the
 current product without repeating every implementation rule. Normative
 requirements live in the documents linked from the [documentation map](../README.md);
 this Wiki must not become a second source of truth.
@@ -15,7 +15,7 @@ this Wiki must not become a second source of truth.
 
 ## The product in one sentence
 
-RestoreWeave keeps exact file content safe, helps people find it with names,
+Cairn keeps exact file content safe, helps people find it with names,
 notes, tags, and optional semantic indexes, and can restore the original bytes
 without making a filesystem mount its core.
 
