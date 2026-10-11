@@ -14,6 +14,10 @@
    result list (components/ResultWindow.tsx). The one measured card height is
    applied by the window, so a card's document offset is `row * stride`. */
 .photo-wall.is-windowed .photo-card { overflow: hidden; }
+/* A photo position whose library page is still arriving: the wall keeps the
+   pending place (and its measured height) instead of shortening onto the loaded
+   subset. It is not a card and carries no result index. */
+.photo-wall .result-pending { border: 1px dashed var(--line, #dce2e9); border-radius: .85rem; background: var(--surface-dim, #f2f5f9); }
 .photo-library[data-density="1"] .photo-wall { --photo-card-min: 320px; }
 .photo-library[data-density="2"] .photo-wall { --photo-card-min: 240px; }
 .photo-library[data-density="3"] .photo-wall { --photo-card-min: 180px; }

@@ -22,12 +22,17 @@ type PendingAnchor = { index: number; viewportOffset: number; columns: number; t
  *  `scrollTop` is the scroll container's own offset. */
 type ScrollerGeometry = { element: HTMLElement | null; contentTop: number; scrollTop: number; height: number };
 
+/** A mounted item. A position whose page has not arrived yet is held open by the
+ *  wall as a placeholder without this attribute, so it is never measured as an
+ *  item and never read back as one. */
 const TILE_SELECTOR = "[data-result-index]";
 const HEIGHT_TOLERANCE = 0.5;
 
 export type ResultWindowState = ResultWindowLayout & {
   /** Items the wall must render right now. */
   renderedCount: number;
+  /** The measured row height the pending positions must keep. */
+  rowHeight: number;
   /** True once a row height and a column count have been measured. */
   measured: boolean;
   /** Spacer and row height for the wall container. */
@@ -138,11 +143,19 @@ function measureTiles(container: HTMLElement, allMounted: boolean): Metrics | nu
   return { columns: Math.max(1, columns), track: Math.max(1, track), gap: rowGapOf(container) };
 }
 
-export function useResultWindow({ containerRef, count, enabled = true, minItems = RESULT_WINDOW_MIN_ITEMS }: {
+export function useResultWindow({ containerRef, count, loadedCount = count, enabled = true, minItems = RESULT_WINDOW_MIN_ITEMS, onNeedMore }: {
   containerRef: RefObject<HTMLElement | null>;
+  /** Positions this wall lays out. It is the whole projection's exact total
+   *  when the daemon reported one, so pending positions keep the scroll length
+   *  of the real listing open. */
   count: number;
+  /** How many of those positions have a real item right now. */
+  loadedCount?: number;
   enabled?: boolean;
   minItems?: number;
+  /** Called when the mounted window reaches the end of what is loaded, so the
+   *  wall can fetch the next bounded page instead of stopping at the boundary. */
+  onNeedMore?: () => void;
 }): ResultWindowState {
   const [metrics, setMetrics] = useState<Metrics>({ columns: 0, track: 0, gap: 0 });
   const [viewport, setViewport] = useState<Viewport>({ relScroll: 0, height: 0 });
@@ -253,6 +266,29 @@ export function useResultWindow({ containerRef, count, enabled = true, minItems 
     // a commit that changed nothing stops here.
   });
 
+  // Fetch the next bounded page when the mounted window has reached the end of
+  // what is loaded. This is the one place the two walls ask for more, so a page
+  // boundary is never mistaken for the end of the listing and the scroll area
+  // never collapses onto the loaded subset.
+  //
+  // The test is "the window now covers the last loaded position", not "the
+  // window is short of the total": a projection over the loaded library (the
+  // Photos wall, a tag or format filter) has no idea how many more of its items
+  // the unfetched pages hold, so its position count is the loaded count and its
+  // own end is the boundary that must keep loading. `onNeedMore` is only passed
+  // while the daemon still offers a continuation, so a complete listing never
+  // re-enters here. The callback is held in a ref: the effect only re-runs when
+  // the window or the loaded count moves, and a fetch already in flight is
+  // refused by the caller.
+  const needMoreRef = useRef(onNeedMore);
+  needMoreRef.current = onNeedMore;
+  const wantMore = Boolean(onNeedMore);
+  useEffect(() => {
+    if (!wantMore) return;
+    if (layout.endIndex < loadedCount) return;
+    needMoreRef.current?.();
+  }, [layout.endIndex, loadedCount, wantMore]);
+
   const revealIndex = useCallback((index: number) => {
     const container = containerRef.current;
     if (!container || countRef.current <= 0) return;
@@ -277,6 +313,7 @@ export function useResultWindow({ containerRef, count, enabled = true, minItems 
   return {
     ...layout,
     renderedCount: Math.max(0, layout.endIndex - layout.startIndex),
+    rowHeight: Math.max(0, metrics.track),
     measured,
     containerClass: measured ? "is-windowed" : "",
     containerStyle: measured

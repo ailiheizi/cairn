@@ -85,11 +85,12 @@ export function dedupFacetValue(hit: SearchHit, identityCounts: Map<string, numb
   return (identityCounts.get(key) ?? 0) > 1 ? "DUPLICATE" : "UNIQUE";
 }
 
-// The library listing already contains the complete publication set, so the
-// whole ordering happens here instead of asking the daemon for a sort. Unknown
-// logical sizes (folders, unmeasured entries) sort after every known size in
-// both directions, and equal keys fall back to the locale-aware name order so
-// the rendered order is deterministic.
+// The library listing is read one bounded page at a time, so the ordering here
+// covers the entries this browser has loaded instead of asking the daemon for a
+// sort; the surface says so while the chain is still incomplete. Unknown logical
+// sizes (folders, unmeasured entries) sort after every known size in both
+// directions, and equal keys fall back to the locale-aware name order so the
+// rendered order is deterministic.
 export function sortableName(hit: SearchHit) { return hit.name?.trim() || hit.path?.split(/[\\/]/).at(-1)?.trim() || ""; }
 export function sortableSize(hit: SearchHit) { return typeof hit.logical_size === "number" && Number.isSafeInteger(hit.logical_size) && hit.logical_size >= 0 ? hit.logical_size : null; }
 

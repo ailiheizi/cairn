@@ -623,7 +623,10 @@ function App() {
     t={t}
     viewMode={view.viewMode}
     hasActiveFilters={library.hasActiveFilters}
-    libraryCount={library.libraryItems.length}
+    // The rail badge describes the library, so it shows the daemon's exact
+    // total once a page has reported one, never the number of entries that
+    // happen to be loaded in this browser.
+    libraryCount={library.libraryTotal || library.libraryItems.length}
     sourceCount={sources.sources.length}
     onLibrary={selectRailView((event) => openLibrary(event))}
     onSources={selectRailView(library.showSourcesSurface)}

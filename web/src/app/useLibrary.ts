@@ -10,11 +10,51 @@ import type { AnnotationRecord, BrowseCrumb, BrowseRoot, LibraryPageMode, Notice
 
 // The content library projection.
 //
-// `content.list` returns the complete publication set and the browser keeps it
-// as one projection: tags, system facets, sorting, path browsing, and the
-// registered pages are client-side views over data the daemon already
-// returned. No filter here changes stored content, membership, or recovery
-// meaning.
+// `content.list` is read as a bounded page chain, not as one whole answer: the
+// first screen is rendered from the first page while the daemon's exact total
+// (`page.entries`) keeps the wall's scroll length and count label describing
+// the real publication set. Further pages are fetched only when the operator
+// reaches the end of what is loaded, so every entry stays reachable without the
+// whole collection being projected up front. Tags, system facets, sorting, path
+// browsing, and the registered pages remain client-side views over the entries
+// that are loaded; the surface says so while the chain is still incomplete. No
+// filter here changes stored content, membership, or recovery meaning.
+//
+// A page cursor is refused when the published projection changed. That is a
+// real event: the chain restarts from the beginning and says so, and rows from
+// two generations are never blended into one list.
+
+/** The bounded first-page size the walls ask `content.list` for.
+ *
+ *  It is inside the daemon's declared 1..1000 bound and is its documented
+ *  default page size, so the first screen never waits for the whole collection
+ *  and a page boundary is never mistaken for the end of the listing. */
+export const LIBRARY_PAGE_SIZE = 200;
+
+type LibraryPageFacts = { total: number; token: string; complete: boolean; paged: boolean };
+
+/** Read the daemon's own page block. An answer with no page block is the whole
+ *  projection (a pre-paging daemon): it is treated as complete and its total is
+ *  never invented. */
+function readLibraryPageFacts(data: unknown, fallbackTotal: number): LibraryPageFacts {
+  const page = (data as { page?: Record<string, unknown> } | undefined)?.page;
+  const fallback = Number.isFinite(fallbackTotal) && fallbackTotal > 0 ? Math.floor(fallbackTotal) : 0;
+  if (!page || typeof page !== "object") return { total: fallback, token: "", complete: true, paged: false };
+  const entries = page.entries;
+  const total = typeof entries === "number" && Number.isFinite(entries) && entries >= 0 ? Math.floor(entries) : fallback;
+  return {
+    total,
+    token: typeof page.token === "string" ? page.token : "",
+    complete: page.complete === true || page.completeness === "COMPLETE",
+    paged: page.mode === "page",
+  };
+}
+
+/** The stable identity of one loaded entry, used only to keep a re-issued page
+ *  from being appended twice. It is never a durable key. */
+function libraryEntryKey(item: SearchHit): string {
+  return (item.entry_id || item.subject_ref || "").trim();
+}
 
 export type LibraryFlow = {
   hits: SearchHit[];
@@ -49,6 +89,19 @@ export type LibraryFlow = {
   setActiveTimelineMonth: (value: string) => void;
   toggleTimelineMonth: (month: string) => void;
   libraryLoaded: boolean;
+  /** The exact total entry count of the published projection, when the daemon
+   *  reported one (`page.entries`). It is the total in every paging mode, not
+   *  the size of the page this browser happens to hold. */
+  libraryTotal: number;
+  /** True only when the loaded entries provably are the whole projection. */
+  libraryListingComplete: boolean;
+  /** True when the daemon offered a continuation this browser can follow. */
+  libraryListingMore: boolean;
+  libraryListingLoading: boolean;
+  /** The daemon's own message when the next page could not be read, or "". */
+  libraryListingError: string;
+  /** Fetches the next bounded page of the same chain, if one is available. */
+  loadMoreLibrary: () => void;
   restoreLibraryHashView: (view: "content" | "tag", tags: string[], month: string) => boolean;
   tagFacets: Array<{ value: string; count: number }>;
   systemFacets: { types: Array<{ value: string; count: number }>; formats: Array<{ value: string; count: number }>; dedup: Array<{ value: string; count: number }>; tags: Array<{ value: string; count: number }>; index: Array<{ value: string; count: number }> };
@@ -112,6 +165,18 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   // never changes stored content or recovery meaning.
   const [activeTimelineMonth, setActiveTimelineMonth] = useState("");
   const [libraryLoaded, setLibraryLoaded] = useState(false);
+  const [libraryTotal, setLibraryTotal] = useState(0);
+  const [libraryListingComplete, setLibraryListingComplete] = useState(true);
+  const [libraryListingMore, setLibraryListingMore] = useState(false);
+  const [libraryListingLoading, setLibraryListingLoading] = useState(false);
+  const [libraryListingError, setLibraryListingError] = useState("");
+  // The live cursor state is kept in a ref so two commits cannot race over the
+  // same chain, and a new first page (a refresh, a workspace change, or a
+  // refused cursor) invalidates every in-flight continuation through the
+  // sequence counter.
+  const libraryPageRef = useRef({ token: "", loading: false, error: "", complete: true });
+  const libraryKeysRef = useRef<Set<string>>(new Set());
+  const libraryLoadSequence = useRef(0);
 
   const visibleWorkspaceTags = tagVocabularyWorkspaceID === workspaceID ? workspaceTags : [];
   const visibleTagStatus = tagVocabularyWorkspaceID === workspaceID ? tagStatus : "loading";
@@ -222,14 +287,101 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     })));
     setSelected(undefined); setBrowseRootID(rootID); setBrowseCrumbs(crumbs); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("path");
   }
+  // Adopt the daemon's own account of the projection: its exact total, whether
+  // this answer was the whole projection, and the continuation that reaches the
+  // rest. The total is never derived from the size of the page.
+  function applyLibraryPage(data: unknown, fallbackTotal: number) {
+    const facts = readLibraryPageFacts(data, fallbackTotal);
+    libraryPageRef.current.token = facts.token;
+    libraryPageRef.current.complete = facts.complete;
+    libraryPageRef.current.error = "";
+    setLibraryTotal(facts.total);
+    setLibraryListingComplete(facts.complete);
+    setLibraryListingMore(!facts.complete && Boolean(facts.token));
+    setLibraryListingError("");
+  }
+  // Replaces every loaded entry with a fresh first page of the same chain. It
+  // preserves the operator's current filters and view: a moved projection is a
+  // reason to restart the chain, not to throw the screen away.
+  async function restartLibraryListing(activeWorkspaceID: string) {
+    const generation = refreshGenerationRef.current;
+    const sequence = ++libraryLoadSequence.current;
+    const response = await command(operations.content.list, { workspace_id: activeWorkspaceID, page: { limit: LIBRARY_PAGE_SIZE } });
+    if (sequence !== libraryLoadSequence.current) return;
+    if (refreshGenerationRef.current !== generation || currentWorkspaceID.current !== activeWorkspaceID) return;
+    const items = (response.data?.items ?? []) as SearchHit[];
+    libraryPageRef.current = { token: "", loading: false, error: "", complete: true };
+    libraryKeysRef.current = new Set(items.map(libraryEntryKey).filter(Boolean));
+    setLibraryItems(items);
+    applyLibraryPage(response.data, items.length);
+  }
+  async function loadMoreLibrary() {
+    const activeWorkspaceID = currentWorkspaceID.current;
+    const page = libraryPageRef.current;
+    // An existing error is only cleared by an explicit call (the surface's own
+    // Retry), never retried in a loop by the window reaching its edge.
+    if (!activeWorkspaceID || page.loading || page.complete || !page.token) return;
+    const generation = refreshGenerationRef.current;
+    const sequence = libraryLoadSequence.current;
+    page.loading = true;
+    page.error = "";
+    setLibraryListingError("");
+    setLibraryListingLoading(true);
+    try {
+      const response = await command(operations.content.list, { workspace_id: activeWorkspaceID, page: { token: page.token } });
+      if (sequence !== libraryLoadSequence.current || refreshGenerationRef.current !== generation || currentWorkspaceID.current !== activeWorkspaceID) return;
+      const returned = (response.data?.items ?? []) as SearchHit[];
+      // A keyset chain returns each entry at most once; the identity check only
+      // keeps a re-issued page from being appended twice.
+      const fresh = returned.filter((item) => {
+        const key = libraryEntryKey(item);
+        return key ? !libraryKeysRef.current.has(key) : true;
+      });
+      for (const item of fresh) {
+        const key = libraryEntryKey(item);
+        if (key) libraryKeysRef.current.add(key);
+      }
+      setLibraryItems((current) => [...current, ...fresh]);
+      applyLibraryPage(response.data, libraryKeysRef.current.size);
+    } catch (error) {
+      if (sequence !== libraryLoadSequence.current || refreshGenerationRef.current !== generation || currentWorkspaceID.current !== activeWorkspaceID) return;
+      const message = error instanceof Error ? error.message : String(error);
+      if (/continuation/i.test(message)) {
+        // The daemon refused the cursor because the published projection moved
+        // under this wall. That is a real event, not a transient error: restart
+        // the chain from the beginning, say what happened, and never blend rows
+        // from two generations into one list.
+        notify({ kind: "warning", text: t("The library changed while you were browsing, so it was reloaded from the beginning.") });
+        try {
+          await restartLibraryListing(activeWorkspaceID);
+        } catch (restartError) {
+          const restartMessage = restartError instanceof Error ? restartError.message : String(restartError);
+          libraryPageRef.current.error = restartMessage;
+          setLibraryListingError(restartMessage);
+          notify({ kind: "error", text: t("The library could not be read again after it changed: {{message}}", { message: restartMessage }) });
+        }
+        return;
+      }
+      page.error = message;
+      setLibraryListingError(message);
+      notify({ kind: "error", text: t("The next page of the library could not be read: {{message}}", { message }) });
+    } finally {
+      page.loading = false;
+      setLibraryListingLoading(false);
+    }
+  }
   async function loadContentLibrary(activeWorkspaceID: string, refreshGeneration = refreshGenerationRef.current, guardDrafts = false) {
     if (guardDrafts && !canLeaveDetailDrafts()) return;
-    const response = await command(operations.content.list, { workspace_id: activeWorkspaceID });
-    if (refreshGenerationRef.current !== refreshGeneration) return;
+    const sequence = ++libraryLoadSequence.current;
+    const response = await command(operations.content.list, { workspace_id: activeWorkspaceID, page: { limit: LIBRARY_PAGE_SIZE } });
+    if (refreshGenerationRef.current !== refreshGeneration || sequence !== libraryLoadSequence.current) return;
     const items = (response.data?.items ?? []) as SearchHit[];
     if (guardDrafts) discardDetailDrafts();
     setQuery(""); setLastExecutedQuery("");
+    libraryPageRef.current = { token: "", loading: false, error: "", complete: true };
+    libraryKeysRef.current = new Set(items.map(libraryEntryKey).filter(Boolean));
     setLibraryItems(items); setHits(items);
+    applyLibraryPage(response.data, items.length);
     const roots = (response.data?.roots ?? []) as BrowseRoot[];
     const rootID = response.data?.root_id || (roots.length === 1 ? roots[0].root_id : "");
     setSelected(undefined); setBrowseRoots(roots); setBrowseRootID(rootID); setBrowseCrumbs([]); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
@@ -381,6 +533,11 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     finally { setBusy(false); }
   }
   function resetLibraryProjection() {
+    // Any in-flight continuation belongs to the listing being dropped.
+    libraryLoadSequence.current += 1;
+    libraryPageRef.current = { token: "", loading: false, error: "", complete: true };
+    libraryKeysRef.current = new Set();
+    setLibraryTotal(0); setLibraryListingComplete(true); setLibraryListingMore(false); setLibraryListingLoading(false); setLibraryListingError("");
     setHits([]); setLibraryItems([]);
     setBrowseRootID(""); setBrowseRoots([]); setBrowseCrumbs([]);
     setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
@@ -418,6 +575,12 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     setActiveTimelineMonth,
     toggleTimelineMonth,
     libraryLoaded,
+    libraryTotal,
+    libraryListingComplete,
+    libraryListingMore,
+    libraryListingLoading,
+    libraryListingError,
+    loadMoreLibrary,
     restoreLibraryHashView,
     tagFacets,
     systemFacets,

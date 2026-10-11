@@ -113,6 +113,20 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const photoScopeCount = mediaContentItems(library.scopeHits, "image").length;
   const musicScopeCount = mediaContentItems(library.scopeHits, "audio").length;
   const otherScopeCount = scopeCount - photoScopeCount - musicScopeCount;
+  // The walls are fed one bounded `content.list` page at a time. A wall that
+  // projects the loaded library (not a search result set or a namespace path)
+  // can continue that chain when the operator reaches the loaded edge.
+  const wallProjectsListing = viewMode !== "search" && viewMode !== "path";
+  // Only the all-types wall whose conditions narrow nothing shows exactly the
+  // published projection, so only there does the daemon's exact total describe
+  // this wall's positions and hold the full scroll length open from the first
+  // answer. A media page, a tag/facet/month filter, and a search result set are
+  // projections over the entries that are loaded; their position count is what
+  // is loaded, and the progress line below says the listing is still arriving.
+  const wallShowsWholeListing = wallProjectsListing && presentationMode === "content" && !library.hasActiveFilters;
+  const listingPositions = wallShowsWholeListing ? Math.max(renderedHits.length, library.libraryTotal) : renderedHits.length;
+  const listingIncomplete = wallProjectsListing && library.libraryLoaded && !library.libraryListingComplete;
+  const wallCanLoadMore = wallProjectsListing && library.libraryListingMore && !library.libraryListingLoading && !library.libraryListingError;
   const visibleSubjectRefs = new Set(renderedHits.map((hit) => hit.subject_ref));
   const hiddenSelectionCount = selection.selectionSubjects.filter((hit) => !visibleSubjectRefs.has(hit.subject_ref)).length;
   const firstSavedFile = renderedHits.find((hit) => hit.entry_type === "REGULAR_FILE" && Boolean(hit.entry_id && hit.content_id));
@@ -144,7 +158,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
     // A recalled query may contain stored fields absent from its displayed text.
     ...(recalledViewActive ? [t("Recalled view conditions are not editable here. Run a new search to save changes.")] : []),
   ];
-  const resultProps = { hits: renderedHits, libraryListRef, libraryLayout: view.libraryLayout, sortField: view.sortField, sortDirection: view.sortDirection, selectionCount: selection.selectionSubjects.length, rovingRow: selection.rovingRow, selectedRef, selectionRefs: selection.selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection: selection.toggleSelectionAt, onKeyDown: onLibraryKeyDown };
+  const resultProps = { hits: renderedHits, libraryListRef, libraryLayout: view.libraryLayout, sortField: view.sortField, sortDirection: view.sortDirection, selectionCount: selection.selectionSubjects.length, rovingRow: selection.rovingRow, selectedRef, selectionRefs: selection.selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection: selection.toggleSelectionAt, onKeyDown: onLibraryKeyDown, listingPositions, onLoadMore: wallCanLoadMore ? library.loadMoreLibrary : undefined };
   const savedRetrievalPanel = <SavedRetrievalPanel flow={retrievalFlow} query={executedPlan.request.query} fields={retrievalFields} unsupportedConditions={unsupportedRetrievalConditions} workspaceID={workspaceID} recalledActive={recalledViewActive} t={t} busy={busy} />;
   if (scopeRestoring || scopeRestoreFailed) {
     return <section className="content-column scope-restore-state" data-view={viewMode} data-presentation={presentationMode}>
@@ -205,7 +219,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
           {viewMode === "search" && <button className="library-return" onClick={library.clearSearchScope}><X size={14} />{t("Clear search")}</button>}
           {viewMode === "path" && workspaceID && <button className="library-return" onClick={() => void library.loadContentLibrary(workspaceID, undefined, true)}><Home size={14} />{t("All content")}</button>}
           {renderedHits.length > 0 && <span className="sort-control" role="group" aria-label={t("Sort library")} aria-describedby="cairn-sort-description">
-            <span className="sr-only" id="cairn-sort-description">{t(sortAvailable ? "Sorts the items already loaded in this browser. The library listing is the complete publication set, so this is not a server query. Items without a logical size sort last." : "Search results keep their relevance order, so sorting is unavailable here.")}</span>
+            <span className="sr-only" id="cairn-sort-description">{t(sortAvailable ? "Sorts the items already loaded in this browser. Items whose page has not arrived yet keep their pending place, and items without a logical size sort last." : "Search results keep their relevance order, so sorting is unavailable here.")}</span>
             <select className="sort-field" aria-label={t("Sort field")} value={view.sortField} disabled={!sortAvailable} onChange={(event) => view.changeSortField(event.target.value as "name" | "size" | "type" | "path")}>
               <option value="name">{t("Name")}</option>
               <option value="size">{t("Size")}</option>
@@ -220,7 +234,21 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
           </span>}
           {canOpenExport && workspaceID && <button className="secondary-button compact export-trigger" onClick={(event) => onOpenExport(event.currentTarget)} disabled={!isConnected || !coreStorageReady}><DownloadIcon size={14} />{t("Export")}</button>}
           {workspaceID && <button type="button" className="secondary-button compact" aria-expanded={retrievalOpen} aria-controls="saved-retrieval-panel" onClick={() => { setRetrievalOpen(!retrievalOpen); if (!retrievalOpen) void retrievalFlow.loadSavedViews(); }} disabled={!isConnected}>{t("Saved retrieval")}</button>}
-          <span className="result-count">{renderedHits.length ? t(viewMode === "search" ? "{{count}} results" : "{{count}} items", { count: renderedHits.length }) : workspaceID ? t("0 items") : t("Nothing added yet")}</span>
+          <span className="result-count">{listingPositions ? t(viewMode === "search" ? "{{count}} results" : "{{count}} items", { count: listingPositions }) : workspaceID ? t("0 items") : t("Nothing added yet")}</span>
+          {listingIncomplete && <p className={`library-listing-progress ${library.libraryListingError ? "is-error" : ""}`} role="status" data-loaded={libraryItems.length} data-total={library.libraryTotal} data-listing-completeness={library.libraryListingComplete ? "COMPLETE" : library.libraryListingMore ? "MORE_AVAILABLE" : "BOUNDED_UNKNOWN"} data-listing-state={library.libraryListingError ? "ERROR" : library.libraryListingLoading ? "LOADING" : "IDLE"}>
+            {/* The loaded figure is the listing this browser actually holds, not
+                the rows a narrowed projection shows: a media page or a filter
+                shows fewer rows than are loaded, and saying "40 of 960 loaded"
+                there would understate what the daemon already answered. */}
+            {library.libraryListingError
+              ? t("{{loaded}} of {{total}} items loaded. The next page could not be read: {{message}}", { loaded: libraryItems.length, total: library.libraryTotal, message: library.libraryListingError })
+              : library.libraryListingLoading
+                ? t("Loading more items: {{loaded}} of {{total}} loaded…", { loaded: libraryItems.length, total: library.libraryTotal })
+                : library.hasActiveFilters || !wallShowsWholeListing
+                  ? t("{{loaded}} of {{total}} items loaded. This screen shows the loaded items only.", { loaded: libraryItems.length, total: library.libraryTotal })
+                  : t("{{loaded}} of {{total}} items loaded.", { loaded: libraryItems.length, total: library.libraryTotal })}
+            {library.libraryListingError && <button type="button" className="secondary-button compact" onClick={() => { void library.loadMoreLibrary(); }}>{t("Retry")}</button>}
+          </p>}
         </>}
       </div>
       {(viewMode === "content" || viewMode === "tag") && <section className="library-secondary-tools" aria-label={t("Browse tools")}>
@@ -297,7 +325,13 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
       </ol>
     </> : <>
       {viewMode === "content" && sources.sourceProjection.state === "DEGRADED" && <p className="notice warning" role="status">{t("Source status could not be read, so this empty listing may be incomplete. Retry before adding content.")}<button type="button" className="secondary-button compact" onClick={refresh}>{t("Retry")}</button></p>}
-      <h2>{t(showFilteredContentEmpty ? "No content matches these filters" : showFirstSource ? "Start by adding a source" : showConfiguredSourceEmpty ? "Source configured, no saved content yet" : viewMode === "search" ? "No matches found" : viewMode === "tag" ? activeTags.length ? "No content matches these tags" : library.hasSystemFacets ? "No content matches these filters" : "No content matches these tags" : viewMode === "path" ? "This source path is empty" : isPhotoView ? "No photos in the loaded listing" : isMusicView ? "No audio files in the loaded listing" : "No content yet")}</h2><p>{t(showFilteredContentEmpty ? "Adjust or clear these filters." : showFirstSource ? "Add a server folder, review what will be stored, then confirm." : showConfiguredSourceEmpty ? "Recheck creates a reviewable plan. Existing saved content is not changed until you confirm." : viewMode === "search" ? "Try another name, path, metadata value, tag, note, or extracted phrase." : viewMode === "tag" ? activeTags.length ? "Choose fewer tags to broaden the result." : library.hasSystemFacets ? "Adjust or clear the system filters." : "Choose fewer tags to broaden the result." : viewMode === "path" ? "No captured items are recorded at this source path." : isPhotoView ? "Regular files with recognized image filename suffixes appear here." : isMusicView ? "Regular files with recognized audio filename suffixes appear here." : "Saved content will appear here independent of its original folders.")}</p>{showFirstSource && <button className="primary-button" onClick={(event) => onOpenAdd(event.currentTarget)} disabled={!coreStorageReady}><Plus size={16} />{t("Add content")}</button>}
+      <h2>{t(showFilteredContentEmpty ? "No content matches these filters" : showFirstSource ? "Start by adding a source" : showConfiguredSourceEmpty ? "Source configured, no saved content yet" : viewMode === "search" ? "No matches found" : viewMode === "tag" ? activeTags.length ? "No content matches these tags" : library.hasSystemFacets ? "No content matches these filters" : "No content matches these tags" : viewMode === "path" ? "This source path is empty" : isPhotoView ? "No photos in the loaded listing" : isMusicView ? "No audio files in the loaded listing" : "No content yet")}</h2><p>{t(showFilteredContentEmpty ? "Adjust or clear these filters." : showFirstSource ? "Add a server folder, review what will be stored, then confirm." : showConfiguredSourceEmpty ? "Recheck creates a reviewable plan. Existing saved content is not changed until you confirm." : viewMode === "search" ? "Try another name, path, metadata value, tag, note, or extracted phrase." : viewMode === "tag" ? activeTags.length ? "Choose fewer tags to broaden the result." : library.hasSystemFacets ? "Adjust or clear the system filters." : "Choose fewer tags to broaden the result." : viewMode === "path" ? "No captured items are recorded at this source path." : isPhotoView ? "Regular files with recognized image filename suffixes appear here." : isMusicView ? "Regular files with recognized audio filename suffixes appear here." : "Saved content will appear here independent of its original folders.")}</p>
+      {/* A filter that matches nothing among the loaded entries must not claim
+          the whole collection was searched: the wall is not mounted, so no page
+          boundary can fetch the rest, and the empty heading would otherwise
+          read as "the library has no match". */}
+      {listingIncomplete && library.hasActiveFilters && renderedHits.length === 0 && <p className="library-listing-progress" role="status" data-listing-state="IDLE" data-loaded={libraryItems.length} data-total={library.libraryTotal}>{t("Only the {{loaded}} loaded items of {{total}} have been filtered so far; the rest of the listing is not loaded yet.", { loaded: libraryItems.length, total: library.libraryTotal })}</p>}
+      {showFirstSource && <button className="primary-button" onClick={(event) => onOpenAdd(event.currentTarget)} disabled={!coreStorageReady}><Plus size={16} />{t("Add content")}</button>}
     </>}</div>}
   </section>;
 }

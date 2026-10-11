@@ -16,6 +16,15 @@ import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, S
 // the DOM holds the rows around the viewport, not the whole publication set, and
 // the spacer keeps the document long enough that every item stays reachable.
 // Indices handed to the row callbacks are always indices into the full listing.
+//
+// The wall is fed one bounded page at a time. `listingPositions` is the exact
+// total the daemon reported for the whole projection when this wall shows it:
+// the scroll length is already the whole listing's from the first page, and a
+// position whose page has not arrived yet is held open as a quiet pending
+// placeholder. It is never rendered as an item and never counted as one. When
+// the mounted window reaches the end of the loaded positions the shared window
+// asks for the next page (`onLoadMore`), so a page boundary is not the end of
+// the listing.
 
 export function ResultRow({ hit, index, roving, duplicateCount, selected, multiSelected, userTags, sizeSort, t, command, workspaceId, locale, showThumb = true, showMatch = false, onRowClick, onToggleSelection }: { hit: SearchHit; index: number; roving: boolean; duplicateCount: number; selected: boolean; multiSelected: boolean; userTags: string[]; sizeSort: boolean; t: Translator; command: Command; workspaceId: string; locale: Locale; showThumb?: boolean; showMatch?: boolean; onRowClick: (index: number, event: RowClickEvent) => void; onToggleSelection: (index: number) => void }) {
   const directory = hit.entry_type === "DIRECTORY";
@@ -58,7 +67,7 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
   </div>;
 }
 
-export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sortDirection, selectionCount, rovingRow, selectedRef, selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection, onKeyDown }: {
+export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sortDirection, selectionCount, rovingRow, selectedRef, selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection, onKeyDown, listingPositions, onLoadMore }: {
   hits: SearchHit[];
   libraryListRef: RefObject<HTMLDivElement | null>;
   libraryLayout: LibraryLayout;
@@ -78,8 +87,15 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
   onRowClick: (index: number, event: RowClickEvent) => void;
   onToggleSelection: (index: number) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  /** The exact total position count of the projection this wall shows, when the
+   *  daemon reported one. Positions at or past `hits.length` are not loaded yet
+   *  and are held open as pending placeholders. */
+  listingPositions?: number;
+  /** Fetches the next bounded page when the window reaches the loaded edge. */
+  onLoadMore?: () => void;
 }) {
-  const window = useResultWindow({ containerRef: libraryListRef, count: hits.length });
+  const positions = Math.max(hits.length, Number.isFinite(listingPositions) ? Math.max(0, Math.floor(listingPositions ?? 0)) : 0);
+  const window = useResultWindow({ containerRef: libraryListRef, count: positions, loadedCount: hits.length, onNeedMore: onLoadMore });
   const { startIndex, endIndex, revealIndex } = window;
   const focusWasInList = useRef(false);
   // Arrow keys, Home and End move a roving index over the whole listing, not
@@ -103,6 +119,17 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
     focusWasInList.current = false;
     target.focus({ preventScroll: true });
   }, [libraryListRef, rovingRow, startIndex, endIndex]);
-  const mounted = hits.slice(startIndex, endIndex);
-  return <div ref={libraryListRef} className={`result-list ${libraryLayout === "list" ? "list-mode" : ""} ${sortField === "size" ? "sort-by-size" : ""} ${window.containerClass}`} style={window.containerStyle} role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.")} data-sort-field={sortField} data-sort-direction={sortDirection} data-selection-count={selectionCount} data-rendered-from={startIndex} data-rendered-to={endIndex} data-listing-count={hits.length} onKeyDown={onKeyDown}>{mounted.map((hit, offset) => <ResultRow key={hit.subject_ref ?? startIndex + offset} index={startIndex + offset} roving={startIndex + offset === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={startIndex + offset < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} />)}</div>;
+  // One entry per laid-out position, so a position whose page has not arrived
+  // keeps its place and its height instead of shortening the document. Pending
+  // positions carry no `data-result-index`: they are neither measured as items
+  // nor reachable as rows.
+  const rowHeight = window.rowHeight > 0 ? { height: `${window.rowHeight}px` } : undefined;
+  const positionsToRender = [];
+  for (let position = startIndex; position < endIndex; position += 1) {
+    const hit = hits[position];
+    positionsToRender.push(hit
+      ? <ResultRow key={hit.subject_ref ?? position} index={position} roving={position === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={position < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} />
+      : <div className="result-pending" key={`pending-${position}`} style={rowHeight} data-result-pending={position} role="presentation" aria-hidden="true" />);
+  }
+  return <div ref={libraryListRef} className={`result-list ${libraryLayout === "list" ? "list-mode" : ""} ${sortField === "size" ? "sort-by-size" : ""} ${window.containerClass}`} style={window.containerStyle} role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.")} data-sort-field={sortField} data-sort-direction={sortDirection} data-selection-count={selectionCount} data-rendered-from={startIndex} data-rendered-to={endIndex} data-listing-count={hits.length} data-listing-total={positions} onKeyDown={onKeyDown}>{positionsToRender}</div>;
 }

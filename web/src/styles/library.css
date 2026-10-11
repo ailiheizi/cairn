@@ -826,6 +826,21 @@ selection bar, and the details inspector column. */
    leave one sparse 190 px row per item. */
 .result-list.is-windowed .result-row { overflow: hidden; }
 
+/* A position in the wall whose bounded page has not arrived yet. The scroll
+   length already describes the whole projection (the daemon's exact total), so
+   an unfetched position is held open here instead of being rendered as an item
+   or collapsed out of the listing. It carries no `data-result-index`, so it is
+   never measured as an item, never counted as a row, and never opened. */
+.result-pending { min-width: 0; border: 1px dashed var(--hairline-strong); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); }
+.result-list.list-mode .result-pending { border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; background: transparent; }
+.result-list.list-mode .result-pending:last-child { border-bottom: 0; }
+
+/* The bounded page chain's own progress line. It states how much of the exact
+   total is loaded and is the one place the surface says a page is in flight, so
+   a partial listing is never presented as the whole one. */
+.library-listing-progress { flex: 0 0 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; padding: 6px 2px 0; color: var(--muted); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.library-listing-progress.is-error { color: var(--coral); }
+
 /* User tags on a tile: a compact chip row under the name. The tile stays a
    picture and a name; tags only appear when the subject actually has them. */
 .result-tags { min-width: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }

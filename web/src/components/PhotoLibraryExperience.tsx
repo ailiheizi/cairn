@@ -66,8 +66,14 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }).filter((item) => item.hit.entry_type !== "DIRECTORY"), [hits]);
   const formats = useMemo(() => [...new Set(items.map((item) => item.format))].sort(), [items]);
   const visibleItems = useMemo(() => items.filter((item) => format === "all" || item.format === format), [format, items]);
-  const wall = useResultWindow({ containerRef: libraryListRef, count: visibleItems.length });
-  const mountedItems = useMemo(() => visibleItems.slice(wall.startIndex, wall.endIndex).map((item, offset) => ({ item, position: wall.startIndex + offset })), [visibleItems, wall.startIndex, wall.endIndex]);
+  const wall = useResultWindow({ containerRef: libraryListRef, count: visibleItems.length, onNeedMore: props.onLoadMore });
+  const mountedItems = useMemo(() => {
+    const rendered: Array<{ item?: PhotoItem; position: number }> = [];
+    for (let position = wall.startIndex; position < wall.endIndex; position += 1) {
+      rendered.push({ item: visibleItems[position], position });
+    }
+    return rendered;
+  }, [visibleItems, wall.startIndex, wall.endIndex]);
   const pendingFocusRef = useRef("");
   const current = viewerIndex == null ? undefined : visibleItems[viewerIndex];
   const resultsIdentity = useMemo(() => JSON.stringify([workspaceID, hits.map((hit) => [hit.subject_ref ?? "", hit.entry_id ?? "", hit.content_id ?? "", hit.logical_size ?? null, hit.path ?? "", hit.name ?? "", hit.entry_type ?? ""])]), [hits, workspaceID]);
@@ -267,6 +273,12 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     {!loading && !error && visibleItems.length === 0 && <div className="photo-library__empty"><ImageIcon size={30} /><strong>{format === "all" ? t("No photos in the loaded listing") : t("No items match this format")}</strong><span>{t("Unsupported image formats remain available as originals from Details.")}</span></div>}
     <div ref={libraryListRef} onKeyDown={onKeyDown} className={`photo-wall ${wall.containerClass}`} style={wall.containerStyle} data-rendered-from={wall.startIndex} data-rendered-to={wall.endIndex} data-listing-count={visibleItems.length}>
       {mountedItems.map(({ item, position }) => {
+        if (!item) {
+          // A photo position whose library page has not arrived yet: it keeps
+          // its height and place so the wall never shortens onto the loaded
+          // subset, and it is not counted as a card.
+          return <div className="result-pending" key={`pending-${position}`} style={wall.rowHeight > 0 ? { height: `${wall.rowHeight}px` } : undefined} data-result-pending={position} role="presentation" aria-hidden="true" />;
+        }
         const { hit, index } = item;
         const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || t("Untitled subject");
         const checked = Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref));
