@@ -57,6 +57,12 @@
 //   CAIRN_LARGE_KEEP=1                  leave the daemon running and keep the
 //                                       temporary profile after this process
 //                                       exits
+//   CAIRN_LARGE_PROFILE                 absolute profile directory a previous
+//                                       CAIRN_LARGE_KEEP=1 run kept. With it,
+//                                       no ingest runs and the kept catalog,
+//                                       repository and recovery records are
+//                                       read verbatim, so a before/after
+//                                       comparison measures the same library.
 //   CAIRN_PLAYWRIGHT_MODULE             Playwright module (default the checkout's
 //                                       web/node_modules/playwright/index.mjs)
 //   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH    Chrome/Chromium binary (default the
@@ -86,6 +92,11 @@ const browserTimeoutMs = Number.parseInt(process.env.CAIRN_LARGE_BROWSER_TIMEOUT
 const scrollSteps = Number.parseInt(process.env.CAIRN_LARGE_SCROLL_STEPS || "200", 10);
 const scrollBudgetMs = Number.parseInt(process.env.CAIRN_LARGE_SCROLL_BUDGET_MS || "120000", 10);
 const keepRunning = process.env.CAIRN_LARGE_KEEP === "1";
+// Opt-in reuse of a profile a previous `CAIRN_LARGE_KEEP=1` run kept. The
+// catalog, repository and recovery records are read verbatim and no ingest
+// runs, so a before/after comparison measures the same library. Unset by
+// default: an ordinary run always builds its own profile and ingests.
+const profileOverride = (process.env.CAIRN_LARGE_PROFILE || "").trim();
 const tempPrefix = join(tmpdir(), "cairn-web-large-library-");
 const buildTag = "purego";
 // The search the client itself can express that matches the largest set: every
@@ -147,6 +158,9 @@ const before = { dataDir: snapshotPath(realDataDir), socketDir: snapshotPath(rea
 
 const state = {
   temp: "",
+  // false only when this run was pointed at a profile the caller already owns.
+  ownsProfile: true,
+  chromeProfile: "",
   daemon: null,
   daemonLog: "",
   logStream: null,
@@ -248,6 +262,14 @@ function cleanup() {
       await Promise.race([closed, new Promise((resolveWait) => setTimeout(resolveWait, 2000))]);
       state.logStream = null;
     }
+    const chromeProfile = state.chromeProfile;
+    if (chromeProfile && chromeProfile.startsWith(join(tmpdir(), "cairn-large-chrome-"))) {
+      await rm(chromeProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => undefined);
+      state.chromeProfile = "";
+    }
+    // A reused profile belongs to the caller, not to this run: a failure while
+    // measuring it must never delete the library it was pointed at.
+    if (!state.ownsProfile) return;
     const target = state.temp;
     if (!target) return;
     if (!target.startsWith(tempPrefix) || target === tempPrefix) {
@@ -540,14 +562,27 @@ async function main() {
   const subfolders = await immediateSubfolders(folder);
   require(subfolders.length > 0, `the argument folder has no immediate subfolders to ingest: ${folder}`);
 
-  const temp = await mkdtemp(tempPrefix);
+  let reuse = false;
+  let temp;
+  if (profileOverride) {
+    temp = resolve(profileOverride);
+    require(temp.startsWith(tempPrefix) && temp !== tempPrefix, `refusing to reuse ${temp}: it is not one of this script's temporary directories`);
+    require(existsSync(join(temp, "catalog.sqlite")), `the reuse profile ${temp} holds no catalog.sqlite`);
+    require(existsSync(join(temp, "config.toml")), `the reuse profile ${temp} holds no config.toml`);
+    reuse = true;
+    state.ownsProfile = false;
+  } else {
+    temp = await mkdtemp(tempPrefix);
+  }
   state.temp = temp;
   require(temp.startsWith(tempPrefix) && temp !== tempPrefix, `refusing to use temporary directory ${temp}`);
 
   const { daemonBin, cliBin } = buildBinaries(temp);
   const config = join(temp, "config.toml");
-  const init = spawnSync(cliBin, ["config", "init", "--path", config], { cwd: temp, stdio: "ignore" });
-  require(init.status === 0, `cairn config init --path ${config} failed (status ${init.status})`);
+  if (!reuse) {
+    const init = spawnSync(cliBin, ["config", "init", "--path", config], { cwd: temp, stdio: "ignore" });
+    require(init.status === 0, `cairn config init --path ${config} failed (status ${init.status})`);
+  }
 
   const env = {
     ...process.env,
@@ -584,7 +619,7 @@ async function main() {
     throw new Error(`${error.message}\n--- isolated daemon log (tail) ---\n${daemonLogTail()}`);
   }
 
-  log(`temporary profile      : ${temp}`);
+  log(`temporary profile      : ${temp}${reuse ? " (reused; no ingest ran)" : ""}`);
   log(`daemon                 : ${daemonBin} (pid ${daemon.pid})`);
   log(`catalog                : ${env.CAIRN_CATALOG}`);
   log(`repository             : ${env.CAIRN_REPOSITORY}`);
@@ -592,12 +627,33 @@ async function main() {
   log(`chrome                 : ${harness.chrome}`);
   log(`argument folder        : ${folder} (opened read-only; no file name is printed)`);
   log("");
-  log(`ingesting ${subfolders.length} immediate subfolders as separate sources in workspace "default"...`);
-  const ingestStarted = Date.now();
-  const library = await ingestLibrary(base, folder);
-  const ingestMs = Date.now() - ingestStarted;
-  require(library.workspaceID, "no ingest publication produced a workspace id");
-  require(library.failed.length === 0, `ingest failed for ${library.failed.length} subfolder(s): ${library.failed.map((item) => item.detail).join("; ")}`);
+  const library = {
+    workspaceID: "",
+    subfolders,
+    applied: [],
+    skippedOverCeiling: [],
+    skippedEmpty: [],
+    failed: [],
+    publishedFiles: 0,
+    publishedBytes: 0,
+  };
+  let ingestMs = 0;
+  if (reuse) {
+    log("reusing the kept profile; no ingest runs and the argument folder is not read again.");
+    const status = await command(base, "status.get", {});
+    library.workspaceID = status.data?.recent_plans?.[0]?.workspace_id ?? "";
+    if (!library.workspaceID) {
+      const snapshots = await command(base, "snapshot.list", {});
+      library.workspaceID = snapshots.data?.snapshots?.at(-1)?.workspace_id ?? "";
+    }
+  } else {
+    log(`ingesting ${subfolders.length} immediate subfolders as separate sources in workspace "default"...`);
+    const ingestStarted = Date.now();
+    Object.assign(library, await ingestLibrary(base, folder));
+    ingestMs = Date.now() - ingestStarted;
+    require(library.failed.length === 0, `ingest failed for ${library.failed.length} subfolder(s): ${library.failed.map((item) => item.detail).join("; ")}`);
+  }
+  require(library.workspaceID, "no workspace id was resolved for the loaded library");
 
   // The daemon's own account of the workspace, measured through `content.list`.
   const listing = await command(base, "content.list", { workspace_id: library.workspaceID });
@@ -621,7 +677,12 @@ async function main() {
 
   // --- real Chrome ------------------------------------------------------------
   const { chromium } = await import(harness.playwrightModule);
-  const profileDir = join(temp, "chrome-profile");
+  // A fresh browser profile every run. A reused profile directory would carry
+  // the previous run's localStorage (including `cairn.workspace_id`) and change
+  // what the client requests before its first frame, making two runs
+  // incomparable.
+  const profileDir = reuse ? await mkdtemp(join(tmpdir(), "cairn-large-chrome-")) : join(temp, "chrome-profile");
+  state.chromeProfile = reuse ? profileDir : "";
   const context = await chromium.launchPersistentContext(profileDir, {
     headless: true,
     executablePath: harness.chrome,
@@ -769,13 +830,13 @@ async function main() {
   lines.push("");
   lines.push("cairn large-library measurement (real Chrome)");
   lines.push(`  subfolders in the argument folder : ${library.subfolders.length}`);
-  lines.push(`  sources published                 : ${library.applied.length}`);
-  lines.push(`  subfolders skipped over the bound : ${library.skippedOverCeiling.length}`);
+  lines.push(`  sources published                 : ${library.applied.length}${reuse ? " (this run reused a kept profile and ingested nothing)" : ""}`);
+  lines.push(`  subfolders skipped over the bound : ${library.skippedOverCeiling.length}${reuse ? " (not re-derived: the kept profile already holds the accepted publications)" : ""}`);
   for (const skipped of library.skippedOverCeiling) {
     lines.push(`      - ${skipped.name.split("/").at(-1)} (${skipped.files} files on disk): ${skipped.reason}`);
   }
-  lines.push(`  subfolders skipped as empty       : ${library.skippedEmpty.length}`);
-  lines.push(`  ingest wall time                  : ${ingestMs} ms`);
+  lines.push(`  subfolders skipped as empty       : ${library.skippedEmpty.length}${reuse ? " (not re-derived)" : ""}`);
+  lines.push(`  ingest wall time                  : ${ingestMs} ms${reuse ? " (no ingest ran)" : ""}`);
   lines.push("");
   lines.push("1. library size as the daemon reports it (content.list)");
   lines.push(`   items                             : ${items.length}`);

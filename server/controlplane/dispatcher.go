@@ -845,10 +845,18 @@ func (d *Dispatcher) handleStatusGet(ctx context.Context, env command.Envelope, 
 		repo.Writable = writability.State
 		repo.WritableReason = writability.Reason
 		repo.WritableCheckedAt = writability.CheckedAt.Format(time.RFC3339)
-		if manifests, err := d.exact.ListSnapshots(ctx); err != nil {
+		// The committed snapshot count is authenticated without assembling any
+		// manifest entry. `status.get` runs on every client startup and the
+		// contract classes it as bounded reconciliation, so reporting one
+		// integer must not cost a full walk of the library. A record whose
+		// commit or prepared closure does not authenticate still fails closed
+		// here; a manifest whose entry parts do not reassemble stays visible on
+		// the surfaces that read restore points (snapshot.list, doctor.check,
+		// verify, restore).
+		if count, err := d.exact.CommittedSnapshotCount(ctx); err != nil {
 			repo.OK = false
 		} else {
-			repo.Snapshots = len(manifests)
+			repo.Snapshots = count
 		}
 		data.Repository = repo
 	}

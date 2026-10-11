@@ -527,7 +527,9 @@ func TestUploadToIngestHandoffProtectsStagedBytesThroughTheOrdinaryPlan(t *testi
 		t.Fatalf("snapshots = %+v", list.Snapshots)
 	}
 	snapshot := list.Snapshots[0]
-	if snapshot.SnapshotRef != appliedData.SnapshotRef || snapshot.Files != 2 || snapshot.ProtectedFiles != 2 || snapshot.UnprotectedFiles != 0 {
+	if snapshot.SnapshotRef != appliedData.SnapshotRef || snapshotReadInt(t, "files", snapshot.Files) != 2 ||
+		snapshotReadInt(t, "protected_files", snapshot.ProtectedFiles) != 2 ||
+		snapshotReadInt(t, "unprotected_files", snapshot.UnprotectedFiles) != 0 {
 		t.Fatalf("snapshot mix = %+v", snapshot)
 	}
 	destination := filepath.Join(t.TempDir(), "restore")

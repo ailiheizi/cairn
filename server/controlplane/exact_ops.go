@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -199,9 +200,91 @@ func (d *Dispatcher) handlePlanRestore(ctx context.Context, env command.Envelope
 	return succeeded(env, started, data)
 }
 
+// snapshotListProjectionIdentity is the bounded `snapshot.list` projection: the
+// authenticated identity of every committed restore point, with no
+// entry-derived count. It is selected explicitly by a caller that only needs to
+// name a restore point, so no surface can receive an identity and render its
+// omitted counts as zero.
+const (
+	snapshotListProjectionIdentity = "identity"
+	// snapshotListProjectionLatest reports the authenticated identity of every
+	// restore point and the complete entry-derived facts of the newest one. It
+	// is the projection a summary that renders only the newest restore point
+	// needs: the daemon assembles one manifest instead of every manifest, and
+	// every older restore point keeps its identity without inheriting a count
+	// nobody read.
+	snapshotListProjectionLatest = "latest"
+)
+
+type snapshotListInput struct {
+	// Projection is optional. Empty or "full" reports every restore-point fact,
+	// including the entry counts, file counts, logical bytes and protection mix
+	// that require assembling each manifest entry. "identity" reports only the
+	// authenticated identity, which does not. "latest" reports identities for
+	// every restore point and the complete facts of the newest one.
+	Projection string `json:"projection,omitempty"`
+}
+
+func resolveSnapshotListProjection(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "full":
+		return "full", nil
+	case snapshotListProjectionIdentity:
+		return snapshotListProjectionIdentity, nil
+	case snapshotListProjectionLatest:
+		return snapshotListProjectionLatest, nil
+	default:
+		return "", fmt.Errorf("projection must be %q, %q or %q, got %q", "full", snapshotListProjectionIdentity, snapshotListProjectionLatest, value)
+	}
+}
+
 func (d *Dispatcher) handleSnapshotList(ctx context.Context, env command.Envelope, started time.Time) command.Result {
 	if d.exact == nil {
 		return unimplementedResult(env, started)
+	}
+	var input snapshotListInput
+	if err := decodeInput(env.Input, &input); err != nil {
+		return invalidInputResult(env, started, err)
+	}
+	projection, err := resolveSnapshotListProjection(input.Projection)
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
+	if projection == snapshotListProjectionIdentity || projection == snapshotListProjectionLatest {
+		identities, err := d.exact.ListSnapshotIdentities(ctx)
+		if err != nil {
+			return failed(env, started, newReason(ReasonCodeCatalogError, err.Error()))
+		}
+		var newest *exact.Manifest
+		if projection == snapshotListProjectionLatest && len(identities) > 0 {
+			manifest, ok, err := d.exact.NewestSnapshotManifest(ctx)
+			if err != nil {
+				return failed(env, started, newReason(ReasonCodeCatalogError, err.Error()))
+			}
+			if ok {
+				newest = &manifest
+			}
+		}
+		summaries := make([]command.SnapshotSummary, 0, len(identities))
+		for _, identity := range identities {
+			// No entry-derived field is set unless this restore point is the
+			// one whose manifest was assembled: an omitted count is not a zero,
+			// and a caller must not receive a protection mix nobody read.
+			summary := command.SnapshotSummary{
+				SnapshotRef:    identity.SnapshotRef,
+				CreatedAt:      identity.CreatedAt.UTC().Format(time.RFC3339),
+				DisplayPath:    identity.DisplayPath,
+				ManifestDigest: identity.ManifestDigest,
+			}
+			// Matched by identity, never by position: a summary may only carry
+			// facts read from the publication it names.
+			if newest != nil && newest.SnapshotRef == identity.SnapshotRef {
+				applySnapshotManifestFacts(&summary, *newest)
+			}
+			d.applySnapshotProvenance(ctx, &summary)
+			summaries = append(summaries, summary)
+		}
+		return succeeded(env, started, command.SnapshotListData{Snapshots: summaries})
 	}
 	manifests, err := d.exact.ListSnapshots(ctx)
 	if err != nil {
@@ -216,25 +299,35 @@ func (d *Dispatcher) handleSnapshotList(ctx context.Context, env command.Envelop
 			ManifestDigest: manifest.ManifestDigest,
 		}
 		applySnapshotManifestFacts(&summary, manifest)
-		// Namespace browsing and verification receipts are optional
-		// operational projections. Snapshot discovery and recovery remain
-		// repository-backed when the catalog is absent, and an absent receipt
-		// is reported as UNRECORDED with a reason rather than a zeroed time.
-		summary.Verification = unrecordedSnapshotVerification(
-			"catalog is not attached; verification receipts are stored in the catalog audit ledger")
-		if d.exact.Store != nil {
-			if root, rootErr := d.exact.Store.GetNamespaceRootBySnapshotRef(ctx, manifest.SnapshotRef); rootErr == nil {
-				summary.WorkspaceID = root.WorkspaceID
-				summary.NamespaceRootID = root.ID
-				summary.Verification = d.snapshotVerificationReceipt(ctx, root.WorkspaceID, manifest.SnapshotRef)
-			} else {
-				summary.Verification = unrecordedSnapshotVerification(
-					"snapshot has no catalog namespace root; verification receipts are read from the catalog audit ledger")
-			}
-		}
+		d.applySnapshotProvenance(ctx, &summary)
 		summaries = append(summaries, summary)
 	}
 	return succeeded(env, started, command.SnapshotListData{Snapshots: summaries})
+}
+
+// applySnapshotProvenance resolves the optional catalog-backed part of one
+// restore-point summary: the workspace and namespace root that record it and
+// the newest verification receipt the catalog holds. Namespace browsing and
+// verification receipts are optional operational projections; snapshot
+// discovery and recovery remain repository-backed when the catalog is absent,
+// and an absent receipt is reported as UNRECORDED with a reason rather than a
+// zeroed time. Both the full and the identity projection share it so an
+// identity can never disagree with the full answer about provenance.
+func (d *Dispatcher) applySnapshotProvenance(ctx context.Context, summary *command.SnapshotSummary) {
+	summary.Verification = unrecordedSnapshotVerification(
+		"catalog is not attached; verification receipts are stored in the catalog audit ledger")
+	if d.exact == nil || d.exact.Store == nil {
+		return
+	}
+	root, rootErr := d.exact.Store.GetNamespaceRootBySnapshotRef(ctx, summary.SnapshotRef)
+	if rootErr != nil {
+		summary.Verification = unrecordedSnapshotVerification(
+			"snapshot has no catalog namespace root; verification receipts are read from the catalog audit ledger")
+		return
+	}
+	summary.WorkspaceID = root.WorkspaceID
+	summary.NamespaceRootID = root.ID
+	summary.Verification = d.snapshotVerificationReceipt(ctx, root.WorkspaceID, summary.SnapshotRef)
 }
 
 // applySnapshotManifestFacts derives restore-point counts only from the
@@ -246,16 +339,21 @@ func (d *Dispatcher) handleSnapshotList(ctx context.Context, env command.Envelop
 func applySnapshotManifestFacts(summary *command.SnapshotSummary, manifest exact.Manifest) {
 	outcomes := map[string]int{}
 	complete := true
+	entries := 0
+	files := 0
+	var bytes int64
+	protectedFiles := 0
+	unprotectedFiles := 0
 	for _, entry := range manifest.Entries {
-		summary.Entries++
+		entries++
 		if sqlite.NamespaceEntryType(entry.EntryType) != sqlite.EntryFile {
 			continue
 		}
-		summary.Files++
+		files++
 		if entry.LogicalSize == nil {
 			complete = false
 		} else {
-			summary.Bytes += *entry.LogicalSize
+			bytes += *entry.LogicalSize
 		}
 		outcome := entry.Protection.Outcome
 		if outcome == "" {
@@ -264,12 +362,20 @@ func applySnapshotManifestFacts(summary *command.SnapshotSummary, manifest exact
 		outcomes[outcome]++
 		switch sqlite.ProtectionOutcome(outcome) {
 		case sqlite.ProtectionExactProtected, sqlite.ProtectionExactFallback:
-			summary.ProtectedFiles++
+			protectedFiles++
 		case sqlite.ProtectionLinkOnlyUnprotected, sqlite.ProtectionExplicitlyUnprotected:
-			summary.UnprotectedFiles++
+			unprotectedFiles++
 		}
 	}
-	summary.BytesComplete = complete
+	// Every entry-derived field is set explicitly, including a genuine zero, so
+	// the default projection never leaves "not read" indistinguishable from
+	// "read as zero".
+	summary.Entries = &entries
+	summary.Files = &files
+	summary.Bytes = &bytes
+	summary.BytesComplete = &complete
+	summary.ProtectedFiles = &protectedFiles
+	summary.UnprotectedFiles = &unprotectedFiles
 	if len(outcomes) > 0 {
 		summary.ProtectionOutcomes = outcomes
 	}

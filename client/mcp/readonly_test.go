@@ -509,8 +509,8 @@ func TestReadOnlyLimitsClampReportAndTruncate(t *testing.T) {
 
 func TestReadOnlyListRecentClampsAndReportsSubjectsOrderingHonestly(t *testing.T) {
 	points := []command.SnapshotSummary{
-		{SnapshotRef: "snap_old", CreatedAt: "2026-01-01T00:00:00Z", WorkspaceID: "wsp_one", Files: 1, Bytes: 10, ManifestDigest: "sha256:old"},
-		{SnapshotRef: "snap_new", CreatedAt: "2026-02-01T00:00:00Z", WorkspaceID: "wsp_one", Files: 2, Bytes: 20, ManifestDigest: "sha256:new"},
+		{SnapshotRef: "snap_old", CreatedAt: "2026-01-01T00:00:00Z", WorkspaceID: "wsp_one", Files: intPtr(1), Bytes: int64Ptr(10), ManifestDigest: "sha256:old"},
+		{SnapshotRef: "snap_new", CreatedAt: "2026-02-01T00:00:00Z", WorkspaceID: "wsp_one", Files: intPtr(2), Bytes: int64Ptr(20), ManifestDigest: "sha256:new"},
 	}
 	subjects := []command.ContentItemData{
 		{SubjectRef: "subj_one", Name: "one.txt", Path: "one.txt", EntryType: "REGULAR_FILE", ContentID: "sha256:one"},
@@ -1224,3 +1224,7 @@ func subjectRefOf(env command.Envelope) string {
 }
 
 func utf8ValidString(value string) bool { return utf8.ValidString(value) }
+
+func intPtr(value int) *int { return &value }
+
+func int64Ptr(value int64) *int64 { return &value }

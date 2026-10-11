@@ -124,8 +124,8 @@ func TestSnapshotVerifyWritesOneAppendOnlyReceiptPerRun(t *testing.T) {
 		receipt.Mode != command.VerifyAuthenticatedMetadata || !receipt.OK {
 		t.Fatalf("recorded receipt = %+v", receipt)
 	}
-	if receipt.AttemptedFiles != afterMetadata.Files || receipt.PassedFiles != afterMetadata.Files ||
-		receipt.AttemptedBytes != afterMetadata.Bytes || receipt.PassedBytes != afterMetadata.Bytes {
+	if receipt.AttemptedFiles != snapshotReadInt(t, "files", afterMetadata.Files) || receipt.PassedFiles != snapshotReadInt(t, "files", afterMetadata.Files) ||
+		receipt.AttemptedBytes != snapshotReadBytes(t, afterMetadata.Bytes) || receipt.PassedBytes != snapshotReadBytes(t, afterMetadata.Bytes) {
 		t.Fatalf("receipt counts = %+v do not match the restore point %+v", receipt, afterMetadata)
 	}
 	if receipt.RequestID != "req-verify-one" || receipt.VerifiedAt == "" {
@@ -324,9 +324,11 @@ func TestLinkOnlyRestorePointReportsUnprotectedMixHonestly(t *testing.T) {
 	}
 
 	summary := findSnapshotSummary(t, list(), ingest.SnapshotRef)
-	if summary.Files != 2 || summary.ProtectedFiles != 1 || summary.UnprotectedFiles != 1 {
+	if snapshotReadInt(t, "files", summary.Files) != 2 || snapshotReadInt(t, "protected_files", summary.ProtectedFiles) != 1 ||
+		snapshotReadInt(t, "unprotected_files", summary.UnprotectedFiles) != 1 {
 		t.Fatalf("mixed protection mix = files %d protected %d unprotected %d, want 2/1/1",
-			summary.Files, summary.ProtectedFiles, summary.UnprotectedFiles)
+			snapshotReadInt(t, "files", summary.Files), snapshotReadInt(t, "protected_files", summary.ProtectedFiles),
+			snapshotReadInt(t, "unprotected_files", summary.UnprotectedFiles))
 	}
 	// The locally stored member is protected whichever recorded exact outcome
 	// the detector produced; the LINK_ONLY member must never count as protected.
@@ -339,13 +341,13 @@ func TestLinkOnlyRestorePointReportsUnprotectedMixHonestly(t *testing.T) {
 	for _, count := range summary.ProtectionOutcomes {
 		bucketed += count
 	}
-	if bucketed != summary.Files {
-		t.Fatalf("protection outcomes %+v do not account for all %d files", summary.ProtectionOutcomes, summary.Files)
+	if bucketed != snapshotReadInt(t, "files", summary.Files) {
+		t.Fatalf("protection outcomes %+v do not account for all %d files", summary.ProtectionOutcomes, snapshotReadInt(t, "files", summary.Files))
 	}
-	if summary.Entries <= summary.Files {
-		t.Fatalf("entries = %d, want non-file entries included and excluded from the protection mix", summary.Entries)
+	if snapshotReadInt(t, "entries", summary.Entries) <= snapshotReadInt(t, "files", summary.Files) {
+		t.Fatalf("entries = %d, want non-file entries included and excluded from the protection mix", snapshotReadInt(t, "entries", summary.Entries))
 	}
-	if summary.Bytes != int64(len("stored")+len("linked")) || !summary.BytesComplete {
+	if snapshotReadBytes(t, summary.Bytes) != int64(len("stored")+len("linked")) || !snapshotReadFlag(t, "bytes_complete", summary.BytesComplete) {
 		t.Fatalf("restore point bytes = %+v", summary)
 	}
 

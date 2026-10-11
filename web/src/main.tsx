@@ -238,7 +238,16 @@ function App() {
       return;
     }
 
-    const [capabilityResult, snapshotResult] = await Promise.allSettled([command(operations.capability.list, {}), command(operations.snapshot.list, {})]);
+    // The shell needs the authenticated identity of the newest restore point —
+    // its ref, its workspace and its recorded verification receipt — to compose
+    // the first screen. It does not read the entry counts, file counts, logical
+    // bytes or protection mix, and the daemon has to assemble every manifest
+    // entry of every publication to report those. Asking for the bounded
+    // identity projection keeps that full-library walk on the surfaces that
+    // actually display it (`snapshot.list` without a projection from the status
+    // disclosure and the verification report), instead of spending it here
+    // before the library listing is even requested.
+    const [capabilityResult, snapshotResult] = await Promise.allSettled([command(operations.capability.list, {}), command(operations.snapshot.list, { projection: "identity" })]);
     if (!isCurrentRefresh()) return;
     if (capabilityResult.status === "fulfilled") setCapabilities(capabilityResult.value.data?.capabilities ?? []);
     else setCapabilities([]);
@@ -292,7 +301,17 @@ function App() {
     },
   };
   const audioPlayback = useAudioPlayback(workspaceID);
-  const musicMetadata = useMusicMetadata(workspaceID, library.libraryItems, command);
+  // Recorded audio facts feed exactly two presentations: the Music page and the
+  // mixed Content overview. Neither is the screen an operator gets by default,
+  // and `audio.list` walks every admitted processor artifact the workspace
+  // holds, so reading it before the library listing turns a page nobody opened
+  // into a request that competes with the first screen. The read starts when
+  // one of those pages is actually selected; the Music page already reports the
+  // read as "Loading recorded audio facts" and keeps filenames and tags
+  // visible, so a deferred read is shown as pending rather than as absent
+  // facts. Details still reads the same projection on demand for one subject.
+  const audioFactsPresentation = view.presentationMode === "music" || view.presentationMode === "page:cairn:overview";
+  const musicMetadata = useMusicMetadata(audioFactsPresentation ? workspaceID : "", library.libraryItems, command);
   const favoriteControls = useFavorites({ t, workspaceID, library, annotationStorageReady, catalogStorageMessage, busy, setBusy, notify: setNotice, refreshCapabilities });
   const originalTakeout = useOriginalTakeout(workspaceID);
   const originalTakeoutBusy = ["planning", "downloading", "preparing"].includes(originalTakeout.status);

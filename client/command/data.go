@@ -160,6 +160,14 @@ type SnapshotListData struct {
 // manifest, never from the rebuildable catalog. Verification is always
 // present: State UNRECORDED carries the reason no receipt exists, so an
 // unverified restore point never renders as a zeroed verification time.
+//
+// The entry-derived fields are pointers with `omitempty` on purpose. The
+// default full projection always sets them, including a genuine zero, so
+// `"protected_files": 0` still means "read, and none were protected". The
+// bounded identity projection does not read the manifest entries at all, and it
+// leaves these fields nil so the keys are absent: a caller can then tell "not
+// read" from "read as zero", and a consumer that would render a count must
+// treat absence as unknown rather than as zero.
 type SnapshotSummary struct {
 	SnapshotRef     string `json:"snapshot_ref"`
 	CreatedAt       string `json:"created_at,omitempty"`
@@ -171,10 +179,10 @@ type SnapshotSummary struct {
 	// sums the recorded logical sizes of regular files. BytesComplete is false
 	// when any regular file lacks a recorded size, so a partial sum is never
 	// presented as the whole.
-	Entries       int   `json:"entries"`
-	Files         int   `json:"files"`
-	Bytes         int64 `json:"bytes"`
-	BytesComplete bool  `json:"bytes_complete"`
+	Entries       *int   `json:"entries,omitempty"`
+	Files         *int   `json:"files,omitempty"`
+	Bytes         *int64 `json:"bytes,omitempty"`
+	BytesComplete *bool  `json:"bytes_complete,omitempty"`
 	// ProtectedFiles counts file entries with a locally verified exact payload
 	// (EXACT_PROTECTED / EXACT_FALLBACK). UnprotectedFiles counts file entries
 	// explicitly recorded as not locally protected (LINK_ONLY_UNPROTECTED /
@@ -182,8 +190,8 @@ type SnapshotSummary struct {
 	// regular file by recorded outcome, including UNRECORDED for a legacy entry
 	// without one, so blocked, unavailable, and external-replayable members
 	// stay visible instead of disappearing from the mix.
-	ProtectedFiles     int                       `json:"protected_files"`
-	UnprotectedFiles   int                       `json:"unprotected_files"`
+	ProtectedFiles     *int                      `json:"protected_files,omitempty"`
+	UnprotectedFiles   *int                      `json:"unprotected_files,omitempty"`
 	ProtectionOutcomes map[string]int            `json:"protection_outcomes,omitempty"`
 	Verification       *SnapshotVerificationData `json:"verification,omitempty"`
 }

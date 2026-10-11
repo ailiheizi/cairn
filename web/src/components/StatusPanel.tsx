@@ -112,7 +112,12 @@ export function StatusPanel({ t, status, statusData, capabilities, onRefresh, on
       return () => { cancelled = true; };
     }
     void (async () => {
-      const [snapshotResult, exportResult] = await Promise.allSettled([command(operations.snapshot.list, {}), command(operations.export.list, {})]);
+      // This panel renders entry-derived facts for the newest restore point
+      // only, and reads the verification receipt of every restore point from
+      // the same answer. Asking for the bounded `latest` projection keeps the
+      // daemon from assembling every publication's manifest to describe one,
+      // and leaves an older restore point's counts absent rather than zero.
+      const [snapshotResult, exportResult] = await Promise.allSettled([command(operations.snapshot.list, { projection: "latest" }), command(operations.export.list, {})]);
       if (cancelled) return;
       const snapshots = snapshotResult.status === "fulfilled" ? ((snapshotResult.value.data?.snapshots ?? []) as SnapshotSummary[]) : [];
       const exports = exportResult.status === "fulfilled" && Array.isArray(exportResult.value.data) ? (exportResult.value.data as ExportManifestData[]) : [];

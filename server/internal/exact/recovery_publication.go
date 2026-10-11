@@ -1236,41 +1236,40 @@ func (s *Service) committedPublications(ctx context.Context) ([]committedPublica
 	return markers, nil
 }
 
-// validatePreparedEnvelope authenticates one prepared publication closure
-// against its signed commit and returns the complete logical manifest. For the
-// part-bound v3 schema it reassembles the manifest entries from the
-// content-addressed parts and requires their digest to equal the signed
-// manifest digest, so a missing, reordered or substituted part fails closed.
-func validatePreparedEnvelope(ctx context.Context, driver repository.RecordDriver, anchor TrustAnchor, commit PublicationCommitRecord, envelope PreparedClosureEnvelope, preparedLength int64) (Manifest, error) {
+// validatePreparedEnvelopeHead authenticates the entry-independent part of one
+// prepared publication closure against its signed commit: the schema and shape
+// agreement, the prepared-closure signature, every prepared/commit binding, the
+// placement receipt, the payload receipt with its totals, and the authenticated
+// metadata evidence digest. It deliberately stops before the manifest entries.
+//
+// It is split out so a bounded read can report an authenticated restore-point
+// identity without assembling the entry parts, which is the step that costs a
+// full-library read. The returned bool is the v2 evidence shape, which the
+// caller needs to continue. Verifying the signature before reading any part is
+// also strictly safer than the previous order, which read attacker-named parts
+// before authenticating the envelope that names them.
+func validatePreparedEnvelopeHead(driver repository.RecordDriver, anchor TrustAnchor, commit PublicationCommitRecord, envelope PreparedClosureEnvelope, preparedLength int64) (bool, error) {
 	v2Shape := envelope.Schema == PreparedEnvelopeSchemaV2 || envelope.Schema == PreparedEnvelopeSchemaV3
 	switch envelope.Schema {
 	case PreparedEnvelopeSchemaV1, PreparedEnvelopeSchemaV2:
 		if len(envelope.ManifestParts) != 0 {
-			return Manifest{}, fmt.Errorf("prepared envelope %q carries a part binding", envelope.Schema)
+			return false, fmt.Errorf("prepared envelope %q carries a part binding", envelope.Schema)
 		}
 	case PreparedEnvelopeSchemaV3:
 		if len(envelope.ManifestParts) == 0 {
-			return Manifest{}, errors.New("prepared envelope v3 requires a part binding")
+			return false, errors.New("prepared envelope v3 requires a part binding")
 		}
 	default:
-		return Manifest{}, fmt.Errorf("unsupported prepared envelope schema %q", envelope.Schema)
+		return false, fmt.Errorf("unsupported prepared envelope schema %q", envelope.Schema)
 	}
 	if envelope.Schema == PreparedEnvelopeSchemaV1 && envelope.Manifest.Schema != SnapshotSchemaV1 {
-		return Manifest{}, errors.New("prepared envelope v1 must contain snapshot v1")
+		return false, errors.New("prepared envelope v1 must contain snapshot v1")
 	}
 	if v2Shape && envelope.Manifest.Schema != SnapshotSchemaV2 {
-		return Manifest{}, errors.New("prepared envelope v2 must contain snapshot v2")
-	}
-	manifest := envelope.Manifest
-	if envelope.Schema == PreparedEnvelopeSchemaV3 {
-		entries, err := readManifestEntryParts(ctx, driver, manifest.ManifestDigest, envelope.ManifestParts)
-		if err != nil {
-			return Manifest{}, err
-		}
-		manifest.Entries = entries
+		return false, errors.New("prepared envelope v2 must contain snapshot v2")
 	}
 	if err := envelope.Prepared.Verify(anchor); err != nil {
-		return Manifest{}, err
+		return false, err
 	}
 	p := envelope.Prepared
 	if p.PublicationID != commit.PublicationID || p.PublicationDomain != commit.PublicationDomain ||
@@ -1281,26 +1280,26 @@ func validatePreparedEnvelope(ctx context.Context, driver repository.RecordDrive
 		p.CaptureDigest != commit.CaptureDigest || p.PolicyDigest != commit.PolicyDigest ||
 		p.VerificationDigest != commit.VerificationDigest || p.TargetIdentity != commit.TargetIdentity ||
 		p.FenceToken != commit.FenceToken || p.ParentCommitDigest != commit.ParentCommitDigest {
-		return Manifest{}, errors.New("prepared closure and publication commit bindings differ")
+		return false, errors.New("prepared closure and publication commit bindings differ")
 	}
 	preparedReceiptDigest, err := DigestCanonicalJSON(stableRecordReceipt{
 		RepositoryID: driver.RepositoryIdentity(), Role: repository.RecordPreparedClosure,
 		Digest: commit.PreparedObjectDigest, Bytes: preparedLength,
 	})
 	if err != nil || preparedReceiptDigest != commit.PreparedReceiptDigest {
-		return Manifest{}, errors.New("prepared closure placement receipt digest mismatch")
+		return false, errors.New("prepared closure placement receipt digest mismatch")
 	}
 	if err := validatePayloadReceipt(envelope.PayloadReceipt); err != nil {
-		return Manifest{}, err
+		return false, err
 	}
 	if envelope.PayloadReceipt.RepositoryID != driver.RepositoryIdentity() ||
 		envelope.PayloadReceipt.PublicationID != commit.PublicationID || envelope.PayloadReceipt.SnapshotRef != commit.SnapshotRef {
-		return Manifest{}, errors.New("payload receipt publication binding mismatch")
+		return false, errors.New("payload receipt publication binding mismatch")
 	}
 	payloadDigest, _ := DigestCanonicalJSON(envelope.PayloadReceipt)
 	if payloadDigest != commit.PayloadReceiptDigest || envelope.PayloadReceipt.TotalBytes != commit.PayloadReceiptLength ||
 		int64(len(envelope.PayloadReceipt.Objects)) != commit.PayloadReceiptObjectCount {
-		return Manifest{}, errors.New("payload receipt digest or totals mismatch")
+		return false, errors.New("payload receipt digest or totals mismatch")
 	}
 	verificationDigest, _ := DigestCanonicalJSON(envelope.VerificationEvidence)
 	wantEvidenceSchema := MetadataEvidenceSchemaV1
@@ -1308,8 +1307,30 @@ func validatePreparedEnvelope(ctx context.Context, driver repository.RecordDrive
 		wantEvidenceSchema = MetadataEvidenceSchemaV2
 	}
 	if envelope.VerificationEvidence.Schema != wantEvidenceSchema || verificationDigest != commit.VerificationDigest {
-		return Manifest{}, errors.New("authenticated metadata evidence mismatch")
+		return false, errors.New("authenticated metadata evidence mismatch")
 	}
+	return v2Shape, nil
+}
+
+// validatePreparedEnvelope authenticates one prepared publication closure
+// against its signed commit and returns the complete logical manifest. For the
+// part-bound v3 schema it reassembles the manifest entries from the
+// content-addressed parts and requires their digest to equal the signed
+// manifest digest, so a missing, reordered or substituted part fails closed.
+func validatePreparedEnvelope(ctx context.Context, driver repository.RecordDriver, anchor TrustAnchor, commit PublicationCommitRecord, envelope PreparedClosureEnvelope, preparedLength int64) (Manifest, error) {
+	v2Shape, err := validatePreparedEnvelopeHead(driver, anchor, commit, envelope, preparedLength)
+	if err != nil {
+		return Manifest{}, err
+	}
+	manifest := envelope.Manifest
+	if envelope.Schema == PreparedEnvelopeSchemaV3 {
+		entries, err := readManifestEntryParts(ctx, driver, manifest.ManifestDigest, envelope.ManifestParts)
+		if err != nil {
+			return Manifest{}, err
+		}
+		manifest.Entries = entries
+	}
+	verificationDigest, _ := DigestCanonicalJSON(envelope.VerificationEvidence)
 	if v2Shape {
 		if envelope.VerificationEvidence.PortableFactsSchema != PortableFactsSchemaV1 ||
 			envelope.VerificationEvidence.PortableFactsDigest == "" ||
