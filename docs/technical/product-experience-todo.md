@@ -9,7 +9,7 @@
 > [Product Experience Plan](product-experience-plan.md); item constraints live
 > in [Product Experience Backlog](product-experience-backlog.md).
 
-Last updated 2026-10-10 (SP-1 first-viewport regression fixed and re-verified; photo viewer touch matrix and narrow-screen download closed with real-Chrome evidence; saved-view kernel fail-open closed and regression-checked against real stored views); older evidence keeps its own date.
+Last updated 2026-10-11 (SP-2 large-library behaviour measured on a real 9,138-item library in real Chrome: the wall materializes every item, `search.query` returns 1000 hits with no continuation, thumbnail reads stay inside the 48-item eager window, and the 10k-wall exit test fails as written — the 16 MiB per-publication record bound is what holds the measured library at 9,138 rather than 10,000+; the SP-1 regression and saved-view fixes keep their 2026-10-10 date); older evidence keeps its own date.
 
 ## Convergence-phase priority order
 
@@ -410,13 +410,13 @@ slice; the original baseline was about 560 px with 159 px tiles and 6 columns:
 
 ## SP-2 — Dense content wall, timeline, map `[ ]`
 
-- [ ] Cursor pagination over `search.query`
-- [ ] Virtualized rendering for large result sets
+- [ ] Cursor pagination over `search.query` — **measured 2026-10-11** on a real 9,138-item library (`node scripts/web-large-library-check.mjs <image-folder>`): `search.query` for every recorded image (`filters.media_class=image`) returns exactly **1000 hits** in a **503,925-byte** response and offers **no** cursor, continuation, offset, page or total key. The client's own `type:image` search sends only `workspace_id`, `query` and `filters` — no limit and no cursor — and renders all 1000 returned hits, so it asks for and shows one truncated page. The result scope already says so ("These counts cover the returned results, which may be limited; they are not full-library matching totals."); the truncation is therefore visible, but it is not paginated and cannot be continued.
+- [ ] Virtualized rendering for large result sets — **measured 2026-10-11 at 9,138 items** in real Chrome: the library wall holds **9,138 `.result-row` elements in the DOM, exactly the 9,138 items `content.list` reports**, and the Photos wall holds **9,100 `.photo-card` elements** for the 9,100 image-suffix items. Nothing is windowed: the whole library materializes (wall load 26,264 ms; JS heap 256.8 MiB used / 306.5 MiB total; Chrome process-tree RSS 749.7 MiB over 8 processes; the `content.list` response is 4,689,018 bytes requested with `workspace_id` alone).
 - [ ] Stable scroll restoration when returning from a detail view
-- [ ] Thumbnails served as `ArtifactRef` through content access
+- [ ] Thumbnails served as `ArtifactRef` through content access — still not implemented; a thumbnail remains a transient browser rendition over `content.open` + `content.read`. Measured 2026-10-11: the library wall issues **96 preview requests** for the whole 9,138-item load (the bounded 48-item eager window, two operations per image) and **0 more** while scrolling that wall to its end; scrolling the 9,100-card Photos wall to its end added **99** further requests, because a candidate above the 1 MiB automatic-thumbnail budget is read only while its card is visible. The bound is real; what is missing is a served `ArtifactRef`.
 - [ ] Timeline view over the existing date facet
 - [ ] Map aggregation from stored coordinates, with no new durable table
-- [ ] Exit: a 10k-image fixture wall scrolls without full materialization
+- [ ] Exit: a 10k-image fixture wall scrolls without full materialization — **fails as measured on 2026-10-11.** The largest library reachable from the operator's real 1.8 GB / 11,561-image folder under the 16 MiB per-publication bound is **9,138 entries**: 20 of its 39 immediate subfolders published, 16 were empty, and 3 were refused by `plan.ingest` for 836, 780 and 816 entries (their image-only subdirectories hold 831, 775 and 811 files and are still above the bound), so 10,000 items was not reachable without splitting an over-ceiling folder, which this measurement did not do. At 9,138 items the wall rendered every item (see the virtualization row) and did scroll its whole 203,463-pixel height with real wheel input in 11,229 ms, but that scroll produced **70 main-thread tasks over 50 ms (largest 520 ms, 4,734 ms total blocking, largest frame gap 517 ms)** and opening Details on a visible row cost **5,654 ms to click plus 1,112 ms to render**. The "without full materialization" half of the exit test is false, and the wall is heavy even where it does work.
 
 Current limit: explicit image inspection handles PNG, JPEG, GIF, and WebP up
 to 8 MiB after complete byte verification; automatic thumbnails remain 1 MiB
