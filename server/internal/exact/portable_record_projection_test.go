@@ -2,6 +2,7 @@ package exact
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -175,55 +176,188 @@ func TestProjectedPublicationRecordsMatchThePlacedRecords(t *testing.T) {
 	}
 }
 
-// TestInspectIngestRefusesPublicationAboveTheRecordBound proves the refusal is
-// decided while planning. The oversized capture must not create a workspace, a
-// plan, a repository object, or any record placement: inspection is read-only.
-func TestInspectIngestRefusesPublicationAboveTheRecordBound(t *testing.T) {
+// TestLargePublicationIsOnePublicationWithOneNamespaceRoot is the
+// convergence-phase fix at the exact-package level. A source root whose
+// monolithic portable record would exceed the repository bound is published as
+// one publication: the oversized logical records are placed as content-addressed
+// parts, the authenticated reader reassembles the complete manifest, and every
+// placed record stays inside the bound. No projection changes are involved.
+func TestLargePublicationIsOnePublicationWithOneNamespaceRoot(t *testing.T) {
 	ctx := context.Background()
-	// A plain-file capture projects about 15 KB of portable fact records per
-	// entry, so this many entries cross the 16 MiB per-record bound with room
-	// to spare and without relying on platform-specific extended attributes.
 	fixture := newProjectionFixture(t, 1200)
-	if !fixture.projection.ExceedsLimit() {
-		t.Fatalf("fixture does not exceed the record bound: %+v", fixture.projection)
+	if fixture.projection.ExceedsLimit() {
+		t.Fatalf("a large publication must still be placeable: %+v", fixture.projection)
 	}
-	_, err := fixture.service.InspectIngest(ctx, fixture.source, IngestOptions{})
-	if !errors.Is(err, ErrPortableRecordTooLarge) {
-		t.Fatalf("oversized inspect ingest = %v, want ErrPortableRecordTooLarge", err)
+	if fixture.projection.LargestBytes() <= repository.MaxRecordBytes {
+		t.Fatalf("fixture does not exceed the monolithic record bound: %+v", fixture.projection)
 	}
-	message := err.Error()
-	for _, fragment := range []string{
-		"ingest subfolders as separate sources",
-		strconv.FormatInt(repository.MaxRecordBytes, 10) + "-byte repository record limit",
-		fmt.Sprintf("for %d entries", fixture.projection.Entries),
-	} {
-		if !strings.Contains(message, fragment) {
-			t.Fatalf("refusal %q is missing %q", message, fragment)
-		}
+	if fixture.projection.LargestItemBytes > repository.MaxRecordBytes {
+		t.Fatalf("fixture has an unsplittable single item: %+v", fixture.projection)
 	}
-	// The measured size in the message comes from the inspection that refused,
-	// which is a second capture of the same tree; only its bound matters here.
-	measured := reportedRecordBytes(t, message)
-	if measured <= repository.MaxRecordBytes {
-		t.Fatalf("refusal reports %d bytes, want more than the %d-byte limit", measured, repository.MaxRecordBytes)
+	plan, err := fixture.service.InspectIngest(ctx, fixture.source, IngestOptions{})
+	if err != nil {
+		t.Fatalf("large inspect ingest: %v", err)
 	}
-	if count, err := fixture.store.CountPlans(ctx); err != nil || count != 0 {
-		t.Fatalf("refused inspection recorded %d plans (err=%v)", count, err)
-	}
-	if _, err := fixture.store.GetWorkspaceByName(ctx, defaultWorkspaceName); !errors.Is(err, sqlite.ErrNotFound) {
-		t.Fatalf("refused inspection created a catalog workspace: %v", err)
+	if _, err := fixture.service.ApplyIngestPlanWithExecutionKey(ctx, plan, "sha256:multi-part-plan"); err != nil {
+		t.Fatalf("large apply: %v", err)
 	}
 	for _, role := range []repository.RecordRole{
-		repository.RecordPreparedClosure, repository.RecordPublicationCommit,
-		repository.RecordProcessorAttemptClosure, repository.RecordPortableFactClosure,
+		repository.RecordPreparedClosure, repository.RecordPublicationCommit, repository.RecordPortableFactClosure,
 	} {
 		digests, err := fixture.repo.ListRecordDigests(ctx, role)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(digests) != 0 {
-			t.Fatalf("refused inspection placed %d %s records", len(digests), role)
+		if len(digests) != 1 {
+			t.Fatalf("%s records = %d, want exactly one publication", role, len(digests))
 		}
+	}
+	for _, role := range []repository.RecordRole{
+		repository.RecordPreparedClosure, repository.RecordPublicationCommit,
+		repository.RecordPortableFactClosure, repository.RecordPart,
+	} {
+		digests, err := fixture.repo.ListRecordDigests(ctx, role)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, digest := range digests {
+			payload, err := readRecord(ctx, fixture.repo, role, digest)
+			if err != nil {
+				t.Fatalf("%s %s: %v", role, digest, err)
+			}
+			if int64(len(payload)) > repository.MaxRecordBytes {
+				t.Fatalf("%s %s is %d bytes, above the %d-byte bound", role, digest, len(payload), repository.MaxRecordBytes)
+			}
+		}
+	}
+	parts, err := fixture.repo.ListRecordDigests(ctx, repository.RecordPart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) == 0 {
+		t.Fatal("the oversized publication placed no content-addressed record parts")
+	}
+	commits, err := fixture.repo.ListRecordDigests(ctx, repository.RecordPublicationCommit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitPayload, err := readRecord(ctx, fixture.repo, repository.RecordPublicationCommit, commits[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var commit PublicationCommitRecord
+	if err := decodeStrictRecord(commitPayload, &commit); err != nil {
+		t.Fatal(err)
+	}
+	// Whichever logical record the projection says is oversized must be placed
+	// in the part-bound v3 shape; the other stays monolithic.
+	wantPreparedV3 := fixture.projection.PreparedClosureBytes > repository.MaxRecordBytes
+	wantFactV3 := fixture.projection.PortableFactClosureBytes > repository.MaxRecordBytes
+	if !wantPreparedV3 && !wantFactV3 {
+		t.Fatal("fixture is not oversized for either logical record")
+	}
+	preparedPayload, err := readRecord(ctx, fixture.repo, repository.RecordPreparedClosure, commit.PreparedObjectDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope PreparedClosureEnvelope
+	if err := decodeStrictRecord(preparedPayload, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if wantPreparedV3 {
+		if envelope.Schema != PreparedEnvelopeSchemaV3 || len(envelope.ManifestParts) == 0 {
+			t.Fatalf("prepared envelope = schema %q with %d parts, want the part-bound v3 shape", envelope.Schema, len(envelope.ManifestParts))
+		}
+	} else if envelope.Schema != PreparedEnvelopeSchemaV2 || len(envelope.ManifestParts) != 0 {
+		t.Fatalf("prepared envelope = schema %q with %d parts, want the monolithic v2 shape", envelope.Schema, len(envelope.ManifestParts))
+	}
+	factDigests, err := fixture.repo.ListRecordDigests(ctx, repository.RecordPortableFactClosure)
+	if err != nil {
+		t.Fatal(err)
+	}
+	factPayload, err := readRecord(ctx, fixture.repo, repository.RecordPortableFactClosure, factDigests[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var factEnvelope PortableFactClosureEnvelope
+	if err := decodeStrictRecord(factPayload, &factEnvelope); err != nil {
+		t.Fatal(err)
+	}
+	if wantFactV3 {
+		if factEnvelope.Schema != PortableFactClosureEnvelopeSchemaV3 || len(factEnvelope.BundleParts) == 0 {
+			t.Fatalf("portable fact envelope = schema %q with %d parts, want the part-bound v3 shape", factEnvelope.Schema, len(factEnvelope.BundleParts))
+		}
+	} else if factEnvelope.Schema != PortableFactClosureEnvelopeSchemaV2 || len(factEnvelope.BundleParts) != 0 {
+		t.Fatalf("portable fact envelope = schema %q with %d parts, want the monolithic v2 shape", factEnvelope.Schema, len(factEnvelope.BundleParts))
+	}
+	publications, err := fixture.service.committedPublications(ctx)
+	if err != nil {
+		t.Fatalf("committed publications: %v", err)
+	}
+	if len(publications) != 1 {
+		t.Fatalf("committed publications = %d, want 1", len(publications))
+	}
+	if got, want := len(publications[0].Manifest.Entries), fixture.projection.Entries; got != want {
+		t.Fatalf("reassembled manifest entries = %d, want %d", got, want)
+	}
+	if publications[0].Manifest.ManifestDigest != commit.ManifestDigest {
+		t.Fatalf("reassembled manifest digest = %s, want the signed %s", publications[0].Manifest.ManifestDigest, commit.ManifestDigest)
+	}
+	closures, err := listPortableFactClosures(ctx, fixture.repo, fixture.repo, *fixture.service.TrustAnchor, testPublicationDomain, commits[0])
+	if err != nil {
+		t.Fatalf("portable fact closures: %v", err)
+	}
+	if len(closures) != 1 {
+		t.Fatalf("portable fact closures = %d, want 1", len(closures))
+	}
+	if int64(len(closures[0].Bundle)) != closures[0].Closure.BundleLength {
+		t.Fatalf("reassembled bundle = %d bytes, want the signed %d", len(closures[0].Bundle), closures[0].Closure.BundleLength)
+	}
+	if DigestBytes(closures[0].Bundle) != closures[0].Closure.BundleDigest {
+		t.Fatal("reassembled bundle digest differs from the signed BundleDigest")
+	}
+}
+
+// TestProjectionRefusesAnUnsplittableSingleItem keeps the pre-flight refusal for
+// the only entry-scaling case a part split cannot place: one logical item larger
+// than the per-record bound.
+func TestProjectionRefusesAnUnsplittableSingleItem(t *testing.T) {
+	projection := PublicationRecordProjection{
+		Entries: 1, Limit: repository.MaxRecordBytes, LargestItemBytes: repository.MaxRecordBytes + 1,
+	}
+	if !projection.ExceedsLimit() {
+		t.Fatal("an unsplittable single item must exceed the record bound")
+	}
+	refusal := projection.Refusal()
+	if !errors.Is(refusal, ErrPortableRecordTooLarge) {
+		t.Fatalf("refusal = %v, want ErrPortableRecordTooLarge", refusal)
+	}
+	message := refusal.Error()
+	for _, fragment := range []string{
+		"one item cannot be split across record parts",
+		strconv.FormatInt(repository.MaxRecordBytes, 10) + "-byte repository record limit",
+		"for 1 entries",
+	} {
+		if !strings.Contains(message, fragment) {
+			t.Fatalf("refusal %q is missing %q", message, fragment)
+		}
+	}
+	if measured := reportedRecordBytes(t, message); measured <= repository.MaxRecordBytes {
+		t.Fatalf("refusal reports %d bytes, want more than the %d-byte limit", measured, repository.MaxRecordBytes)
+	}
+}
+
+// TestManifestPartSplitterRefusesAnOversizedEntry proves the splitter itself,
+// not only the gate, refuses an atomic item it cannot place.
+func TestManifestPartSplitterRefusesAnOversizedEntry(t *testing.T) {
+	oversized := json.RawMessage(`"` + strings.Repeat("A", int(repository.MaxRecordBytes)+1024) + `"`)
+	manifest := Manifest{
+		Schema: SnapshotSchemaV2, SnapshotRef: "snap:splitter-test",
+		ManifestDigest: DigestBytes([]byte("splitter-test")),
+		Entries:        []ManifestEntry{{RelativePath: "huge", RawPath: []byte("huge"), EntryType: "file", MetadataAfter: oversized}},
+	}
+	if _, err := buildManifestEntryParts(manifest, manifest.ManifestDigest); !errors.Is(err, ErrPortableRecordTooLarge) {
+		t.Fatalf("oversized entry split = %v, want ErrPortableRecordTooLarge", err)
 	}
 }
 

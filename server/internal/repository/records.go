@@ -21,6 +21,12 @@ const (
 	RecordPublicationCommit       RecordRole = "PUBLICATION_COMMIT"
 	RecordProcessorAttemptClosure RecordRole = "PROCESSOR_ATTEMPT_CLOSURE"
 	RecordPortableFactClosure     RecordRole = "PORTABLE_FACT_CLOSURE"
+	// RecordPart is one content-addressed slice of a logical portable record
+	// whose canonical JSON does not fit the per-record bound. A part is never a
+	// publication by itself: only the binding record that lists it is discovery
+	// authority, and the binding is authenticated by the digest the existing
+	// signature already covers.
+	RecordPart RecordRole = "RECORD_PART"
 
 	recoveryDirName          = "recovery"
 	repositoryIdentityFile   = "repository.identity"
@@ -324,7 +330,7 @@ func (repo *Memory) ListRecordDigests(ctx context.Context, role RecordRole) ([]s
 
 func validateRecordRole(role RecordRole) error {
 	switch role {
-	case RecordPreparedClosure, RecordPublicationCommit, RecordProcessorAttemptClosure, RecordPortableFactClosure:
+	case RecordPreparedClosure, RecordPublicationCommit, RecordProcessorAttemptClosure, RecordPortableFactClosure, RecordPart:
 		return nil
 	default:
 		return fmt.Errorf("unsupported portable record role %q", role)
@@ -340,6 +346,9 @@ func recordRoleDir(role RecordRole) string {
 	}
 	if role == RecordPortableFactClosure {
 		return "portable-facts"
+	}
+	if role == RecordPart {
+		return "parts"
 	}
 	return "commits"
 }

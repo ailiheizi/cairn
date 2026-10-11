@@ -177,7 +177,12 @@ type PreparedClosureEnvelope struct {
 	Prepared             SignedPreparedClosure         `json:"prepared"`
 	PayloadReceipt       PayloadReceipt                `json:"payload_receipt"`
 	VerificationEvidence AuthenticatedMetadataEvidence `json:"verification_evidence"`
-	Manifest             Manifest                      `json:"manifest"`
+	// Manifest carries the complete manifest for PreparedEnvelopeSchemaV1/V2.
+	// For PreparedEnvelopeSchemaV3 it carries every manifest field except
+	// entries, including the canonical manifest_digest, and ManifestParts binds
+	// the content-addressed parts that carry the entries.
+	Manifest      Manifest        `json:"manifest"`
+	ManifestParts []RecordPartRef `json:"manifest_parts,omitempty"`
 }
 
 type stableRecordReceipt struct {
@@ -331,14 +336,29 @@ var ErrPortableRecordTooLarge = errors.New("ingest publication exceeds the porta
 // count. A publication's commit marker is a fixed-size record, and the
 // processor-attempt closure was measured well below both projected records on
 // a real library; both remain covered by the placement guard.
+//
+// An oversized logical record is placed as content-addressed parts, so the
+// entry count no longer makes a publication unplaceable. LargestItemBytes is
+// the largest single logical item (one manifest entry or one portable fact
+// record); a part cannot be split below one item, and that is the only
+// entry-scaling size that can still refuse a plan.
 type PublicationRecordProjection struct {
 	Entries                  int
 	PreparedClosureBytes     int64
 	PortableFactClosureBytes int64
+	LargestItemBytes         int64
 	Limit                    int64
 }
 
-// LargestBytes returns the largest portable record the publication would place.
+// recordPartItemMargin is the conservative allowance for the part envelope's
+// own fields and array punctuation when the largest single item is compared
+// with the per-record bound. It is deliberately much larger than the measured
+// part overhead.
+const recordPartItemMargin = int64(4 << 10)
+
+// LargestBytes returns the largest portable record the publication would place
+// if it were placed whole. This is informational once part splitting is
+// available; ExceedsLimit decides whether the publication can be placed.
 func (p PublicationRecordProjection) LargestBytes() int64 {
 	if p.PreparedClosureBytes > p.PortableFactClosureBytes {
 		return p.PreparedClosureBytes
@@ -346,20 +366,19 @@ func (p PublicationRecordProjection) LargestBytes() int64 {
 	return p.PortableFactClosureBytes
 }
 
-// ExceedsLimit reports whether the publication cannot be placed under the
-// repository's per-record bound.
+// ExceedsLimit reports whether a single logical item cannot fit one repository
+// record, so that no part split can place the publication.
 func (p PublicationRecordProjection) ExceedsLimit() bool {
-	return p.Limit > 0 && p.LargestBytes() > p.Limit
+	return p.Limit > 0 && p.LargestItemBytes > p.Limit-recordPartItemMargin
 }
 
-// Refusal is the ordinary invalid-input refusal for a publication that cannot
-// be placed. One sentence carries the measured entry count, the projected
-// record size, the limit, and the remedy that keeps each publication inside the
-// bound.
+// Refusal is the ordinary invalid-input refusal for a publication whose single
+// largest item cannot be split across parts. It names the item size, the entry
+// count, and the limit.
 func (p PublicationRecordProjection) Refusal() error {
 	return fmt.Errorf(
-		"%w: applying this plan would place a %d-byte portable recovery record for %d entries, above the %d-byte repository record limit; ingest subfolders as separate sources so each publication stays under the limit",
-		ErrPortableRecordTooLarge, p.LargestBytes(), p.Entries, p.Limit,
+		"%w: applying this plan would place a %d-byte portable recovery record for %d entries, above the %d-byte repository record limit; one item cannot be split across record parts, so this publication cannot be placed",
+		ErrPortableRecordTooLarge, p.LargestItemBytes, p.Entries, p.Limit,
 	)
 }
 
@@ -500,6 +519,9 @@ func (s *Service) projectPublicationRecords(
 		}
 		manifestEntryCount++
 		manifestEntryBytes += int64(len(encoded))
+		if int64(len(encoded)) > projection.LargestItemBytes {
+			projection.LargestItemBytes = int64(len(encoded))
+		}
 		if sqlite.NamespaceEntryType(manifestEntry.EntryType) == sqlite.EntryFile {
 			fileCount++
 			if manifestEntry.ContentID != "" {
@@ -518,13 +540,16 @@ func (s *Service) projectPublicationRecords(
 				return projection, err
 			}
 		}
-		recordBytes, recordCount, err := projectedPortableFactRecordBytes(
+		recordBytes, recordCount, recordMax, err := projectedPortableFactRecordBytes(
 			workspaceID, snapshotRef, rootID, sourceID, entry.Name, parentSubject, manifestEntry)
 		if err != nil {
 			return projection, err
 		}
 		factRecordCount += recordCount
 		factRecordBytes += recordBytes
+		if recordMax > projection.LargestItemBytes {
+			projection.LargestItemBytes = recordMax
+		}
 	}
 	projection.Entries = manifestEntryCount
 
@@ -702,33 +727,34 @@ func projectedPreparedItem(
 	return item, nil
 }
 
-// projectedPortableFactRecordBytes returns the summed serialized length and the
-// count of the portable fact records one manifest entry contributes to the
-// post-publication child closure. The payloads are the same values the apply
-// path serializes; catalog-derived identifiers are same-width placeholders.
+// projectedPortableFactRecordBytes returns the summed serialized length, the
+// count, and the largest single serialized record that one manifest entry
+// contributes to the post-publication child closure. The payloads are the same
+// values the apply path serializes; catalog-derived identifiers are same-width
+// placeholders.
 func projectedPortableFactRecordBytes(
 	workspaceID, snapshotRef, rootID, sourceID, displayName, parentSubject string,
 	entry ManifestEntry,
-) (int64, int, error) {
+) (int64, int, int64, error) {
 	recordSchema, err := portableFactRecordSchema(PortableFactBundleSchemaV2)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	entryID, err := sqlite.NewStableID(sqlite.IDPrefixNamespaceEntry)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	subjectRef, err := sqlite.NewStableID(sqlite.IDPrefixSubject)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	fileVersionID := ""
 	if entry.ContentID != "" {
 		if fileVersionID, err = sqlite.NewStableID(sqlite.IDPrefixFileVersion); err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 	}
-	total, count := int64(0), 0
+	total, count, largest := int64(0), 0, int64(0)
 	appendRecord := func(kind, id string, payload, provenance any) error {
 		payloadBytes, err := CanonicalJSON(payload)
 		if err != nil {
@@ -749,6 +775,9 @@ func projectedPortableFactRecordBytes(
 		}
 		total += int64(len(encoded))
 		count++
+		if int64(len(encoded)) > largest {
+			largest = int64(len(encoded))
+		}
 		return nil
 	}
 	selected := make(map[string]struct{})
@@ -777,20 +806,20 @@ func projectedPortableFactRecordBytes(
 	if err := appendRecord("SUBJECT_MAPPING", entryID, mapping, map[string]any{
 		"namespace_root_id": rootID, "entry_type": entry.EntryType,
 	}); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	if entry.Facts == nil {
-		return total, count, nil
+		return total, count, largest, nil
 	}
 	for _, fact := range entry.Facts.Facts {
 		if err := appendRecord("METADATA_FACT", entryID+":capture:"+fact.Name, fact, map[string]any{
 			"source_profile": fact.SourceProfile, "authority": fact.Authority,
 			"capture_time": fact.CapturedAt, "provenance_digest": fact.ProvenanceDigest,
 		}); err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 	}
-	return total, count, nil
+	return total, count, largest, nil
 }
 
 func (s *Service) publishRecoveryClosure(ctx context.Context, adopted adopted, manifest Manifest, placed placedSet, planDigest, captureDigest, policyDigest string) (result PublicationClosureResult, retErr error) {
@@ -903,6 +932,40 @@ func (s *Service) publishRecoveryClosure(ctx context.Context, adopted adopted, m
 	preparedBytes, err := CanonicalJSON(envelope)
 	if err != nil {
 		return result, err
+	}
+	// A manifest whose canonical envelope does not fit one repository record is
+	// placed as content-addressed parts plus a v3 binding envelope. The signed
+	// ManifestDigest still describes the reassembled manifest, so the parts
+	// carry no trust of their own.
+	var partPlacements []recordPartPlacement
+	if int64(len(preparedBytes)) > repository.MaxRecordBytes {
+		partPlacements, err = buildManifestEntryParts(manifest, manifest.ManifestDigest)
+		if err != nil {
+			return result, err
+		}
+		header := manifest
+		header.Entries = nil
+		envelope = PreparedClosureEnvelope{
+			Schema: PreparedEnvelopeSchemaV3, Prepared: prepared, PayloadReceipt: payloadReceipt,
+			VerificationEvidence: evidence, Manifest: header, ManifestParts: recordPartRefs(partPlacements),
+		}
+		if preparedBytes, err = CanonicalJSON(envelope); err != nil {
+			return result, err
+		}
+	}
+	for _, placement := range partPlacements {
+		if err := s.validatePublicationFence(ctx, lease); err != nil {
+			return result, err
+		}
+		receipt, placeErr := driver.PlaceRecord(ctx, repository.RecordPart, bytes.NewReader(placement.payload))
+		if placeErr == nil {
+			placeErr = driver.VerifyRecord(ctx, receipt)
+		}
+		if placeErr != nil {
+			if reconcileErr := s.reconcileUnknownChildOutcome(ctx, driver, repository.RecordPart, placement.payload, adopted.publicationID, manifest.SnapshotRef, "", planDigest, fmt.Errorf("place prepared closure part %d: %w", placement.ref.Ordinal, placeErr)); reconcileErr != nil {
+				return result, reconcileErr
+			}
+		}
 	}
 	if err := s.validatePublicationFence(ctx, lease); err != nil {
 		return result, err
@@ -1163,27 +1226,51 @@ func (s *Service) committedPublications(ctx context.Context) ([]committedPublica
 		if err := decodeStrictRecord(preparedBytes, &envelope); err != nil {
 			return nil, fmt.Errorf("decode prepared closure %s: %w", markers[i].Commit.PreparedObjectDigest, err)
 		}
-		if err := validatePreparedEnvelope(driver, *s.TrustAnchor, markers[i].Commit, envelope, int64(len(preparedBytes))); err != nil {
+		manifest, err := validatePreparedEnvelope(ctx, driver, *s.TrustAnchor, markers[i].Commit, envelope, int64(len(preparedBytes)))
+		if err != nil {
 			return nil, fmt.Errorf("validate publication %s: %w", markers[i].CommitDigest, err)
 		}
 		markers[i].Prepared = envelope
-		markers[i].Manifest = envelope.Manifest
+		markers[i].Manifest = manifest
 	}
 	return markers, nil
 }
 
-func validatePreparedEnvelope(driver repository.RecordDriver, anchor TrustAnchor, commit PublicationCommitRecord, envelope PreparedClosureEnvelope, preparedLength int64) error {
-	if envelope.Schema != PreparedEnvelopeSchemaV1 && envelope.Schema != PreparedEnvelopeSchemaV2 {
-		return fmt.Errorf("unsupported prepared envelope schema %q", envelope.Schema)
+// validatePreparedEnvelope authenticates one prepared publication closure
+// against its signed commit and returns the complete logical manifest. For the
+// part-bound v3 schema it reassembles the manifest entries from the
+// content-addressed parts and requires their digest to equal the signed
+// manifest digest, so a missing, reordered or substituted part fails closed.
+func validatePreparedEnvelope(ctx context.Context, driver repository.RecordDriver, anchor TrustAnchor, commit PublicationCommitRecord, envelope PreparedClosureEnvelope, preparedLength int64) (Manifest, error) {
+	v2Shape := envelope.Schema == PreparedEnvelopeSchemaV2 || envelope.Schema == PreparedEnvelopeSchemaV3
+	switch envelope.Schema {
+	case PreparedEnvelopeSchemaV1, PreparedEnvelopeSchemaV2:
+		if len(envelope.ManifestParts) != 0 {
+			return Manifest{}, fmt.Errorf("prepared envelope %q carries a part binding", envelope.Schema)
+		}
+	case PreparedEnvelopeSchemaV3:
+		if len(envelope.ManifestParts) == 0 {
+			return Manifest{}, errors.New("prepared envelope v3 requires a part binding")
+		}
+	default:
+		return Manifest{}, fmt.Errorf("unsupported prepared envelope schema %q", envelope.Schema)
 	}
 	if envelope.Schema == PreparedEnvelopeSchemaV1 && envelope.Manifest.Schema != SnapshotSchemaV1 {
-		return errors.New("prepared envelope v1 must contain snapshot v1")
+		return Manifest{}, errors.New("prepared envelope v1 must contain snapshot v1")
 	}
-	if envelope.Schema == PreparedEnvelopeSchemaV2 && envelope.Manifest.Schema != SnapshotSchemaV2 {
-		return errors.New("prepared envelope v2 must contain snapshot v2")
+	if v2Shape && envelope.Manifest.Schema != SnapshotSchemaV2 {
+		return Manifest{}, errors.New("prepared envelope v2 must contain snapshot v2")
+	}
+	manifest := envelope.Manifest
+	if envelope.Schema == PreparedEnvelopeSchemaV3 {
+		entries, err := readManifestEntryParts(ctx, driver, manifest.ManifestDigest, envelope.ManifestParts)
+		if err != nil {
+			return Manifest{}, err
+		}
+		manifest.Entries = entries
 	}
 	if err := envelope.Prepared.Verify(anchor); err != nil {
-		return err
+		return Manifest{}, err
 	}
 	p := envelope.Prepared
 	if p.PublicationID != commit.PublicationID || p.PublicationDomain != commit.PublicationDomain ||
@@ -1194,66 +1281,66 @@ func validatePreparedEnvelope(driver repository.RecordDriver, anchor TrustAnchor
 		p.CaptureDigest != commit.CaptureDigest || p.PolicyDigest != commit.PolicyDigest ||
 		p.VerificationDigest != commit.VerificationDigest || p.TargetIdentity != commit.TargetIdentity ||
 		p.FenceToken != commit.FenceToken || p.ParentCommitDigest != commit.ParentCommitDigest {
-		return errors.New("prepared closure and publication commit bindings differ")
+		return Manifest{}, errors.New("prepared closure and publication commit bindings differ")
 	}
 	preparedReceiptDigest, err := DigestCanonicalJSON(stableRecordReceipt{
 		RepositoryID: driver.RepositoryIdentity(), Role: repository.RecordPreparedClosure,
 		Digest: commit.PreparedObjectDigest, Bytes: preparedLength,
 	})
 	if err != nil || preparedReceiptDigest != commit.PreparedReceiptDigest {
-		return errors.New("prepared closure placement receipt digest mismatch")
+		return Manifest{}, errors.New("prepared closure placement receipt digest mismatch")
 	}
 	if err := validatePayloadReceipt(envelope.PayloadReceipt); err != nil {
-		return err
+		return Manifest{}, err
 	}
 	if envelope.PayloadReceipt.RepositoryID != driver.RepositoryIdentity() ||
 		envelope.PayloadReceipt.PublicationID != commit.PublicationID || envelope.PayloadReceipt.SnapshotRef != commit.SnapshotRef {
-		return errors.New("payload receipt publication binding mismatch")
+		return Manifest{}, errors.New("payload receipt publication binding mismatch")
 	}
 	payloadDigest, _ := DigestCanonicalJSON(envelope.PayloadReceipt)
 	if payloadDigest != commit.PayloadReceiptDigest || envelope.PayloadReceipt.TotalBytes != commit.PayloadReceiptLength ||
 		int64(len(envelope.PayloadReceipt.Objects)) != commit.PayloadReceiptObjectCount {
-		return errors.New("payload receipt digest or totals mismatch")
+		return Manifest{}, errors.New("payload receipt digest or totals mismatch")
 	}
 	verificationDigest, _ := DigestCanonicalJSON(envelope.VerificationEvidence)
 	wantEvidenceSchema := MetadataEvidenceSchemaV1
-	if envelope.Schema == PreparedEnvelopeSchemaV2 {
+	if v2Shape {
 		wantEvidenceSchema = MetadataEvidenceSchemaV2
 	}
 	if envelope.VerificationEvidence.Schema != wantEvidenceSchema || verificationDigest != commit.VerificationDigest {
-		return errors.New("authenticated metadata evidence mismatch")
+		return Manifest{}, errors.New("authenticated metadata evidence mismatch")
 	}
-	if envelope.Schema == PreparedEnvelopeSchemaV2 {
+	if v2Shape {
 		if envelope.VerificationEvidence.PortableFactsSchema != PortableFactsSchemaV1 ||
 			envelope.VerificationEvidence.PortableFactsDigest == "" ||
-			envelope.VerificationEvidence.PortableFactsEntryCount != int64(len(envelope.Manifest.Entries)) ||
+			envelope.VerificationEvidence.PortableFactsEntryCount != int64(len(manifest.Entries)) ||
 			envelope.VerificationEvidence.PortableFactsCoverage != portableFactsCoveragePartial ||
 			!sameStrings(envelope.VerificationEvidence.PortableFactsOmissions, portableFactsV1Omissions) {
-			return errors.New("portable file-fact coverage declaration is invalid")
+			return Manifest{}, errors.New("portable file-fact coverage declaration is invalid")
 		}
 	}
-	if err := authenticateManifest(envelope.Manifest); err != nil {
-		return err
+	if err := authenticateManifest(manifest); err != nil {
+		return Manifest{}, err
 	}
-	manifestDigest, err := envelope.Manifest.Digest()
-	if err != nil || manifestDigest != envelope.Manifest.ManifestDigest || manifestDigest != commit.ManifestDigest {
-		return errors.New("manifest digest differs from signed publication")
+	manifestDigest, err := manifest.Digest()
+	if err != nil || manifestDigest != manifest.ManifestDigest || manifestDigest != commit.ManifestDigest {
+		return Manifest{}, errors.New("manifest digest differs from signed publication")
 	}
-	if envelope.Manifest.SnapshotRef != commit.SnapshotRef || envelope.VerificationEvidence.ManifestDigest != manifestDigest {
-		return errors.New("manifest publication binding mismatch")
+	if manifest.SnapshotRef != commit.SnapshotRef || envelope.VerificationEvidence.ManifestDigest != manifestDigest {
+		return Manifest{}, errors.New("manifest publication binding mismatch")
 	}
-	if err := compareManifestPayloadReceipt(envelope.Manifest, envelope.PayloadReceipt); err != nil {
-		return err
+	if err := compareManifestPayloadReceipt(manifest, envelope.PayloadReceipt); err != nil {
+		return Manifest{}, err
 	}
-	wantEvidence, err := buildMetadataEvidence(envelope.Manifest)
+	wantEvidence, err := buildMetadataEvidence(manifest)
 	if err != nil {
-		return err
+		return Manifest{}, err
 	}
 	wantEvidenceDigest, _ := DigestCanonicalJSON(wantEvidence)
 	if wantEvidenceDigest != verificationDigest {
-		return errors.New("authenticated metadata evidence does not describe the manifest")
+		return Manifest{}, errors.New("authenticated metadata evidence does not describe the manifest")
 	}
-	return nil
+	return manifest, nil
 }
 
 func sameStrings(left, right []string) bool {

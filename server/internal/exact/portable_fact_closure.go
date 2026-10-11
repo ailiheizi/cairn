@@ -27,7 +27,10 @@ const (
 type PortableFactClosureEnvelope struct {
 	Schema  string                    `json:"schema"`
 	Closure PortableFactClosureRecord `json:"closure"`
-	Bundle  json.RawMessage           `json:"bundle"`
+	// Bundle is the inline canonical bundle for envelope v1/v2. Envelope v3
+	// omits it and binds the content-addressed parts in BundleParts instead.
+	Bundle      json.RawMessage `json:"bundle,omitempty"`
+	BundleParts []RecordPartRef `json:"bundle_parts,omitempty"`
 }
 
 type portableFactBundle struct {
@@ -242,9 +245,37 @@ func (s *Service) publishPortableFactClosure(ctx context.Context, workspaceID, s
 	if err != nil {
 		return err
 	}
-	payload, err := CanonicalJSON(PortableFactClosureEnvelope{Schema: envelopeSchema, Closure: closure, Bundle: bundleBytes})
+	envelope := PortableFactClosureEnvelope{Schema: envelopeSchema, Closure: closure, Bundle: bundleBytes}
+	payload, err := CanonicalJSON(envelope)
 	if err != nil {
 		return err
+	}
+	// A bundle whose canonical envelope does not fit one repository record is
+	// placed as content-addressed parts plus a v3 binding envelope. The signed
+	// BundleDigest and BundleLength still describe the reassembled bundle.
+	if int64(len(payload)) > repository.MaxRecordBytes {
+		placements, err := buildFactBundleParts(bundle, bundleDigest)
+		if err != nil {
+			return err
+		}
+		envelope = PortableFactClosureEnvelope{
+			Schema: PortableFactClosureEnvelopeSchemaV3, Closure: closure, BundleParts: recordPartRefs(placements),
+		}
+		if payload, err = CanonicalJSON(envelope); err != nil {
+			return err
+		}
+		for _, placement := range placements {
+			if err := s.validatePublicationFence(ctx, lease); err != nil {
+				return err
+			}
+			receipt, err := driver.PlaceRecord(ctx, repository.RecordPart, bytes.NewReader(placement.payload))
+			if err != nil {
+				return s.reconcileUnknownChildOutcome(ctx, driver, repository.RecordPart, placement.payload, parent.Commit.PublicationID, snapshotRef, parentDigest, parent.Commit.PlanDigest, fmt.Errorf("place portable fact part %d: %w", placement.ref.Ordinal, err))
+			}
+			if err := driver.VerifyRecord(ctx, receipt); err != nil {
+				return s.reconcileUnknownChildOutcome(ctx, driver, repository.RecordPart, placement.payload, parent.Commit.PublicationID, snapshotRef, parentDigest, parent.Commit.PlanDigest, fmt.Errorf("verify portable fact part %d: %w", placement.ref.Ordinal, err))
+			}
+		}
 	}
 	if err := s.validatePublicationFence(ctx, lease); err != nil {
 		return err
@@ -548,11 +579,12 @@ func listPortableFactClosures(ctx context.Context, repo repository.Driver, drive
 		if err := decodeStrictRecord(preparedBytes, &prepared); err != nil {
 			return nil, err
 		}
-		if err := validatePreparedEnvelope(driver, anchor, commits[i].Commit, prepared, int64(len(preparedBytes))); err != nil {
+		manifest, err := validatePreparedEnvelope(ctx, driver, anchor, commits[i].Commit, prepared, int64(len(preparedBytes)))
+		if err != nil {
 			return nil, err
 		}
 		commits[i].Prepared = prepared
-		commits[i].Manifest = prepared.Manifest
+		commits[i].Manifest = manifest
 		parents[commits[i].CommitDigest] = commits[i]
 	}
 	digests, err := driver.ListRecordDigests(ctx, repository.RecordPortableFactClosure)
@@ -570,15 +602,18 @@ func listPortableFactClosures(ctx context.Context, repo repository.Driver, drive
 		if err := decodeStrictRecord(payload, &envelope); err != nil {
 			return nil, err
 		}
-		if envelope.Schema != PortableFactClosureEnvelopeSchemaV1 && envelope.Schema != PortableFactClosureEnvelopeSchemaV2 || DigestBytes(payload) != digest {
+		if envelope.Schema != PortableFactClosureEnvelopeSchemaV1 && envelope.Schema != PortableFactClosureEnvelopeSchemaV2 && envelope.Schema != PortableFactClosureEnvelopeSchemaV3 || DigestBytes(payload) != digest {
 			return nil, errors.New("portable fact closure envelope is invalid")
 		}
 		closureSchema := PortableFactClosureSchemaV1
-		if envelope.Schema == PortableFactClosureEnvelopeSchemaV2 {
+		if envelope.Schema == PortableFactClosureEnvelopeSchemaV2 || envelope.Schema == PortableFactClosureEnvelopeSchemaV3 {
 			closureSchema = PortableFactClosureSchemaV2
 		}
 		if envelope.Closure.Schema != closureSchema {
 			return nil, errors.New("portable fact closure envelope and closure schema differ")
+		}
+		if err := openPortableFactBundle(ctx, driver, &envelope); err != nil {
+			return nil, err
 		}
 		if err := envelope.Closure.Verify(anchor); err != nil {
 			return nil, err
@@ -1310,7 +1345,7 @@ func validateProcessorAttachmentChild(ctx context.Context, driver repository.Rec
 	if err := envelope.Closure.Verify(anchor); err != nil {
 		return err
 	}
-	if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 ||
+	if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 && envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV2 ||
 		envelope.Closure.ParentCommitDigest != closure.ParentCommitDigest ||
 		envelope.Closure.WorkspaceID != closure.WorkspaceID ||
 		envelope.Closure.PublicationID != closure.PublicationID ||
@@ -1322,7 +1357,10 @@ func validateProcessorAttachmentChild(ctx context.Context, driver repository.Rec
 		DigestBytes(payload) != closure.ProcessorAttemptDigest {
 		return errors.New("portable processor-attempt child binding mismatch")
 	}
-	attempts, err := validateProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
+	if err := openProcessorAttemptBundle(ctx, driver, &envelope); err != nil {
+		return err
+	}
+	attempts, err := parseProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
 	if err != nil || attempts.Schema != envelope.Closure.AttemptBundleSchema ||
 		DigestBytes(envelope.Bundle) != envelope.Closure.AttemptBundleDigest ||
 		int64(len(envelope.Bundle)) != envelope.Closure.AttemptBundleLength ||

@@ -140,8 +140,13 @@ func (s *Service) BuildRecoveryReference(ctx context.Context, snapshotRef string
 		CriticalExtensions:         []string{},
 		OptionalExtensions:         json.RawMessage(`{}`),
 	}
+	bundles := make([][]byte, 0, len(closures))
 	for _, envelope := range closures {
-		envelopeBytes, err := CanonicalJSON(envelope)
+		// A part-bound envelope is embedded exactly as it was placed so its
+		// canonical JSON still reproduces the placed record digest and the
+		// independently retainable reference stays bounded.
+		placed := placedFactEnvelope(envelope)
+		envelopeBytes, err := CanonicalJSON(placed)
 		if err != nil {
 			return RecoveryReference{}, err
 		}
@@ -150,13 +155,15 @@ func (s *Service) BuildRecoveryReference(ctx context.Context, snapshotRef string
 			return RecoveryReference{}, err
 		}
 		reference.PortableFactClosures = append(reference.PortableFactClosures, RecoveryFactClosureReference{
-			RecordDigest: DigestBytes(envelopeBytes), ClosureDigest: closureDigest, Envelope: envelope,
+			RecordDigest: DigestBytes(envelopeBytes), ClosureDigest: closureDigest, Envelope: placed,
 		})
+		bundles = append(bundles, envelope.Bundle)
 	}
 	if len(reference.PortableFactClosures) > 0 {
 		reference.FactHealth = RecoveryFactHealthComplete
 	}
-	if err := validateReferenceFactChain(reference, *s.TrustAnchor); err != nil {
+	manifest := selected.Manifest
+	if err := validateReferenceFactChain(reference, *s.TrustAnchor, &manifest, bundles); err != nil {
 		return RecoveryReference{}, err
 	}
 	if err := reference.validateShape(); err != nil {
@@ -273,46 +280,67 @@ func (reference RecoveryReference) Validate(anchor TrustAnchor) error {
 	if err := reference.PreparedClosure.Prepared.Verify(anchor); err != nil {
 		return err
 	}
-	if err := validateReferencePublicationBinding(reference); err != nil {
+	// A part-bound prepared envelope cannot check manifest content without the
+	// repository, so Validate remains structural and signature-only for it;
+	// ValidateAgainstRepository reassembles the parts and re-derives the
+	// manifest before accepting it.
+	var manifest *Manifest
+	if !partBoundPreparedEnvelope(reference.PreparedClosure) {
+		embedded := reference.PreparedClosure.Manifest
+		manifest = &embedded
+	}
+	if err := validateReferencePublicationBinding(reference, manifest); err != nil {
 		return err
 	}
-	return validateReferenceFactChain(reference, anchor)
+	bundles := make([][]byte, 0, len(reference.PortableFactClosures))
+	for _, fact := range reference.PortableFactClosures {
+		bundles = append(bundles, fact.Envelope.Bundle)
+	}
+	return validateReferenceFactChain(reference, anchor, manifest, bundles)
 }
 
 // ValidateAgainstRepository extends Validate with profile/identity, signed
-// record placement, payload receipt, and attachment readback checks.
+// record placement, payload receipt, and attachment readback checks. For a
+// part-bound prepared envelope it reassembles the manifest from the repository
+// parts and re-runs the content-level manifest checks before accepting them.
 func (reference RecoveryReference) ValidateAgainstRepository(ctx context.Context, repo repository.Driver, anchor TrustAnchor) error {
+	_, err := reference.validateAgainstRepository(ctx, repo, anchor)
+	return err
+}
+
+func (reference RecoveryReference) validateAgainstRepository(ctx context.Context, repo repository.Driver, anchor TrustAnchor) (Manifest, error) {
+	var empty Manifest
 	if repo == nil {
-		return errors.New("repository is required")
+		return empty, errors.New("repository is required")
 	}
 	if err := reference.Validate(anchor); err != nil {
-		return err
+		return empty, err
 	}
 	driver, ok := repo.(repository.RecordDriver)
 	if !ok {
-		return errors.New("repository does not support recovery records")
+		return empty, errors.New("repository does not support recovery records")
 	}
 	profile := repository.DescribeProfile(repo)
 	if reference.Repository.RepositoryID != driver.RepositoryIdentity() || reference.Repository.Profile != profile.Repository || reference.Repository.Compression != profile.Compression {
-		return errors.New("recovery reference repository binding mismatch")
+		return empty, errors.New("recovery reference repository binding mismatch")
 	}
 	if reference.PublicationCommit.TargetIdentity != driver.RepositoryIdentity() {
-		return errors.New("publication target identity differs from repository")
+		return empty, errors.New("publication target identity differs from repository")
 	}
 	expectedDependencies := portableFactReaderDependencies(repo)
 	if len(reference.PortableFactClosures) > 0 {
 		closureSchema, _, schemaErr := portableFactClosureSchemas(reference.PortableFactClosures[len(reference.PortableFactClosures)-1].Envelope.Closure.BundleSchema)
 		if schemaErr != nil {
-			return fmt.Errorf("recovery reference portable-fact schema is unavailable: %w", schemaErr)
+			return empty, fmt.Errorf("recovery reference portable-fact schema is unavailable: %w", schemaErr)
 		}
 		expectedDependencies = portableFactReaderDependenciesForSchema(repo, closureSchema)
 	}
 	if !sameStrings(reference.RequiredReaderDependencies, expectedDependencies) {
-		return errors.New("recovery reference reader dependencies are unavailable")
+		return empty, errors.New("recovery reference reader dependencies are unavailable")
 	}
 	commits, err := listCommitMarkers(ctx, driver, anchor, reference.PublicationDomain)
 	if err != nil {
-		return fmt.Errorf("authenticated publication lineage is unavailable: %w", err)
+		return empty, fmt.Errorf("authenticated publication lineage is unavailable: %w", err)
 	}
 	committed := false
 	for _, candidate := range commits {
@@ -322,69 +350,86 @@ func (reference RecoveryReference) ValidateAgainstRepository(ctx context.Context
 		}
 	}
 	if !committed {
-		return errors.New("referenced publication commit is not in the authenticated lineage")
+		return empty, errors.New("referenced publication commit is not in the authenticated lineage")
 	}
 	commitPayload, err := readRecoveryRecord(ctx, driver, repository.RecordPublicationCommit, reference.PublicationCommitDigest)
 	if err != nil {
-		return err
+		return empty, err
 	}
 	if DigestBytes(commitPayload) != reference.PublicationCommitDigest {
-		return errors.New("publication commit placement digest mismatch")
+		return empty, errors.New("publication commit placement digest mismatch")
 	}
 	var commit PublicationCommitRecord
 	if err := decodeStrictRecord(commitPayload, &commit); err != nil {
-		return err
+		return empty, err
 	}
 	commitDigest, err := commit.Digest()
 	if err != nil || commitDigest != reference.PublicationCommitDigest {
-		return errors.New("publication commit bytes differ from reference")
+		return empty, errors.New("publication commit bytes differ from reference")
 	}
 	preparedPayload, err := readRecoveryRecord(ctx, driver, repository.RecordPreparedClosure, reference.PublicationCommit.PreparedObjectDigest)
 	if err != nil {
-		return err
+		return empty, err
 	}
 	if DigestBytes(preparedPayload) != reference.PreparedClosureDigest {
-		return errors.New("prepared closure placement digest mismatch")
+		return empty, errors.New("prepared closure placement digest mismatch")
 	}
-	if err := validatePreparedEnvelope(driver, anchor, reference.PublicationCommit, reference.PreparedClosure, int64(len(preparedPayload))); err != nil {
-		return err
+	canonicalPrepared, err := CanonicalJSON(reference.PreparedClosure)
+	if err != nil || !bytes.Equal(preparedPayload, canonicalPrepared) {
+		return empty, errors.New("prepared closure bytes differ from reference")
+	}
+	manifest, err := validatePreparedEnvelope(ctx, driver, anchor, reference.PublicationCommit, reference.PreparedClosure, int64(len(preparedPayload)))
+	if err != nil {
+		return empty, err
+	}
+	if err := validateReferencePublicationBinding(reference, &manifest); err != nil {
+		return empty, err
 	}
 	for _, object := range reference.PreparedClosure.PayloadReceipt.Objects {
 		if err := verifyExactObjectReadback(ctx, repo, object.ContentID, object.LogicalBytes); err != nil {
-			return fmt.Errorf("payload object %s: %w", object.ContentID, err)
+			return empty, fmt.Errorf("payload object %s: %w", object.ContentID, err)
 		}
 	}
+	bundles := make([][]byte, 0, len(reference.PortableFactClosures))
 	for _, fact := range reference.PortableFactClosures {
 		payload, err := readRecoveryRecord(ctx, driver, repository.RecordPortableFactClosure, fact.RecordDigest)
 		if err != nil {
-			return err
+			return empty, err
 		}
 		if DigestBytes(payload) != fact.RecordDigest {
-			return errors.New("portable fact closure placement digest mismatch")
+			return empty, errors.New("portable fact closure placement digest mismatch")
 		}
 		canonical, err := CanonicalJSON(fact.Envelope)
 		if err != nil || !bytes.Equal(payload, canonical) {
-			return errors.New("portable fact closure bytes differ from reference")
+			return empty, errors.New("portable fact closure bytes differ from reference")
 		}
-		bundle, err := validatePortableFactBundle(fact.Envelope.Bundle, fact.Envelope.Closure.WorkspaceID, fact.Envelope.Closure.SnapshotRef)
+		placed := fact.Envelope
+		if err := openPortableFactBundle(ctx, driver, &placed); err != nil {
+			return empty, err
+		}
+		bundles = append(bundles, placed.Bundle)
+		bundle, err := validatePortableFactBundle(placed.Bundle, placed.Closure.WorkspaceID, placed.Closure.SnapshotRef)
 		if err != nil {
-			return err
+			return empty, err
 		}
 		for _, attachment := range bundle.Attachments {
 			if attachment.RepositoryID != reference.Repository.RepositoryID {
-				return fmt.Errorf("portable fact attachment %s repository binding mismatch", attachment.AttachmentID)
+				return empty, fmt.Errorf("portable fact attachment %s repository binding mismatch", attachment.AttachmentID)
 			}
 		}
-		if err := validateReferenceProcessorAttemptChild(ctx, driver, anchor, fact.Envelope.Closure, bundle); err != nil {
-			return fmt.Errorf("portable processor-attempt child: %w", err)
+		if err := validateReferenceProcessorAttemptChild(ctx, driver, anchor, placed.Closure, bundle); err != nil {
+			return empty, fmt.Errorf("portable processor-attempt child: %w", err)
 		}
 		for _, attachment := range bundle.Attachments {
 			if err := verifyExactObjectReadback(ctx, repo, attachment.ContentID, attachment.LogicalLength); err != nil {
-				return fmt.Errorf("portable fact attachment %s: %w", attachment.AttachmentID, err)
+				return empty, fmt.Errorf("portable fact attachment %s: %w", attachment.AttachmentID, err)
 			}
 		}
 	}
-	return nil
+	if err := validateReferenceFactChain(reference, anchor, &manifest, bundles); err != nil {
+		return empty, err
+	}
+	return manifest, nil
 }
 
 // ExportRecoveryReference writes the v2 typed reference without overwriting an
@@ -406,8 +451,36 @@ func (s *Service) ExportRecoveryReference(ctx context.Context, snapshotRef, dest
 	if err != nil {
 		return result, err
 	}
-	files, bytes := manifestFileTotals(reference.PreparedClosure.Manifest)
-	return ExportResult{SnapshotRef: snapshotRef, Schema: RecoveryReferenceSchemaV2, ManifestDigest: reference.PreparedClosure.Manifest.ManifestDigest, ArtifactPath: path, Length: int64(len(payload)), Files: files, Bytes: bytes, IndependentlyStored: true}, nil
+	driver, err := s.publicationRecordDriver()
+	if err != nil {
+		return result, err
+	}
+	manifest, err := reference.reassembledManifest(ctx, driver)
+	if err != nil {
+		return result, err
+	}
+	files, bytes := manifestFileTotals(manifest)
+	return ExportResult{SnapshotRef: snapshotRef, Schema: RecoveryReferenceSchemaV2, ManifestDigest: manifest.ManifestDigest, ArtifactPath: path, Length: int64(len(payload)), Files: files, Bytes: bytes, IndependentlyStored: true}, nil
+}
+
+// reassembledManifest returns the complete logical manifest of a reference. For
+// a part-bound prepared envelope it reads the content-addressed parts and
+// requires the reassembled manifest digest to equal the signed manifest digest.
+func (reference RecoveryReference) reassembledManifest(ctx context.Context, driver repository.RecordDriver) (Manifest, error) {
+	manifest := reference.PreparedClosure.Manifest
+	if !partBoundPreparedEnvelope(reference.PreparedClosure) {
+		return manifest, nil
+	}
+	entries, err := readManifestEntryParts(ctx, driver, manifest.ManifestDigest, reference.PreparedClosure.ManifestParts)
+	if err != nil {
+		return Manifest{}, err
+	}
+	manifest.Entries = entries
+	digest, err := manifest.Digest()
+	if err != nil || digest != manifest.ManifestDigest {
+		return Manifest{}, errors.New("reassembled recovery reference manifest digest mismatch")
+	}
+	return manifest, nil
 }
 
 func writeNewRecoveryFile(destination string, payload []byte) (string, error) {
@@ -502,7 +575,12 @@ func validateRecoveryExtensions(critical []string, optional json.RawMessage) err
 	return nil
 }
 
-func validateReferencePublicationBinding(reference RecoveryReference) error {
+// validateReferencePublicationBinding checks the reference's embedded signed
+// publication binding. When manifest is non-nil it also re-derives the
+// content-level manifest facts. A part-bound prepared envelope passes nil here,
+// because only the repository can reassemble its entries; ValidateAgainstRepository
+// calls this again with the reassembled manifest.
+func validateReferencePublicationBinding(reference RecoveryReference, manifest *Manifest) error {
 	commit := reference.PublicationCommit
 	prepared := reference.PreparedClosure.Prepared
 	if commit.PreparedObjectDigest != reference.PreparedClosureDigest {
@@ -511,38 +589,57 @@ func validateReferencePublicationBinding(reference RecoveryReference) error {
 	if prepared.PublicationID != commit.PublicationID || prepared.PublicationDomain != commit.PublicationDomain || prepared.Generation != commit.Generation || prepared.SnapshotRef != commit.SnapshotRef || prepared.RRFRootDigest != commit.RRFRootDigest || prepared.ManifestDigest != commit.ManifestDigest || prepared.PayloadReceiptDigest != commit.PayloadReceiptDigest || prepared.PayloadReceiptLength != commit.PayloadReceiptLength || prepared.PayloadReceiptObjectCount != commit.PayloadReceiptObjectCount || prepared.PlanDigest != commit.PlanDigest || prepared.CaptureDigest != commit.CaptureDigest || prepared.PolicyDigest != commit.PolicyDigest || prepared.VerificationDigest != commit.VerificationDigest || prepared.TargetIdentity != commit.TargetIdentity || prepared.FenceToken != commit.FenceToken || prepared.ParentCommitDigest != commit.ParentCommitDigest {
 		return errors.New("prepared closure and publication commit bindings differ")
 	}
-	if err := authenticateManifest(reference.PreparedClosure.Manifest); err != nil {
+	validatePayload := func() error {
+		if err := validatePayloadReceipt(reference.PreparedClosure.PayloadReceipt); err != nil {
+			return err
+		}
+		payloadDigest, err := DigestCanonicalJSON(reference.PreparedClosure.PayloadReceipt)
+		if err != nil || payloadDigest != commit.PayloadReceiptDigest || reference.PreparedClosure.PayloadReceipt.TotalBytes != commit.PayloadReceiptLength || int64(len(reference.PreparedClosure.PayloadReceipt.Objects)) != commit.PayloadReceiptObjectCount {
+			return errors.New("recovery reference payload receipt mismatch")
+		}
+		evidenceDigest, err := DigestCanonicalJSON(reference.PreparedClosure.VerificationEvidence)
+		if err != nil || evidenceDigest != commit.VerificationDigest {
+			return errors.New("recovery reference verification evidence mismatch")
+		}
+		return nil
+	}
+	if manifest == nil {
+		return validatePayload()
+	}
+	if err := authenticateManifest(*manifest); err != nil {
 		return err
 	}
-	manifestDigest, err := reference.PreparedClosure.Manifest.Digest()
-	if err != nil || manifestDigest != commit.ManifestDigest || manifestDigest != reference.PreparedClosure.Manifest.ManifestDigest {
+	manifestDigest, err := manifest.Digest()
+	if err != nil || manifestDigest != commit.ManifestDigest || manifestDigest != manifest.ManifestDigest {
 		return errors.New("recovery reference manifest digest mismatch")
 	}
-	if err := validatePayloadReceipt(reference.PreparedClosure.PayloadReceipt); err != nil {
+	if err := validatePayload(); err != nil {
 		return err
 	}
-	payloadDigest, err := DigestCanonicalJSON(reference.PreparedClosure.PayloadReceipt)
-	if err != nil || payloadDigest != commit.PayloadReceiptDigest || reference.PreparedClosure.PayloadReceipt.TotalBytes != commit.PayloadReceiptLength || int64(len(reference.PreparedClosure.PayloadReceipt.Objects)) != commit.PayloadReceiptObjectCount {
-		return errors.New("recovery reference payload receipt mismatch")
-	}
-	evidenceDigest, err := DigestCanonicalJSON(reference.PreparedClosure.VerificationEvidence)
-	if err != nil || evidenceDigest != commit.VerificationDigest {
-		return errors.New("recovery reference verification evidence mismatch")
-	}
-	wantEvidence, err := buildMetadataEvidence(reference.PreparedClosure.Manifest)
+	wantEvidence, err := buildMetadataEvidence(*manifest)
 	if err != nil {
 		return err
 	}
 	wantEvidenceDigest, err := DigestCanonicalJSON(wantEvidence)
+	evidenceDigest, _ := DigestCanonicalJSON(reference.PreparedClosure.VerificationEvidence)
 	if err != nil || wantEvidenceDigest != evidenceDigest {
 		return errors.New("recovery reference evidence does not describe manifest")
 	}
-	return compareManifestPayloadReceipt(reference.PreparedClosure.Manifest, reference.PreparedClosure.PayloadReceipt)
+	return compareManifestPayloadReceipt(*manifest, reference.PreparedClosure.PayloadReceipt)
 }
 
-func validateReferenceFactChain(reference RecoveryReference, anchor TrustAnchor) error {
+// validateReferenceFactChain authenticates the complete signed fact successor
+// chain. bundles carries the bundle bytes for each closure: the inline bundle
+// for envelope v1/v2, the reassembled bundle for a part-bound v3 envelope when
+// a repository was available, and nil when the parts could not be read. Content
+// checks that need the manifest or the bundle are skipped only when the caller
+// could not supply them; an inline envelope with no bundle is always an error.
+func validateReferenceFactChain(reference RecoveryReference, anchor TrustAnchor, manifest *Manifest, bundles [][]byte) error {
 	if len(reference.PortableFactClosures) == 0 {
 		return nil
+	}
+	if len(bundles) != len(reference.PortableFactClosures) {
+		return errors.New("portable fact reference bundle set is incomplete")
 	}
 	previous := ""
 	for index, fact := range reference.PortableFactClosures {
@@ -563,7 +660,9 @@ func validateReferenceFactChain(reference RecoveryReference, anchor TrustAnchor)
 		closure := fact.Envelope.Closure
 		closureSchema, envelopeSchema, schemaErr := portableFactClosureSchemas(closure.BundleSchema)
 		expectedClosureDependencies := portableFactReaderDependenciesForReference(reference.Repository, closureSchema)
-		if schemaErr != nil || fact.Envelope.Schema != envelopeSchema || closure.Schema != closureSchema ||
+		envelopeSchemaMatches := fact.Envelope.Schema == envelopeSchema ||
+			(envelopeSchema == PortableFactClosureEnvelopeSchemaV2 && fact.Envelope.Schema == PortableFactClosureEnvelopeSchemaV3)
+		if schemaErr != nil || !envelopeSchemaMatches || closure.Schema != closureSchema ||
 			closure.ParentCommitDigest != reference.PublicationCommitDigest ||
 			closure.PublicationID != reference.PublicationCommit.PublicationID ||
 			closure.PublicationDomain != reference.PublicationDomain ||
@@ -587,15 +686,25 @@ func validateReferenceFactChain(reference RecoveryReference, anchor TrustAnchor)
 		} else if closure.SignedAt.Before(reference.PortableFactClosures[index-1].Envelope.Closure.SignedAt) {
 			return errors.New("portable fact reference signed time is not monotonic")
 		}
-		bundle, err := validatePortableFactBundle(fact.Envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
+		bundleBytes := bundles[index]
+		if len(bundleBytes) == 0 {
+			if !partBoundFactEnvelope(fact.Envelope) {
+				return errors.New("portable fact reference bundle is unavailable")
+			}
+			previous = closureDigest
+			continue
+		}
+		bundle, err := validatePortableFactBundle(bundleBytes, closure.WorkspaceID, closure.SnapshotRef)
 		if err != nil {
 			return err
 		}
-		if DigestBytes(fact.Envelope.Bundle) != closure.BundleDigest || int64(len(fact.Envelope.Bundle)) != closure.BundleLength || int64(len(bundle.Records)) != closure.RecordCount || int64(len(bundle.Attachments)) != closure.AttachmentCount {
+		if DigestBytes(bundleBytes) != closure.BundleDigest || int64(len(bundleBytes)) != closure.BundleLength || int64(len(bundle.Records)) != closure.RecordCount || int64(len(bundle.Attachments)) != closure.AttachmentCount {
 			return errors.New("portable fact reference bundle binding mismatch")
 		}
-		if err := validatePortableFactRecordsAgainstManifest(bundle, reference.PreparedClosure.Manifest); err != nil {
-			return err
+		if manifest != nil {
+			if err := validatePortableFactRecordsAgainstManifest(bundle, *manifest); err != nil {
+				return err
+			}
 		}
 		for _, attachment := range bundle.Attachments {
 			if attachment.RepositoryID != reference.Repository.RepositoryID {
@@ -658,7 +767,7 @@ func validateReferenceProcessorAttemptChild(ctx context.Context, driver reposito
 		if err := decodeStrictRecord(payload, &envelope); err != nil {
 			return err
 		}
-		if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 {
+		if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 && envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV2 {
 			return errors.New("unsupported processor attempt closure envelope schema")
 		}
 		// ProcessorAttemptDigest is the signed envelope object digest (the
@@ -680,7 +789,10 @@ func validateReferenceProcessorAttemptChild(ctx context.Context, driver reposito
 			envelope.Closure.FenceToken != closure.FenceToken {
 			return errors.New("portable processor-attempt child binding mismatch")
 		}
-		attempts, err := validateProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
+		if err := openProcessorAttemptBundle(ctx, driver, &envelope); err != nil {
+			return err
+		}
+		attempts, err := parseProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
 		if err != nil {
 			return err
 		}

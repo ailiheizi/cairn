@@ -297,11 +297,12 @@ func (token RecoveryToken) ValidateAgainstRepository(ctx context.Context, repo r
 	if err := decodeStrictRecord(preparedPayload, &prepared); err != nil {
 		return fmt.Errorf("%w: decode prepared closure: %v", ErrRecoveryTokenInvalid, err)
 	}
-	if err := validatePreparedEnvelope(driver, anchor, commit, prepared, int64(len(preparedPayload))); err != nil {
+	manifest, err := validatePreparedEnvelope(ctx, driver, anchor, commit, prepared, int64(len(preparedPayload)))
+	if err != nil {
 		return fmt.Errorf("%w: validate prepared closure: %v", ErrRecoveryTokenInvalid, err)
 	}
 
-	entry, err := resolveTokenManifestSubject(ctx, repo, driver, anchor, commit.PublicationDomain, commitDigest, prepared.Manifest, token.SubjectRef)
+	entry, err := resolveTokenManifestSubject(ctx, repo, driver, anchor, commit.PublicationDomain, commitDigest, manifest, token.SubjectRef)
 	if err != nil {
 		return err
 	}
@@ -754,11 +755,12 @@ func (s *Service) committedPublicationWithAnchor(ctx context.Context, anchor Tru
 		if err := decodeStrictRecord(preparedBytes, &envelope); err != nil {
 			return committedPublication{}, err
 		}
-		if err := validatePreparedEnvelope(driver, anchor, markers[i].Commit, envelope, int64(len(preparedBytes))); err != nil {
+		manifest, err := validatePreparedEnvelope(ctx, driver, anchor, markers[i].Commit, envelope, int64(len(preparedBytes)))
+		if err != nil {
 			return committedPublication{}, err
 		}
 		markers[i].Prepared = envelope
-		markers[i].Manifest = envelope.Manifest
+		markers[i].Manifest = manifest
 		if found != nil {
 			return committedPublication{}, fmt.Errorf("conflicting committed publications for snapshot %s", snapshotRef)
 		}

@@ -101,7 +101,7 @@ func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, tru
 		if err := decodeStrictRecord(payload, &bundle); err != nil {
 			return result, fmt.Errorf("decode recovery bundle: %w", err)
 		}
-		if _, _, _, err := s.verifyImportBundle(ctx, anchor, bundle); err != nil {
+		if _, _, _, _, err := s.verifyImportBundle(ctx, anchor, bundle); err != nil {
 			return result, fmt.Errorf("validate legacy recovery bundle for migration: %w", err)
 		}
 		// BuildRecoveryReference reads the authenticated repository lineage and
@@ -149,10 +149,18 @@ func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, tru
 	if err != nil {
 		return result, err
 	}
-	files, bytes := manifestFileTotals(reference.PreparedClosure.Manifest)
+	driver, err := s.publicationRecordDriver()
+	if err != nil {
+		return result, err
+	}
+	manifest, err := reference.reassembledManifest(ctx, driver)
+	if err != nil {
+		return result, err
+	}
+	files, bytes := manifestFileTotals(manifest)
 	return ExportResult{
 		SnapshotRef: reference.SnapshotRef, Schema: RecoveryReferenceSchemaV2,
-		ManifestDigest: reference.PreparedClosure.Manifest.ManifestDigest,
+		ManifestDigest: manifest.ManifestDigest,
 		ArtifactPath:   path, Length: int64(len(encoded)), Files: files, Bytes: bytes,
 		IndependentlyStored: true,
 	}, nil
@@ -224,11 +232,11 @@ func (s *Service) loadRecoveryImportAnchor(trustAnchorPath, publicationDomain st
 
 func (s *Service) importRecoveryBundle(ctx context.Context, anchor TrustAnchor, bundle recoveryExportBundle) (RecoveryImportResult, error) {
 	var result RecoveryImportResult
-	commitDigest, preparedDigest, anchorDigest, err := s.verifyImportBundle(ctx, anchor, bundle)
+	commitDigest, preparedDigest, anchorDigest, manifest, err := s.verifyImportBundle(ctx, anchor, bundle)
 	if err != nil {
 		return result, err
 	}
-	files, bytes := manifestFileTotals(bundle.PreparedClosure.Manifest)
+	files, bytes := manifestFileTotals(manifest)
 	result = RecoveryImportResult{
 		Schema:                bundle.Schema,
 		SnapshotRef:           bundle.SnapshotRef,
@@ -253,7 +261,8 @@ func (s *Service) importRecoveryBundle(ctx context.Context, anchor TrustAnchor, 
 
 func (s *Service) importRecoveryReference(ctx context.Context, anchor TrustAnchor, reference RecoveryReference) (RecoveryImportResult, error) {
 	var result RecoveryImportResult
-	if err := reference.ValidateAgainstRepository(ctx, s.Repo, anchor); err != nil {
+	manifest, err := reference.validateAgainstRepository(ctx, s.Repo, anchor)
+	if err != nil {
 		return result, err
 	}
 	driver, err := s.publicationRecordDriver()
@@ -271,7 +280,7 @@ func (s *Service) importRecoveryReference(ctx context.Context, anchor TrustAncho
 	if err != nil {
 		return result, err
 	}
-	files, bytes := manifestFileTotals(reference.PreparedClosure.Manifest)
+	files, bytes := manifestFileTotals(manifest)
 	result = RecoveryImportResult{
 		Schema:                reference.Schema,
 		SnapshotRef:           reference.SnapshotRef,
@@ -336,55 +345,55 @@ func readRecoveryBundle(artifactPath string) (recoveryExportBundle, error) {
 // recovery bundle against the supplied anchor and the target repository. It
 // returns the commit digest, the prepared-closure digest, and the anchor
 // digest, all recomputed from the authenticated records.
-func (s *Service) verifyImportBundle(ctx context.Context, anchor TrustAnchor, bundle recoveryExportBundle) (commitDigest, preparedDigest, anchorDigest string, err error) {
+func (s *Service) verifyImportBundle(ctx context.Context, anchor TrustAnchor, bundle recoveryExportBundle) (commitDigest, preparedDigest, anchorDigest string, manifest Manifest, err error) {
 	if bundle.Schema != RecoveryExportBundleSchemaV1 {
-		return "", "", "", fmt.Errorf("unsupported recovery bundle schema %q", bundle.Schema)
+		return "", "", "", Manifest{}, fmt.Errorf("unsupported recovery bundle schema %q", bundle.Schema)
 	}
 	if bundle.SnapshotRef != bundle.PublicationCommit.SnapshotRef ||
 		bundle.PublicationCommit.PublicationDomain != anchor.PublicationDomain ||
 		bundle.PreparedClosure.Prepared.PublicationDomain != anchor.PublicationDomain {
-		return "", "", "", errors.New("recovery bundle publication domain differs from trust anchor")
+		return "", "", "", Manifest{}, errors.New("recovery bundle publication domain differs from trust anchor")
 	}
 	if bundle.RequiredTrustAnchorKeyID != anchor.KeyID {
-		return "", "", "", fmt.Errorf("recovery bundle requires anchor key %q, got %q", bundle.RequiredTrustAnchorKeyID, anchor.KeyID)
+		return "", "", "", Manifest{}, fmt.Errorf("recovery bundle requires anchor key %q, got %q", bundle.RequiredTrustAnchorKeyID, anchor.KeyID)
 	}
 	anchorDigest, err = DigestCanonicalJSON(anchor)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
 	if bundle.RequiredTrustAnchorDigest != anchorDigest {
-		return "", "", "", errors.New("recovery bundle trust-anchor digest mismatch")
+		return "", "", "", Manifest{}, errors.New("recovery bundle trust-anchor digest mismatch")
 	}
 	if err := bundle.PublicationCommit.Verify(anchor); err != nil {
-		return "", "", "", fmt.Errorf("verify publication commit: %w", err)
+		return "", "", "", Manifest{}, fmt.Errorf("verify publication commit: %w", err)
 	}
 	if err := bundle.PreparedClosure.Prepared.Verify(anchor); err != nil {
-		return "", "", "", fmt.Errorf("verify prepared closure: %w", err)
+		return "", "", "", Manifest{}, fmt.Errorf("verify prepared closure: %w", err)
 	}
 	commitDigest, err = bundle.PublicationCommit.Digest()
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
 	if commitDigest != bundle.PublicationCommitDigest {
-		return "", "", "", errors.New("recovery bundle publication commit digest mismatch")
+		return "", "", "", Manifest{}, errors.New("recovery bundle publication commit digest mismatch")
 	}
 	preparedBytes, err := CanonicalJSON(bundle.PreparedClosure)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
 	preparedDigest = DigestBytes(preparedBytes)
 	if preparedDigest != bundle.PreparedClosureDigest || preparedDigest != bundle.PublicationCommit.PreparedObjectDigest {
-		return "", "", "", errors.New("recovery bundle prepared closure digest mismatch")
+		return "", "", "", Manifest{}, errors.New("recovery bundle prepared closure digest mismatch")
 	}
 	driver, err := s.publicationRecordDriver()
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
 	if bundle.PublicationCommit.TargetIdentity != driver.RepositoryIdentity() {
-		return "", "", "", errors.New("recovery bundle publication targets another repository")
+		return "", "", "", Manifest{}, errors.New("recovery bundle publication targets another repository")
 	}
-	if err := validatePreparedEnvelope(driver, anchor, bundle.PublicationCommit, bundle.PreparedClosure, int64(len(preparedBytes))); err != nil {
-		return "", "", "", fmt.Errorf("validate recovery bundle prepared closure: %w", err)
+	if manifest, err = validatePreparedEnvelope(ctx, driver, anchor, bundle.PublicationCommit, bundle.PreparedClosure, int64(len(preparedBytes))); err != nil {
+		return "", "", "", Manifest{}, fmt.Errorf("validate recovery bundle prepared closure: %w", err)
 	}
 	// The legacy v1 bundle carries the authenticated payload receipt but not a
 	// separate v2 reference reader envelope. Validate every exact object here so
@@ -392,7 +401,7 @@ func (s *Service) verifyImportBundle(ctx context.Context, anchor TrustAnchor, bu
 	// a clean-install recovery artifact as admitted.
 	for _, object := range bundle.PreparedClosure.PayloadReceipt.Objects {
 		if err := verifyExactObjectReadback(ctx, s.Repo, object.ContentID, object.LogicalBytes); err != nil {
-			return "", "", "", fmt.Errorf("verify recovery bundle payload %s: %w", object.ContentID, err)
+			return "", "", "", Manifest{}, fmt.Errorf("verify recovery bundle payload %s: %w", object.ContentID, err)
 		}
 	}
 	domain := s.PublicationDomain
@@ -401,12 +410,12 @@ func (s *Service) verifyImportBundle(ctx context.Context, anchor TrustAnchor, bu
 	}
 	commits, err := listCommitMarkers(ctx, driver, anchor, domain)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
 	if err := verifyImportLineage(bundle.PublicationCommit, commitDigest, commits); err != nil {
-		return "", "", "", err
+		return "", "", "", Manifest{}, err
 	}
-	return commitDigest, preparedDigest, anchorDigest, nil
+	return commitDigest, preparedDigest, anchorDigest, manifest, nil
 }
 
 // verifyImportLineage checks the bundle commit's generation/parent shape and

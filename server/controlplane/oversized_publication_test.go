@@ -3,12 +3,11 @@ package controlplane
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -100,72 +99,103 @@ func catalogTableCounts(t *testing.T, catalogPath string) map[string]int {
 	return counts
 }
 
-// TestPlanIngestRefusesOversizedPublicationBeforeAnyDurableWrite is the
-// operator-facing half of the pre-flight guard. An ingest whose publication
-// would place a portable record above the repository bound is refused as
-// ordinary invalid input, with the entry count, the projected size, the limit,
-// and the split-into-sources remedy, and with no plan, job, publication,
-// namespace, or repository record left behind.
-func TestPlanIngestRefusesOversizedPublicationBeforeAnyDurableWrite(t *testing.T) {
+// TestPlanIngestPublishesALargeRootAsOnePublicationWithOneNamespaceRoot is the
+// operator-facing half of the convergence-phase fix. A root whose monolithic
+// portable record would exceed the repository bound is planned and applied as
+// ONE publication with ONE namespace root: the oversized logical records are
+// placed as content-addressed parts, the operational content.list projection
+// reports every entry without any projection change, and no placed record
+// exceeds the bound.
+func TestPlanIngestPublishesALargeRootAsOnePublicationWithOneNamespaceRoot(t *testing.T) {
 	ctx := context.Background()
 	// A plain-file capture with a bound processor projects about 21 KB per
-	// entry, so this many entries cross the 16 MiB record bound without relying
-	// on platform-specific extended attributes.
-	fixture := newPlanIngestFixture(t, 900)
-	result := fixture.dispatcher.Handle(ctx, mustEnvelope(t, command.OpPlanIngest, map[string]any{"root": fixture.source}))
-	if result.Status != command.StatusFailed || !hasReasonCode(result, ReasonCodeInvalidInput) {
-		t.Fatalf("oversized plan.ingest = %q %+v, want a failed invalid_input refusal", result.Status, result.Reasons)
+	// entry and really places about 15 KB of portable fact records per entry,
+	// so this many entries make the placed child cross the 16 MiB record bound
+	// while its data volume is far below it.
+	const files = 1200
+	fixture := newPlanIngestFixture(t, files)
+	planned := fixture.dispatcher.Handle(ctx, mustEnvelope(t, command.OpPlanIngest, map[string]any{"root": fixture.source}))
+	if planned.Status != command.StatusSucceeded {
+		t.Fatalf("large plan.ingest = %q %+v", planned.Status, planned.Reasons)
 	}
-	if len(result.Reasons) != 1 {
-		t.Fatalf("oversized refusal reasons = %+v, want exactly one", result.Reasons)
+	var plan command.PlanIngestData
+	if err := json.Unmarshal(planned.Data, &plan); err != nil {
+		t.Fatal(err)
 	}
-	message := result.Reasons[0].Message
-	for _, fragment := range []string{
-		"ingest subfolders as separate sources",
-		strconv.FormatInt(repository.MaxRecordBytes, 10) + "-byte repository record limit",
-		"entries",
-	} {
-		if !strings.Contains(message, fragment) {
-			t.Fatalf("refusal %q is missing %q", message, fragment)
-		}
+	applied := fixture.dispatcher.Handle(ctx, mustEnvelope(t, command.OpPlanApply, map[string]any{
+		"workspace_id": plan.WorkspaceID, "plan_id": plan.PlanID, "plan_digest": plan.PlanDigest,
+	}))
+	if applied.Status != command.StatusSucceeded {
+		t.Fatalf("large plan.apply = %q %+v", applied.Status, applied.Reasons)
 	}
-	if measured := reportedRecordBytes(t, message); measured <= repository.MaxRecordBytes {
-		t.Fatalf("refusal reports %d bytes, want more than the %d-byte limit", measured, repository.MaxRecordBytes)
+
+	// One publication, one namespace root in the rebuildable projection.
+	counts := catalogTableCounts(t, fixture.catalogPath)
+	if counts["publications"] != 1 {
+		t.Fatalf("publications = %d, want exactly one", counts["publications"])
 	}
-	if result.Reasons[0].Resolution != nil {
-		t.Fatalf("a refusal must not offer a reconciliation resolution: %+v", result.Reasons[0].Resolution)
+	if counts["namespace_roots"] != 1 {
+		t.Fatalf("namespace_roots = %d, want exactly one", counts["namespace_roots"])
 	}
-	for table, count := range catalogTableCounts(t, fixture.catalogPath) {
-		if count != 0 {
-			t.Fatalf("refused plan.ingest left %d %s rows", count, table)
-		}
+
+	// The operational view reports every entry, so no projection needed a change.
+	listed := fixture.dispatcher.Handle(ctx, mustEnvelope(t, command.OpContentList, map[string]any{"workspace_id": plan.WorkspaceID}))
+	if listed.Status != command.StatusSucceeded {
+		t.Fatalf("content.list = %q %+v", listed.Status, listed.Reasons)
+	}
+	var content command.ContentListData
+	if err := json.Unmarshal(listed.Data, &content); err != nil {
+		t.Fatal(err)
+	}
+	if content.Page == nil || content.Page.Entries == nil {
+		t.Fatalf("content.list carried no complete page block: %+v", content.Page)
+	}
+	if *content.Page.Entries != files {
+		t.Fatalf("content.list entries = %d, want %d", *content.Page.Entries, files)
+	}
+	if len(content.Items) != files {
+		t.Fatalf("content.list returned %d items, want %d", len(content.Items), files)
+	}
+
+	// The repository placed content-addressed parts and nothing above the bound.
+	parts, err := fixture.repo.ListRecordDigests(ctx, repository.RecordPart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) == 0 {
+		t.Fatal("the oversized publication placed no content-addressed record parts")
 	}
 	for _, role := range []repository.RecordRole{
 		repository.RecordPreparedClosure, repository.RecordPublicationCommit,
-		repository.RecordProcessorAttemptClosure, repository.RecordPortableFactClosure,
+		repository.RecordProcessorAttemptClosure, repository.RecordPortableFactClosure, repository.RecordPart,
 	} {
 		digests, err := fixture.repo.ListRecordDigests(ctx, role)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(digests) != 0 {
-			t.Fatalf("refused plan.ingest placed %d %s records", len(digests), role)
+		for _, digest := range digests {
+			body, err := fixture.repo.OpenRecord(ctx, role, digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, readErr := io.ReadAll(body)
+			closeErr := body.Close()
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if closeErr != nil {
+				t.Fatal(closeErr)
+			}
+			if int64(len(payload)) > repository.MaxRecordBytes {
+				t.Fatalf("%s %s is %d bytes, above the %d-byte bound", role, digest, len(payload), repository.MaxRecordBytes)
+			}
 		}
 	}
-}
-
-var reportedRecordPattern = regexp.MustCompile(`would place a ([0-9]+)-byte portable recovery record`)
-
-// reportedRecordBytes reads the measured size out of one refusal message.
-func reportedRecordBytes(t *testing.T, message string) int64 {
-	t.Helper()
-	match := reportedRecordPattern.FindStringSubmatch(message)
-	if match == nil {
-		t.Fatalf("refusal %q does not name the projected record size", message)
-	}
-	value, err := strconv.ParseInt(match[1], 10, 64)
+	commits, err := fixture.repo.ListRecordDigests(ctx, repository.RecordPublicationCommit)
 	if err != nil {
-		t.Fatalf("refusal size %q: %v", match[1], err)
+		t.Fatal(err)
 	}
-	return value
+	if len(commits) != 1 {
+		t.Fatalf("publication commits = %d, want exactly one publication", len(commits))
+	}
 }

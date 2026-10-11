@@ -119,7 +119,7 @@ func (s *Service) ReconcileIngestPublicationCompletion(ctx context.Context, work
 	if err != nil {
 		return result, fmt.Errorf("inspect processor attempts for reconciliation: %w", err)
 	}
-	parsed, err := validateProcessorAttemptBundle(bundle, workspaceID, result.SnapshotRef)
+	parsed, err := parseProcessorAttemptBundle(bundle, workspaceID, result.SnapshotRef)
 	if err != nil {
 		return result, err
 	}
@@ -163,7 +163,7 @@ func (s *Service) preparedPublicationByPlanDigest(ctx context.Context, planDiges
 		if envelope.Prepared.PublicationDomain != s.PublicationDomain || envelope.Prepared.PlanDigest != planDigest {
 			continue
 		}
-		if err := validatePreparedCandidate(driver, *s.TrustAnchor, envelope); err != nil {
+		if err := validatePreparedCandidate(ctx, driver, *s.TrustAnchor, envelope); err != nil {
 			return empty, fmt.Errorf("validate prepared closure %s: %w", digest, err)
 		}
 		if found != nil {
@@ -178,26 +178,44 @@ func (s *Service) preparedPublicationByPlanDigest(ctx context.Context, planDiges
 	return *found, nil
 }
 
-func validatePreparedCandidate(driver repository.RecordDriver, anchor TrustAnchor, envelope PreparedClosureEnvelope) error {
-	if envelope.Schema != PreparedEnvelopeSchemaV1 && envelope.Schema != PreparedEnvelopeSchemaV2 {
+func validatePreparedCandidate(ctx context.Context, driver repository.RecordDriver, anchor TrustAnchor, envelope PreparedClosureEnvelope) error {
+	v2Shape := envelope.Schema == PreparedEnvelopeSchemaV2 || envelope.Schema == PreparedEnvelopeSchemaV3
+	switch envelope.Schema {
+	case PreparedEnvelopeSchemaV1, PreparedEnvelopeSchemaV2:
+		if len(envelope.ManifestParts) != 0 {
+			return fmt.Errorf("prepared envelope %q carries a part binding", envelope.Schema)
+		}
+	case PreparedEnvelopeSchemaV3:
+		if len(envelope.ManifestParts) == 0 {
+			return errors.New("prepared envelope v3 requires a part binding")
+		}
+	default:
 		return fmt.Errorf("unsupported prepared envelope schema %q", envelope.Schema)
 	}
 	if envelope.Schema == PreparedEnvelopeSchemaV1 && envelope.Manifest.Schema != SnapshotSchemaV1 {
 		return errors.New("prepared envelope v1 must contain snapshot v1")
 	}
-	if envelope.Schema == PreparedEnvelopeSchemaV2 && envelope.Manifest.Schema != SnapshotSchemaV2 {
+	if v2Shape && envelope.Manifest.Schema != SnapshotSchemaV2 {
 		return errors.New("prepared envelope v2 must contain snapshot v2")
+	}
+	manifest := envelope.Manifest
+	if envelope.Schema == PreparedEnvelopeSchemaV3 {
+		entries, err := readManifestEntryParts(ctx, driver, manifest.ManifestDigest, envelope.ManifestParts)
+		if err != nil {
+			return err
+		}
+		manifest.Entries = entries
 	}
 	if err := envelope.Prepared.Verify(anchor); err != nil {
 		return err
 	}
 	if envelope.Prepared.TargetIdentity != driver.RepositoryIdentity() || envelope.Prepared.FenceToken < 1 ||
-		envelope.Prepared.RRFRootDigest != envelope.Manifest.ManifestDigest ||
-		envelope.Prepared.ManifestDigest != envelope.Manifest.ManifestDigest ||
-		envelope.Prepared.SnapshotRef != envelope.Manifest.SnapshotRef {
+		envelope.Prepared.RRFRootDigest != manifest.ManifestDigest ||
+		envelope.Prepared.ManifestDigest != manifest.ManifestDigest ||
+		envelope.Prepared.SnapshotRef != manifest.SnapshotRef {
 		return errors.New("prepared closure identity differs from its manifest or repository")
 	}
-	if err := authenticateManifest(envelope.Manifest); err != nil {
+	if err := authenticateManifest(manifest); err != nil {
 		return err
 	}
 	if err := validatePayloadReceipt(envelope.PayloadReceipt); err != nil {
@@ -214,7 +232,7 @@ func validatePreparedCandidate(driver repository.RecordDriver, anchor TrustAncho
 		int64(len(envelope.PayloadReceipt.Objects)) != envelope.Prepared.PayloadReceiptObjectCount {
 		return errors.New("prepared payload receipt digest or totals mismatch")
 	}
-	evidence, err := buildMetadataEvidence(envelope.Manifest)
+	evidence, err := buildMetadataEvidence(manifest)
 	if err != nil {
 		return err
 	}
@@ -224,7 +242,7 @@ func validatePreparedCandidate(driver repository.RecordDriver, anchor TrustAncho
 		evidenceDigest != verificationDigest {
 		return errors.New("prepared metadata evidence mismatch")
 	}
-	return compareManifestPayloadReceipt(envelope.Manifest, envelope.PayloadReceipt)
+	return compareManifestPayloadReceipt(manifest, envelope.PayloadReceipt)
 }
 
 func (s *Service) committedPublicationByPlanDigest(ctx context.Context, planDigest string) (committedPublication, error) {

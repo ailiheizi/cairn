@@ -153,33 +153,53 @@ is an independently retained backup artifact derived from the catalog and
 publication records; it is not a second live catalog that ordinary operations
 must keep in sync.
 
-### 3.2 Portable record bound
+### 3.2 Portable record bound and record parts
 
 One portable recovery record is bounded at `16777216` bytes (`16 MiB`), the
 `MaxRecordBytes` limit enforced by the repository record layer. The bound
 applies to each placed record independently: the prepared publication closure,
-the publication commit marker, the post-publication portable fact child, and a
-processor-attempt closure. Enlarging it, chunking a record, or merkleizing a
-closure is a separately reviewed change to the frozen portable record format.
+the publication commit marker, the post-publication portable fact child, a
+processor-attempt closure, and each record part.
 
 Because a publication closure carries per-entry facts — names, captured
 metadata, portable file facts, protection and recovery references — rather than
-payload bytes, the bound is effectively a bound on the number of entries in one
-publication, not on the amount of content it protects. A thousand small text
-files cross it exactly as a thousand photographs do. A single source tree of
-roughly 700 to 800 entries can therefore exceed the bound while its data volume
-is far below it, and the entry count at which that happens varies with the
-recorded paths and facts, so a fixed entry count is not a usable sizing rule.
+payload bytes, the monolithic size of an entry-scaling record is effectively a
+bound on the number of entries whose facts fit in one JSON value, not on the
+amount of content a publication protects. A thousand small text files cross it
+exactly as a thousand photographs do.
+
+A logical record whose canonical JSON exceeds the bound MUST be placed as
+several content-addressed **record parts** plus the record that binds them, as
+decided in ADR-033. The successors are
+`org.cairn.prepared-envelope.v3`,
+`org.cairn.portable-fact-closure-envelope.v3`, and
+`org.cairn.processor-attempt-closure-envelope.v2`; a part is a `RECORD_PART`
+repository record addressed by its own SHA-256 and verified by the ordinary
+record readback. The binding is authenticated by the signature that already
+covers the logical value: the signed `manifest_digest` describes the reassembled
+manifest, and the signed bundle digest, length and counts describe the
+reassembled bundle or attempt set. A reader MUST reassemble the bound parts in
+ordinal order, MUST reject a missing, reordered, substituted, truncated or
+mis-bound part, an unknown envelope schema, and any reassembly whose digest,
+length or counts differ from the signed value, and MUST NOT fall back to a
+partial value. A record that fits one bounded record is still placed whole in
+its existing v1/v2 shape, so existing bytes, digests and signatures do not
+change.
+
+One publication therefore remains one complete snapshot of one source root with
+one namespace root for a root of any practical size, and no projection query,
+index key or migration changes. The bound is still never a reason to drop facts,
+truncate names, or turn one publication into a partial one. Enlarging
+`MaxRecordBytes` remains a separately reviewed change; record parts do not
+enlarge it.
 
 A publication that cannot be placed MUST be refused by `plan.ingest`, before any
-durable write, with the measured entry count, the projected record size, the
-limit, and the remedy. The remedy is to ingest subfolders as separate sources:
-one workspace named `default` holds one source per root keyed
-`local-tree:<root>`, so ingesting subfolders separately accumulates one library
-while keeping each publication inside the bound. Placement MUST also refuse an
-oversized record as defence in depth, and that refusal MUST remain visible
-rather than being silently retried. The bound is never a reason to drop facts,
-truncate names, or split one record.
+durable write, with the measured entry count, the projected item size, and the
+limit. The only remaining entry-scaling refusal is a single logical item — one
+manifest entry, one processor attempt or one portable fact record — that is
+itself larger than the bound and therefore cannot be split across parts.
+Placement MUST also refuse an oversized record as defence in depth, and that
+refusal MUST remain visible rather than being silently retried.
 
 ## 4. Identity and exactness
 
@@ -848,7 +868,7 @@ This is the canonical checkout-status matrix. Other plans may add evidence, but 
 | `directory-cas-dev-v1` | development only | Raw test driver, never the release default |
 | `local-zstd-v1` | candidate | Embedded compression, whole-file dedup, corruption rejection, relocation, profile isolation, explicit repair, copy-forward migration with independently reopened source/target clean readers and rollback preservation, including a real pre-publication process-crash/retry boundary, mechanism-separated savings, and `NON_DESTRUCTIVE_ONLY` verified root/inventory candidate planning exist and are tested; encryption admission, broader crash/migration rollback and reader-closure qualification, representative corpus/host evidence, packaging, and a dated release-engine decision remain. Chunking is optional and unselected; destructive GC is disabled and is not an MVP gate. The separate `local-zstd-encrypted-v1` experimental profile has host-owned AES-256-GCM/key-provider, key-rotation copy-forward, and real pre-publication process-crash/retry evidence but is not available through the persisted config/daemon or a release default |
 | Protection records and digest-bound plan/apply | implemented and tested for the admitted development profile | Exact/link-only/metadata-only decisions and portable recovery references are authenticated; external acquisition remains a later profile |
-| Signed recovery publication | implemented and tested for the admitted development profile | Prepared/commit records, signed processor-attempt and portable-fact successor children, portable subject mapping and body attachments, catalog-free exact restore, independent-anchor clean-install import/reader, deterministic recovery-token sets, independently hashed attachment readback, cross-process fencing, and unknown-outcome reconciliation work. Sparse extent maps, broader per-field provenance, production repository qualification, and release acceptance remain open |
+| Signed recovery publication | implemented and tested for the admitted development profile | Prepared/commit records, signed processor-attempt and portable-fact successor children, content-addressed record parts for oversized prepared and portable-fact records (ADR-033), portable subject mapping and body attachments, catalog-free exact restore, independent-anchor clean-install import/reader, deterministic recovery-token sets, independently hashed attachment readback, cross-process fencing, and unknown-outcome reconciliation work. Sparse extent maps, broader per-field provenance, production repository qualification, and release acceptance remain open |
 | User/imported description revisions and segments | implemented and tested for the admitted recovery profile | SQLite/CLI revisions, source-aligned segments, config/provider/segmentation bindings, and authenticated portable body bindings work; lifecycle and provider admission remain |
 | Lexical/structured discovery | implemented and tested for the stated field scope | Required fields, typed filters, segment provenance, coverage, and fused query are wired; semantic remains unavailable when no admitted real bundle is supplied |
 | Read-only capacity and per-item index status | implemented and tested for the current profile | `status.get` reports measured or explicit unknown capacity; `content.list`, `namespace.list`, and search results expose calculated tag/lexical/semantic coverage without creating a durable status table. Missing optional projections never make exact content unreadable |
@@ -890,7 +910,12 @@ repository attachments rather than SQLite-only bodies or oversized tokens.
 This frozen v1 shape is implemented and tested for the admitted development
 profile. Catalog-free round-trip, attachment, conflict, clean-import,
 corruption, relocation, and reader-dependency tests cover it; expanded fact
-profiles require a reviewed successor rather than reinterpretation.
+profiles require a reviewed successor rather than reinterpretation. A bundle
+whose canonical JSON exceeds the per-record bound is placed as
+content-addressed parts under the `org.cairn.portable-fact-closure-envelope.v3`
+binding (ADR-033); the signed bundle digest, length and counts still describe
+the reassembled bundle, so no fact is dropped and no partial bundle is
+admitted.
 
 Release blockers follow one dependency graph, not a priority list that optional work may interrupt:
 

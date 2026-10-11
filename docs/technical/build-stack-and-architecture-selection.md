@@ -1312,6 +1312,129 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   only after the operator's explicit approval; the rest of this ADR authorizes no
   other guardrail change.
 
+### ADR-033: One publication, many content-addressed record parts
+
+- **Status:** Admitted 2026-10-11 by the operator as the convergence-phase fix
+  for the measured per-publication entry ceiling. It changes the signed portable
+  record shape, so it also carries the required product-requirement revision and
+  the reader-dependency analysis in this section. The implementation and its
+  executable evidence live in `server/internal/exact` and
+  `server/internal/repository`; this ADR does not raise `MaxRecordBytes`, add a
+  record role family beyond the part role below, or authorize any new surface.
+- **Problem:** one publication is one complete snapshot of one source root. Its
+  signed `PREPARED_CLOSURE` record embeds the whole `Manifest`, and its signed
+  `PORTABLE_FACT_CLOSURE` child embeds the whole canonical portable-fact bundle.
+  Both are single JSON values whose size grows with the entry count — measured
+  on a real 11,561-image tree at about 22 KB per entry, dominated by per-file
+  facts rather than payload — and both are placed as one record under
+  `repository.MaxRecordBytes` (`16 MiB`). A root above roughly 700–800 entries
+  therefore could not be published at all: `plan.ingest` projects the two
+  entry-scaling records and refuses before any durable write, and placement
+  refuses as defence in depth. Raising the cap only moves the wall; the cost is
+  per entry, so a million entries would be tens of gigabytes of records.
+- **Rejected alternative — bounded instalments.** A bounded-instalment feature
+  was implemented and mechanically verified, then deliberately reverted. An
+  instalment is a separate publication with its own namespace root, and the
+  operational projection takes the latest root per source. Draining a real
+  11,561-file folder therefore made the client and the index show only the last
+  instalment: the newest lexical generation indexed 152 of 888 published
+  entries. A rigorous analysis proved that distinguishing "complete snapshot"
+  from "partial instalment" cannot be derived from the recovery authority
+  (repository objects plus authenticated portable records) and would require
+  writing that fact into a signed record. That is a larger and more dangerous
+  change than making one record placeable in pieces, and it would have changed
+  the projection. **Decision:** keep one publication = one complete snapshot =
+  one namespace root, and make one logical record placeable as several
+  independently verifiable parts.
+- **Chosen successor.** A logical portable record whose canonical JSON exceeds
+  `MaxRecordBytes` is placed as N content-addressed **part** records plus the
+  binding record that already binds the logical value:
+  1. **Prepared publication closure**, `org.cairn.prepared-envelope.v3`
+     (successor to `...v2`). Its `manifest` member carries every manifest field
+     *except* `entries` — including the canonical `manifest_digest` — and it adds
+     `manifest_parts`: an ordered list of `{ordinal, digest, bytes, count}`.
+     Each part is a `RECORD_PART` record with schema
+     `org.cairn.record-part.manifest-entry.v1` carrying `logical_digest`,
+     `ordinal`, `total`, and that slice's ordered `entries`.
+  2. **Portable fact child**, `org.cairn.portable-fact-closure-envelope.v3`
+     (successor to `...v2`). It drops the inline `bundle` and adds `bundle_parts`
+     with the same descriptor shape. Each part is a `RECORD_PART` record with
+     schema `org.cairn.record-part.portable-fact-bundle.v1` carrying that slice's
+     ordered `records` and `attachments`.
+  3. **Processor-attempt closure**,
+     `org.cairn.processor-attempt-closure-envelope.v2` (successor to `...v1`). It
+     drops the inline `bundle` and adds `bundle_parts` with the same descriptor
+     shape. Each part is a `RECORD_PART` record with schema
+     `org.cairn.record-part.processor-attempt-bundle.v1` carrying that slice's
+     ordered `attempts`. This is the record a real processed root crosses first:
+     an 11,561-file publication records about 23,000 terminal attempts.
+  4. A new repository record role `RECORD_PART` (`recovery/parts/`) holds the
+     parts. Parts are addressed by their own SHA-256, verified by the ordinary
+     `VerifyRecord` readback, and are never enumerated to establish publication;
+     only the binding record is discovery authority.
+  The commit marker, the publisher's signed `SignedPreparedClosure`, and the
+  signed `PortableFactClosureRecord` keep their field meaning and are not
+  versioned: the parts are bound *through* the digests those signatures already
+  cover. A record that fits is still placed whole in its existing v1/v2 shape,
+  so existing bytes, digests and signatures do not change.
+- **Why a missing or reordered part cannot pass.** The binding is authenticated
+  by the signature that already covers the logical value: the signed
+  `ManifestDigest` (also in the commit) is the digest of the **reassembled**
+  manifest, and the signed `BundleDigest`/`BundleLength`/`RecordCount`/
+  `AttachmentCount` describe the **reassembled** bundle. A reader concatenates
+  the bound parts in ordinal order, re-derives the canonical value, and compares
+  its digest and count against the signed values. A missing part is an explicit
+  error naming the ordinal; a reordered, substituted or truncated part changes
+  the reassembled value and fails the digest comparison. Each part also names
+  the logical digest it belongs to, so a part from another record cannot be
+  substituted even behind a forged binding. No catalog, index or trust in the
+  repository layout is involved; the signed digest is the trust anchor.
+- **Exact identity and restore are unchanged.** The identity of a restored byte
+  stream is still the SHA-256 digest plus logical length of the complete logical
+  stream, computed by the reader from the exact payload objects the receipt
+  names. Part placement never changes a payload object, a content identity, a
+  payload receipt, or a recovery reference.
+- **Reader rules — explicit refusal, never a silent misread.**
+  1. A reader at this version reads v1 and v2 prepared and fact records exactly
+     as before; existing publications are byte-for-byte unaffected.
+  2. A reader MUST refuse an unknown envelope schema, a v3 binding whose parts
+     are missing, non-contiguous or unavailable, a part whose `logical_digest`
+     does not match the binding, and a reassembled value whose digest or count
+     does not equal the signed value. It never falls back to the partial value.  3. An **older** binary meeting a newer record refuses: the strict decoder
+     (`DisallowUnknownFields`) rejects the unknown `manifest_parts` or
+     `bundle_parts` member before any value is used. Authenticated discovery
+     aborts on that refusal rather than skipping the record, so an old binary
+     reports the repository as unreadable instead of silently showing a
+     truncated snapshot.
+- **Reader-dependency consequence for what is already written.** Every record
+  written before this change remains readable by both an old and a new binary,
+  with unchanged bytes, digests and signatures. Once a repository contains a v3
+  publication, an older binary can no longer complete authenticated discovery in
+  that publication domain and must be upgraded; it does not partially read the
+  repository. An operator can keep an old binary usable against a repository
+  whose publications are all v1/v2.
+- **Bounded recovery artifacts.** `recovery.export` and the portable
+  `org.cairn.recovery-reference.v2` reader artifact embed the *placed* envelopes
+  and are capped at `portableRecordReadLimit` on load, so they cannot embed a
+  large manifest or bundle. The reference schema is deliberately not changed
+  (`cairnd --recovery-reference` requires v2); a v2 reference for a large
+  publication embeds the v3 prepared envelope and the v3 fact envelopes, and the
+  content-level checks that need the manifests — authenticated manifest digest,
+  metadata evidence, fact-records-against-manifest — move into
+  `ValidateAgainstRepository`, which already requires the repository. The
+  reference alone remains a structural and signature check; the repository
+  remains the recovery authority. This keeps a whole-publication recovery
+  artifact bounded for a root of any practical size, which the previous
+  monolithic shape already could not do above roughly 570 entries.
+- **Consequences.** `plan.ingest` no longer refuses on entry count; the
+  plan-time projection now refuses only the genuinely unplaceable case, where a
+  single atomic item (one manifest entry or one fact record) is itself larger
+  than the per-record bound. `MaxRecordBytes` is unchanged and still enforced for
+  every part and every record. Nothing about the projection changes: the
+  operational catalog still takes the latest root per source, one publication is
+  still one complete snapshot with one namespace root, and no index key, query or
+  migration is touched.
+
 ## 9. Open gates before the release binary
 
 | Gate | Blocks | Owner of the evidence |

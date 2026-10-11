@@ -13,15 +13,34 @@ import (
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
-const ProcessorAttemptClosureEnvelopeSchemaV1 = "org.cairn.processor-attempt-closure-envelope.v1"
+const (
+	ProcessorAttemptClosureEnvelopeSchemaV1 = "org.cairn.processor-attempt-closure-envelope.v1"
+	// ProcessorAttemptClosureEnvelopeSchemaV2 binds an attempt bundle that is
+	// placed as content-addressed parts instead of inline (ADR-033).
+	ProcessorAttemptClosureEnvelopeSchemaV2 = "org.cairn.processor-attempt-closure-envelope.v2"
+	ProcessorAttemptBundlePartSchemaV1      = "org.cairn.record-part.processor-attempt-bundle.v1"
+)
 
 // ProcessorAttemptClosureEnvelope keeps the signed child and the exact
 // deterministic SQLite projection together. The bundle is supplemental: its
-// absence never makes the exact publication undiscoverable.
+// absence never makes the exact publication undiscoverable. Envelope v2 omits
+// the inline bundle and binds its parts instead.
 type ProcessorAttemptClosureEnvelope struct {
-	Schema  string                        `json:"schema"`
-	Closure ProcessorAttemptClosureRecord `json:"closure"`
-	Bundle  json.RawMessage               `json:"bundle"`
+	Schema      string                        `json:"schema"`
+	Closure     ProcessorAttemptClosureRecord `json:"closure"`
+	Bundle      json.RawMessage               `json:"bundle,omitempty"`
+	BundleParts []RecordPartRef               `json:"bundle_parts,omitempty"`
+}
+
+// processorAttemptBundlePart is one ordered slice of an oversized processor
+// attempt bundle. Reassembly re-marshals the same struct, so the concatenated
+// attempts reproduce the signed AttemptBundleDigest byte for byte.
+type processorAttemptBundlePart struct {
+	Schema        string                          `json:"schema"`
+	LogicalDigest string                          `json:"logical_digest"`
+	Ordinal       int                             `json:"ordinal"`
+	Total         int                             `json:"total"`
+	Attempts      []sqlite.ProcessorAttemptExport `json:"attempts"`
 }
 
 type processorAttemptBundle struct {
@@ -91,7 +110,7 @@ func (s *Service) publishProcessorAttemptClosure(ctx context.Context, workspaceI
 	if err != nil {
 		return fmt.Errorf("export processor attempts: %w", err)
 	}
-	parsed, err := validateProcessorAttemptBundle(bundle, workspaceID, snapshotRef)
+	parsed, err := parseProcessorAttemptBundle(bundle, workspaceID, snapshotRef)
 	if err != nil {
 		return err
 	}
@@ -135,11 +154,40 @@ func (s *Service) publishProcessorAttemptClosure(ctx context.Context, workspaceI
 	if err := closure.Verify(*s.TrustAnchor); err != nil {
 		return fmt.Errorf("verify signed processor attempt closure: %w", err)
 	}
-	payload, err := CanonicalJSON(ProcessorAttemptClosureEnvelope{
+	envelope := ProcessorAttemptClosureEnvelope{
 		Schema: ProcessorAttemptClosureEnvelopeSchemaV1, Closure: closure, Bundle: json.RawMessage(bundle),
-	})
+	}
+	payload, err := CanonicalJSON(envelope)
 	if err != nil {
 		return err
+	}
+	// A bundle whose canonical envelope does not fit one repository record is
+	// placed as content-addressed parts plus a v2 binding envelope. The signed
+	// AttemptBundleDigest and AttemptBundleLength still describe the reassembled
+	// bundle.
+	if int64(len(payload)) > repository.MaxRecordBytes {
+		placements, err := buildProcessorAttemptParts(parsed, closure.AttemptBundleDigest)
+		if err != nil {
+			return err
+		}
+		envelope = ProcessorAttemptClosureEnvelope{
+			Schema: ProcessorAttemptClosureEnvelopeSchemaV2, Closure: closure, BundleParts: recordPartRefs(placements),
+		}
+		if payload, err = CanonicalJSON(envelope); err != nil {
+			return err
+		}
+		for _, placement := range placements {
+			if err := s.validatePublicationFence(ctx, lease); err != nil {
+				return err
+			}
+			receipt, err := driver.PlaceRecord(ctx, repository.RecordPart, bytes.NewReader(placement.payload))
+			if err != nil {
+				return s.reconcileUnknownChildOutcome(ctx, driver, repository.RecordPart, placement.payload, parent.PublicationID, snapshotRef, parentDigest, parent.PlanDigest, fmt.Errorf("place processor attempt part %d: %w", placement.ref.Ordinal, err))
+			}
+			if err := driver.VerifyRecord(ctx, receipt); err != nil {
+				return s.reconcileUnknownChildOutcome(ctx, driver, repository.RecordPart, placement.payload, parent.PublicationID, snapshotRef, parentDigest, parent.PlanDigest, fmt.Errorf("verify processor attempt part %d: %w", placement.ref.Ordinal, err))
+			}
+		}
 	}
 	if err := s.validatePublicationFence(ctx, lease); err != nil {
 		return err
@@ -163,10 +211,14 @@ func (s *Service) PublishProcessorAttemptClosure(ctx context.Context, workspaceI
 	return s.publishProcessorAttemptClosure(ctx, workspaceID, snapshotRef, parentDigest)
 }
 
-func validateProcessorAttemptBundle(payload []byte, workspaceID, snapshotRef string) (processorAttemptBundle, error) {
+// parseProcessorAttemptBundle decodes and validates one complete attempt bundle.
+// It deliberately has no size bound of its own: a bundle larger than one
+// repository record is placed and reassembled as content-addressed parts, and
+// each part is separately bounded at placement.
+func parseProcessorAttemptBundle(payload []byte, workspaceID, snapshotRef string) (processorAttemptBundle, error) {
 	var bundle processorAttemptBundle
-	if len(payload) == 0 || int64(len(payload)) > portableRecordReadLimit {
-		return bundle, errors.New("processor attempt bundle is empty or exceeds reader limit")
+	if len(payload) == 0 {
+		return bundle, errors.New("processor attempt bundle is empty")
 	}
 	if err := decodeStrictRecord(payload, &bundle); err != nil {
 		return bundle, fmt.Errorf("decode processor attempt bundle: %w", err)
@@ -296,11 +348,14 @@ func (s *Service) processorAttemptClosureEntries(ctx context.Context, snapshotRe
 		if err := decodeStrictRecord(payload, &envelope); err != nil {
 			return nil, fmt.Errorf("decode processor attempt closure %s: %w", digest, err)
 		}
-		if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 {
+		if envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV1 && envelope.Schema != ProcessorAttemptClosureEnvelopeSchemaV2 {
 			return nil, errors.New("unsupported processor attempt closure envelope schema")
 		}
 		if objectDigest := DigestBytes(payload); objectDigest != digest {
 			return nil, errors.New("processor attempt closure object digest mismatch")
+		}
+		if err := openProcessorAttemptBundle(ctx, driver, &envelope); err != nil {
+			return nil, err
 		}
 		closure := envelope.Closure
 		if closure.PublicationDomain != s.PublicationDomain {
@@ -312,7 +367,7 @@ func (s *Service) processorAttemptClosureEntries(ctx context.Context, snapshotRe
 		if closure.TargetIdentity != driver.RepositoryIdentity() {
 			return nil, errors.New("processor attempt closure repository binding mismatch")
 		}
-		bundle, err := validateProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
+		bundle, err := parseProcessorAttemptBundle(envelope.Bundle, closure.WorkspaceID, closure.SnapshotRef)
 		if err != nil {
 			return nil, err
 		}
