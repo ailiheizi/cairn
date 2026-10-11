@@ -153,6 +153,34 @@ is an independently retained backup artifact derived from the catalog and
 publication records; it is not a second live catalog that ordinary operations
 must keep in sync.
 
+### 3.2 Portable record bound
+
+One portable recovery record is bounded at `16777216` bytes (`16 MiB`), the
+`MaxRecordBytes` limit enforced by the repository record layer. The bound
+applies to each placed record independently: the prepared publication closure,
+the publication commit marker, the post-publication portable fact child, and a
+processor-attempt closure. Enlarging it, chunking a record, or merkleizing a
+closure is a separately reviewed change to the frozen portable record format.
+
+Because a publication closure carries per-entry facts — names, captured
+metadata, portable file facts, protection and recovery references — rather than
+payload bytes, the bound is effectively a bound on the number of entries in one
+publication, not on the amount of content it protects. A thousand small text
+files cross it exactly as a thousand photographs do. A single source tree of
+roughly 700 to 800 entries can therefore exceed the bound while its data volume
+is far below it, and the entry count at which that happens varies with the
+recorded paths and facts, so a fixed entry count is not a usable sizing rule.
+
+A publication that cannot be placed MUST be refused by `plan.ingest`, before any
+durable write, with the measured entry count, the projected record size, the
+limit, and the remedy. The remedy is to ingest subfolders as separate sources:
+one workspace named `default` holds one source per root keyed
+`local-tree:<root>`, so ingesting subfolders separately accumulates one library
+while keeping each publication inside the bound. Placement MUST also refuse an
+oversized record as defence in depth, and that refusal MUST remain visible
+rather than being silently retried. The bound is never a reason to drop facts,
+truncate names, or split one record.
+
 ## 4. Identity and exactness
 
 ### 4.1 Default identity

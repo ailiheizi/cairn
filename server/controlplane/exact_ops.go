@@ -68,6 +68,14 @@ func (d *Dispatcher) handlePlanIngest(ctx context.Context, env command.Envelope,
 		if errors.Is(err, exact.ErrBlocked) {
 			return invalidInputResult(env, started, err)
 		}
+		// A publication the repository cannot place is refused while planning,
+		// before any catalog or repository mutation, as ordinary invalid input.
+		// Without this the operator would only learn the bound from a
+		// mid-apply UNKNOWN_EXTERNAL_OUTCOME whose offered resolution is to
+		// replay the same failing plan.apply.
+		if errors.Is(err, exact.ErrPortableRecordTooLarge) {
+			return invalidInputResult(env, started, err)
+		}
 		return failed(env, started, newReason(ReasonCodeCatalogError, err.Error()))
 	}
 	workspaceID, err := d.ensurePlanningSource(ctx, &inspected)

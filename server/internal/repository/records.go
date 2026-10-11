@@ -25,7 +25,14 @@ const (
 	recoveryDirName          = "recovery"
 	repositoryIdentityFile   = "repository.identity"
 	repositoryEncryptionFile = "repository.encryption"
-	maxRecordBytes           = int64(16 << 20)
+
+	// MaxRecordBytes is the hard bound on one portable recovery record. A record
+	// is the closure for one publication and carries per-entry facts rather than
+	// payload, so the bound is effectively an entry-count bound: a thousand
+	// small text files fail exactly as a thousand photographs do. Placement
+	// refuses an oversized record, but that refusal happens after the write
+	// starts, so a caller that can project the record must refuse first.
+	MaxRecordBytes = int64(16 << 20)
 )
 
 // RecordRole distinguishes portable recovery metadata from payload objects.
@@ -76,12 +83,12 @@ func (repo *Dir) PlaceRecord(ctx context.Context, role RecordRole, body io.Reade
 		_ = os.Remove(tempName)
 	}()
 	digest := sha256.New()
-	written, err := io.Copy(io.MultiWriter(temp, digest), io.LimitReader(body, maxRecordBytes+1))
+	written, err := io.Copy(io.MultiWriter(temp, digest), io.LimitReader(body, MaxRecordBytes+1))
 	if err != nil {
 		return RecordReceipt{}, fmt.Errorf("write record placement: %w", err)
 	}
-	if written > maxRecordBytes {
-		return RecordReceipt{}, fmt.Errorf("portable record exceeds %d bytes", maxRecordBytes)
+	if written > MaxRecordBytes {
+		return RecordReceipt{}, fmt.Errorf("portable record exceeds %d bytes", MaxRecordBytes)
 	}
 	if err := temp.Sync(); err != nil {
 		return RecordReceipt{}, fmt.Errorf("sync record placement: %w", err)
@@ -231,12 +238,12 @@ func (repo *Memory) PlaceRecord(ctx context.Context, role RecordRole, body io.Re
 	if err := validateRecordRole(role); err != nil {
 		return RecordReceipt{}, err
 	}
-	payload, err := io.ReadAll(io.LimitReader(body, maxRecordBytes+1))
+	payload, err := io.ReadAll(io.LimitReader(body, MaxRecordBytes+1))
 	if err != nil {
 		return RecordReceipt{}, err
 	}
-	if int64(len(payload)) > maxRecordBytes {
-		return RecordReceipt{}, fmt.Errorf("portable record exceeds %d bytes", maxRecordBytes)
+	if int64(len(payload)) > MaxRecordBytes {
+		return RecordReceipt{}, fmt.Errorf("portable record exceeds %d bytes", MaxRecordBytes)
 	}
 	sum := sha256.Sum256(payload)
 	digest := AlgorithmSHA256 + ":" + hex.EncodeToString(sum[:])

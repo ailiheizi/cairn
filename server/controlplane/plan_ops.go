@@ -596,6 +596,11 @@ func (d *Dispatcher) handlePlanRevise(ctx context.Context, env command.Envelope,
 		if errors.Is(err, exact.ErrBlocked) {
 			return conflictResult(env, started, err.Error())
 		}
+		// A revision whose successor publication could not be placed is refused
+		// before the successor plan is written, exactly like plan.ingest.
+		if errors.Is(err, exact.ErrPortableRecordTooLarge) {
+			return invalidInputResult(env, started, err)
+		}
 		return failed(env, started, newReason(ReasonCodeCatalogError, err.Error()))
 	}
 	// Keep the source identity stable when the inspection found the same

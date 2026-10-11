@@ -3,15 +3,19 @@ package exact
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strings"
 
+	"github.com/ailiheizi/cairn/server/internal/capture"
 	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/scanner"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
 
@@ -21,7 +25,7 @@ const (
 	MetadataEvidenceSchemaV2           = "org.cairn.authenticated-metadata-evidence.v2"
 	PreparedEnvelopeSchemaV1           = "org.cairn.prepared-envelope.v1"
 	PreparedEnvelopeSchemaV2           = "org.cairn.prepared-envelope.v2"
-	portableRecordReadLimit      int64 = 16 << 20
+	portableRecordReadLimit      int64 = repository.MaxRecordBytes
 	portableFactsCoveragePartial       = "PARTIAL"
 )
 
@@ -293,6 +297,500 @@ func buildMetadataEvidence(manifest Manifest) (AuthenticatedMetadataEvidence, er
 		evidence.ContentCoverageComplete = false
 	}
 	return evidence, nil
+}
+
+// postPublicationChildBytesPerFile is the measured conservative ceiling for the
+// records one processed file adds to the post-publication portable fact child
+// and that cannot exist while a plan is still read-only: the terminal attempt's
+// artifact descriptor, the attachment reference to its body, and the extracted
+// metadata facts the capability declares.
+//
+// Measured on a real 11,561-image library (a 353-file batch, one repository
+// publication): the child placed 7,772,137 bytes, of which 5,690,066 bytes were
+// the records derived from the publication's own manifest and 2,075,378 bytes
+// (351 artifact descriptors, 1,053 extracted facts, 351 attachment references)
+// depended on post-publication processing — 5,913 bytes per processed file.
+// 6 KiB is that measurement with a small margin, and it is deliberately kept
+// tight because the same library places a 16,310,074-byte child for 742 files
+// and fails above that; a wider allowance would refuse work that fits. It is a
+// measured model, not a proof: a capability that emits materially more per file
+// than the measured profile can still cross the placement bound, which remains
+// the backstop.
+const postPublicationChildBytesPerFile = int64(6 << 10)
+
+// ErrPortableRecordTooLarge reports that applying a plan would place a portable
+// recovery record larger than the repository accepts. It is decided while
+// planning, before any catalog, repository, or publication mutation, so the
+// operator gets an ordinary refusal instead of an unknown-outcome
+// reconciliation state.
+var ErrPortableRecordTooLarge = errors.New("ingest publication exceeds the portable record limit")
+
+// PublicationRecordProjection is the plan-time projection of the portable
+// records one ingest publication would place. PreparedClosureBytes and
+// PortableFactClosureBytes cover the two records that grow with the entry
+// count. A publication's commit marker is a fixed-size record, and the
+// processor-attempt closure was measured well below both projected records on
+// a real library; both remain covered by the placement guard.
+type PublicationRecordProjection struct {
+	Entries                  int
+	PreparedClosureBytes     int64
+	PortableFactClosureBytes int64
+	Limit                    int64
+}
+
+// LargestBytes returns the largest portable record the publication would place.
+func (p PublicationRecordProjection) LargestBytes() int64 {
+	if p.PreparedClosureBytes > p.PortableFactClosureBytes {
+		return p.PreparedClosureBytes
+	}
+	return p.PortableFactClosureBytes
+}
+
+// ExceedsLimit reports whether the publication cannot be placed under the
+// repository's per-record bound.
+func (p PublicationRecordProjection) ExceedsLimit() bool {
+	return p.Limit > 0 && p.LargestBytes() > p.Limit
+}
+
+// Refusal is the ordinary invalid-input refusal for a publication that cannot
+// be placed. One sentence carries the measured entry count, the projected
+// record size, the limit, and the remedy that keeps each publication inside the
+// bound.
+func (p PublicationRecordProjection) Refusal() error {
+	return fmt.Errorf(
+		"%w: applying this plan would place a %d-byte portable recovery record for %d entries, above the %d-byte repository record limit; ingest subfolders as separate sources so each publication stays under the limit",
+		ErrPortableRecordTooLarge, p.LargestBytes(), p.Entries, p.Limit,
+	)
+}
+
+// projectPublicationRecords computes the byte length of the portable records a
+// capture would place, from the same captured facts, through the same builders
+// and the same JSON encoding the apply path uses. Identifiers and digests that
+// cannot exist before apply are substituted with same-width placeholders, so
+// the projected sizes are exact for the records derived from this publication's
+// own manifest; measured against a real library those are the binding records
+// (a 353-file batch, 356 manifest entries, placed a 2,730,823-byte prepared
+// closure and a 7,772,137-byte portable fact closure, about 22 KB per entry).
+//
+// The post-publication portable fact child also carries records that only
+// exist after processing runs. Those add postPublicationChildBytesPerFile for
+// every processed file; that ceiling is a measurement of the real library, not
+// a proof, so it is conservative rather than exact and the placement guard
+// remains the backstop.
+func (s *Service) projectPublicationRecords(
+	entries []scanner.EntryRecord,
+	policy ingestPolicy,
+	boundLocators map[string][]IngestLocator,
+	binding capture.BindingRecord,
+	captureDigest, protectionDigest string,
+) (PublicationRecordProjection, error) {
+	projection := PublicationRecordProjection{Limit: repository.MaxRecordBytes}
+	if s == nil || s.SigningIdentity == nil || s.TrustAnchor == nil {
+		// Without a signing identity and trust anchor the apply path places no
+		// portable record at all, so no record bound applies.
+		return projection, nil
+	}
+	driver, ok := s.Repo.(repository.RecordDriver)
+	if !ok {
+		return projection, nil
+	}
+	// Every identifier the apply path allocates for this publication comes from
+	// the same generator, so the placeholders carry the exact width of the real
+	// values even though the values themselves cannot match.
+	workspaceID, err := sqlite.NewStableID(sqlite.IDPrefixWorkspace)
+	if err != nil {
+		return projection, err
+	}
+	sourceID, err := sqlite.NewStableID(sqlite.IDPrefixSource)
+	if err != nil {
+		return projection, err
+	}
+	rootID, err := sqlite.NewStableID(sqlite.IDPrefixNamespaceRoot)
+	if err != nil {
+		return projection, err
+	}
+	snapshotRef, err := sqlite.NewStableID("snap")
+	if err != nil {
+		return projection, err
+	}
+	publicationID, err := sqlite.NewStableID(sqlite.IDPrefixPublication)
+	if err != nil {
+		return projection, err
+	}
+	projectedDigest := DigestBytes([]byte("cairn.projected.portable.record"))
+	if strings.TrimSpace(captureDigest) == "" {
+		captureDigest = projectedDigest
+	}
+	if strings.TrimSpace(protectionDigest) == "" {
+		protectionDigest = projectedDigest
+	}
+	policy.decisionDigest = protectionDigest
+
+	ordered := append([]scanner.EntryRecord(nil), entries...)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].RelativePath < ordered[j].RelativePath })
+	rootPathID := ""
+	for _, entry := range ordered {
+		if entry.RelativePath == "." {
+			rootPathID = entry.PathID
+			break
+		}
+	}
+
+	// placeFiles places one payload object per unique exact-mode content
+	// identity; the payload receipt is built from exactly those facts.
+	placed := placedSet{}
+	seenContent := make(map[string]struct{})
+	for _, entry := range ordered {
+		if entry.Kind != scanner.KindRegularFile {
+			continue
+		}
+		if metadataOnlyResolutionQualified(scanner.CaptureModeRootedFD, entry, policy) {
+			continue
+		}
+		if entry.State != scanner.EntryComplete || entry.Content == nil {
+			continue
+		}
+		mode := policy.modeFor(entry.RelativePath)
+		if mode != sqlite.ProtectionStoreExact && mode != sqlite.ProtectionStoreExactWithExternalFallback {
+			continue
+		}
+		if _, seen := seenContent[entry.Content.ContentID]; seen {
+			continue
+		}
+		seenContent[entry.Content.ContentID] = struct{}{}
+		placed.payloadReceipts = append(placed.payloadReceipts, repository.Receipt{
+			ContentID: entry.Content.ContentID, Bytes: entry.Content.BytesRead,
+		})
+	}
+	payloadReceipt, err := buildPayloadReceipt(driver, publicationID, snapshotRef, placed)
+	if err != nil {
+		return projection, err
+	}
+
+	representations := make(map[string]string)
+	manifestEntryCount, manifestEntryBytes := 0, int64(0)
+	factRecordCount, factRecordBytes := 0, int64(0)
+	processedFiles := 0
+	fileCount, locallyProtected, explicitlyUnprotected := int64(0), int64(0), int64(0)
+	contentCoverageComplete := true
+	for _, entry := range ordered {
+		entryType, ok := namespaceType(entry.Kind)
+		if !ok {
+			continue
+		}
+		if entry.RelativePath == "." {
+			// The capture root is published as the namespace root, not as a
+			// manifest entry; the apply path skips it here as well.
+			continue
+		}
+		item, err := projectedPreparedItem(entry, entryType, policy, boundLocators, representations)
+		if err != nil {
+			return projection, err
+		}
+		if err := validatePreparedProtection(item); err != nil {
+			return projection, fmt.Errorf("%w: %v", ErrBlocked, err)
+		}
+		manifestEntry, err := toManifestEntry(item.entry, item.entryType, item, binding)
+		if err != nil {
+			return projection, err
+		}
+		encoded, err := CanonicalJSON(manifestEntry)
+		if err != nil {
+			return projection, err
+		}
+		manifestEntryCount++
+		manifestEntryBytes += int64(len(encoded))
+		if sqlite.NamespaceEntryType(manifestEntry.EntryType) == sqlite.EntryFile {
+			fileCount++
+			if manifestEntry.ContentID != "" {
+				processedFiles++
+			}
+			if manifestEntry.Protection.LocalRepresentationID != "" && manifestEntry.ContentID != "" {
+				locallyProtected++
+			} else {
+				explicitlyUnprotected++
+				contentCoverageComplete = false
+			}
+		}
+		parentSubject := ""
+		if entry.ParentPathID != "" && entry.ParentPathID != rootPathID {
+			if parentSubject, err = sqlite.NewStableID(sqlite.IDPrefixSubject); err != nil {
+				return projection, err
+			}
+		}
+		recordBytes, recordCount, err := projectedPortableFactRecordBytes(
+			workspaceID, snapshotRef, rootID, sourceID, entry.Name, parentSubject, manifestEntry)
+		if err != nil {
+			return projection, err
+		}
+		factRecordCount += recordCount
+		factRecordBytes += recordBytes
+	}
+	projection.Entries = manifestEntryCount
+
+	manifestBase := Manifest{
+		Schema: CurrentSnapshotSchema, SnapshotRef: snapshotRef, CreatedAt: s.now(), Binding: binding,
+		ConfigDigest: s.ConfigDigest, ProtectionDigest: protectionDigest,
+		ManifestDigest: projectedDigest, Entries: []ManifestEntry{},
+	}
+	// Reuse the real evidence builder so its record shape cannot drift, then
+	// patch the counts it derived from the empty skeleton manifest.
+	evidence, err := buildMetadataEvidence(manifestBase)
+	if err != nil {
+		return projection, err
+	}
+	evidence.EntryCount = int64(manifestEntryCount)
+	evidence.PortableFactsEntryCount = int64(manifestEntryCount)
+	evidence.FileCount = fileCount
+	evidence.LocallyProtectedFiles = locallyProtected
+	evidence.ExplicitlyUnprotected = explicitlyUnprotected
+	evidence.ContentCoverageComplete = contentCoverageComplete
+
+	// A JSON array literal of count elements costs its element bytes plus one
+	// byte per separator and two brackets.
+	entriesLiteralBytes := manifestEntryBytes + int64(manifestEntryCount) + 1
+	if manifestEntryCount == 0 {
+		entriesLiteralBytes = 2
+	}
+	preparedEnvelope := PreparedClosureEnvelope{
+		Schema: PreparedEnvelopeSchemaV2,
+		Prepared: SignedPreparedClosure{
+			Schema: PreparedClosureSchemaV1, SignatureDomain: RecoverySignatureDomainV1,
+			RecordKind: PreparedClosureKind, PublicationID: publicationID,
+			PublicationDomain: s.PublicationDomain,
+			// Unknown before apply: pin to the widest possible encoding so the
+			// projection never under-reports the record that will be placed.
+			Generation: math.MaxUint64, FenceToken: math.MaxUint64, ParentCommitDigest: projectedDigest,
+			SnapshotRef: snapshotRef, RRFRootDigest: projectedDigest, ManifestDigest: projectedDigest,
+			PayloadReceiptDigest: projectedDigest, PayloadReceiptLength: payloadReceipt.TotalBytes,
+			PayloadReceiptObjectCount: int64(len(payloadReceipt.Objects)), PlanDigest: projectedDigest,
+			CaptureDigest: captureDigest, PolicyDigest: protectionDigest, VerificationDigest: projectedDigest,
+			TargetIdentity: driver.RepositoryIdentity(),
+			WriterIdentity: s.SigningIdentity.WriterIdentity, KeyID: s.SigningIdentity.KeyID,
+			SignedAt: s.now(), Signature: make([]byte, ed25519.SignatureSize),
+		},
+		PayloadReceipt: payloadReceipt, VerificationEvidence: evidence, Manifest: manifestBase,
+	}
+	preparedEnvelopeBytes, err := CanonicalJSON(preparedEnvelope)
+	if err != nil {
+		return projection, err
+	}
+	projection.PreparedClosureBytes = int64(len(preparedEnvelopeBytes)) - 2 + entriesLiteralBytes
+
+	bundleBase := portableFactBundle{
+		Schema: PortableFactBundleSchemaV2, WorkspaceID: workspaceID, SnapshotRef: snapshotRef,
+		Records: []portableFactRecord{}, Attachments: []portableFactAttachment{},
+	}
+	bundleBaseBytes, err := CanonicalJSON(bundleBase)
+	if err != nil {
+		return projection, err
+	}
+	recordsLiteralBytes := factRecordBytes + int64(factRecordCount) + 1
+	if factRecordCount == 0 {
+		recordsLiteralBytes = 2
+	}
+	bundleBytes := int64(len(bundleBaseBytes)) - 2 + recordsLiteralBytes
+	closureSchema, envelopeSchema, err := portableFactClosureSchemas(bundleBase.Schema)
+	if err != nil {
+		return projection, err
+	}
+	factClosure := PortableFactClosureRecord{
+		Schema: closureSchema, SignatureDomain: RecoverySignatureDomainV1, RecordKind: PortableFactClosureKind,
+		WorkspaceID: workspaceID, PublicationID: publicationID, PublicationDomain: s.PublicationDomain,
+		SnapshotRef: snapshotRef, ManifestDigest: projectedDigest, ParentCommitDigest: projectedDigest,
+		// Unknown before apply; the widest encoding is the conservative reading.
+		ParentGeneration: math.MaxUint64, ClosureSequence: math.MaxUint64,
+		PredecessorClosureDigest: projectedDigest,
+		BundleSchema:             bundleBase.Schema, BundleDigest: projectedDigest, BundleLength: bundleBytes,
+		RecordCount: int64(factRecordCount), AttachmentCount: 0,
+		ProcessorAttemptDigest: projectedDigest, TargetIdentity: driver.RepositoryIdentity(),
+		WriterIdentity: s.SigningIdentity.WriterIdentity, KeyID: s.SigningIdentity.KeyID,
+		FenceToken:                 math.MaxUint64,
+		RequiredReaderDependencies: portableFactReaderDependenciesForSchema(s.Repo, closureSchema),
+		CanonicalizationProfile:    "encoding/json-compact-v1",
+		CriticalExtensions:         []string{}, OptionalExtensions: json.RawMessage(`{}`),
+		SignedAt: s.now(), Signature: make([]byte, ed25519.SignatureSize),
+	}
+	// The bundle is embedded verbatim, so measuring the envelope with an empty
+	// bundle and substituting the bundle length is exact.
+	factEnvelope := PortableFactClosureEnvelope{
+		Schema: envelopeSchema, Closure: factClosure, Bundle: json.RawMessage(`[]`),
+	}
+	factEnvelopeBytes, err := CanonicalJSON(factEnvelope)
+	if err != nil {
+		return projection, err
+	}
+	projection.PortableFactClosureBytes = int64(len(factEnvelopeBytes)) - 2 + bundleBytes
+	if s.Processor != nil {
+		// The post-publication child also carries what processing emitted for
+		// this publication. That output cannot exist before apply, so it is
+		// covered by the measured per-file ceiling above.
+		projection.PortableFactClosureBytes += postPublicationChildBytesPerFile * int64(processedFiles)
+	}
+	return projection, nil
+}
+
+// projectedPreparedItem mirrors the identifier allocation the apply path
+// performs for one captured entry. It performs no catalog, repository, or
+// publication mutation; the identifiers exist only to carry the right width
+// into the projection.
+func projectedPreparedItem(
+	entry scanner.EntryRecord,
+	entryType sqlite.NamespaceEntryType,
+	policy ingestPolicy,
+	boundLocators map[string][]IngestLocator,
+	representations map[string]string,
+) (prepared, error) {
+	var item prepared
+	observationID, err := sqlite.NewStableID(sqlite.IDPrefixObservation)
+	if err != nil {
+		return item, err
+	}
+	item = prepared{
+		entry: entry, observationID: observationID, entryType: entryType,
+		protectionMode: policy.modeFor(entry.RelativePath), protectionDigest: policy.decisionDigest,
+	}
+	item.protectionOutcome, item.protectionReason = protectionOutcome(entry, item.protectionMode)
+	if item.namespaceID, err = sqlite.NewStableID(sqlite.IDPrefixNamespaceEntry); err != nil {
+		return item, err
+	}
+	if item.protectionID, err = sqlite.NewStableID(sqlite.IDPrefixProtectionRecord); err != nil {
+		return item, err
+	}
+	if entryType != sqlite.EntryFile {
+		return item, nil
+	}
+	if entry.Content == nil && !(item.protectionMode == sqlite.ProtectionMetadataOnly && metadataOnlyEntryEvidence(entry)) {
+		return item, fmt.Errorf("%w: regular file %q has no content digest", ErrBlocked, entry.RelativePath)
+	}
+	if entry.Content != nil {
+		if item.fileVersionID, err = sqlite.NewStableID(sqlite.IDPrefixFileVersion); err != nil {
+			return item, err
+		}
+		key := entry.Content.ContentID + "\x00" + string(item.protectionMode)
+		representation, ok := representations[key]
+		if !ok {
+			if representation, err = sqlite.NewStableID(sqlite.IDPrefixRepresentation); err != nil {
+				return item, err
+			}
+			representations[key] = representation
+		}
+		item.representation = representation
+		if item.protectionMode == sqlite.ProtectionStoreExact || item.protectionMode == sqlite.ProtectionStoreExactWithExternalFallback {
+			if item.recoveryID, err = sqlite.NewStableID(sqlite.IDPrefixRecoveryReference); err != nil {
+				return item, err
+			}
+		}
+	}
+	for priority, locator := range boundLocators[entry.PathID] {
+		if item.externalBindingID == "" {
+			if item.externalBindingID, err = sqlite.NewStableID(sqlite.IDPrefixExternalBinding); err != nil {
+				return item, err
+			}
+			if item.externalRecoveryID, err = sqlite.NewStableID(sqlite.IDPrefixRecoveryReference); err != nil {
+				return item, err
+			}
+		}
+		locatorID, err := sqlite.NewStableID(sqlite.IDPrefixExternalLocator)
+		if err != nil {
+			return item, err
+		}
+		item.externalLocators = append(item.externalLocators, preparedLocator{
+			id: locatorID, priority: int64(priority), locator: locator,
+		})
+	}
+	return item, nil
+}
+
+// projectedPortableFactRecordBytes returns the summed serialized length and the
+// count of the portable fact records one manifest entry contributes to the
+// post-publication child closure. The payloads are the same values the apply
+// path serializes; catalog-derived identifiers are same-width placeholders.
+func projectedPortableFactRecordBytes(
+	workspaceID, snapshotRef, rootID, sourceID, displayName, parentSubject string,
+	entry ManifestEntry,
+) (int64, int, error) {
+	recordSchema, err := portableFactRecordSchema(PortableFactBundleSchemaV2)
+	if err != nil {
+		return 0, 0, err
+	}
+	entryID, err := sqlite.NewStableID(sqlite.IDPrefixNamespaceEntry)
+	if err != nil {
+		return 0, 0, err
+	}
+	subjectRef, err := sqlite.NewStableID(sqlite.IDPrefixSubject)
+	if err != nil {
+		return 0, 0, err
+	}
+	fileVersionID := ""
+	if entry.ContentID != "" {
+		if fileVersionID, err = sqlite.NewStableID(sqlite.IDPrefixFileVersion); err != nil {
+			return 0, 0, err
+		}
+	}
+	total, count := int64(0), 0
+	appendRecord := func(kind, id string, payload, provenance any) error {
+		payloadBytes, err := CanonicalJSON(payload)
+		if err != nil {
+			return err
+		}
+		provenanceBytes, err := CanonicalJSON(provenance)
+		if err != nil {
+			return err
+		}
+		encoded, err := CanonicalJSON(portableFactRecord{
+			Schema: recordSchema, RecordKind: kind, RecordID: id, WorkspaceID: workspaceID,
+			SnapshotRef: snapshotRef, StableSubjectRef: subjectRef, Revision: 1,
+			PayloadDigest: DigestBytes(payloadBytes), PayloadLength: int64(len(payloadBytes)),
+			Provenance: provenanceBytes, Payload: payloadBytes,
+		})
+		if err != nil {
+			return err
+		}
+		total += int64(len(encoded))
+		count++
+		return nil
+	}
+	selected := make(map[string]struct{})
+	if entry.Protection.LocalRepresentationID != "" {
+		selected[entry.Protection.LocalRepresentationID] = struct{}{}
+	}
+	for _, reference := range entry.Protection.RecoveryReferences {
+		if reference.RepresentationID != "" {
+			selected[reference.RepresentationID] = struct{}{}
+		}
+	}
+	selectedRefs := make([]string, 0, len(selected))
+	for ref := range selected {
+		selectedRefs = append(selectedRefs, ref)
+	}
+	sort.Strings(selectedRefs)
+	mapping := subjectMappingPayload{
+		WorkspaceID: workspaceID, NamespaceRootID: rootID, NamespaceEntryID: entryID,
+		StableSubjectRef: subjectRef, SourceID: sourceID, ParentSubjectRef: parentSubject,
+		RawPath: entry.RawPath, RawName: entry.RawName, DisplayName: displayName,
+		EntryType: entry.EntryType, ContentID: entry.ContentID, LogicalLength: entry.LogicalSize,
+		FileVersionID: fileVersionID, SelectedRepresentationRefs: selectedRefs,
+		MetadataBefore: entry.MetadataBefore, MetadataAfter: entry.MetadataAfter,
+		Protection: entry.Protection,
+	}
+	if err := appendRecord("SUBJECT_MAPPING", entryID, mapping, map[string]any{
+		"namespace_root_id": rootID, "entry_type": entry.EntryType,
+	}); err != nil {
+		return 0, 0, err
+	}
+	if entry.Facts == nil {
+		return total, count, nil
+	}
+	for _, fact := range entry.Facts.Facts {
+		if err := appendRecord("METADATA_FACT", entryID+":capture:"+fact.Name, fact, map[string]any{
+			"source_profile": fact.SourceProfile, "authority": fact.Authority,
+			"capture_time": fact.CapturedAt, "provenance_digest": fact.ProvenanceDigest,
+		}); err != nil {
+			return 0, 0, err
+		}
+	}
+	return total, count, nil
 }
 
 func (s *Service) publishRecoveryClosure(ctx context.Context, adopted adopted, manifest Manifest, placed placedSet, planDigest, captureDigest, policyDigest string) (result PublicationClosureResult, retErr error) {

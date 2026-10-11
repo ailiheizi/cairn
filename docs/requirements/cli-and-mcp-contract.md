@@ -410,6 +410,20 @@ The matching CLI is `cairn ingest <root> --protection LINK_ONLY --file-protectio
 
 Planning MAY retain a qualified capture and invoke explicitly selected read-only processors. It MUST NOT publish repository data, mutate source content, delete a source, or contact a network destination outside the selected targets and granted processor profiles.
 
+`plan.ingest` MUST refuse, as ordinary invalid input and before any catalog or
+repository write, a capture whose publication would place a portable recovery
+record above the `16777216`-byte (`16 MiB`) per-record bound. The refusal names
+the entry count, the projected record size, the limit, and the remedy: ingest
+subfolders as separate sources, so each publication stays inside the bound while
+the default workspace accumulates one library. The bound counts entries rather
+than data volume, so it is not a size in bytes of the source tree, and the plan
+MUST NOT be recorded, applied, or left in a reconciliation state when the
+refusal applies. `plan.revise` MUST apply the same refusal to a successor plan.
+`plan.apply` retains the placement-level refusal as defence in depth; that
+second check is the backstop for records whose content only exists after
+publication, and it MUST NOT be replaced by, or silently retry past, the plan
+check.
+
 The plan result includes:
 
 - Plan reference, digest, intent, creation time, expiry, and validity conditions.

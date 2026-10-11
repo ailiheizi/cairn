@@ -124,6 +124,23 @@ func (s *Service) InspectIngest(ctx context.Context, root string, options Ingest
 		return plan, err
 	}
 	locators := append([]IngestLocator(nil), policy.locators...)
+	executable := len(blockedEntries) == 0 && (captureResult.scanResult.State == scanner.ScanComplete || metadataOnlyScanResolved(captureResult.sink.start.CaptureMode, captureResult.sink.entries, policy))
+	// Refuse a publication that could not be placed while the plan is still
+	// read-only. The projection is derived from this capture; nothing durable
+	// has been created yet, so the operator gets an ordinary refusal instead of
+	// a plan that fails mid-apply and leaves an unknown-outcome reconciliation
+	// state. A plan that cannot be applied at all (blocked entries, incomplete
+	// scan) is left for the ordinary executable/blocked review path.
+	if executable {
+		projection, projectErr := s.projectPublicationRecords(
+			captureResult.sink.entries, policy, boundLocators, captureResult.binding, basis, protectionDigest)
+		if projectErr != nil {
+			return plan, projectErr
+		}
+		if projection.ExceedsLimit() {
+			return plan, projection.Refusal()
+		}
+	}
 	return IngestPlan{
 		Root:                    captureResult.binding.DisplayPath,
 		SourceID:                captureResult.sourceID,
@@ -135,7 +152,7 @@ func (s *Service) InspectIngest(ctx context.Context, root string, options Ingest
 		FileProtection:          cloneProtectionModes(policy.fileModes),
 		ProtectionDecisions:     protectionDecisions,
 		BlockedEntries:          blockedEntries,
-		Executable:              len(blockedEntries) == 0 && (captureResult.scanResult.State == scanner.ScanComplete || metadataOnlyScanResolved(captureResult.sink.start.CaptureMode, captureResult.sink.entries, policy)),
+		Executable:              executable,
 		ConfirmLinkOnly:         options.ConfirmLinkOnly,
 		ExternalLocators:        locators,
 		MetadataOnlyResolutions: append([]string(nil), options.MetadataOnlyResolutions...),
