@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Expand, Image as ImageIcon, X } from "lucide-react";
 import type { ComponentProps, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { ResultList } from "./ResultList";
+import { useResultWindow } from "./ResultWindow";
 import { ContentPreview, previewThumbKind } from "./ContentPreview";
 import { PhotoThumbnail } from "./PhotoThumbnail";
 import { FavoriteButton } from "./FavoriteButton";
@@ -16,6 +17,12 @@ import "./PhotoLibraryExperience.css";
  * Integration: render in place of ResultList for viewMode === "photos", pass
  * the same ResultList props and the existing onOpenHit details callback.
  * Indices passed to row/selection callbacks always refer to props.hits.
+ *
+ * The wall is windowed by the same shared result window as the library result
+ * list (components/ResultWindow.tsx): the DOM holds the cards around the
+ * viewport and the spacer keeps every card reachable. Positions handed to the
+ * viewer and to the row callbacks are always positions in the filtered listing,
+ * exactly as before.
  */
 export type PhotoLibraryExperienceProps = ComponentProps<typeof ResultList> & {
   onOpenHit: (hit: SearchHit) => void;
@@ -37,7 +44,7 @@ const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_AXIS_RATIO = 1.6;
 
 export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
-  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, tagsBySubject, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
+  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
   const [format, setFormat] = useState("all");
   const [density, setDensity] = useState(3);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -59,6 +66,9 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }).filter((item) => item.hit.entry_type !== "DIRECTORY"), [hits]);
   const formats = useMemo(() => [...new Set(items.map((item) => item.format))].sort(), [items]);
   const visibleItems = useMemo(() => items.filter((item) => format === "all" || item.format === format), [format, items]);
+  const wall = useResultWindow({ containerRef: libraryListRef, count: visibleItems.length });
+  const mountedItems = useMemo(() => visibleItems.slice(wall.startIndex, wall.endIndex).map((item, offset) => ({ item, position: wall.startIndex + offset })), [visibleItems, wall.startIndex, wall.endIndex]);
+  const pendingFocusRef = useRef("");
   const current = viewerIndex == null ? undefined : visibleItems[viewerIndex];
   const resultsIdentity = useMemo(() => JSON.stringify([workspaceID, hits.map((hit) => [hit.subject_ref ?? "", hit.entry_id ?? "", hit.content_id ?? "", hit.logical_size ?? null, hit.path ?? "", hit.name ?? "", hit.entry_type ?? ""])]), [hits, workspaceID]);
   const previousResultsIdentity = useRef(resultsIdentity);
@@ -67,10 +77,24 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     const subjectRef = focusedSubjectRef?.trim();
     if (!subjectRef || subjectRef === lastHostFocus.current) return;
     lastHostFocus.current = subjectRef;
+    pendingFocusRef.current = subjectRef;
+  }, [focusedSubjectRef]);
+
+  // Focus follows the App-owned subject once its card is mounted. A subject
+  // outside the window is revealed first, so a focus carried across
+  // presentations still lands on the real card instead of a missing element.
+  useEffect(() => {
+    const subjectRef = pendingFocusRef.current;
+    if (!subjectRef) return;
+    const position = visibleItems.findIndex((item) => item.hit.subject_ref === subjectRef);
+    if (position < 0) { pendingFocusRef.current = ""; return; }
+    if (position < wall.startIndex || position >= wall.endIndex) { wall.revealIndex(position); return; }
     const target = Array.from(libraryListRef.current?.querySelectorAll<HTMLElement>("[data-subject-ref] a, [data-subject-ref] button") ?? [])
       .find((node) => node.closest("[data-subject-ref]")?.getAttribute("data-subject-ref") === subjectRef);
-    target?.focus();
-  }, [focusedSubjectRef, libraryListRef]);
+    if (!target) return;
+    pendingFocusRef.current = "";
+    target.focus({ preventScroll: true });
+  }, [libraryListRef, mountedItems, visibleItems, wall.endIndex, wall.measured, wall.revealIndex, wall.startIndex]);
 
   useEffect(() => {
     if (previousResultsIdentity.current !== resultsIdentity) {
@@ -81,6 +105,28 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
       }
     }
   }, [resultsIdentity, viewerIndex]);
+
+  // The roving index is an index into props.hits; the window counts positions
+  // in the filtered listing. A roving index outside the mounted window is
+  // revealed first and focused once mounted, so arrow keys, Home and End reach
+  // every card on the wall, not only the mounted ones.
+  const focusWasInWall = useRef(false);
+  const rovingPosition = useMemo(() => visibleItems.findIndex((item) => item.index === rovingRow), [rovingRow, visibleItems]);
+  useEffect(() => {
+    const container = libraryListRef.current;
+    if (!container || container.querySelector(`[data-result-index="${rovingRow}"]`)) return;
+    focusWasInWall.current = container.contains(document.activeElement);
+    if (rovingPosition >= 0) wall.revealIndex(rovingPosition);
+  }, [libraryListRef, rovingPosition, rovingRow, wall.revealIndex]);
+  useEffect(() => {
+    const container = libraryListRef.current;
+    if (!container) return;
+    const target = container.querySelector<HTMLElement>(`[data-result-index="${rovingRow}"] .result-open-copy`);
+    if (!target || document.activeElement === target) { focusWasInWall.current = false; return; }
+    if (!focusWasInWall.current) return;
+    focusWasInWall.current = false;
+    target.focus({ preventScroll: true });
+  }, [libraryListRef, rovingRow, wall.endIndex, wall.startIndex]);
 
   useEffect(() => {
     if (!current) return undefined;
@@ -219,8 +265,8 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     {error && <p className="photo-library__state is-error" role="alert">{t("Photos could not be loaded")}: {error}</p>}
     {loading && <p className="photo-library__state" role="status">{t("Loading photos…")}</p>}
     {!loading && !error && visibleItems.length === 0 && <div className="photo-library__empty"><ImageIcon size={30} /><strong>{format === "all" ? t("No photos in the loaded listing") : t("No items match this format")}</strong><span>{t("Unsupported image formats remain available as originals from Details.")}</span></div>}
-    <div ref={libraryListRef} onKeyDown={onKeyDown} className="photo-wall">
-      {visibleItems.map((item, position) => {
+    <div ref={libraryListRef} onKeyDown={onKeyDown} className={`photo-wall ${wall.containerClass}`} style={wall.containerStyle} data-rendered-from={wall.startIndex} data-rendered-to={wall.endIndex} data-listing-count={visibleItems.length}>
+      {mountedItems.map(({ item, position }) => {
         const { hit, index } = item;
         const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || t("Untitled subject");
         const checked = Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref));

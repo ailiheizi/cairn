@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { Archive, Check, FileAudio, FileText, FileType2, FileVideo, Folder, Image as ImageIcon, Tag } from "lucide-react";
 import type { Locale, Translator } from "../i18n";
 import { ContentPreview, previewThumbBudget, previewThumbKind } from "./ContentPreview";
+import { useResultWindow } from "./ResultWindow";
 import { exactIdentityKey, formatBytes, formatEntryType, formatFacetValue, mediaClassFromSuffix, previewUnicodeText, searchSegmentSourceLabel, sortableSize } from "../lib/format";
 import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, SortField, ViewMode } from "../lib/types";
 
@@ -9,6 +11,11 @@ import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, S
 // from the same loaded projection. The listing never invents content: a tile
 // shows a picture and a name, and only a real image may read content for its
 // thumbnail.
+//
+// The list is windowed by the shared result window (components/ResultWindow.tsx):
+// the DOM holds the rows around the viewport, not the whole publication set, and
+// the spacer keeps the document long enough that every item stays reachable.
+// Indices handed to the row callbacks are always indices into the full listing.
 
 export function ResultRow({ hit, index, roving, duplicateCount, selected, multiSelected, userTags, sizeSort, t, command, workspaceId, locale, showThumb = true, showMatch = false, onRowClick, onToggleSelection }: { hit: SearchHit; index: number; roving: boolean; duplicateCount: number; selected: boolean; multiSelected: boolean; userTags: string[]; sizeSort: boolean; t: Translator; command: Command; workspaceId: string; locale: Locale; showThumb?: boolean; showMatch?: boolean; onRowClick: (index: number, event: RowClickEvent) => void; onToggleSelection: (index: number) => void }) {
   const directory = hit.entry_type === "DIRECTORY";
@@ -72,5 +79,30 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
   onToggleSelection: (index: number) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }) {
-  return <div ref={libraryListRef} className={`result-list ${libraryLayout === "list" ? "list-mode" : ""} ${sortField === "size" ? "sort-by-size" : ""}`} role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.")} data-sort-field={sortField} data-sort-direction={sortDirection} data-selection-count={selectionCount} onKeyDown={onKeyDown}>{hits.map((hit, index) => <ResultRow key={hit.subject_ref ?? index} index={index} roving={index === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={index < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} />)}</div>;
+  const window = useResultWindow({ containerRef: libraryListRef, count: hits.length });
+  const { startIndex, endIndex, revealIndex } = window;
+  const focusWasInList = useRef(false);
+  // Arrow keys, Home and End move a roving index over the whole listing, not
+  // only over the mounted rows. When the target row is outside the window, the
+  // list is scrolled to it first and focus follows once it is mounted, so an
+  // item scrolled out of the window is still keyboard-reachable and keeps its
+  // selection: selection lives on the subject refs, never on the mounted row.
+  useEffect(() => {
+    const container = libraryListRef.current;
+    if (!container || container.querySelector(`[data-result-index="${rovingRow}"]`)) return;
+    focusWasInList.current = container.contains(document.activeElement);
+    revealIndex(rovingRow);
+  }, [libraryListRef, revealIndex, rovingRow]);
+  useEffect(() => {
+    const container = libraryListRef.current;
+    if (!container) return;
+    const target = container.querySelector<HTMLElement>(`[data-result-index="${rovingRow}"] .result-open-copy`);
+    if (!target) return;
+    if (document.activeElement === target) { focusWasInList.current = false; return; }
+    if (!focusWasInList.current) return;
+    focusWasInList.current = false;
+    target.focus({ preventScroll: true });
+  }, [libraryListRef, rovingRow, startIndex, endIndex]);
+  const mounted = hits.slice(startIndex, endIndex);
+  return <div ref={libraryListRef} className={`result-list ${libraryLayout === "list" ? "list-mode" : ""} ${sortField === "size" ? "sort-by-size" : ""} ${window.containerClass}`} style={window.containerStyle} role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.")} data-sort-field={sortField} data-sort-direction={sortDirection} data-selection-count={selectionCount} data-rendered-from={startIndex} data-rendered-to={endIndex} data-listing-count={hits.length} onKeyDown={onKeyDown}>{mounted.map((hit, offset) => <ResultRow key={hit.subject_ref ?? startIndex + offset} index={startIndex + offset} roving={startIndex + offset === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={startIndex + offset < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} />)}</div>;
 }

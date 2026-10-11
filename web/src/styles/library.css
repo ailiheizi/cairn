@@ -813,6 +813,19 @@ selection bar, and the details inspector column. */
    have no logical size at all. */
 .result-list.sort-by-size .result-meta { display: inline-flex; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 
+/* Windowed result wall. The container becomes a spacer over the whole loaded
+   listing and only the rows around the viewport are mounted, so ten thousand
+   items no longer mean ten thousand rows in the DOM. In the tile grid every
+   mounted row keeps the one measured height (the window sets `grid-auto-rows`),
+   which is what makes a row's document offset exactly `row * stride` and keeps
+   the list from correcting itself under the operator's cursor. `overflow:
+   hidden` only stops a taller row from painting over its neighbour during the
+   single pre-paint commit in which the measurement adopts the greater height.
+   The dense list is not forced to a height: its rows are single-line and
+   already uniform, and forcing the grid's tall tile height onto them would
+   leave one sparse 190 px row per item. */
+.result-list.is-windowed .result-row { overflow: hidden; }
+
 /* User tags on a tile: a compact chip row under the name. The tile stays a
    picture and a name; tags only appear when the subject actually has them. */
 .result-tags { min-width: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }

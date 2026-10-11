@@ -9,6 +9,11 @@
 .photo-library__filters button, .photo-card__foot button { border: 1px solid var(--line, #dce2e9); background: var(--surface, #fff); color: inherit; border-radius: 999px; padding: .4rem .75rem; cursor: pointer; white-space: nowrap; }
 .photo-library__filters button[aria-pressed="true"] { color: var(--accent, #5268dc); border-color: currentColor; background: color-mix(in srgb, var(--accent, #5268dc) 8%, white); }
 .photo-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--photo-card-min, 180px)), 1fr)); gap: clamp(.45rem, 1.2vw, .9rem); }
+/* Windowed photo wall: the container is a spacer over the whole loaded listing
+   and only the cards around the viewport are mounted, exactly like the library
+   result list (components/ResultWindow.tsx). The one measured card height is
+   applied by the window, so a card's document offset is `row * stride`. */
+.photo-wall.is-windowed .photo-card { overflow: hidden; }
 .photo-library[data-density="1"] .photo-wall { --photo-card-min: 320px; }
 .photo-library[data-density="2"] .photo-wall { --photo-card-min: 240px; }
 .photo-library[data-density="3"] .photo-wall { --photo-card-min: 180px; }
