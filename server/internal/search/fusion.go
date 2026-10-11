@@ -18,6 +18,10 @@ type Component struct {
 	// Reason carries the stable machine-readable reason when a component did
 	// not succeed. It is empty for SUCCEEDED components.
 	Reason string
+	// Page is this component's honest bounding state. It is what lets a fused
+	// answer state that one of its lanes is a bounded top-k set rather than a
+	// complete match set.
+	Page PageState
 }
 
 // FusedHit is a subject that one or more components returned.
@@ -61,6 +65,11 @@ func dimensionHasQueryMaterial(req QueryRequest, id string) bool {
 type FuseResult struct {
 	Hits       []FusedHit
 	Components []Component
+	// Page is the pageable lane's bounding state, when the fused request
+	// declared one. A fused union is only pageable when exactly one of its
+	// lanes is pageable; the union as a whole never is, because the other lanes
+	// are bounded top-k sets with no seekable order.
+	Page PageState
 }
 
 // DefaultFuseDimensions is the host-owned ordinary query surface. It is
@@ -132,20 +141,38 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 			result.Components = append(result.Components, component)
 			continue
 		}
-		generation, hits, err := idx.Query(ctx, QueryRequest{
+		// Only the lexical lane is pageable. A bounded top-k lane is queried
+		// with its own ceiling and never receives a continuation position.
+		lanePage := req.Page
+		if lanePage.Limit == 0 {
+			lanePage.Limit = legacyResultLimit
+		}
+		if id != DimensionLexical {
+			lanePage = PageRequest{Limit: lanePage.Limit}
+		}
+		lane, err := idx.QueryPage(ctx, QueryRequest{
 			WorkspaceID: req.WorkspaceID,
 			Dimension:   id,
 			Text:        req.Text,
 			Axes:        req.Axes,
 			Filters:     req.Filters,
 			ImageQuery:  req.ImageQuery,
+			Page:        lanePage,
 		})
-		component.GenerationID = generation.ID
+		component.GenerationID = lane.Generation.ID
+		component.Page = lane.Page
+		if id == DimensionLexical {
+			// The fused answer carries its pageable lane's bounding state. The
+			// union as a whole is still partial whenever another lane is a
+			// bounded top-k set; the control plane states that separately.
+			result.Page = lane.Page
+		}
 		if err != nil {
 			component.Reason = QueryFailureReason(id, err)
 			result.Components = append(result.Components, component)
 			continue
 		}
+		hits := lane.Hits
 		component.Status = "SUCCEEDED"
 		component.Hits = len(hits)
 		result.Components = append(result.Components, component)

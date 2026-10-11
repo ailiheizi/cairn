@@ -547,6 +547,142 @@ type NamespaceListData struct {
 	Entries  []NamespaceEntryData `json:"entries"`
 }
 
+// PageCompleteness is the explicit three-state answer a caller must be able to
+// tell apart. Collapsing the last two states into one is the dishonest case:
+// "there is nothing more" and "this lane cannot tell you" are different
+// answers.
+const (
+	// PageCompletenessComplete means this answer provably contains every match
+	// of the query.
+	PageCompletenessComplete = "COMPLETE"
+	// PageCompletenessMoreAvailable means the daemon proved at least one further
+	// match exists beyond this answer.
+	PageCompletenessMoreAvailable = "MORE_AVAILABLE"
+	// PageCompletenessBoundedUnknown means this answer was cut by a bound the
+	// daemon cannot page (a bounded top-k lane, or a lane that did not answer),
+	// so it neither contains everything nor can say that more exists.
+	PageCompletenessBoundedUnknown = "BOUNDED_UNKNOWN"
+)
+
+// PageMode names the request shape an answer was produced for.
+const (
+	// PageModeDefault is the pre-existing single-answer shape: the caller asked
+	// for no bound of its own and the daemon's own bound applied. For
+	// content.list that default is the complete workspace projection.
+	PageModeDefault = "default"
+	// PageModePage is an explicitly requested bounded page.
+	PageModePage = "page"
+)
+
+// PageTruncationReason names why an answer was cut by a bound the daemon
+// cannot page.
+const (
+	// PageTruncationBoundedTopK means the lane ranks a bounded candidate set
+	// (a top-k answer) and has no seekable order, so the match set behind it is
+	// not materializable as pages.
+	PageTruncationBoundedTopK = "BOUNDED_TOP_K"
+	// PageTruncationResultLimit means the pre-paging single-answer bound cut the
+	// answer. It is pageable on the lexical lane; request a page to continue.
+	PageTruncationResultLimit = "RESULT_LIMIT"
+	// PageTruncationUnansweredLane means a declared lane did not answer, so its
+	// possible matches are absent from this union.
+	PageTruncationUnansweredLane = "LANE_DID_NOT_ANSWER"
+)
+
+// PageContinuationReason names why an answer carries no continuation.
+const (
+	// PageContinuationBoundedLane means the answer came from a bounded top-k
+	// lane, which has no seekable order to resume.
+	PageContinuationBoundedLane = "LANE_IS_BOUNDED_TOP_K"
+	// PageContinuationFusedUnion means the answer is a fusion of lanes, at
+	// least one of which is a bounded top-k set. A union that mixes a complete
+	// match set with a bounded one is inherently partial and cannot be one
+	// continuation chain; page the complete lane instead.
+	PageContinuationFusedUnion = "FUSED_UNION_INCLUDES_BOUNDED_TOP_K"
+)
+
+// PageLaneData is one lane's completeness inside a multi-lane answer.
+type PageLaneData struct {
+	Dimension string `json:"dimension"`
+	// Status is the lane's own component status (SUCCEEDED, SKIPPED,
+	// DEGRADED, ...). It is copied from the fused component so a caller does
+	// not have to join two lists.
+	Status   string `json:"status"`
+	Returned int    `json:"returned"`
+	// Limit is the bound applied to this lane, or 0 when the lane applies no
+	// page bound of its own.
+	Limit int `json:"limit"`
+	// Complete is true only when this lane provably returned every match it
+	// was asked for.
+	Complete bool `json:"complete"`
+	// HasMore is true only when this lane proved further matches exist.
+	HasMore bool `json:"has_more"`
+	// Truncated is true when this lane's answer was cut by a bound it cannot
+	// page.
+	Truncated bool `json:"truncated"`
+	// BoundedTopK is the lane's top-k ceiling, or 0 when the lane is not a
+	// bounded top-k lane.
+	BoundedTopK int `json:"bounded_top_k,omitempty"`
+	// Pageable is true only for a lane whose complete match set the daemon can
+	// walk in bounded pages.
+	Pageable bool `json:"pageable"`
+}
+
+// PageData states plainly how one answer was bounded. It is present on every
+// search.query and content.list answer so a caller can never mistake a partial
+// answer for the whole answer, and never has to infer a bound from a count.
+type PageData struct {
+	// Mode is the request shape this answer was produced for.
+	Mode string `json:"mode"`
+	// Limit is the page bound actually applied to this answer. It mirrors the
+	// request's page.limit. It is 0 when no page bound was applied and the
+	// answer carries every entry the projection holds, and it is also 0 on a
+	// fused answer, where no single bound applies to the union: each lane
+	// reports its own bound in Lanes instead.
+	Limit int `json:"limit"`
+	// Returned is the number of hits or items in this answer.
+	Returned int `json:"returned"`
+	// Entries is the total number of entries the daemon's projection holds for
+	// the queried scope, when that total is exactly known. It is present on
+	// content.list answers and omitted where an exact total cannot be produced
+	// without evaluating every candidate, rather than reported as a guess.
+	Entries *int `json:"entries,omitempty"`
+	// Completeness is the explicit three-state answer. It is the field a
+	// caller should branch on.
+	Completeness string `json:"completeness"`
+	// Complete is true only when Completeness is PageCompletenessComplete.
+	Complete bool `json:"complete"`
+	// HasMore is true only when Completeness is PageCompletenessMoreAvailable.
+	HasMore bool `json:"has_more"`
+	// Truncated is true when this answer was cut by a bound the daemon cannot
+	// page. It is never set merely because more results exist on a pageable
+	// lane.
+	Truncated bool `json:"truncated"`
+	// TruncationReason is the stable reason when Truncated is true.
+	TruncationReason string `json:"truncation_reason,omitempty"`
+	// Lane names the single lane this answer came from, when there is one.
+	Lane string `json:"lane,omitempty"`
+	// Lanes reports per-lane completeness for a multi-lane (fused) answer.
+	Lanes []PageLaneData `json:"lanes,omitempty"`
+	// Order names the total order the page was produced in. A pageable answer
+	// always names one.
+	Order string `json:"order,omitempty"`
+	// ContinuationSupported is true only when the daemon can continue this
+	// exact chain.
+	ContinuationSupported bool `json:"continuation_supported"`
+	// ContinuationReason is the stable reason when ContinuationSupported is
+	// false.
+	ContinuationReason string `json:"continuation_reason,omitempty"`
+	// Token is the opaque continuation for this exact query and generation. It
+	// is the value to send back as the next request's page.token. It is present
+	// only when ContinuationSupported is true and more matches exist.
+	Token string `json:"token,omitempty"`
+	// ExpiresAt is when Token stops being accepted (RFC 3339, UTC). A
+	// caller that reaches it restarts the chain; an expired cursor is refused
+	// rather than answered.
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
 // ContentListData is the flat, read-only content-library projection. Paths
 // are provenance strings; subject refs remain the stable catalog identity.
 type ContentListData struct {
@@ -554,6 +690,9 @@ type ContentListData struct {
 	RootID      string            `json:"root_id"`
 	Roots       []ContentRootData `json:"roots,omitempty"`
 	Items       []ContentItemData `json:"items"`
+	// Page states plainly how this projection was bounded and how many entries
+	// the projection holds in total.
+	Page *PageData `json:"page,omitempty"`
 }
 
 // ContentRootData is a read-only source-path browsing choice projected from
@@ -946,6 +1085,11 @@ type SearchQueryData struct {
 	FusedDimensions []string              `json:"fused_dimensions,omitempty"`
 	Components      []SearchComponentData `json:"components,omitempty"`
 	Hits            []SearchHitData       `json:"hits"`
+	// Page states plainly how this answer was bounded, whether it is complete,
+	// and how (or whether) it can be continued. It is present on every answer,
+	// including one that carries no continuation, so a caller can never mistake
+	// a partial answer for the whole answer.
+	Page *PageData `json:"page,omitempty"`
 }
 
 // SearchRebuildData reports the result of rebuilding disposable search

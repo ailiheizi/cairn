@@ -1055,16 +1055,32 @@ type namespaceListInput struct {
 
 type contentListInput struct {
 	WorkspaceID string `json:"workspace_id"`
+	// Page is the additive bounded-paging input. A caller that omits it keeps
+	// the pre-paging behavior: the complete latest published content
+	// projection. A caller that asks for a page gets one, and every answer
+	// states which mode it was produced in and how many entries the projection
+	// holds in total.
+	Page *pageInput `json:"page,omitempty"`
 }
 
 // handleContentList is the flat content-library projection. Directory
 // navigation remains the separate namespace.list operation.
+//
+// Paging is explicitly requestable and the default is unchanged: with no
+// page_size and no cursor the answer is the complete projection and says so
+// ("mode": "default", "complete": true, "entries": N). Unboundedness is not
+// itself the trust problem; silent unboundedness is, so every answer names its
+// mode and the exact total.
 func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope, started time.Time) command.Result {
 	var input contentListInput
 	if err := decodeInput(env.Input, &input); err != nil {
 		return invalidInputResult(env, started, err)
 	}
 	if err := requireStableID("workspace_id", input.WorkspaceID); err != nil {
+		return invalidInputResult(env, started, err)
+	}
+	request, err := resolvePageInput(input.Page, 0)
+	if err != nil {
 		return invalidInputResult(env, started, err)
 	}
 	if _, err := d.store.GetWorkspace(ctx, input.WorkspaceID); err != nil {
@@ -1096,12 +1112,59 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 			break
 		}
 	}
-	items := make([]command.ContentItemData, 0, len(entries))
-	indexStatus, err := d.contentIndexStatuses(ctx, input.WorkspaceID, entries)
+	// The continuation is bound to the exact latest publication set, so a chain
+	// can never cross a publication change and silently skip or repeat an
+	// entry. A cursor whose resume entry is gone is refused rather than seeked.
+	publicationDigest := contentListPublicationDigest(input.WorkspaceID, roots)
+	start := 0
+	if request.Token != "" {
+		resumeEntryID, resolveErr := d.resolveContentListCursor(input.WorkspaceID, publicationDigest, request.Token)
+		if resolveErr != nil {
+			return invalidInputResult(env, started, resolveErr)
+		}
+		found := false
+		for index, entry := range entries {
+			if entry.ID == resumeEntryID {
+				start = index + 1
+				found = true
+				break
+			}
+		}
+		if !found {
+			return invalidInputResult(env, started, fmt.Errorf(
+				"%w: the entry this continuation resumes after is not in the current published projection",
+				search.ErrStaleContinuation))
+		}
+	}
+	end := len(entries)
+	if request.Mode == command.PageModePage {
+		end = start + request.Limit
+		if end > len(entries) {
+			end = len(entries)
+		}
+	}
+	window := entries[start:end]
+	hasMore := end < len(entries)
+	facts := contentListPageData(request.Mode, request.Limit, len(window), len(entries), hasMore, !hasMore)
+	if request.Mode == command.PageModeDefault {
+		// No page bound was applied: the answer carries the whole projection,
+		// so it must not claim a page size it did not use.
+		facts.Limit = 0
+	}
+	if hasMore && len(window) > 0 {
+		cursor, expires, mintErr := d.mintContentListCursor(input.WorkspaceID, publicationDigest, window[len(window)-1].ID)
+		if mintErr != nil {
+			return catalogErrorResult(env, started, mintErr)
+		}
+		facts.Token = cursor
+		facts.ExpiresAt = expires
+	}
+	items := make([]command.ContentItemData, 0, len(window))
+	indexStatus, err := d.contentIndexStatuses(ctx, input.WorkspaceID, window)
 	if err != nil {
 		return catalogErrorResult(env, started, err)
 	}
-	for _, entry := range entries {
+	for _, entry := range window {
 		items = append(items, command.ContentItemData{
 			SubjectRef:  entry.SubjectRef,
 			EntryID:     entry.ID,
@@ -1134,6 +1197,7 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 		RootID:      rootID,
 		Roots:       rootChoices,
 		Items:       items,
+		Page:        facts,
 	})
 }
 

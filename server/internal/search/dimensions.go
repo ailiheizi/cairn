@@ -132,6 +132,11 @@ type QueryRequest struct {
 	// vision-tower vector never establishes identity and never authorizes any
 	// deletion. Exactly one of Text and ImageQuery may serve one dimension.
 	ImageQuery *ImageQueryInput
+	// Page bounds this invocation and, for the pageable lexical lane, resumes
+	// strictly after an exact keyset position. A zero Page keeps the
+	// pre-paging single-answer bound (legacyResultLimit) so callers that do not
+	// page see the same shape as before.
+	Page PageRequest
 }
 
 // IndexBinding identifies the host configuration and immutable provider

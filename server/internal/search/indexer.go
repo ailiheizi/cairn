@@ -1832,69 +1832,72 @@ func (idx *Indexer) RebuildLatest(ctx context.Context, workspaceID string) (sqli
 	return idx.Rebuild(ctx, publication.WorkspaceID, publication.SnapshotRef, publication.NamespaceRootID)
 }
 
-// Query runs one lexical query against a named generation, or the latest
-// generation when generationID is empty. Missing generation files return
-// ErrUnavailable without touching durable catalog rows.
+// QueryPageResult is one bounded provider answer. Hits and Page always
+// describe the same answer: Page never reports a bound the hits did not
+// respect.
+type QueryPageResult struct {
+	Generation sqlite.IndexGeneration
+	Hits       []Hit
+	// Page is the honest bounding state of this answer. For the lexical lane
+	// it distinguishes "no more matches exist" (Complete) from "more matches
+	// exist" (HasMore) from "this lane is a bounded top-k and cannot tell you"
+	// (Truncated).
+	Page PageState
+}
+
+// Query runs one query against a named generation, or the latest generation
+// when generationID is empty. Missing generation files return ErrUnavailable
+// without touching durable catalog rows.
+//
+// It keeps the pre-paging single-answer shape: when the request carries no
+// page of its own, the legacyResultLimit bound applies and the page state is
+// dropped. Callers that must be able to retrieve every match call QueryPage,
+// which returns the same hits together with the explicit bound.
 func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGeneration, []Hit, error) {
-	var generation sqlite.IndexGeneration
+	if req.Page.Limit == 0 && req.Page.Position == nil {
+		req.Page = PageRequest{Limit: legacyResultLimit}
+	}
+	result, err := idx.QueryPage(ctx, req)
+	return result.Generation, result.Hits, err
+}
+
+// QueryPage runs one bounded query and reports exactly how it was bounded.
+//
+// Only the lexical lane is pageable: it has a complete, materializable, total
+// order. Every other lane is a bounded top-k answer with no seekable order, so
+// it is reported Truncated with its ceiling and never claims completeness. A
+// continuation position supplied for a non-pageable lane fails closed rather
+// than being ignored.
+func (idx *Indexer) QueryPage(ctx context.Context, req QueryRequest) (QueryPageResult, error) {
+	var result QueryPageResult
 	if idx == nil || idx.Store == nil || idx.Engine == nil {
-		return generation, nil, errors.New("search indexer requires a catalog and engine")
+		return result, errors.New("search indexer requires a catalog and engine")
 	}
 	filters, err := NormalizeFilters(req.Filters)
 	if err != nil {
-		return generation, nil, fmt.Errorf("%w: %v", ErrInvalidQuery, err)
+		return result, fmt.Errorf("%w: %v", ErrInvalidQuery, err)
 	}
 	req.Filters = filters
-	dimension := strings.TrimSpace(req.Dimension)
-	if dimension == "" {
-		dimension = DimensionLexical
-	}
-	if strings.TrimSpace(req.GenerationID) == "" {
-		generation, err = idx.Store.LatestIndexGeneration(ctx, req.WorkspaceID, dimension)
-	} else {
-		generation, err = idx.Store.GetIndexGeneration(ctx, req.GenerationID)
-	}
+	generation, dimension, err := idx.queryGeneration(ctx, req)
+	result.Generation = generation
 	if err != nil {
-		if errors.Is(err, sqlite.ErrNotFound) {
-			return generation, nil, ErrUnavailable
-		}
-		return generation, nil, err
-	}
-	if generation.Dimension != "" && generation.Dimension != dimension {
-		return generation, nil, ErrUnavailable
-	}
-	if !generationBindingMatches(idx, generation, dimension) {
-		// The image space refuses a generation whose recorded space or provider
-		// binding differs from the configured one. That refusal carries its own
-		// stable reason so a caller can tell a cross-space query from a generic
-		// unavailable index; it is never scored against the recorded vectors.
-		if dimension == DimensionMultimodal {
-			reason := MultimodalIndexUnavailableReason
-			if recorded := strings.TrimSpace(generation.SemanticSpace); recorded != "" {
-				if configured := strings.TrimSpace(idx.semanticSpace(DimensionMultimodal)); configured != "" && recorded != configured {
-					reason = MultimodalSpaceMismatchReason
-				}
-			}
-			return generation, nil, fmt.Errorf("%w: %s", ErrUnavailable, reason)
-		}
-		return generation, nil, ErrUnavailable
-	}
-	if workspaceID := strings.TrimSpace(req.WorkspaceID); workspaceID != "" &&
-		workspaceID != strings.TrimSpace(generation.WorkspaceID) {
-		// A pinned generation is still scoped to the workspace that published
-		// it. Do not let an internal caller use a valid index from another
-		// workspace merely because it knows the generation ID.
-		return generation, nil, ErrUnavailable
+		return result, err
 	}
 	if dimension == DimensionSemantic && semanticRequiresCurrentFeed(idx) {
 		if err := validateSemanticGenerationMapping(ctx, idx.Store, generation); err != nil {
-			return generation, nil, fmt.Errorf("%w: semantic generation root mapping: %v", ErrUnavailable, err)
+			return result, fmt.Errorf("%w: semantic generation root mapping: %v", ErrUnavailable, err)
 		}
 		if strings.TrimSpace(req.GenerationID) == "" {
 			if err := idx.semanticGenerationMatchesLatestFeed(ctx, generation); err != nil {
-				return generation, nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+				return result, fmt.Errorf("%w: %v", ErrUnavailable, err)
 			}
 		}
+	}
+	if dimension != DimensionLexical && req.Page.Position != nil {
+		// A continuation is a claim about one total order over one complete
+		// match set. A bounded top-k lane has neither, so honouring the
+		// position would answer a different question than the caller asked.
+		return result, fmt.Errorf("%w: the %s lane is a bounded top-k lane and cannot be resumed from a continuation", ErrInvalidQuery, dimension)
 	}
 	var hits []Hit
 	switch dimension {
@@ -1933,10 +1936,23 @@ func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGe
 	case DimensionGraph:
 		hits, err = idx.Engine.QueryGraph(ctx, generation.DBPath, req.Text)
 	default:
-		hits, err = idx.Engine.QueryFiltered(ctx, generation.DBPath, req.Text, req.Axes, req.Filters)
+		page, pageErr := idx.Engine.QueryPage(ctx, generation.DBPath, req.Text, req.Axes, req.Filters, req.Page)
+		if pageErr != nil {
+			return result, pageErr
+		}
+		result.Hits = page.Hits
+		result.Page = PageState{
+			Returned: len(page.Hits),
+			HasMore:  page.HasMore,
+			Complete: !page.HasMore,
+			Order:    page.Order,
+			Lane:     DimensionLexical,
+			Next:     nextPosition(page),
+		}
+		return result, nil
 	}
 	if err != nil {
-		return generation, nil, err
+		return result, err
 	}
 	if dimension != DimensionLexical && filters.Has() {
 		workspaceID := strings.TrimSpace(req.WorkspaceID)
@@ -1945,10 +1961,101 @@ func (idx *Indexer) Query(ctx context.Context, req QueryRequest) (sqlite.IndexGe
 		}
 		hits, err = idx.filterProviderHits(ctx, workspaceID, generation, hits, filters)
 		if err != nil {
-			return generation, nil, err
+			return result, err
 		}
 	}
-	return generation, hits, nil
+	result.Hits = hits
+	result.Page = boundedLanePageState(dimension, len(hits))
+	return result, nil
+}
+
+// nextPosition returns the resume key of a page that proved more matches
+// exist, and nil for a page that reached the end of the generation.
+func nextPosition(page HitPage) *PagePosition {
+	if !page.HasMore {
+		return nil
+	}
+	position := page.Next
+	return &position
+}
+
+// BoundedTopKCeiling is the ceiling every non-lexical lane answers with. It is
+// a provider bound, not a page size: the lane ranks a bounded candidate set
+// and has no seekable order, so it can never be walked to exhaustion.
+const BoundedTopKCeiling = 100
+
+// boundedLanePageState describes one bounded top-k answer. Completeness is
+// never claimed: returning exactly the ceiling proves the answer was cut,
+// while returning fewer means only that this answer did not reach the ceiling.
+func boundedLanePageState(dimension string, returned int) PageState {
+	return PageState{
+		Returned:    returned,
+		Complete:    false,
+		Truncated:   returned >= BoundedTopKCeiling,
+		BoundedTopK: BoundedTopKCeiling,
+		Lane:        dimension,
+	}
+}
+
+// ResolveQueryGeneration returns the immutable generation one query would run
+// against, without running it. The control plane uses it to authenticate a
+// continuation against the exact generation before executing anything, so a
+// stale token is refused instead of being seeked into a replacement index.
+func (idx *Indexer) ResolveQueryGeneration(ctx context.Context, req QueryRequest) (sqlite.IndexGeneration, error) {
+	if idx == nil || idx.Store == nil || idx.Engine == nil {
+		return sqlite.IndexGeneration{}, errors.New("search indexer requires a catalog and engine")
+	}
+	generation, _, err := idx.queryGeneration(ctx, req)
+	return generation, err
+}
+
+// queryGeneration resolves and validates the immutable generation a request
+// names, or the newest generation for its dimension. It never runs a query.
+func (idx *Indexer) queryGeneration(ctx context.Context, req QueryRequest) (sqlite.IndexGeneration, string, error) {
+	var generation sqlite.IndexGeneration
+	dimension := strings.TrimSpace(req.Dimension)
+	if dimension == "" {
+		dimension = DimensionLexical
+	}
+	var err error
+	if strings.TrimSpace(req.GenerationID) == "" {
+		generation, err = idx.Store.LatestIndexGeneration(ctx, req.WorkspaceID, dimension)
+	} else {
+		generation, err = idx.Store.GetIndexGeneration(ctx, req.GenerationID)
+	}
+	if err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			return generation, dimension, ErrUnavailable
+		}
+		return generation, dimension, err
+	}
+	if generation.Dimension != "" && generation.Dimension != dimension {
+		return generation, dimension, ErrUnavailable
+	}
+	if !generationBindingMatches(idx, generation, dimension) {
+		// The image space refuses a generation whose recorded space or provider
+		// binding differs from the configured one. That refusal carries its own
+		// stable reason so a caller can tell a cross-space query from a generic
+		// unavailable index; it is never scored against the recorded vectors.
+		if dimension == DimensionMultimodal {
+			reason := MultimodalIndexUnavailableReason
+			if recorded := strings.TrimSpace(generation.SemanticSpace); recorded != "" {
+				if configured := strings.TrimSpace(idx.semanticSpace(DimensionMultimodal)); configured != "" && recorded != configured {
+					reason = MultimodalSpaceMismatchReason
+				}
+			}
+			return generation, dimension, fmt.Errorf("%w: %s", ErrUnavailable, reason)
+		}
+		return generation, dimension, ErrUnavailable
+	}
+	if workspaceID := strings.TrimSpace(req.WorkspaceID); workspaceID != "" &&
+		workspaceID != strings.TrimSpace(generation.WorkspaceID) {
+		// A pinned generation is still scoped to the workspace that published
+		// it. Do not let an internal caller use a valid index from another
+		// workspace merely because it knows the generation ID.
+		return generation, dimension, ErrUnavailable
+	}
+	return generation, dimension, nil
 }
 
 // filterProviderHits makes the matching lexical generation the host-owned

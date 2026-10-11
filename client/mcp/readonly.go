@@ -410,6 +410,75 @@ func readOnlyReasonText(result command.Result) string {
 	return strings.Join(parts, "; ")
 }
 
+// readOnlyContentListPageSize is the page size this surface requests when it
+// must walk the whole projection rather than just its own bounded slice.
+const readOnlyContentListPageSize = 1000
+
+// readOnlyContentScan walks the workspace's latest published content
+// projection through its own continuation until visit reports it is done or
+// the projection is exhausted. It returns the daemon's exact total entry count
+// and the last result so the caller can render an honest failure.
+//
+// content.list currently answers in default mode with the complete projection,
+// so this is one call in the ordinary case. A paged answer is still followed
+// correctly: the loop is bounded, and a continuation that fails to advance
+// stops with a visible error rather than spinning or presenting a partial scan
+// as complete.
+func readOnlyContentScan(
+	ctx context.Context,
+	gateway *readOnlyGateway,
+	collector *readOnlyCollector,
+	workspace string,
+	visit func(command.ContentItemData) bool,
+) (int, command.Result, error) {
+	const maxContentListPages = 64
+	var last command.Result
+	total := 0
+	cursor := ""
+	for page := 0; page < maxContentListPages; page++ {
+		input := map[string]any{"workspace_id": workspace}
+		if cursor != "" {
+			input["page"] = map[string]any{"token": cursor, "limit": readOnlyContentListPageSize}
+		}
+		result, callErr := gateway.execute(ctx, command.OpContentList, input)
+		if callErr != nil {
+			return 0, command.Result{}, callErr
+		}
+		last = result
+		collector.record(command.OpContentList, result)
+		if result.Status != command.StatusSucceeded && result.Status != command.StatusDegraded {
+			return 0, result, nil
+		}
+		var data command.ContentListData
+		if decodeErr := decodeData(result, &data); decodeErr != nil {
+			return 0, command.Result{}, decodeErr
+		}
+		if data.Page != nil && data.Page.Entries != nil {
+			total = *data.Page.Entries
+		} else {
+			// A daemon that predates the page block answers with the complete
+			// projection, so its own count is the total.
+			total = len(data.Items)
+		}
+		if visit != nil {
+			for _, item := range data.Items {
+				if visit(item) {
+					return total, result, nil
+				}
+			}
+		}
+		if data.Page == nil || !data.Page.HasMore || data.Page.Token == "" {
+			return total, result, nil
+		}
+		next := data.Page.Token
+		if next == cursor {
+			return 0, result, errors.New("content.list continuation did not advance")
+		}
+		cursor = next
+	}
+	return 0, last, errors.New("content.list projection did not finish within the page bound")
+}
+
 // applyReadOnlyLimit validates and clamps one tool's limit. A request above the
 // maximum is clamped and reported; a request for the default is marked as
 // defaulted; a negative request is invalid input.
@@ -580,9 +649,33 @@ func addReadOnlySearch(server *mcpsdk.Server, gateway *readOnlyGateway) {
 		if len(hits) > limit {
 			hits = hits[:limit]
 		}
-		bounds.Reported = len(data.Hits)
+		// The daemon's own page block is the authority for what this answer
+		// covers. A partial answer is stated as partial here, so a fused or
+		// bounded result is never presented as the whole answer, and a caller
+		// can tell "there is nothing more" from "this lane cannot tell you".
+		if data.Page != nil {
+			bounds.Reported = data.Page.Returned
+			if !data.Page.Complete {
+				completeness := data.Page.Completeness
+				if completeness == "" {
+					completeness = command.PageCompletenessBoundedUnknown
+				}
+				detail := "the daemon's search answer is not complete (" + completeness + ")"
+				if data.Page.TruncationReason != "" {
+					detail += ", truncated: " + data.Page.TruncationReason
+				}
+				if data.Page.HasMore {
+					detail += "; more matches exist — repeat the search with a single lexical dimension to page every match"
+				} else if data.Page.ContinuationReason != "" {
+					detail += "; no continuation is available: " + data.Page.ContinuationReason
+				}
+				collector.unavailable("search_completeness", readOnlyStateNotReported, detail, command.OpSearchQuery)
+			}
+		} else {
+			bounds.Reported = len(data.Hits)
+		}
 		bounds.Returned = len(hits)
-		bounds.Truncated = len(hits) < len(data.Hits)
+		bounds.Truncated = len(hits) < bounds.Reported
 		base.DaemonStatus = string(result.Status)
 		base.Steps = collector.steps
 		base.Unavailable = collector.notes
@@ -718,28 +811,29 @@ func addReadOnlyGetSubject(server *mcpsdk.Server, gateway *readOnlyGateway) {
 			return &mcpsdk.CallToolResult{Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: subjectOutputText(output)}}}, output, nil
 		}
 
-		listed, callErr := gateway.execute(ctx, command.OpContentList, map[string]any{"workspace_id": workspace})
-		if callErr != nil {
-			return readOnlySubjectRefusal("mcp_surface", callErr.Error())
+		// The projection is read through its own continuation until the subject
+		// is found or the projection is exhausted. content.list answers in
+		// default mode with the complete projection today, but this read-only
+		// surface must stay correct under a paged answer too: a partial scan is
+		// never presented as a complete one, and the scan stops with a visible
+		// error if a continuation fails to advance.
+		_, listed, scanErr := readOnlyContentScan(ctx, gateway, collector, workspace, func(item command.ContentItemData) bool {
+			if item.SubjectRef != subjectRef {
+				return false
+			}
+			found := item
+			output.Content = &found
+			return true
+		})
+		if scanErr != nil {
+			return readOnlySubjectRefusal("mcp_surface", scanErr.Error())
 		}
-		collector.record(command.OpContentList, listed)
 		output.DaemonStatus = string(listed.Status)
 		if listed.Status != command.StatusSucceeded && listed.Status != command.StatusDegraded {
 			errResult, failedBase := readOnlyDaemonFailure(output.readOnlyBase, command.OpContentList, listed)
 			failedBase.Steps = collector.steps
 			failedBase.Unavailable = append(collector.notes, failedBase.Unavailable...)
 			return errResult, readOnlySubjectOutput{readOnlyBase: failedBase}, nil
-		}
-		var content command.ContentListData
-		if decodeErr := decodeData(listed, &content); decodeErr != nil {
-			return nil, readOnlySubjectOutput{}, decodeErr
-		}
-		for index := range content.Items {
-			if content.Items[index].SubjectRef == subjectRef {
-				item := content.Items[index]
-				output.Content = &item
-				break
-			}
 		}
 		if output.Content == nil {
 			collector.unavailable("subject", readOnlyStateNotFound,
@@ -1027,7 +1121,13 @@ func addReadOnlyListRecent(server *mcpsdk.Server, gateway *readOnlyGateway) {
 			output.Ordering = "not available"
 			return &mcpsdk.CallToolResult{Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: recentOutputText(output)}}}, output, nil
 		}
-		result, callErr := gateway.execute(ctx, command.OpContentList, map[string]any{"workspace_id": workspace})
+		// One bounded page is enough for this tool's own limit, and the answer's
+		// own page block reports the exact total for the workspace. The reported
+		// total is never inferred from the size of the page returned here.
+		result, callErr := gateway.execute(ctx, command.OpContentList, map[string]any{
+			"workspace_id": workspace,
+			"page":         map[string]any{"limit": limit},
+		})
 		if callErr != nil {
 			return readOnlyRecentRefusal(kind, "mcp_surface", callErr.Error())
 		}
@@ -1050,9 +1150,18 @@ func addReadOnlyListRecent(server *mcpsdk.Server, gateway *readOnlyGateway) {
 		if len(returned) > limit {
 			returned = returned[:limit]
 		}
-		bounds.Reported = len(items)
+		reported := len(items)
+		if data.Page != nil && data.Page.Entries != nil {
+			reported = *data.Page.Entries
+		}
+		if data.Page != nil && data.Page.HasMore {
+			collector.unavailable("content_projection", readOnlyStateNotReported,
+				"the daemon returned a bounded page of the content projection; the reported total comes from the answer's own page block, not from the size of this page",
+				command.OpContentList)
+		}
+		bounds.Reported = reported
 		bounds.Returned = len(returned)
-		bounds.Truncated = len(returned) < len(items)
+		bounds.Truncated = len(returned) < reported
 		output.Ordering = "the daemon's own content.list order over the latest published namespace (no recorded subject timestamp)"
 		output.Subjects = returned
 		output.Steps = collector.steps

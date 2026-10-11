@@ -61,6 +61,10 @@ type searchQueryInput struct {
 	// false and the semantic component would egress, a missing confirmation is
 	// a typed EGRESS_CONFIRMATION_REQUIRED outcome, never a silent fallback.
 	EgressConfirmation json.RawMessage `json:"egress_confirmation,omitempty"`
+	// Page is the additive bounded-paging input. A caller that omits it keeps
+	// the pre-paging single-answer bound; a caller that asks for a page gets
+	// one, and every answer states the bound it applied.
+	Page *pageInput `json:"page,omitempty"`
 }
 
 // egressConfirmationInput is the typed per-request egress confirmation carried
@@ -452,6 +456,10 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 	if err := decodeInput(env.Input, &input); err != nil {
 		return invalidInputResult(env, started, err)
 	}
+	page, err := resolvePageInput(input.Page, search.LegacyResultLimit)
+	if err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	confirmation, err := semanticEgressConfirmationFromInput(input.EgressConfirmation)
 	if err != nil {
 		return invalidInputResult(env, started, err)
@@ -540,7 +548,7 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		if input.GenerationID != "" {
 			return invalidInputResult(env, started, errString("fuse cannot pin one index_generation_ref"))
 		}
-		return d.handleFusedSearch(ctx, env, started, input.WorkspaceID, queryText, requestedAxes, fuseIDs, filters, defaultBroker, imageQuery)
+		return d.handleFusedSearch(ctx, env, started, input.WorkspaceID, queryText, requestedAxes, fuseIDs, filters, defaultBroker, imageQuery, page)
 	}
 	dimension, ok := search.LookupDimension(dimensionID, search.IndexerReadiness(d.search))
 	if !ok {
@@ -562,6 +570,15 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 			return invalidInputResult(env, started, err)
 		}
 	}
+	// The lexical lane is the only lane with a complete, totally ordered match
+	// set, so it is the only lane a continuation can be accepted for. A cursor
+	// against any other shape is refused as invalid input instead of being
+	// ignored or answered from a bounded top-k set.
+	pageable := dimension.ID == search.DimensionLexical
+	pageRefusal := "the " + dimension.ID + " lane is a bounded top-k answer with no seekable order; pin dimension=" + search.DimensionLexical + " to page the complete lexical match set"
+	if err := resolveLexicalConstraint(pageable, dimension.ID, pageRefusal, page.Token); err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	empty := command.SearchQueryData{
 		Dimension:      dimension.ID,
 		Provider:       dimension.Provider,
@@ -571,10 +588,11 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 	}
 	if dimension.State != command.CapabilityAvailable {
 		empty.ConstructAxes = nil
+		empty.Page = boundedSearchPageData(page.Mode, page.Limit, dimension.ID, string(dimension.State), 0, 0)
 		return degradedResult(env, started, empty,
 			dimension.ID+" is unavailable in this build; lexical search, namespace, annotations, and restore are unaffected")
 	}
-	generation, hits, err := d.search.Query(ctx, search.QueryRequest{
+	request := search.QueryRequest{
 		WorkspaceID:  input.WorkspaceID,
 		GenerationID: input.GenerationID,
 		Dimension:    dimension.ID,
@@ -582,13 +600,49 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		Axes:         axes,
 		Filters:      filters,
 		ImageQuery:   imageQuery,
-	})
+		Page:         search.PageRequest{Limit: page.Limit},
+	}
+	// A continuation is authenticated against the exact generation, query,
+	// order, and authorization scope before anything runs. A token that names
+	// another query, another generation, an expired instant, or another
+	// workspace is refused as invalid input, never answered with a page.
+	var binding search.ContinuationBinding
+	if pageable && page.Token != "" {
+		resolvedGeneration, resolveErr := d.search.ResolveQueryGeneration(ctx, request)
+		if resolveErr != nil {
+			return invalidInputResult(env, started, fmt.Errorf("%w: %v", search.ErrStaleContinuation, resolveErr))
+		}
+		queryDigest, digestErr := (search.QueryShape{
+			WorkspaceID:     input.WorkspaceID,
+			Dimension:       dimension.ID,
+			Text:            queryText,
+			Axes:            axes,
+			Filters:         filters,
+			ImageSubjectRef: input.ImageSubjectRef,
+		}).Digest()
+		if digestErr != nil {
+			return invalidInputResult(env, started, digestErr)
+		}
+		binding = search.ContinuationBinding{
+			Scope:        search.AuthorizationScopeDigest(input.WorkspaceID),
+			Query:        queryDigest,
+			GenerationID: resolvedGeneration.ID,
+			Lane:         search.DimensionLexical,
+			Order:        search.LexicalOrder(queryText),
+		}
+		position, parseErr := search.ParseContinuation(page.Token, binding, d.now())
+		if parseErr != nil {
+			return invalidInputResult(env, started, parseErr)
+		}
+		request.Page.Position = &position
+	}
+	result, err := d.search.QueryPage(ctx, request)
 	if err != nil {
 		if errors.Is(err, search.ErrInvalidQuery) {
 			return invalidInputResult(env, started, err)
 		}
 		if errors.Is(err, search.ErrUnavailable) {
-			empty.GenerationID = generation.ID
+			empty.GenerationID = result.Generation.ID
 			if reason := search.SemanticEgressReasonOf(err); reason != "" {
 				return degradedResult(env, started, empty,
 					"semantic search requires an egress authorization ("+string(reason)+"); lexical search, namespace, annotations, and restore are unaffected")
@@ -597,17 +651,52 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		}
 		return catalogErrorResult(env, started, err)
 	}
-	return succeeded(env, started, command.SearchQueryData{
-		GenerationID:   generation.ID,
+	data := command.SearchQueryData{
+		GenerationID:   result.Generation.ID,
 		Dimension:      dimension.ID,
 		Provider:       dimension.Provider,
 		ScoreSemantics: dimension.ScoreSemantics,
 		ConstructAxes:  axes,
-		Hits:           d.authorizeHits(ctx, input.WorkspaceID, generation.WorkspaceID, hits, nil),
-	})
+		Hits:           d.authorizeHits(ctx, input.WorkspaceID, result.Generation.WorkspaceID, result.Hits, nil),
+	}
+	if pageable {
+		data.Page = lexicalPageData(page.Mode, page.Limit, result.Page, len(data.Hits))
+		if binding.Query == "" {
+			// The binding is built for the answer even when this page carried
+			// no cursor, so the continuation it issues is authenticated against
+			// exactly this generation and query shape.
+			queryDigest, digestErr := (search.QueryShape{
+				WorkspaceID:     input.WorkspaceID,
+				Dimension:       dimension.ID,
+				Text:            queryText,
+				Axes:            axes,
+				Filters:         filters,
+				ImageSubjectRef: input.ImageSubjectRef,
+			}).Digest()
+			if digestErr != nil {
+				return catalogErrorResult(env, started, digestErr)
+			}
+			binding = search.ContinuationBinding{
+				Scope:        search.AuthorizationScopeDigest(input.WorkspaceID),
+				Query:        queryDigest,
+				GenerationID: result.Generation.ID,
+				Lane:         search.DimensionLexical,
+				Order:        result.Page.Order,
+			}
+		}
+		if err := d.attachLexicalContinuation(data.Page, binding, result.Page.Next); err != nil {
+			return catalogErrorResult(env, started, err)
+		}
+	} else {
+		data.Page = boundedSearchPageData(page.Mode, page.Limit, dimension.ID, string(command.StatusSucceeded), len(data.Hits), result.Page.BoundedTopK)
+	}
+	return succeeded(env, started, data)
 }
 
-func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope, started time.Time, workspaceID, queryText string, requestedAxes, fuseIDs []string, filters search.Filters, defaultBroker bool, imageQuery *search.ImageQueryInput) command.Result {
+func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope, started time.Time, workspaceID, queryText string, requestedAxes, fuseIDs []string, filters search.Filters, defaultBroker bool, imageQuery *search.ImageQueryInput, page searchPageRequest) command.Result {
+	if err := resolveLexicalConstraint(false, strings.Join(fuseIDs, ","), "a fused answer unions the complete lexical match set with bounded top-k lanes, so the union itself cannot be one continuation chain; pin dimension="+search.DimensionLexical+" to page the complete lexical match set", page.Token); err != nil {
+		return invalidInputResult(env, started, err)
+	}
 	dims, err := search.NormalizeFuse(fuseIDs)
 	if err != nil {
 		return invalidInputResult(env, started, err)
@@ -632,6 +721,7 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 		Fuse:        dims,
 		Filters:     filters,
 		ImageQuery:  imageQuery,
+		Page:        search.PageRequest{Limit: page.Limit},
 	})
 	if err != nil {
 		return catalogErrorResult(env, started, err)
@@ -672,6 +762,11 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 		Components:      components,
 		Hits:            d.authorizeHits(ctx, authorizedWorkspaceID, "", hits, dimBySubject),
 	}
+	// The fused answer states its own partiality: a union that mixes the
+	// complete lexical match set with bounded top-k lanes is not a complete
+	// answer, and it never invents a continuation over lanes that cannot be
+	// resumed. A caller that needs every match pins the lexical dimension.
+	data.Page = fusedSearchPageData(page.Mode, page.Limit, fused.Components, len(data.Hits))
 	if !search.FuseSucceeded(fused) {
 		return degradedResult(env, started, data, fusedDegradedMessage(fused.Components,
 			"all fused dimensions were unavailable; namespace, annotations, and restore are unaffected"))

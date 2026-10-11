@@ -410,19 +410,22 @@ The matching CLI is `cairn ingest <root> --protection LINK_ONLY --file-protectio
 
 Planning MAY retain a qualified capture and invoke explicitly selected read-only processors. It MUST NOT publish repository data, mutate source content, delete a source, or contact a network destination outside the selected targets and granted processor profiles.
 
-`plan.ingest` MUST refuse, as ordinary invalid input and before any catalog or
-repository write, a capture whose publication would place a portable recovery
-record above the `16777216`-byte (`16 MiB`) per-record bound. The refusal names
-the entry count, the projected record size, the limit, and the remedy: ingest
-subfolders as separate sources, so each publication stays inside the bound while
-the default workspace accumulates one library. The bound counts entries rather
-than data volume, so it is not a size in bytes of the source tree, and the plan
-MUST NOT be recorded, applied, or left in a reconciliation state when the
-refusal applies. `plan.revise` MUST apply the same refusal to a successor plan.
-`plan.apply` retains the placement-level refusal as defence in depth; that
-second check is the backstop for records whose content only exists after
-publication, and it MUST NOT be replaced by, or silently retry past, the plan
-check.
+`plan.ingest` MUST plan a capture whose monolithic portable records would
+exceed the `16777216`-byte (`16 MiB`) per-record bound as ONE publication of ONE
+source root: the oversized prepared closure, processor-attempt closure and
+portable fact child are placed as content-addressed record parts under ADR-033,
+so the operational library still takes one source root per publication and no
+projection, index key or migration changes. `plan.ingest` MUST still refuse, as
+ordinary invalid input and before any catalog or repository write, the only
+remaining unplaceable case: a single logical item — one manifest entry, one
+processor attempt or one portable fact record — that is itself larger than the
+bound and therefore cannot be split across parts. That refusal names the item
+size, the entry count, and the limit, and the plan MUST NOT be recorded, applied,
+or left in a reconciliation state when the refusal applies. `plan.revise` MUST
+apply the same refusal to a successor plan. `plan.apply` retains the
+placement-level refusal as defence in depth; that second check is the backstop
+for records whose content only exists after publication, and it MUST NOT be
+replaced by, or silently retry past, the plan check.
 
 The plan result includes:
 
@@ -799,6 +802,72 @@ The result contains candidates with:
 
 Each snapshot's relationship to a generation is one of `PENDING`, `CURRENT`, `PARTIAL`, `STALE`, `FAILED`, or `UNAVAILABLE`, with indexed-through revision and coverage. `REJECT_STALE` fails rather than silently querying stale data; `ALLOW_STALE_WITH_STATUS` returns explicit status. A search page token is opaque and authenticated and binds the interface version, query digest, exact generation, provider profile, principal and authorization revision, projection, sort order, and expiry. It cannot cross a query, generation, provider, principal, authorization, projection, or sort change. Following one chain returns each authorized result at most once under the declared stable ordering; retrying an identical request is idempotent, and an invalid, expired, or out-of-scope token fails closed rather than restarting against a current generation.
 
+### 10.1 Lane completeness and bounded discovery paging
+
+This subsection is normative. A caller MUST be able to tell a complete answer
+from a partial one from an answer that cannot be complete, and MUST be able to
+retrieve every match of a query whose match set is finite and materializable.
+
+The shipped `search.query` and `content.list` inputs accept one optional `page`
+object, `{"page": {"limit": <int>, "token": <opaque>}}`. An absent `page` keeps
+the operation's own default bound and mode; `limit` alone requests a bounded
+page; `token` alone resumes a chain at the daemon's default page size. A `limit`
+outside `1..1000` MUST be refused as invalid input and MUST NOT be clamped.
+A page token is opaque and authenticated, carries no query, path, workspace, or
+filter, and is bound to the exact interface version, lane, query digest, index
+generation or published projection, total order, authorization scope, and
+expiry. A malformed, tampered, expired, out-of-scope, or generation-crossing
+token MUST be refused as invalid input with a typed reason; it MUST NOT restart
+the chain, be seeked into a replacement projection, or return a page from
+another query.
+
+`content.list` binds its chain to the exact latest published projection of every
+source root, and its position is the stable identity of the last returned
+namespace entry. A new publication MUST invalidate every outstanding token. Like
+`search.query`, it MUST state its mode and the exact total entry count in the
+answer itself, so a partial answer cannot be mistaken for the whole projection.
+
+The answer states the bound it applied as `page.limit` and the number of
+results it returned as `page.returned`. A fused answer reports `0` for
+`page.limit`, because no single page bound applies to a fused union; each lane
+reports the bound applied to it in `page.lanes`. `content.list` additionally
+reports `page.entries`, the exact total entry count of the published projection,
+in every answer and in every mode.
+
+Every answer MUST carry an explicit completeness word, and the three states are
+distinct answers that MUST remain distinguishable:
+
+- `COMPLETE` — the answer provably contains every match of the query.
+- `MORE_AVAILABLE` — the daemon proved at least one further match exists beyond
+  this answer; the answer states how to continue.
+- `BOUNDED_UNKNOWN` — this answer was cut by a bound the daemon cannot page, so
+  it neither contains everything nor can say that more exists. An exact total
+  that cannot be produced without evaluating every candidate MUST be omitted or
+  reported as unknown rather than reported as the size of one page.
+
+Which lane is complete is a stated property, not an implementation detail:
+
+- The lexical generation lane has a finite, materializable match set and a total
+  order (bm25 rank, then the unique row identity; the unique row identity alone
+  for a filter-only query). It is the pageable lane, and one continuation chain
+  over it MUST return every match exactly once with no duplicates and no
+  omissions, including under concurrent catalog change.
+- Every other discovery lane — semantic, multimodal, acoustic, graph, and any
+  token/fingerprint projection — is a bounded top-k answer with no seekable
+  order. Such a lane MUST report itself bounded and truncated with its own
+  ceiling, MUST NOT claim completeness, and MUST NOT issue a continuation.
+- A fused answer is partial by construction whenever any of its lanes is a
+  bounded top-k lane: it unions a complete match set with a bounded one. A fused
+  answer MUST state that plainly, MUST report per-lane completeness, and MUST
+  NOT invent a continuation chain over a union it cannot resume. A caller that
+  needs every match MUST pin the pageable lexical lane. A `search.query` request
+  that supplies a token on a fused or bounded-lane shape MUST be refused as
+  invalid input rather than answered from a lane that has no complete set.
+
+A page token is valid only for the pageable lane of the query it was issued for,
+so a token cannot be replayed against another query, projection, sort, workspace,
+or authorization scope.
+
 The core query broker resolves and reauthorizes every candidate through the authoritative namespace and access policy before a presentation adapter receives it. Opening content requires `content.open`. Query results cannot publish, delete, restore, or select a weaker representation.
 
 If no provider is configured, the operation returns `BLOCKED` with `QUERY_PROVIDER_UNAVAILABLE`. If the baseline provider is absent in `RW-MVP-1`, the installation is non-conforming. Exact browse and restore remain available.
@@ -887,7 +956,8 @@ cairn browse [<snapshot-ref>[:<path>]]
 cairn stat <snapshot-ref>:<path>
 cairn representations <snapshot-ref>:<path>
 cairn cat <snapshot-ref>:<path> [--representation <representation-ref>] [--to-file <new-file>]
-cairn search <query> [--provider <query-provider-ref>] [--generation <index-generation-ref>] [--snapshot <snapshot-ref>] [--allow-stale]
+cairn search <query> [--provider <query-provider-ref>] [--generation <index-generation-ref>] [--snapshot <snapshot-ref>] [--allow-stale] [--dimension <dimension-ref>] [--page-size <count>] [--cursor <page-token>]
+cairn content list --workspace <workspace-ref> [--page-size <count>] [--cursor <page-token>]
 cairn view save <name> --query <query>
 cairn view show <view-ref>
 cairn export plan (--view <view-ref> | --subject <subject-ref>...) --target <profile>
@@ -915,6 +985,8 @@ cairn mcp serve --stdio
 ~~~
 
 The concise `plan`, `apply`, `profile run`, `browse`, `search`, `view`, `export`, `tag`, `note`, `verify`, and `restore` commands are product porcelain over canonical operations. They do not add hidden semantics. Mounting is intentionally outside the command ABI. A saved ingest profile creates a fresh plan against current source and capability state; it never reapplies an old mutable plan.
+
+`cairn search --page-size`/`--cursor` and `cairn content list --page-size`/`--cursor` are thin porcelain over the operation's `page` object: the flags only fill `page.limit` and `page.token`, and the human output always prints the answer's own mode, bound, completeness word, and continuation (or the reason there is none). The porcelain never infers a total or a continuation from the size of one page. A cursor is accepted only for the pageable lexical search shape; the fused default broker and every bounded top-k lane refuse one, and the refusal names the pinning needed to retrieve every match.
 
 Interactive `restore` porcelain first creates an immutable `plan.restore` result, displays its exact digest and consequences, and applies it only through `plan.apply` after the required confirmation and authority checks. Noninteractive and machine clients MUST call the two canonical operations explicitly; a convenience command cannot bypass the plan digest.
 
@@ -1254,6 +1326,10 @@ Initial MCP can list authorized annotations but exposes no annotation mutation o
 ### CM-AT-022: Scoped pagination
 
 List a large immutable directory through CLI JSON and MCP with varied page sizes and repeated requests. One continuation chain returns every authorized entry exactly once, the same token retry returns the same page, and tokens fail closed after a principal, directory, snapshot, namespace-root, sort, filter, authorization-revision, or expiry change.
+
+### CM-AT-023: Exhaustive discovery paging
+
+Page a lexical `search.query` whose match set is far larger than one page, over at least three consecutive pages and with varied page sizes. One chain returns every match exactly once with no duplicates and no omissions under the declared total order; the exhausted page states `COMPLETE`; a malformed, tampered, expired, stale, or other-query token is refused as invalid input instead of being answered; a token on a fused or bounded-lane request is refused; and a bounded top-k answer states `BOUNDED_UNKNOWN` with its ceiling rather than claiming completeness. `content.list` states its mode and exact total in every answer, pages exactly, and fails closed after a publication change.
 
 ## 22. Explicit initial exclusions
 

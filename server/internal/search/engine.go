@@ -194,64 +194,127 @@ func (engine *Engine) Query(ctx context.Context, dbPath, text string, axes []str
 
 // QueryFiltered is the structured form of Query. Typed filters become precise
 // post-filter predicates; free-text behavior is unchanged from Query.
+//
+// It keeps the pre-paging single-answer shape: at most legacyResultLimit hits
+// and no continuation. Callers that must be able to retrieve every match use
+// QueryPage, which replaces the same bound with an explicit, pageable one.
 func (engine *Engine) QueryFiltered(ctx context.Context, dbPath, text string, axes []string, filters Filters) ([]Hit, error) {
+	page, err := engine.queryPage(ctx, dbPath, text, axes, filters, PageRequest{Limit: legacyResultLimit})
+	if err != nil {
+		return nil, err
+	}
+	return page.Hits, nil
+}
+
+// QueryPage returns one bounded page of lexical hits in a total order.
+//
+// The page is a keyset page: the caller resumes strictly after the position
+// the previous page reported. A generation is immutable, so (rank, rowid) --
+// or rowid alone when no MATCH runs -- is a total order over the whole match
+// set and a page boundary cannot lose or duplicate a row. The continuation is
+// bound to that exact generation and query by its caller, never by this
+// method.
+func (engine *Engine) QueryPage(ctx context.Context, dbPath, text string, axes []string, filters Filters, page PageRequest) (HitPage, error) {
+	return engine.queryPage(ctx, dbPath, text, axes, filters, page)
+}
+
+func (engine *Engine) queryPage(ctx context.Context, dbPath, text string, axes []string, filters Filters, page PageRequest) (result HitPage, err error) {
 	normalizedFilters, err := NormalizeFilters(filters)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidQuery, err)
+		return result, fmt.Errorf("%w: %v", ErrInvalidQuery, err)
 	}
 	filters = normalizedFilters
 	if strings.TrimSpace(text) == "" && !filters.Has() {
-		return nil, errors.New("search query text is required")
+		return result, errors.New("search query text is required")
+	}
+	limit, err := ResolvePageSize(page.Limit)
+	if err != nil {
+		return result, err
+	}
+	if page.Position != nil {
+		if err := validatePosition(*page.Position, orderFor(!page.Position.HasRank)); err != nil {
+			return result, err
+		}
 	}
 	if _, err := os.Stat(dbPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrUnavailable
+			return result, ErrUnavailable
 		}
-		return nil, err
+		return result, err
 	}
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	defer db.Close()
 	matcher, err := newProvenanceMatcher(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("initialize provenance matcher: %w", err)
+		return result, fmt.Errorf("initialize provenance matcher: %w", err)
 	}
 	defer matcher.Close()
 	tokens := queryTokens(text)
+	hasText := len(tokens) > 0
+	result.Order = orderFor(!hasText)
 	// FTS5 MATCH requires at least one term. With no free text the structured
 	// filters still run, so fall back to a plain full-table scan; typed
 	// post-filter predicates do the real constraint work in both cases.
 	where := ""
 	args := []any{}
-	if len(tokens) > 0 {
+	if hasText {
 		where = "WHERE documents MATCH ?"
 		args = append(args, ftsQuery(text, axes))
+	}
+	if page.Position != nil {
+		position := *page.Position
+		if position.Lane != "" && position.Lane != DimensionLexical {
+			return result, fmt.Errorf("%w: continuation position belongs to lane %q", ErrInvalidQuery, position.Lane)
+		}
+		if hasText {
+			if where == "" {
+				where = "WHERE"
+			} else {
+				where += " AND"
+			}
+			// bm25 is lower-is-better and rowid is unique, so this is a strict
+			// resume after the last returned row of the previous page.
+			where += " (rank > ? OR (rank = ? AND rowid > ?))"
+			args = append(args, position.Rank, position.Rank, position.RowID)
+		} else {
+			if where == "" {
+				where = "WHERE"
+			} else {
+				where += " AND"
+			}
+			where += " rowid > ?"
+			args = append(args, position.RowID)
+		}
+	}
+	rankColumn := ""
+	if hasText {
+		rankColumn = ", rank"
 	}
 	query := `
 SELECT subject_id, path, name, suffix, entry_type, content_id, metadata,
        duplicates, protection, locators, tags, notes, descriptions, descriptions_pinyin, extracted,
        detection, processing, representations, language,
-       size_facet, mtime_facet, duplicate_group, segments
+       size_facet, mtime_facet, duplicate_group, segments, rowid` + rankColumn + `
 FROM documents ` + where
-	if len(tokens) > 0 {
+	if hasText {
 		query += ` ORDER BY rank, rowid`
 	} else {
 		// A deterministic order makes candidate paging stable while filters
 		// are applied after the row is decoded.
 		query += ` ORDER BY rowid`
 	}
-	const (
-		candidatePageSize = 1000
-		resultLimit       = 1000
-	)
-	var hits []Hit
-	for offset := 0; len(hits) < resultLimit; offset += candidatePageSize {
+	const candidatePageSize = 1000
+	hits := make([]Hit, 0, limit)
+	var last PagePosition
+	hasMore := false
+	for offset := 0; ; offset += candidatePageSize {
 		pageArgs := append(append([]any(nil), args...), candidatePageSize, offset)
 		rows, queryErr := db.QueryContext(ctx, query+` LIMIT ? OFFSET ?`, pageArgs...)
 		if queryErr != nil {
-			return nil, fmt.Errorf("query fts5: %w", queryErr)
+			return result, fmt.Errorf("query fts5: %w", queryErr)
 		}
 		pageRows := 0
 		for rows.Next() {
@@ -261,49 +324,76 @@ FROM documents ` + where
 			var detection, processing, representations, language string
 			var sizeFacet, mtimeFacet sql.NullInt64
 			var duplicateGroup, segments string
-			if err := rows.Scan(
+			var rowID int64
+			var rank float64
+			scan := []any{
 				&hit.SubjectID, &hit.Path, &hit.Name, &suffix, &hit.EntryType,
 				&hit.ContentID, &metadata, &duplicates, &protection, &locators,
 				&tags, &notes, &descriptions, &descriptionsPinyin, &extracted, &detection, &processing,
 				&representations, &language, &sizeFacet, &mtimeFacet, &duplicateGroup,
-				&segments,
-			); err != nil {
+				&segments, &rowID,
+			}
+			if hasText {
+				scan = append(scan, &rank)
+			}
+			if err := rows.Scan(scan...); err != nil {
 				_ = rows.Close()
-				return nil, err
+				return result, err
 			}
 			if !matchesFilters(hit, filters, sizeFacet, mtimeFacet, duplicateGroup, suffix, protection, language) {
 				continue
+			}
+			if len(hits) == limit {
+				// The (limit+1)-th match proves the generation holds more
+				// matches than this page. Report it explicitly instead of
+				// silently truncating: the page keeps the first limit matches
+				// and resumes strictly after the last of them.
+				hasMore = true
+				break
 			}
 			hit.ConstructAxes, queryErr = matchedConstructAxes(ctx, matcher, hit, suffix, metadata, duplicates,
 				protection, locators, tags, notes, descriptions, extracted,
 				detection, processing, representations, language, duplicateGroup, tokens, axes)
 			if queryErr != nil {
 				_ = rows.Close()
-				return nil, fmt.Errorf("project construct match: %w", queryErr)
+				return result, fmt.Errorf("project construct match: %w", queryErr)
 			}
 			hit.Segments, queryErr = matchedDescriptionSegments(ctx, matcher, segments, tokens, axes, descriptions, descriptionsPinyin, extracted, hit.SubjectID)
 			if queryErr != nil {
 				_ = rows.Close()
-				return nil, fmt.Errorf("project source match spans: %w", queryErr)
+				return result, fmt.Errorf("project source match spans: %w", queryErr)
 			}
 			hits = append(hits, hit)
-			if len(hits) >= resultLimit {
-				break
-			}
+			last = PagePosition{Lane: DimensionLexical, RowID: rowID, Rank: rank, HasRank: hasText}
 		}
 		rowsErr := rows.Err()
 		closeErr := rows.Close()
 		if rowsErr != nil {
-			return nil, rowsErr
+			return result, rowsErr
 		}
 		if closeErr != nil {
-			return nil, closeErr
+			return result, closeErr
 		}
-		if pageRows < candidatePageSize || len(hits) >= resultLimit {
+		if hasMore || pageRows < candidatePageSize {
 			break
 		}
 	}
-	return hits, nil
+	result.Hits = hits
+	result.HasMore = hasMore
+	if hasMore {
+		result.Next = last
+	}
+	return result, nil
+}
+
+// orderFor names the total order a lexical page is produced in. A free-text
+// page orders by (bm25 rank, rowid); a filter-only page has no rank column and
+// orders by the unique rowid alone.
+func orderFor(filterOnly bool) string {
+	if filterOnly {
+		return OrderRowID
+	}
+	return OrderRankRowID
 }
 
 // filterCandidates applies lexical typed facets to an already bounded set of

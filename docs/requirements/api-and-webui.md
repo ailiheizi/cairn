@@ -111,6 +111,7 @@ A shipped REST profile MUST:
 - Version its media types or API surface independently from human-readable UI releases.
 - Use structured request and result envelopes rather than scraping CLI prose.
 - Support bounded pagination, sorting, filtering, field selection, and cancellation.
+- Forward the operation's `page` object unchanged, and forward the answer's own page block unchanged, including its completeness word. An adapter MUST NOT infer completeness, a total, or a continuation from the size of one page, and MUST NOT present a `MORE_AVAILABLE` or `BOUNDED_UNKNOWN` answer as the complete result. The lane completeness and bounded-paging contract is normative in [CLI and MCP Contract](cli-and-mcp-contract.md) §10.1.
 - Preserve decimal-string handling for large byte counts and offsets where required by the core schema.
 - Use immutable opaque resource references rather than exposing database row IDs or repository locators.
 - Enforce request, response, query-complexity, upload, download, concurrency, and rate limits.
@@ -282,6 +283,12 @@ A shipped WebUI profile SHOULD define:
 - Keyboard operation, semantic markup, screen-reader labels, focus management, and color-independent status.
 - Localization boundaries without localizing machine reason codes or opaque identities.
 - Large-collection behavior using server-side pagination and virtualization.
+- A visible large-collection state that distinguishes an exhausted result
+  (`COMPLETE`) from a result with more available (`MORE_AVAILABLE`) from a
+  bounded lane the daemon cannot page (`BOUNDED_UNKNOWN`). A surface MUST NOT
+  render a partial page as if it were the whole result, and MUST NOT derive a
+  total from the size of one page; it renders the daemon's own stated total or
+  an explicit unknown.
 - Progressive results that label estimates as provisional or final.
 - Reconnection and stale-view handling through explicit resource revisions.
 - Safe cache policy for sensitive metadata, previews, and content.

@@ -20,6 +20,7 @@ func newContentCommand(env *clientEnv) *cobra.Command {
 			"for one regular file entry.",
 	}
 	content.AddCommand(newContentOpenCommand(env))
+	content.AddCommand(newContentListCommand(env))
 	content.AddCommand(newExitCommand(env, "read <handle> [offset] [length]", "Read bytes from a content handle",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) < 1 || len(args) > 3 {

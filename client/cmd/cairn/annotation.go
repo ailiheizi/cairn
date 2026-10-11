@@ -15,10 +15,12 @@ func newSearchCommand(env *clientEnv) *cobra.Command {
 	var filterValues []string
 	var language, suffix, entryType, contentID, duplicateGroup, protectionMode string
 	var sizeMin, sizeMax, mtimeAfter, mtimeBefore int64
+	var pageSize int
+	var cursor string
 	commandNode := newExitCommand(env, "search <query>", "Query the default lexical+structured+semantic broker",
 		func(cmd *cobra.Command, env *clientEnv, args []string) int {
 			if len(args) != 1 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn search <query> [--workspace <id>] [--filter key=value]\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "usage: cairn search <query> [--workspace <id>] [--filter key=value] [--page-size <n>] [--cursor <token>]\n")
 				return 1
 			}
 			input := map[string]any{"query": args[0]}
@@ -30,6 +32,9 @@ func newSearchCommand(env *clientEnv) *cobra.Command {
 			}
 			if dimension := cmd.Flags().Lookup("dimension").Value.String(); dimension != "" {
 				input["dimension"] = dimension
+			}
+			if page := searchPageInput(cmd, pageSize, cursor); page != nil {
+				input["page"] = page
 			}
 			if axes, err := cmd.Flags().GetStringSlice("axis"); err == nil && len(axes) > 0 {
 				input["construct_axes"] = axes
@@ -66,11 +71,13 @@ func newSearchCommand(env *clientEnv) *cobra.Command {
 				}
 				if len(data.Hits) == 0 {
 					fmt.Fprintln(cmd.OutOrStdout(), "no hits")
+					renderPageFacts(cmd, data.Page)
 					return nil
 				}
 				for _, hit := range data.Hits {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\n", hit.EntryType, hit.SubjectRef, hit.Path, hit.Name)
 				}
+				renderPageFacts(cmd, data.Page)
 				return nil
 			})
 		})
@@ -79,6 +86,8 @@ func newSearchCommand(env *clientEnv) *cobra.Command {
 	commandNode.Flags().String("dimension", "", "declared index dimension (omit for the default lexical+structured+semantic broker)")
 	commandNode.Flags().StringSlice("axis", nil, "restrict lexical construct axes (path,name,suffix,tags,notes,extracted)")
 	commandNode.Flags().StringSlice("fuse", nil, "host-owned fusion of two or more declared dimensions")
+	commandNode.Flags().IntVar(&pageSize, "page-size", 0, "page.limit: bounded page size (1..1000); omit for the daemon's default single-answer bound")
+	commandNode.Flags().StringVar(&cursor, "cursor", "", "page.token: opaque continuation from an earlier page; only a single lexical query can be continued")
 	commandNode.Flags().StringArrayVar(&filterValues, "filter", nil, "typed filter as key=value; repeat for entry_type, content_id, duplicate_group, protection_mode, language, suffix, size_min, size_max, mtime_after, or mtime_before")
 	commandNode.Flags().StringVar(&language, "language", "", "exact language facet")
 	commandNode.Flags().StringVar(&suffix, "suffix", "", "exact filename suffix facet")
