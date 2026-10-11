@@ -31,6 +31,15 @@
 //     `search.query` response size and whether it offers any continuation,
 //     scrolling long tasks and frame gaps, thumbnail/preview request counts,
 //     and resident memory when it can be read;
+//   * after the scroll, opens Details on a result row that is mounted and
+//     visible at the position the scroll actually reached. The wall windows its
+//     DOM, so at a far scroll position the window first holds pending
+//     placeholders while the bounded page chain catches up: the harness waits
+//     for a clickable row there (bounded, and the wait is reported), clicks it
+//     by its real on-screen coordinates, and checks that the panel names the row
+//     it clicked. If no clickable row arrives inside the bound the step fails
+//     with the wall's own loaded/window numbers rather than clicking some other
+//     row and calling it equivalent;
 //   * stops its daemon and removes its temporary profile on success, failure and
 //     signal, and says so.
 //
@@ -54,6 +63,15 @@
 //                                       to its end (default 200)
 //   CAIRN_LARGE_SCROLL_BUDGET_MS        wall-clock budget for one wall's scroll
 //                                       (default 120000)
+//   CAIRN_LARGE_DETAIL_ROW_WAIT_MS      budget to wait, at the reached scroll
+//                                       position, for a mounted result row whose
+//                                       open button is inside the viewport. A far
+//                                       scroll position waits for the bounded page
+//                                       chain to fill its window; when nothing is
+//                                       clickable inside this budget the Details
+//                                       step fails loudly (default 90000, the same
+//                                       settle budget web-wall-paging-check.mjs
+//                                       allows its page chain)
 //   CAIRN_LARGE_KEEP=1                  leave the daemon running and keep the
 //                                       temporary profile after this process
 //                                       exits
@@ -63,6 +81,9 @@
 //                                       repository and recovery records are
 //                                       read verbatim, so a before/after
 //                                       comparison measures the same library.
+//                                       The run leaves that profile in place and
+//                                       says so; it never removes one it does
+//                                       not own.
 //   CAIRN_PLAYWRIGHT_MODULE             Playwright module (default the checkout's
 //                                       web/node_modules/playwright/index.mjs)
 //   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH    Chrome/Chromium binary (default the
@@ -91,6 +112,20 @@ const timeoutMs = Number.parseInt(process.env.CAIRN_LARGE_TIMEOUT_MS || "1800000
 const browserTimeoutMs = Number.parseInt(process.env.CAIRN_LARGE_BROWSER_TIMEOUT_MS || "900000", 10);
 const scrollSteps = Number.parseInt(process.env.CAIRN_LARGE_SCROLL_STEPS || "200", 10);
 const scrollBudgetMs = Number.parseInt(process.env.CAIRN_LARGE_SCROLL_BUDGET_MS || "120000", 10);
+// How long the post-scroll Details step waits, at the scroll position it
+// actually reached, for a mounted result row whose open button is really
+// inside the viewport. The wall windows its DOM, so a far scroll position is
+// first held open by `.result-pending` placeholders while the bounded page
+// chain catches up; this is the explicit bound on that wait, and how long it
+// really took is reported. The same 90 s settle budget is what
+// `scripts/web-wall-paging-check.mjs` allows the chain at the bottom.
+const detailRowWaitMs = Number.parseInt(process.env.CAIRN_LARGE_DETAIL_ROW_WAIT_MS || "90000", 10);
+// A click is dispatched by real coordinates (no Playwright auto-scroll, which
+// would re-window the wall being measured). One bounded retry covers a commit
+// landing between the probe and the click; the panel check below is what makes
+// either attempt count as the journey working.
+const DETAIL_CLICK_ATTEMPTS = 2;
+const DETAIL_PANEL_WAIT_MS = 30000;
 const keepRunning = process.env.CAIRN_LARGE_KEEP === "1";
 // Opt-in reuse of a profile a previous `CAIRN_LARGE_KEEP=1` run kept. The
 // catalog, repository and recovery records are read verbatim and no ingest
@@ -553,6 +588,81 @@ function continuationKeys(value, found = new Set(), depth = 0) {
   return found;
 }
 
+// --- the post-scroll Details target ------------------------------------------
+
+/** The mounted wall window and the one row that is genuinely clickable now.
+ *
+ *  The wall windows its DOM (`web/src/components/ResultWindow.tsx`): only the
+ *  rows around the viewport are mounted, and a position whose bounded page has
+ *  not arrived yet is a `.result-pending` placeholder carrying no
+ *  `data-result-index`. So `document.querySelectorAll(".result-row")[0]` is not
+ *  "the row on screen": at a far scroll position it can be thousands of pixels
+ *  above the viewport, or absent entirely while the page chain catches up, and
+ *  clicking it makes Playwright scroll the wall and re-window the very
+ *  measurement it is taking.
+ *
+ *  This reads the wall's own account of what it holds and returns the mounted
+ *  row whose `.result-open-copy` is inside the viewport and is the topmost
+ *  element at its own centre — the row an operator would actually click. When
+ *  none exists it returns `found: false` with those numbers instead of a silent
+ *  zero, and the caller must fail on that. `name` is returned only so the caller
+ *  can compare it with the panel it opens; it is never printed.
+ */
+const READ_CLICKABLE_ROW = (selector) => {
+  const list = document.querySelector(".result-list");
+  const rows = [...document.querySelectorAll(selector)];
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const viewportMiddle = viewportHeight / 2;
+  const candidates = [];
+  for (const row of rows) {
+    const button = row.querySelector(".result-open-copy");
+    if (!button) continue;
+    const rect = button.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    if (x < 0 || x > viewportWidth || y < 0 || y > viewportHeight) continue;
+    const hit = document.elementFromPoint(x, y);
+    if (hit === null || (hit !== button && !button.contains(hit))) continue;
+    const rowRect = row.getBoundingClientRect();
+    candidates.push({
+      position: Number(row.dataset.resultIndex),
+      name: button.textContent?.trim() ?? "",
+      x: Math.round(x),
+      y: Math.round(y),
+      rowTop: Math.round(rowRect.top),
+      rowBottom: Math.round(rowRect.bottom),
+      overlapPx: Math.round(Math.max(0, Math.min(rowRect.bottom, viewportHeight) - Math.max(rowRect.top, 0))),
+    });
+  }
+  // The row nearest the middle of the viewport is the one an operator would
+  // use; a row only partly on screen still wins when it is the only one there.
+  candidates.sort((left, right) => Math.abs(left.y - viewportMiddle) - Math.abs(right.y - viewportMiddle));
+  const chosen = candidates[0];
+  return {
+    found: Boolean(chosen),
+    row: chosen ?? null,
+    scrollY: Math.round(window.scrollY),
+    scrollMax: Math.max(0, document.documentElement.scrollHeight - document.documentElement.clientHeight),
+    viewportHeight,
+    clickableInViewport: candidates.length,
+    mountedRows: rows.length,
+    mountedPending: list ? list.querySelectorAll("[data-result-pending]").length : 0,
+    windowFrom: list?.dataset.renderedFrom ?? "",
+    windowTo: list?.dataset.renderedTo ?? "",
+    loaded: list?.dataset.listingCount ?? "",
+    total: list?.dataset.listingTotal ?? "",
+  };
+};
+
+/** One line describing what the wall held, for the report and the failure. */
+function describeWallWindow(probe) {
+  if (!probe) return "the wall could not be read";
+  return `scrollY ${probe.scrollY} px of ${probe.scrollMax} px, window ${probe.windowFrom}..${probe.windowTo} of ${probe.loaded} loaded / ${probe.total} exact total, ` +
+    `${probe.mountedRows} mounted row(s), ${probe.mountedPending} pending position(s), ${probe.clickableInViewport} clickable row(s) in the viewport`;
+}
+
 // --- measurement run ----------------------------------------------------------
 
 async function main() {
@@ -736,28 +846,83 @@ async function main() {
   const wallScroll = await scrollWall(page);
   const previewAfterWallScroll = countOperations(PREVIEW_OPERATIONS);
 
-  // Does the operator still get to work after that scroll? Open Details on the
-  // row that is actually on screen, and time the click separately from the
-  // panel becoming visible, so an auto-scroll is never mistaken for latency.
-  let interaction = { ok: false, clickMs: 0, panelMs: 0, detail: "" };
+  // Does the operator still get to work after that scroll? Open Details on a row
+  // that is mounted and visible at the position the scroll actually reached —
+  // never by backing off to an easier row. The wall windows its DOM, so a far
+  // scroll position is first held open by pending placeholders while the bounded
+  // page chain catches up; the harness waits for a clickable row there inside an
+  // explicit budget, reports how long that took and which listing position it
+  // opened, clicks by real coordinates, and checks that the panel names the row
+  // it clicked. "Found nothing to click" is a failure, not a pass.
+  const interaction = {
+    ok: false, named: false, probeMs: 0, clickMs: 0, panelMs: 0, attempts: 0,
+    row: null, wallText: "", detail: "",
+  };
   {
-    const visibleIndex = await page.evaluate((selector) => {
-      const rows = [...document.querySelectorAll(selector)];
-      const index = rows.findIndex((row) => {
-        const rect = row.getBoundingClientRect();
-        return rect.bottom > 0 && rect.top < window.innerHeight;
-      });
-      return index;
-    }, WALL_ROW);
-    const target = visibleIndex >= 0 ? visibleIndex : 0;
-    const started = Date.now();
+    const probeStarted = Date.now();
+    let previous = null;
+    let probe = null;
     try {
-      await page.locator(WALL_ROW).nth(target).locator(".result-open-copy").first().click({ timeout: 30000 });
-      const clicked = Date.now();
-      await page.locator(".detail-column").first().waitFor({ state: "visible", timeout: 30000 });
-      interaction = { ok: true, clickMs: clicked - started, panelMs: Date.now() - clicked, detail: `Details opened for visible row ${target}` };
+      while (Date.now() - probeStarted < detailRowWaitMs) {
+        const current = await page.evaluate(READ_CLICKABLE_ROW, WALL_ROW);
+        // Two consecutive agreeing reads: a row that is still moving while a page
+        // arrives is not yet a target an operator could reliably click.
+        if (current.found && previous?.found && previous.row.position === current.row.position &&
+          Math.abs(previous.row.x - current.row.x) <= 1 && Math.abs(previous.row.y - current.row.y) <= 1) {
+          probe = current;
+          break;
+        }
+        previous = current;
+        await page.waitForTimeout(250);
+      }
     } catch (error) {
-      interaction = { ok: false, clickMs: Date.now() - started, panelMs: 0, detail: String(error?.message ?? error) };
+      interaction.detail = `the wall could not be read: ${String(error?.message ?? error)}`;
+    }
+    interaction.probeMs = Date.now() - probeStarted;
+    const last = probe ?? previous;
+    interaction.wallText = describeWallWindow(last);
+    if (!interaction.detail) {
+      if (!probe) {
+        interaction.detail = `no mounted result row had a clickable open button inside the viewport after ${interaction.probeMs} ms`;
+      } else {
+        interaction.row = probe.row.position;
+        let failure = "";
+        for (let attempt = 0; attempt < DETAIL_CLICK_ATTEMPTS; attempt += 1) {
+          const target = attempt === 0 ? probe : await page.evaluate(READ_CLICKABLE_ROW, WALL_ROW);
+          if (!target.found) {
+            failure = `the clickable row left the viewport before attempt ${attempt + 1}`;
+            break;
+          }
+          interaction.row = target.row.position;
+          interaction.attempts = attempt + 1;
+          const clickStarted = Date.now();
+          try {
+            await page.mouse.click(target.row.x, target.row.y);
+            interaction.clickMs = Date.now() - clickStarted;
+            // The panel names the row it opened, so "a panel is visible" is not
+            // enough: the click has to have reached the row this step chose.
+            const named = await page.waitForFunction((expected) => {
+              const node = document.querySelector(".detail-column .detail-title h2");
+              return Boolean(node) && (node.textContent ?? "").trim() === expected;
+            }, target.row.name, { timeout: DETAIL_PANEL_WAIT_MS }).then(() => true).catch(() => false);
+            interaction.panelMs = Date.now() - clickStarted - interaction.clickMs;
+            if (named) {
+              interaction.ok = true;
+              interaction.named = true;
+              break;
+            }
+            const seen = await page.locator(".detail-column .detail-title h2").first()
+              .evaluate((node) => (node.textContent ?? "").trim()).catch(() => "");
+            failure = seen
+              ? "the Details panel opened naming a different item than the clicked row"
+              : `no Details panel naming the clicked row appeared within ${DETAIL_PANEL_WAIT_MS} ms`;
+          } catch (error) {
+            interaction.clickMs = Date.now() - clickStarted;
+            failure = `clicking the visible row failed: ${String(error?.message ?? error)}`;
+          }
+        }
+        if (!interaction.ok) interaction.detail = failure;
+      }
     }
   }
 
@@ -822,7 +987,7 @@ async function main() {
   if (items.length === 0) failures.push("the daemon reported zero items for the workspace after a successful publication");
   if (!wallRows) failures.push("the library wall rendered no result rows although the daemon reported items");
   if (wallScroll.maxScroll > 0 && wallScroll.reachedScrollTop === 0) failures.push("the library wall did not scroll at all");
-  if (!interaction.ok) failures.push(`the client did not answer an ordinary Details interaction after scrolling: ${interaction.detail}`);
+  if (!interaction.ok) failures.push(`the client did not open Details on a mounted, visible row after scrolling: ${interaction.detail}; ${interaction.wallText}`);
   if (!searchRequest) failures.push(`the client issued no search.query request for its own ${JSON.stringify(CLIENT_SEARCH_TEXT)} operator`);
   if (searchRows && searchRows >= items.length && searchRows > (directSearch.data?.hits ?? []).length) failures.push("the client rendered more search rows than the daemon returned hits");
   for (const error of pageErrors) failures.push(`the page raised an uncaught error: ${error}`);
@@ -870,7 +1035,11 @@ async function main() {
   lines.push(`   long tasks while scrolling        : ${wallScroll.longTasks.count} (largest ${wallScroll.longTasks.worstMs} ms, blocking ${wallScroll.longTasks.blockingMs} ms)`);
   lines.push(`   frame gaps while scrolling        : ${wallScroll.frames.frames} frames, largest gap ${wallScroll.frames.worstGapMs} ms`);
   lines.push(`   long tasks during page load       : ${loadLongTasks.count} (largest ${loadLongTasks.worstMs} ms, blocking ${loadLongTasks.blockingMs} ms)`);
-  lines.push(`   post-scroll Details interaction   : ${interaction.ok ? "opened" : "FAILED"} (click ${interaction.clickMs} ms, panel ${interaction.panelMs} ms; ${interaction.detail})`);
+  lines.push(`   post-scroll Details interaction   : ${interaction.ok ? "opened" : "FAILED"}`);
+  lines.push(`      listing position opened         : ${interaction.row ?? "none"} (the panel named the clicked row: ${interaction.named ? "yes" : "no"})`);
+  lines.push(`      probe / click / panel           : ${interaction.probeMs} ms / ${interaction.clickMs} ms / ${interaction.panelMs} ms, ${interaction.attempts} click attempt(s)`);
+  lines.push(`      wall at that position           : ${interaction.wallText}`);
+  if (!interaction.ok) lines.push(`      failure                         : ${interaction.detail}`);
   if (photos.available && photos.scroll) {
     lines.push(`   photos wall scroll                : ${photos.scroll.wheelSteps} steps, ${photos.scroll.reachedScrollTop} px of ${photos.scroll.maxScroll} px (bottom reached: ${photos.scroll.bottomReached ? "yes" : "no"}), largest long task ${photos.scroll.longTasks.worstMs} ms, largest frame gap ${photos.scroll.frames.worstGapMs} ms`);
   }
@@ -963,9 +1132,19 @@ if (outcome) {
   await cleanup();
   const daemonStopped = Boolean(daemon && daemon.exitCode !== null) || daemon?.signalCode !== null;
   const tempRemoved = !existsSync(state.temp);
-  log(`   daemon stopped: ${daemonStopped ? "yes" : "NO"}; temporary profile removed: ${tempRemoved ? "yes" : "NO"} (${state.temp})`);
-  if (!daemonStopped || !tempRemoved) {
-    console.error("FAIL: cleanup did not stop the daemon and remove the temporary profile");
+  // A run pointed at a caller's kept profile must leave it exactly where it was,
+  // so the honest cleanup claim differs between the two modes. Asserting the
+  // owned-profile claim there made every reuse run exit 1 after doing its work,
+  // which is the misleading report this mode exists to avoid.
+  const profileDisposition = state.ownsProfile
+    ? (tempRemoved ? "removed" : "NOT removed")
+    : (tempRemoved ? "REMOVED although this run did not own it" : "kept (this run did not own it)");
+  log(`   daemon stopped: ${daemonStopped ? "yes" : "NO"}; temporary profile: ${profileDisposition} (${state.temp})`);
+  const cleanupHonest = state.ownsProfile ? tempRemoved : !tempRemoved;
+  if (!daemonStopped || !cleanupHonest) {
+    console.error(state.ownsProfile
+      ? "FAIL: cleanup did not stop the daemon and remove the temporary profile"
+      : "FAIL: cleanup removed a profile this run did not own");
     process.exit(1);
   }
   process.exit(exitCode);

@@ -2,6 +2,14 @@
 // The runner owns a temporary config, catalog, repository, recovery directory,
 // inbox, browser, and loopback listener. It never reads or changes a saved user
 // profile or the persistent local QA daemon.
+//
+// Its evidence — the screenshots, the generated original, the taken-out copy and
+// result.json — is written inside this run's own temporary profile by default,
+// so a run can never land in a build output directory such as `dist/` and
+// overwrite what an earlier run left there. The directory it used is printed,
+// and the default one goes away with the profile when the run ends. Set
+// CAIRN_FIRST_USE_EVIDENCE_DIR to an absolute path to keep the evidence
+// deliberately.
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -15,9 +23,11 @@ import { tmpdir } from "node:os";
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = join(repo, "web");
 const tempRoot = await mkdtemp(join(tmpdir(), "cairn-first-use-"));
-const evidenceDir = process.env.CAIRN_FIRST_USE_EVIDENCE_DIR
-  ? resolve(process.env.CAIRN_FIRST_USE_EVIDENCE_DIR)
-  : join(repo, "dist", "whole-product-20261006", "first-use");
+const evidenceOverride = (process.env.CAIRN_FIRST_USE_EVIDENCE_DIR || "").trim();
+const evidenceDir = evidenceOverride ? resolve(evidenceOverride) : join(tempRoot, "evidence");
+console.log(evidenceOverride
+  ? `FIRST_USE_EVIDENCE_DIR ${evidenceDir} (from CAIRN_FIRST_USE_EVIDENCE_DIR; kept after the run)`
+  : `FIRST_USE_EVIDENCE_DIR ${evidenceDir} (inside this run's temporary profile; removed with it — set CAIRN_FIRST_USE_EVIDENCE_DIR to keep evidence)`);
 let daemon;
 let browserContext;
 let closeout = false;
@@ -378,6 +388,7 @@ try {
     status: "PASS",
     date: new Date().toISOString(),
     scope: "fresh empty browser profile using existing upload, plan/apply, query, annotation, and original-download operations",
+    evidenceDirectory: { path: evidenceDir, fromOverride: Boolean(evidenceOverride), keptAfterRun: Boolean(evidenceOverride) },
     build: { daemonPath: daemonBin, daemonSha256: binaryDigests.daemon, cairnPath: cairnBin, cairnSha256: binaryDigests.cairn, webDistPath: webDist, webDistTreeSha256: binaryDigests.web },
     isolatedRuntime: { config: configPath, catalog: join(dataRoot, "catalog.sqlite"), repository: join(dataRoot, "repository"), recovery: join(dataRoot, "recovery"), socket: socketPath, listener: baseURL, profileRoot: tempRoot },
     generatedFile: { name: fixtureName, logicalBytes: fixtureBytes.length, sha256: expectedDigest, stagingUnprotectedBeforeApply: true, noPublishedSnapshotBeforeConfirmation: true, reviewProtectionMode: "STORE_EXACT" },
