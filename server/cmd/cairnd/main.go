@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -34,6 +35,54 @@ func main() {
 	if err := run(); err != nil {
 		log.Fatalf("cairnd: %v", err)
 	}
+}
+
+// buildVersion is injected at build time with
+// -ldflags "-X main.buildVersion=<version>". An unreplaced build reports the
+// module version Go stamped into the binary, so an operator can always tell
+// which build is installed.
+var buildVersion string
+
+// buildVersionInfo prefers the injected release token and otherwise falls back
+// to the build metadata Go records, including the VCS revision when the build
+// host had one.
+func buildVersionInfo() string {
+	if value := strings.TrimSpace(buildVersion); value != "" {
+		return value
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	version := strings.TrimSpace(info.Main.Version)
+	if version == "" || version == "(devel)" {
+		version = "devel"
+	}
+	// Go itself appends "+dirty" when the build host had uncommitted changes.
+	// That is not the same fact as the installed build identity, so keep only
+	// the base version and add the revision marker below.
+	version = strings.TrimSuffix(version, "+dirty")
+	revision := ""
+	modified := ""
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value
+		}
+	}
+	if revision == "" {
+		return version
+	}
+	short := revision
+	if len(short) > 12 {
+		short = short[:12]
+	}
+	if modified == "true" {
+		return version + "+" + short + ".dirty"
+	}
+	return version + "+" + short
 }
 
 func run() error {
@@ -61,8 +110,16 @@ func run() error {
 		apiToken                = flag.String("api-token", os.Getenv("CAIRN_API_TOKEN"), "Bearer token for HTTP /api/v1")
 		onnxWorkerProcessBundle = flag.String("onnx-worker-process", "",
 			"private host-supervisor ONNX worker bundle root")
+		showVersion = flag.Bool("version", false,
+			"print the installed daemon build version and exit")
 	)
 	flag.Parse()
+	if *showVersion {
+		// The operator's only honest way to tell an upgraded installation from
+		// the one it replaced. It reads no catalog, repository, or config.
+		fmt.Printf("cairnd %s\n", buildVersionInfo())
+		return nil
+	}
 	semanticBundleOverride := strings.TrimSpace(*semanticBundle) != ""
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

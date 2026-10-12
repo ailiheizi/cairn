@@ -59,6 +59,29 @@ skipped. When a harness can skip, the row says so.
 
 ## Active product todo — 2026-10-09
 
+### UX-D1 — focused full-page Photos and Music (2026-10-12)
+
+The operator explicitly selected this current presentation slice on 2026-10-12.
+It refines admitted client surfaces; the core phase order remains unchanged.
+The normative boundary is
+[First-Party Client Experiences §14](../requirements/first-party-client-experiences.md#14-ux-d1-full-page-photos-and-music-composition),
+with the rationale in
+[ADR-034](build-stack-and-architecture-selection.md#adr-034-focused-full-page-domain-layouts-over-shared-host-state).
+
+- [~] Give Photos/Music full-page composition selected by compiled metadata,
+  with compatible direct links and no permanently expanded generic rail/tools.
+- [~] Keep management, trusted status, shared search and original actions
+  reachable; active restrictions and incomplete listing states stay legible.
+- [~] Refine readable light/dark domain content and concise Music batch actions
+  without changing their displayed-scope counts, omissions or transient queue.
+- [ ] Accept the integrated browser journey at 390/1280: direct links, controls,
+  shared player through navigation, guarded drafts, scope and original actions.
+
+Implementation has been delegated through DeepSeek Harness to the explicitly
+selected `sub2api / deepseek-v4.1-flash` route. Primary review and acceptance
+remain required. This row grants no album/playlist, runtime package, new query,
+core-phase or release completion.
+
 This ledger now tracks the parallel RW-PERSONAL-UX-1 client cohort admitted by
 [ADR-025](build-stack-and-architecture-selection.md#adr-025-admit-dedicated-personal-client-workflows-without-a-new-media-service)
 and specified in the [first-party client contract](../requirements/first-party-client-experiences.md).
@@ -365,10 +388,67 @@ small standalone polish rounds or unrelated platform/package experiments.
 
 ### G7 — Release
 
-- [ ] Packaging
-- [ ] Migration
-- [ ] Backup and upgrade
-- [ ] Performance bounds
+- [x] Packaging — **closed 2026-10-12 for the candidate path, with the qualified
+  bundle still open.** `scripts/build-offline-package.sh` builds the CLI and
+  daemon with `-tags purego`, stages WebUI assets, and calls the existing
+  `scripts/package-offline.sh`; `scripts/accept-offline-journey.sh` then
+  extracts that artifact into a prefix that has never held Cairn, verifies all
+  20 members against `checksums.sha256` (`OK` for every one), starts the
+  installed daemon with no Docker and no first-query download, and reaches a
+  healthy empty catalog (`publications=0`). The running instance names its own
+  profiles rather than having them inferred: `directory-cas-dev-v1` +
+  `identity-v1` + `STORE_EXACT` + `embedding_mode=local` /
+  `bge-small-zh-v1.5` / `zvec` + `local-ed25519-v1` signing, with a
+  `config_digest` the CLI reports identically, and `capability.list` naming the
+  real `query.semantic.onnx-bge-zvec.v1` provider once the packaged offline
+  bundle is installed (`semantic bundle install --archive`, one restart). The
+  semantic provider honestly reports `UNAVAILABLE` before that install and
+  `NOT_BUILT` after it, and never a fixture. What is **not** closed: the
+  qualified default semantic bundle, redistribution review, the release SBOM
+  (the artifact still declares `INCOMPLETE_NOT_RELEASE_SBOM` at
+  `CANDIDATE_ONLY_NOT_SUPPORTED`), and non-Darwin hosts. See the
+  [operator procedure](operator-install-backup-upgrade.md) and the
+  [dated acceptance record](operator-journey-acceptance-20261012.md).
+- [ ] Migration — **still open.** No released artifact from an earlier build was
+  available to import, so no old-catalog, old-repository, or old-config
+  migration was executed. The upgrade path was exercised against an
+  existing *current* catalog and reopened `schema_state=CURRENT
+  schema_version=27 binary_version=27` with nothing to migrate; that is
+  evidence that this upgrade pair needed no migration, not that version-to-
+  version migration works. One known hazard is recorded but not executed: a
+  repository holding an ADR-033 part-bound record must be read by an upgraded
+  binary, because an older binary refuses such a record outright.
+- [x] Backup and upgrade — **closed 2026-10-12 for the candidate path.** The
+  executed procedure backs up `config.toml`, `catalog.sqlite`, `repository/`,
+  `recovery/`, `vectors/`, and `models/` with the daemon stopped, plus an
+  independently retained `recovery export` reference and `recovery anchor
+  export` anchor outside every prefix, and proves sufficiency by restoring into
+  a **second** fresh prefix: 4 of 4 entries, a passing full-byte verify, and a
+  source-vs-restore manifest comparison that is byte-identical. The stronger
+  claim also holds: a catalog-free `--recovery-reader` over the repository plus
+  the independent anchor reproduces the same exact bytes, and four negative
+  controls fail closed — absent anchor (`exit 1`), tampered anchor (`exit 4`),
+  a **structurally valid anchor from a different Ed25519 identity**
+  (`exit 4`, which shows the retained anchor is the trust root rather than a
+  file whose presence is accepted), and an absent reference (`exit 4`).
+  In-place upgrade then replaces the installed pair with a freshly built one
+  (`cairnd --version` before `v0.1.0-prealpha...dc34fc39`, after
+  `offline-upgrade-v2`; binary SHA-256 changed), restarts on the **existing**
+  data with the process stopped across the swap, and re-verifies
+  `schema_state=CURRENT`, the same 4 entries, full-byte verification, recovery
+  import, and a byte-identical restore. Two limits are recorded rather than
+  hidden: the catalog must be backed up **quiesced** — measured on this host,
+  `catalog.sqlite-wal` held 1,005,312 bytes and an online copy of only
+  `.sqlite` reported 0 publications, while a clean daemon stop checkpointed the
+  WAL to 0 bytes and the same copy reported 1; and `recovery.import` only
+  reconciles a missing publication row against an **existing** namespace root,
+  so a lost catalog is **not** currently rebuildable from the repository, which
+  keeps the normative "catalog is a rebuildable projection" claim unproven
+  rather than violated. See the
+  [operator procedure](operator-install-backup-upgrade.md) and the
+  [dated acceptance record](operator-journey-acceptance-20261012.md).
+- [ ] Performance bounds — **still open.** No measured latency, throughput,
+  memory, or net-savings bound was produced by this work.
 - [ ] Full release acceptance
 
 ## SP-1 — Visual system and desktop shell `[~]`
