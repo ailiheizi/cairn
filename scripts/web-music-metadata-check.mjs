@@ -19,7 +19,7 @@ const projectionSource = await readFile(new URL("musicMetadata.ts", root), "utf8
 const linkedProjection = transpile(projectionSource)
   .replaceAll('"./audioPlayback"', JSON.stringify(playbackURL))
   .replaceAll('"./format"', JSON.stringify(formatURL));
-const { projectMusicFacts, musicGroupKey, orderRecordedAlbumTracks, playableMusicTrack } = await import(dataURL(linkedProjection));
+const { projectMusicFacts, musicGroupKey, orderRecordedAlbumTracks, playableMusicTrack, musicPlaybackEligibility, sortMusicRows } = await import(dataURL(linkedProjection));
 
 const digest = `sha256:${"a".repeat(64)}`;
 const hit = (subject_ref, overrides = {}) => ({
@@ -67,4 +67,43 @@ assert.equal(playableMusicTrack(loaded[0], undefined), undefined);
 assert.equal(playableMusicTrack(hit("bad", { content_id: "bare-digest" }), "workspace-one"), undefined);
 assert.equal(playableMusicTrack(hit("unknown-size", { logical_size: undefined }), "workspace-one"), undefined);
 
-console.log("PASS: recorded artist/album facts filter loaded tracks; stale subjects are excluded; absent facts retain Unknown groups and filename-backed playback; oversized, unknown-identity, and unknown-length entries are excluded from displayed supported playback.");
+// Sorting is a browser-local projection over the loaded rows. The default is
+// identity/order preserving (including the caller's known-album track order),
+// and missing values stay last in either direction while ties keep source index.
+const sortRows = [
+  { index: 4, hit: hit("z", { name: "z.mp3", logical_size: 20 }), facts: { title: "Beta", artist: "Zed", album: "B", track: 2, durationMS: 200 } },
+  { index: 1, hit: hit("unknown", { name: undefined, logical_size: undefined }), facts: undefined },
+  { index: 3, hit: hit("a2", { name: "a2.mp3", logical_size: 10 }), facts: { title: "Alpha", artist: "Ada", album: "A", track: 1, durationMS: 100 } },
+  { index: 2, hit: hit("a1", { name: "a1.mp3", logical_size: 10 }), facts: { title: "Alpha", artist: "Ada", album: "A", track: 1, durationMS: 100 } },
+];
+assert.deepEqual(sortMusicRows(sortRows, "original", "desc").map((row) => row.index), [4, 1, 3, 2]);
+assert.deepEqual(sortMusicRows(sortRows, "title", "asc").map((row) => row.index), [2, 3, 4, 1], "title ties preserve original input index and missing title sorts last");
+assert.deepEqual(sortMusicRows(sortRows, "title", "desc").map((row) => row.index), [4, 2, 3, 1], "descending reverses known values but still leaves unknowns last");
+assert.deepEqual(sortMusicRows(sortRows, "artist", "asc").map((row) => row.index), [2, 3, 4, 1]);
+assert.deepEqual(sortMusicRows(sortRows, "album", "desc").map((row) => row.index), [4, 2, 3, 1]);
+assert.deepEqual(sortMusicRows(sortRows, "track", "desc").map((row) => row.index), [4, 2, 3, 1]);
+assert.deepEqual(sortMusicRows(sortRows, "duration", "asc").map((row) => row.index), [2, 3, 4, 1]);
+assert.deepEqual(sortMusicRows(sortRows, "size", "desc").map((row) => row.index), [4, 2, 3, 1]);
+assert.deepEqual(sortMusicRows([{ index: 1, hit: hit("bad-track"), facts: { track: 0 } }, sortRows[2]], "track", "asc").map((row) => row.index), [3, 1], "non-positive recorded track numbers are treated as unknown");
+
+assert.deepEqual(musicPlaybackEligibility(hit("valid"), "workspace-one"), { playable: true });
+assert.deepEqual(musicPlaybackEligibility(hit("unsupported", { name: "unsupported.xyz" }), "workspace-one"), { playable: false, reason: "unsupported-format" });
+assert.deepEqual(musicPlaybackEligibility(hit("bad-id", { content_id: "bad" }), "workspace-one"), { playable: false, reason: "identity-unavailable" });
+assert.deepEqual(musicPlaybackEligibility(hit("unknown-length", { logical_size: undefined }), "workspace-one"), { playable: false, reason: "size-unavailable" });
+assert.deepEqual(musicPlaybackEligibility(hit("too-large", { logical_size: 32 * 1024 * 1024 + 1 }), "workspace-one"), { playable: false, reason: "size-limit" });
+assert.deepEqual(musicPlaybackEligibility(hit("no-workspace"), undefined), { playable: false, reason: "workspace-unavailable" });
+assert.deepEqual(musicPlaybackEligibility(hit("blank-workspace"), "   "), { playable: false, reason: "workspace-unavailable" });
+assert.equal(playableMusicTrack(hit("blank-workspace"), "   "), undefined, "eligibility and actual play guard reject the same blank workspace");
+
+// The component must route visible keyboard navigation through its sorted row
+// projection while invoking host selection/details with each original index.
+const component = await readFile(new URL("../web/src/components/MusicLibraryExperience.tsx", import.meta.url), "utf8");
+assert.match(component, /trackRows\.findIndex\(\(row\) => row\.index === sourceIndex\)/);
+assert.match(component, /const open = \(row: MusicRow[\s\S]*?props\.onRowClick\(row\.index, event\)/);
+assert.match(component, /ArrowDown[\s\S]*?trackRows\[nextPosition\]\.index/);
+assert.match(component, /if \(\["ArrowDown"[\s\S]*?return;\s*}\s*props\.onKeyDown\(event\);/, "arrow handling is local; other host keyboard actions still delegate");
+assert.match(component, /PLAYBACK_REASON_MESSAGES\[eligibility\.reason\]/, "reason enums are mapped to human sentence keys before translation");
+assert.doesNotMatch(component, /t\(eligibility\.reason\)/, "internal eligibility codes must not appear as translated text");
+assert.match(component, /Use the arrow keys to move through visible tracks; Space selects and Enter opens the focused track\./);
+
+console.log("PASS: recorded-fact scope; stable album order; local seven-field sorting with unknown-last ties; aligned eligibility/play guards; human eligibility reasons; original-index host selection/details; visible-order arrows with delegated remaining keys.");

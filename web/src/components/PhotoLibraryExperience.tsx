@@ -29,6 +29,7 @@ export type PhotoLibraryExperienceProps = ComponentProps<typeof ResultList> & {
   /** App-owned focus carried across same-context page presentations. */
   focusedSubjectRef?: string;
   onFocusSubject?: (subjectRef: string) => void;
+  onShowSelectionActions?: () => void;
   loading?: boolean;
   error?: string;
   favoriteControls?: FavoriteControls;
@@ -44,9 +45,9 @@ const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_AXIS_RATIO = 1.6;
 
 export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
-  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
+  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
   const [format, setFormat] = useState("all");
-  const [density, setDensity] = useState(3);
+  const [density, setDensity] = useState(2);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [fit, setFit] = useState(true);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -66,6 +67,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }).filter((item) => item.hit.entry_type !== "DIRECTORY"), [hits]);
   const formats = useMemo(() => [...new Set(items.map((item) => item.format))].sort(), [items]);
   const visibleItems = useMemo(() => items.filter((item) => format === "all" || item.format === format), [format, items]);
+  const activeFormatLabel = format === "all" ? t("All formats") : format === "unknown" ? t("Unknown format") : format.toUpperCase();
   const wall = useResultWindow({ containerRef: libraryListRef, count: visibleItems.length, onNeedMore: props.onLoadMore });
   const mountedItems = useMemo(() => {
     const rendered: Array<{ item?: PhotoItem; position: number }> = [];
@@ -76,6 +78,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }, [visibleItems, wall.startIndex, wall.endIndex]);
   const pendingFocusRef = useRef("");
   const current = viewerIndex == null ? undefined : visibleItems[viewerIndex];
+  const currentSelected = Boolean(current?.hit.subject_ref && selectionRefs.includes(current.hit.subject_ref));
   const resultsIdentity = useMemo(() => JSON.stringify([workspaceID, hits.map((hit) => [hit.subject_ref ?? "", hit.entry_id ?? "", hit.content_id ?? "", hit.logical_size ?? null, hit.path ?? "", hit.name ?? "", hit.entry_type ?? ""])]), [hits, workspaceID]);
   const previousResultsIdentity = useRef(resultsIdentity);
 
@@ -236,10 +239,14 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     if (viewerIndex !== null) closeViewer(false);
     onOpenHit(item.hit);
   };
+  function showBatchActions() {
+    closeViewer(false);
+    requestAnimationFrame(() => onShowSelectionActions?.());
+  }
   const modal = current && <div className="photo-viewer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeViewer(); }}>
     <section ref={viewerDialogRef} className="photo-viewer" role="dialog" aria-modal="true" aria-label={t("Photo viewer")}>
       <header className="photo-viewer__header">
-        <div className="photo-viewer__identity"><h2 ref={viewerTitleRef} tabIndex={-1}>{current.hit.name || t("Untitled subject")}</h2><span>{t("{{position}} of {{count}}", { position: viewerIndex! + 1, count: visibleItems.length })}</span></div>
+        <div className="photo-viewer__identity"><h2 ref={viewerTitleRef} tabIndex={-1}>{current.hit.name || t("Untitled subject")}</h2><span>{t("{{position}} of {{count}}", { position: viewerIndex! + 1, count: visibleItems.length })}</span><span className="photo-viewer__selection-count" role="status">{t("{{count}} selected items", { count: selectionCount })}</span></div>
         <div className="photo-viewer__actions">
           {/* Each control disables itself while it is already the active mode,
               so actual size is never a one-way trap: the way back to fit stays
@@ -247,7 +254,9 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
           <button type="button" disabled={fit} aria-label={t("Fit to window")} title={t("Fit to window")} onClick={() => setFit(true)}><Expand size={17} /></button>
           <button type="button" disabled={!fit} aria-label={t("Actual size")} title={t("Actual size")} onClick={() => setFit(false)}>{t("Actual size")}</button>
           <button type="button" aria-label={t("Details")} onClick={() => openDetails(current)}>{t("Details")}</button>
+          <button type="button" className={`photo-viewer__select ${currentSelected ? "is-selected" : ""}`} aria-pressed={currentSelected} aria-label={t(currentSelected ? "Deselect {{name}}" : "Select {{name}}", { name: current.hit.name || t("Untitled subject") })} title={t(currentSelected ? "Deselect {{name}}" : "Select {{name}}", { name: current.hit.name || t("Untitled subject") })} disabled={!current.hit.subject_ref} onFocus={() => current.hit.subject_ref && onFocusSubject?.(current.hit.subject_ref)} onClick={() => onToggleSelection(current.index)}><ImageIcon size={15} />{t(currentSelected ? "Selected" : "Select")}</button>
           <span className="photo-viewer__favorite" onKeyDown={(event) => event.stopPropagation()} onFocusCapture={() => current.hit.subject_ref && onFocusSubject?.(current.hit.subject_ref)}><FavoriteButton hit={current.hit} controls={favoriteControls} t={t} /></span>
+          {onShowSelectionActions && selectionRefs.length > 0 && <button type="button" onClick={showBatchActions}>{t("Show batch actions")}</button>}
           <button type="button" aria-label={t("Close viewer")} onClick={() => closeViewer()}><X size={18} /></button>
         </div>
       </header>
@@ -260,14 +269,26 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   </div>;
 
   return <section className="photo-library" aria-label={t("Photos")} data-density={density}>
-    <div className="photo-library__toolbar">
-      <div><p className="photo-library__eyebrow">{t("PHOTO LIBRARY")}</p><h1>{t("Photos")}</h1><p>{t("{{count}} photos and files in the loaded listing", { count: visibleItems.length })}</p></div>
-      <label className="photo-library__density">{t("Wall density")}<input type="range" min="1" max="5" step="1" value={density} onChange={(event) => setDensity(Number(event.target.value))} /><span>{density}</span></label>
-    </div>
-    <div className="photo-library__filters" role="group" aria-label={t("Filter by format")}>
-      <button type="button" aria-pressed={format === "all"} onClick={() => setFormat("all")}>{t("All formats")}</button>
-      {formats.map((value) => <button type="button" key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "unknown" ? t("Unknown format") : value.toUpperCase()}</button>)}
-    </div>
+    {/* Domain title, density and format tools: the host frame supplies the page
+        navigation and gutters, so this masthead does not repeat them. */}
+    <header className="photo-library__masthead">
+      <div className="photo-library__title">
+        <h1>{t("Photos")}</h1>
+        <p className="photo-library__count">{t("{{count}} items in this photo view", { count: visibleItems.length })}</p>
+      </div>
+      <label className="photo-library__density">
+        <span>{t("Wall density")}</span>
+        <input type="range" min="1" max="5" step="1" value={density} onChange={(event) => setDensity(Number(event.target.value))} />
+        <span className="photo-library__density-value" aria-hidden="true">{density}</span>
+      </label>
+      <details className="photo-library__format-filter">
+        <summary><span>{t("Filter by format")}</span><strong>{activeFormatLabel}</strong></summary>
+        <div className="photo-library__filters" role="group" aria-label={t("Filter by format")}>
+          <button type="button" aria-pressed={format === "all"} onClick={() => setFormat("all")}>{t("All formats")}</button>
+          {formats.map((value) => <button type="button" key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "unknown" ? t("Unknown format") : value.toUpperCase()}</button>)}
+        </div>
+      </details>
+    </header>
     {error && <p className="photo-library__state is-error" role="alert">{t("Photos could not be loaded")}: {error}</p>}
     {loading && <p className="photo-library__state" role="status">{t("Loading photos…")}</p>}
     {!loading && !error && visibleItems.length === 0 && <div className="photo-library__empty"><ImageIcon size={30} /><strong>{format === "all" ? t("No photos in the loaded listing") : t("No items match this format")}</strong><span>{t("Unsupported image formats remain available as originals from Details.")}</span></div>}
@@ -282,6 +303,9 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
         const { hit, index } = item;
         const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || t("Untitled subject");
         const checked = Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref));
+        // Only real recorded tags are shown: repeating "No tags" on every card
+        // is noise, while the Details action below stays available.
+        const cardTags = hit.subject_ref ? (tagsBySubject.get(hit.subject_ref) ?? []).slice(0, 2) : [];
         // Keep the legacy eager-thumbnail window bounded. Larger PNG/JPEG
         // candidates can appear anywhere because PhotoThumbnail reads them
         // only while the card is visible and enforces its separate budget.
@@ -293,17 +317,20 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
           }
           openViewer(position, trigger);
         };
-        return <article className={`photo-card ${selectedRef === hit.subject_ref ? "is-current" : ""} ${item.previewable ? "has-preview" : "has-fallback"}`} key={hit.subject_ref ?? hit.entry_id ?? `${name}-${index}`} data-result-index={index} data-original-index={index} data-subject-ref={hit.subject_ref ?? ""}>
+        return <article className={`photo-card ${selectedRef === hit.subject_ref ? "is-current" : ""} ${checked ? "is-selected" : ""} ${item.previewable ? "has-preview" : "has-fallback"}`} key={hit.subject_ref ?? hit.entry_id ?? `${name}-${index}`} data-result-index={index} data-original-index={index} data-subject-ref={hit.subject_ref ?? ""}>
           <button type="button" className="photo-card__image" aria-label={t("Open {{name}}", { name })} onFocus={() => hit.subject_ref && onFocusSubject?.(hit.subject_ref)} onClick={(event) => photoTrigger(event.currentTarget, event)}>
             {thumbAllowed ? <PhotoThumbnail command={command} locale={locale} workspaceId={workspaceID} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={name} logicalSize={hit.logical_size} /> : <span className="photo-card__unsupported"><ImageIcon size={26} /><small>{item.format === "unknown" ? t("Unknown format") : item.format.toUpperCase()}</small><small>{t("Thumbnail not loaded")}</small></span>}
           </button>
-          <div className="photo-card__caption"><div><button type="button" className="result-open-copy photo-card__name" aria-label={t("Open {{name}}", { name })} onFocus={() => hit.subject_ref && onFocusSubject?.(hit.subject_ref)} onClick={(event) => photoTrigger(event.currentTarget, event)}>{name}</button><small>{item.format === "unknown" ? t("Unknown format") : item.format.toUpperCase()}{hit.logical_size != null ? ` · ${formatBytes(hit.logical_size)}` : ""}</small></div>
+          <div className="photo-card__caption"><div><button type="button" title={name} className="result-open-copy photo-card__name" aria-label={t("Open {{name}}", { name })} onFocus={() => hit.subject_ref && onFocusSubject?.(hit.subject_ref)} onClick={(event) => photoTrigger(event.currentTarget, event)}>{name}</button><small>{item.format === "unknown" ? t("Unknown format") : item.format.toUpperCase()}{hit.logical_size != null ? ` · ${formatBytes(hit.logical_size)}` : ""}</small></div>
             <div className="photo-card__caption-actions">
               <span className="photo-card__favorite" onKeyDown={(event) => event.stopPropagation()} onFocusCapture={() => hit.subject_ref && onFocusSubject?.(hit.subject_ref)}><FavoriteButton hit={hit} controls={favoriteControls} t={t} /></span>
               <label className="photo-card__select"><input type="checkbox" checked={checked} disabled={!hit.subject_ref} aria-label={t(checked ? "Deselect {{name}}" : "Select {{name}}", { name })} onChange={() => onToggleSelection(index)} /></label>
             </div>
           </div>
-          <div className="photo-card__foot"><span>{hit.subject_ref ? (tagsBySubject.get(hit.subject_ref) ?? []).slice(0, 2).join(" · ") || t("No tags") : t("Details unavailable")}</span><button type="button" onClick={() => openDetails(item)}>{t("Details")}</button></div>
+          <div className="photo-card__foot">
+            {hit.subject_ref ? (cardTags.length > 0 ? <span>{cardTags.join(" · ")}</span> : null) : <span>{t("Details unavailable")}</span>}
+            <button type="button" aria-label={t("Open details for {{name}}", { name })} onClick={() => openDetails(item)}>{t("Details")}</button>
+          </div>
         </article>;
       })}
     </div>

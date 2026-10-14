@@ -22,6 +22,7 @@ type ExhibitionProps = {
   totalCount: number;
   selectedRef: string;
   selectionRefs: string[];
+  selectionCount?: number;
   focusedSubjectRef?: string;
   t: LibraryResultProps["t"];
   renderThumbnail: (hit: SearchHit) => ReactNode;
@@ -31,6 +32,7 @@ type ExhibitionProps = {
   onReturnToWall: () => void;
   returnLabel: string;
   onOpenPhotoPreview: (hit: SearchHit, trigger: HTMLElement) => void;
+  onShowSelectionActions?: () => void;
 };
 type PageRenderer = (props: LibraryPageHostProps) => ReactNode;
 
@@ -52,15 +54,17 @@ export type LibraryPageHostProps = {
   returnLabel?: string;
   onFallback?: (mode: ViewMode) => void;
   onOpenPhotoPreview?: (hit: SearchHit, trigger: HTMLElement) => void;
+  onShowSelectionActions?: () => void;
   onNavigate?: (mode: "content" | LibraryPageMode) => void;
 };
 
-function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, photoLoading, favoriteControls }: LibraryPageHostProps) {
+function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls }: LibraryPageHostProps) {
   return <PhotoLibraryExperience
     {...resultProps}
     onOpenHit={onOpenHit}
     focusedSubjectRef={focusedSubjectRef}
     onFocusSubject={onFocusSubject}
+    onShowSelectionActions={onShowSelectionActions}
     loading={photoLoading}
     favoriteControls={favoriteControls}
   />;
@@ -96,20 +100,22 @@ function renderLibraryThumbnail(hit: SearchHit, resultProps: LibraryResultProps)
     />;
 }
 
-function renderExhibition({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onReturnToWall, returnLabel, onOpenPhotoPreview }: LibraryPageHostProps) {
-  const { hits, t, selectedRef, selectionRefs, onToggleSelection } = resultProps;
+function renderExhibition({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, onReturnToWall, returnLabel, onOpenPhotoPreview }: LibraryPageHostProps) {
+  const { hits, t, selectedRef, selectionRefs, selectionCount, onToggleSelection } = resultProps;
   const renderThumbnail = (hit: SearchHit): ReactNode => renderLibraryThumbnail(hit, resultProps);
   const props: ExhibitionProps = {
     hits,
     totalCount: hits.length,
     selectedRef,
     selectionRefs,
+    selectionCount,
     focusedSubjectRef,
     t,
     renderThumbnail,
     onToggleSelection,
     onOpenHit,
     onOpenPhotoPreview: onOpenPhotoPreview ?? (() => undefined),
+    onShowSelectionActions,
     onFocusSubject: onFocusSubject ?? (() => undefined),
     onReturnToWall: onReturnToWall ?? (() => undefined),
     returnLabel: returnLabel ?? resultProps.t("Return to photo wall"),
@@ -177,6 +183,14 @@ export function LibraryPageHost(props: LibraryPageHostProps) {
     setPhotoPreviewHit(undefined);
     if (restoreFocus) requestAnimationFrame(() => { if (photoPreviewOpener.current?.isConnected) photoPreviewOpener.current.focus(); });
   };
+  function showPreviewBatchActions() {
+    closePhotoPreview(false);
+    requestAnimationFrame(() => props.onShowSelectionActions?.());
+  }
+  const photoPreviewIndex = photoPreviewHit?.subject_ref
+    ? resultProps.hits.findIndex((hit) => hit.subject_ref === photoPreviewHit.subject_ref)
+    : -1;
+  const photoPreviewSelected = Boolean(photoPreviewHit?.subject_ref && resultProps.selectionRefs.includes(photoPreviewHit.subject_ref));
   useEffect(() => {
     if (page?.mediaClass !== "image" || (photoPreviewHit && !resultProps.hits.some((hit) => hit.subject_ref === photoPreviewHit.subject_ref))) {
       setPhotoPreviewHit(undefined);
@@ -226,6 +240,9 @@ export function LibraryPageHost(props: LibraryPageHostProps) {
         <header className="photo-viewer__header">
           <div className="photo-viewer__identity"><h2 id="exhibition-photo-inspector-title" ref={photoPreviewTitle} tabIndex={-1}>{photoPreviewHit.name || resultProps.t("Untitled subject")}</h2><span>{resultProps.t("Exact image inspection is limited to 8 MiB.")}</span></div>
           <div className="photo-viewer__actions">
+            <span className="photo-viewer__selection-count" role="status">{resultProps.t("{{count}} selected items", { count: resultProps.selectionCount ?? resultProps.selectionRefs.length })}</span>
+            <button type="button" aria-pressed={photoPreviewSelected} aria-label={resultProps.t(photoPreviewSelected ? "Deselect {{name}}" : "Select {{name}}", { name: photoPreviewHit.name || resultProps.t("Untitled subject") })} disabled={photoPreviewIndex < 0 || !photoPreviewHit.subject_ref} onClick={() => photoPreviewIndex >= 0 && resultProps.onToggleSelection(photoPreviewIndex)}>{resultProps.t(photoPreviewSelected ? "Selected" : "Select")}</button>
+            {props.onShowSelectionActions && resultProps.selectionRefs.length > 0 && <button type="button" onClick={showPreviewBatchActions}>{resultProps.t("Show batch actions")}</button>}
             <button type="button" onClick={() => { closePhotoPreview(false); props.onOpenHit(photoPreviewHit); }}>{resultProps.t("Details")}</button>
             <button type="button" aria-label={resultProps.t("Close preview")} onClick={() => closePhotoPreview()}><X size={18} /></button>
           </div>

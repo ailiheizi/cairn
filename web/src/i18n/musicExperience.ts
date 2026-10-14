@@ -1,5 +1,6 @@
 export const musicExperience: Record<string, string> = {
   "Music library": "音乐库", "Play and organize original audio files from your library.": "播放并整理音乐库中的原始音频文件。",
+  "{{count}} tracks": "{{count}} 首",
   "Track names come from original filenames. Metadata and artwork are shown only when real facts are available.": "曲目名称来自原始文件名。仅在存在真实信息时显示元数据和封面。",
   "Playback and format details": "播放与格式说明", "Play {{name}}": "播放 {{name}}", "Playback requires a known original of at most 32 MiB": "播放需要已知且不超过 32 MiB 的原件", "This audio format is not supported for browser playback. Open Details to download the original.": "浏览器不支持播放此音频格式。请打开详情下载原件。", "Add to queue": "加入队列", "Add {{name}} to queue": "将 {{name}} 加入队列", "Queue ({{count}})": "队列（{{count}}）", "Listening queue": "播放队列", "Clear queue": "清空队列", "Stop playback before removing the current track": "请先停止播放，再从队列移除当前曲目。", "Remove from queue": "从队列移除", "Queue is empty": "队列为空", "Previous track": "上一首", "Next track": "下一首", "Play": "播放", "Pause": "暂停", "Stop": "停止", "Seek": "进度", "Volume": "音量", "Music player": "音乐播放器", "Nothing playing": "未在播放", "Loading and verifying original": "正在读取并校验原件", "Original audio": "原始音频", "Details / Download original": "详情 / 下载原件", "No audio tracks in the loaded listing": "当前列表中没有音频曲目",
   // Playback failure outcomes. AudioPlayer.tsx maps each typed playback error

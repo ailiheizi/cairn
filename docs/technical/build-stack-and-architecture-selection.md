@@ -1435,6 +1435,306 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   still one complete snapshot with one namespace root, and no index key, query or
   migration is touched.
 
+### ADR-034: Focused full-page domain layouts over shared host state
+
+- **Status:** Implemented for the tested local client scope, 2026-10-12; the
+  [acceptance record](full-page-domain-layouts-acceptance-20261012.md) identifies
+  the real browser journeys, candidate identity and remaining limits. Normative scope is
+  [UX-D1](../requirements/first-party-client-experiences.md#14-ux-d1-full-page-photos-and-music-composition).
+- **Problem:** Photos and Music already have separate compiled renderers and
+  routes, but generic library controls and management chrome surround them.
+  The operator experiences a crowded toolbox rather than a focused gallery or
+  listening library. Adding another route alone would leave that clutter intact.
+- **Decision:** Give those two existing destinations full-page composition,
+  selected by registered page metadata. Domain content and controls lead;
+  library tools, management and trusted status remain reachable through narrow
+  host entry points. Keep one query/selection authority, one verified player,
+  existing draft guards, preferences and compatible deep links. Returning to
+  the library is client navigation, so it does not restart playback.
+  The 2026-10-12 header refinement consolidates domain switching and utility
+  entry points in a compact glass capsule, with one disclosed global search
+  and one navigation/status menu. In-domain display choices stay with their
+  content. Native disclosure focus opens before the existing search shortcut
+  focuses; dismissal never clears a query. Blog's local `GlassNavigation`
+  design informed the spacing and translucent treatment, without importing
+  its animation dependencies or changing the shared state authority.
+  The [header-refinement acceptance](immersive-host-header-acceptance-20261012.md)
+  records its final local browser evidence and supersedes the earlier header
+  arrangement, including the phone navigation disclosure.
+- **Why:** Shared content meaning does not require identical physical controls
+  on every page. The existing immersive seam already permits host-controlled
+  placement. Proving two useful first-party layouts improves daily use before
+  expanding presentation-package machinery.
+- **Limits:** This changes presentation only. It does not admit independent
+  domain queries, album/playlist persistence, extraction, another catalog,
+  streaming, a runtime loader, a plugin store or a new framework. Search scope
+  and incomplete loading stay visible; short labels cannot widen their actions.
+- **Exit:** Direct route, navigation, search/scope, original actions, guarded
+  drafts and uninterrupted shared-player checks, plus light/dark responsive
+  browser evidence under UX-D1. Helper/build evidence alone does not close it.
+
+### ADR-035: Private-drive positioning and file-oriented intake
+
+- **Status:** Implemented and tested for the bounded local intake scope on
+  2026-10-12. The operator explicitly chose this positioning and requested
+  simpler Add plus mature interface references. The [local acceptance](private-drive-intake-acceptance-20261012.md)
+  records actual original downloads, Luna's final interface checks and the
+  untested fault branches; it grants no core-phase or release qualification.
+- **Problem:** The platform/category wording and technical source drawer
+  make a daily action feel like configuring storage. Uploading requires a
+  staging-to-path handoff even though the core can already prepare its plan.
+- **Decision:** Present Cairn as a better self-hosted private drive for one
+  owner. Keep files, unified discovery, original takeout and focused Photos/
+  Music as the daily product. Lead browser intake with choose/drop; after a
+  fully reported successful request, automatically prepare the existing plan
+  for that request's staging directory and retain one explicit confirmation.
+  Keep the user in one file-oriented surface; disclose technical details on
+  demand. Server-directory import remains an explicit secondary choice.
+- **Why:** A familiar category explains what the owner can do immediately.
+  Removing a technical handoff improves the core add/find/use/takeout loop
+  without weakening exact saving or multiplying storage/state authorities.
+  The [reference review](../research/private-drive-interface-reference-20261012.md)
+  separates documented mature-product patterns from our design choices.
+- **Boundary:** This changes product language and the existing client adapter.
+  It creates no endpoint, schema, processor, job/policy lifecycle or recovery
+  format. Unknown/partial uploads remain unresolved, subset review is explicit,
+  and unknown applies use the existing check path. It advertises no unimplemented
+  folder mutation, sharing, sync, media persistence or universal playback.
+  Core phase order, grouping gates and single-owner scope remain intact.
+- **Exit:** Real browser selection → automatic preparation in the same panel
+  → explicit save → original verification/use, with visible blocked/unknown
+  outcomes and readable 390/1280 light/dark states. Client evidence cannot
+  qualify a release or a core phase.
+
+### ADR-036: Everyday library actions over the shared returned scope
+
+- **Status:** Decision recorded 2026-10-12; integrated client acceptance in
+  progress. This maintains existing API/WebUI and UX-C1/T1 admissions and
+  grants no core-phase or release credit.
+- **Problem:** Ordinary browsing permanently exposes tags, system fields,
+  accounting and retrieval tools. Selecting files then adds several competing
+  download/export/report actions and a long explanation. On a phone this
+  consumes the space needed to recognize and use files.
+- **Decision:** Keep navigation, favorites, sorting, layout and selection
+  entry predictable. Put filters and secondary tools behind native labelled
+  disclosures while showing active conditions, returned/loaded scope and
+  unavailable states outside them. Once files are selected, make verified
+  original ZIP takeout the primary action; retain server-directory export,
+  report, image-search and tag entry as reachable secondary actions. Use a
+  semantic row-selection control with a 44 px target, preserving existing
+  roving keyboard and virtual listing behavior.
+- **Why:** The ordinary job is find → select → use/take out. A clear next
+  action makes existing capability useful without adding another content
+  authority or making the familiar drive category depend on a writable tree.
+  Native disclosures require no custom overlay/focus state machine. Existing
+  typed callbacks still own decisions and failures.
+- **Boundary:** One host-owned result/selection scope, existing Notes/tags,
+  verified original access and the frozen export contract remain intact.
+  No new query, endpoint, schema, processor, persistent grouping, runtime
+  loader or recovery format is admitted. No unloaded catalog entries are
+  silently selected. Focused Photos/Music compositions keep their existing
+  host tools and shared state; common batch/row controls stay compatible.
+- **Exit:** Real browse/filter/search → displayed selection → one observable
+  original ZIP → independent byte verification, with keyboard selection,
+  Details return, empty results, readable phone/desktop light/dark states and
+  honest unavailable/partial scope. Small-model diffs are not accepted without
+  primary review and executable evidence.
+
+### ADR-037: Complete existing domain journeys, then review a personal video successor
+
+- **Date:** 2026-10-13
+- **Status:** Accepted product prioritization; future media candidates remain
+  proposed and unadmitted. This ADR changes no normative phase or core gate.
+- **Context:** The operator requested local Luna implementation after the
+  Haiku route exhausted its quota, identified uncomfortable existing layouts,
+  and asked about media libraries, Bangumi and danmaku. Existing Photos names
+  are cramped and Music splits related actions across competing rows. Merely
+  adding destinations would leave the actual daily journey incomplete.
+- **Decision:** Refine existing Photos/Music first: image-first cards with
+  full-width names and reachable controls; a coherent Music browse/action row,
+  honest view-local counts and one shared verified player. Local Luna handles
+  disjoint implementation and focused validation; the primary reviewer owns
+  product decisions and integration. Record video/anime as the next domain
+  candidates, with local retained-video use preceding optional metadata,
+  sidecars, account sync and online aggregation.
+- **Rationale:** Each extra capability should complete a useful journey.
+  Video seeking/codecs, series/episode association, watch progress, provider
+  matches and danmaku alignment require concrete contracts; the existing
+  32 MiB full-original audio profile cannot become general video playback by
+  changing its label. Supplementary providers must leave local originals and
+  filename-based access useful when unavailable.
+- **Boundaries:** No native video surface, new endpoint/schema/processor,
+  runtime loader or durable organization is admitted here. External IDs do
+  not establish exact identity. Current client work remains inside
+  RW-PERSONAL-UX-1. Media candidates and their proposed exits are documented in
+  [the primary-source review](../research/media-and-anime-experience-20261013.md).
+- **Tradeoff:** This sequence favors a small number of comfortable experiences
+  while leaving substantial future vertical scope explicit. Photos/Music
+  polish alone does not satisfy complete albums/playlists, video or release.
+
+### ADR-038: Explicit app destinations with one stable host header
+
+- **Date:** 2026-10-13
+- **Status:** Accepted client presentation decision; core phase order and
+  admission stay unchanged. Integrated evidence is recorded separately.
+- **Context:** The operator found Photos/Music switches misleading: a control
+  named All types also returned from a dedicated experience, changing the
+  whole header/frame. AutoBangumi was supplied as the closer self-hosted
+  vertical reference. Clear app destinations should not masquerade as type
+  filters or add unrelated management controls to an immersive domain.
+- **Decision:** The host header consistently presents Library, Photos, Music
+  and the compiled Overview destination, plus the same search/add/utility
+  entries. Library means the ordinary presentation of the current returned
+  scope; All content remains the explicit full-listing action in the rail.
+  Type filters retain the ordinary Library composition. Photo wall/Exhibition
+  remain in-domain presentation choices. Remove the duplicate global switcher
+  from the Library toolbar. Preserve existing route/registry/guard ownership.
+- **Why:** Stable global affordances explain where the user is and how to
+  return while each destination owns its useful content layout. App navigation
+  retains current query/tag conditions rather than silently expanding scope.
+  Names, icons and active-page semantics express destination entry rather
+  than a new filter/query authority.
+- **Implementation boundary:** Workspace/showcase remain selected Library
+  content frames; Photos/Music keep immersive content frames. A shared compact
+  header reuses the existing search form and native disclosures. Desktop
+  Library owns its rail in the frame; focused/compact layouts expose it from
+  the menu, without duplicate rail mounts. One host player, existing draft
+  guards, original actions and old deep links remain intact. No new endpoint,
+  schema, runtime loader, provider or durable format is added.
+- **Reference boundary:** [AutoBangumi](https://www.autobangumi.org/) informs
+  workflow/navigation choices. RSS acquisition, downloader jobs and file
+  renaming remain proposed foreign-tool concerns. This decision adds no media
+  integration or automatic external download behavior.
+- **Exit:** Library → Photos → Music → Library keeps the same global entry
+  order and usable controls; current search/tag scope does not rerun or clear;
+  decoded audio retains its source; draft guards work; one header/search/rail
+  owner remains; 390/1280 light/dark and narrower Showcase layouts stay usable.
+
+### ADR-039: Library layouts and on-demand search assistance
+
+- **Date:** 2026-10-13
+- **Status:** Accepted presentation refinement within RW-PERSONAL-UX-1
+  UX-C1/C2/D1 and API/WebUI sections 5.3/6. Executable evidence is recorded
+  separately; this decision changes no admission or core phase gate.
+- **Context:** The operator could not distinguish Library from Overview and
+  found the opened search and everyday toolbar crowded. Peer destinations
+  implied separate collections even though Overview already uses the same
+  returned content. Permanently exposed helpers competed with the file list.
+- **Decision:** Keep Library, Photos and Music as the global destinations.
+  Place File view and the enabled compiled Overview in Library's View options;
+  the Chinese Overview label becomes "分类总览". Library stays active in the
+  header for either layout. This supersedes only ADR-038's peer Overview
+  placement; its stable header and shared-state decisions remain in force.
+  Put sorting and applicable grid/list controls in View options, Favorite in
+  Filters, and visible-scope bulk selection in More tools. Keep result counts,
+  active restrictions, incomplete scope and actionable failures visible.
+- **Search hierarchy:** Opening search first exposes the existing field and
+  submit action. Recent searches and Search help require explicit expansion.
+  Ordinary words and short operator prefixes do not open a palette. An exact
+  operator name may offer its completion; known tag and protection values
+  retain their bounded suggestions. Parsed condition editing, grammar errors
+  and actual query limitations remain visible. Technical predicate mapping
+  belongs inside Search help.
+- **Why:** The navigation expresses one collection with different useful
+  layouts. Progressive disclosure gives the file list and search task visual
+  priority while retaining secondary tools at named, keyboard-reachable
+  locations. Hiding an active restriction or a refused search would undermine
+  that simpler interface, so those states are not optional disclosures.
+- **Boundary:** Reuse the compiled registry, existing route/disabled-page
+  resolution, single host query, selection, original actions and verified
+  player. Recent-history expansion is transient browser interaction state;
+  persistence and submission semantics do not change. No new endpoint,
+  schema, processor, index, durable domain record or runtime loader is added.
+- **Exit:** File view → Overview → File view retains current search/tag scope
+  without another search; header ownership and original actions remain
+  coherent. Blank/plain search is calm; explicit recent/help controls,
+  keyboard completion, refusal and dismiss/reopen behavior work. Review
+  390/1280 light/dark layouts and viewport bounds against the served build.
+
+### ADR-040: Exhibition as a focused gallery over the existing Photos scope
+
+- **Date:** 2026-10-13
+- **Status:** Accepted client presentation refinement within
+  RW-PERSONAL-UX-1 UX-E2/D1. Local acceptance is recorded separately;
+  admission and core phase order do not change.
+- **Context:** The operator wants Exhibition to feel like an attractive
+  specialist application. Its large introductory heading, permanent
+  explanations, repeated per-card actions and variable-width corridor gave
+  management controls more emphasis than the photographs.
+- **Decision:** Use a compact title and visible loaded-photo position, one
+  centered primary image, quiet neighboring previews on desktop and a
+  center-only phone stage. Center placement is stable at the beginning and
+  end of the loaded scope. Previous/next controls sit beside the image; the
+  current filename and one set of inspection, Details and selection actions
+  sit below it. Put explanatory and keyboard guidance in Browsing help.
+  Retain the host's Photo wall/Exhibition choice and normal-wall return.
+- **Interaction:** A neighboring image changes focus without opening a
+  management panel. The current image opens the existing bounded inspector;
+  Details remains an explicit host action for Notes, tags and originals.
+  Keyboard focus names the actual action, navigation endpoints are disabled
+  honestly, and reduced-motion use removes transitions.
+- **Why:** Exhibition offers an enjoyable way to look through personal
+  images while the photo wall supports scanning and selection. A stable
+  center, complete image aspect ratio, restrained framing and one current
+  action row give the photographs visual priority. Loaded counts and real
+  filenames retain understandable scope without invented dates or albums.
+- **Boundary:** Keep the existing radius-two moving window with at most five
+  mounted thumbnail components; each file has only one preview mount.
+  Preserve shared identity checks, read/cache ceilings, focus, selection,
+  drafts, original actions, unavailable states and player ownership. Do not
+  add another inspector, read path, query, persistent album, processor,
+  endpoint, runtime loader or durable state.
+- **Exit:** Review 390/1280 light/dark layouts with an existing fixture photo;
+  navigate first/middle/last through the loaded context by buttons and arrow
+  keys; verify stable center, bounded mounts, neighbor focus, inspector and
+  Details entry, retained wall selection, visible fallback and reduced motion.
+
+### ADR-041: Complete useful client operations before further visual redesign
+
+- **Date:** 2026-10-13
+- **Status:** Accepted priority refinement within the admitted client track.
+  Implementation and acceptance are recorded separately; no core phase or
+  domain-state contract changes.
+- **Context:** The operator explicitly moved appearance work behind missing
+  functionality and asked local Luna agents to implement the remaining useful
+  operations, with the primary agent deciding scope and reviewing results.
+  Existing Music browsing, verified playback, transient queues and shared
+  organization already supply reusable host actions.
+- **Decision:** Complete practical operations over the current loaded scope:
+  Music local sorting and playback-eligibility filtering, one-action insertion
+  after the current queue occurrence, inclusive ordinary-Library range
+  selection, and explicit batch tag/favorite addition and removal. Follow with
+  easier access to existing saved retrieval and selected-photo actions.
+  Defer further gallery/shell redesign until the admitted daily operations
+  are usable. Fix a layout or interaction defect when it blocks these tasks.
+- **Why:** These operations let an owner organize a selected set and use the
+  result immediately. They reuse the same subjects, annotations and player,
+  so improvements apply across Library, Photos and Music without creating
+  another catalog or duplicating a host workflow. Explicit add/remove actions
+  are understandable for selections containing mixed tag/favorite states.
+- **Safety and scope:** Sorting and filtering retain original host indices;
+  unknown facts remain unknown. Eligibility is a pre-download guard; browser
+  decoding can still fail. Queue insertion creates a distinct occurrence,
+  preserves the active original and position, and respects the atomic
+  1,000-entry ceiling. Batch organization reads complete current per-subject
+  annotations, adds only absent exact tags, removes only matching TAG records
+  with expected revisions, and rereads outcomes. Unavailable reads, partial
+  writes and uncertain responses remain visible. These actions make no new
+  portable-publication claim and introduce no schema, endpoint or processor.
+- **Full target:** Curated photo albums, durable ordered playlists and a
+  personal video/anime workflow remain separately recorded product targets.
+  A TAG shortcut and transient listening queue do not satisfy those targets.
+  Their admission, data/recovery contracts and applicable core gates must
+  precede implementation. LinkGroup remains behind Phases 4/5; new capture
+  facts, streaming/transcoding and external acquisition require their own
+  reviewed contracts. Runtime third-party loading remains out of scope.
+- **Exit:** Sort/filter Music and act on the same subjects in visible order;
+  insert D into A/B/C as A/D/B/C without restarting A; refuse overflow without
+  changing playback; select rows 2–5 inclusively in displayed Library order;
+  add/reuse/remove a chosen tag and Favorite on a captured selection while
+  preserving unrelated annotations. Verify incomplete reads cause no writes
+  for the affected item and report partial/unknown results truthfully.
+
 ## 9. Open gates before the release binary
 
 | Gate | Blocks | Owner of the evidence |

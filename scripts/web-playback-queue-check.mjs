@@ -15,7 +15,7 @@ const queueSource = await readFile(new URL("../web/src/lib/playbackQueue.ts", im
 const linkedQueue = transpile(queueSource).replaceAll('"./audioPlayback"', JSON.stringify(audioURL));
 const queueURL = `data:text/javascript;base64,${Buffer.from(linkedQueue).toString("base64")}`;
 const {
-  isPlayableQueueTrack, MAX_AUDIO_QUEUE_ENTRIES, moveQueueTrack, preparePlayableQueue,
+  insertQueueTrackNext, isPlayableQueueTrack, MAX_AUDIO_QUEUE_ENTRIES, moveQueueTrack, preparePlayableQueue,
   removeQueueOccurrence, resolveQueueAdvance, sameAudioTrack, sameQueueOccurrence, shuffleUpcomingTracks,
 } = await import(queueURL);
 
@@ -41,6 +41,16 @@ assert.equal(sameQueueOccurrence(a, preparedABA.tracks[0]), false, "an unqueued 
 
 // Only the selected occurrence moves or removes; deleting the active occurrence is refused without substitution.
 const [aFirst, bEntry, aSecond] = preparedABA.tracks;
+// Insert-next creates a distinct occurrence after a queued current item, or at the front when idle/unqueued.
+const queuedD = preparePlayableQueue([d], "workspace-a", ids("next")).tracks[0];
+assert.deepEqual(insertQueueTrackNext(preparedABA.tracks, queuedD, aFirst).map((entry) => entry.entryID), ["a", "d", "b", "a"]);
+assert.deepEqual(insertQueueTrackNext(preparedABA.tracks, queuedD).map((entry) => entry.entryID), ["d", "a", "b", "a"]);
+const playingA = { ...a, occurrenceID: "playing-a" };
+assert.deepEqual(insertQueueTrackNext(preparedABA.tracks, queuedD, playingA).map((entry) => entry.entryID), ["d", "a", "b", "a"], "an unqueued playing current inserts at the front");
+const duplicateA = preparePlayableQueue([a], "workspace-a", ids("duplicate")).tracks[0];
+const withDuplicate = insertQueueTrackNext(preparedABA.tracks, duplicateA, aFirst);
+assert.equal(withDuplicate[1].entryID, "a");
+assert.notEqual(withDuplicate[1].occurrenceID, aFirst.occurrenceID, "inserting the same file creates another occurrence");
 assert.deepEqual(moveQueueTrack(preparedABA.tracks, aSecond, -1).map((entry) => entry.occurrenceID), [aFirst.occurrenceID, aSecond.occurrenceID, bEntry.occurrenceID]);
 assert.deepEqual(removeQueueOccurrence(preparedABA.tracks, aSecond).queue.map((entry) => entry.occurrenceID), [aFirst.occurrenceID, bEntry.occurrenceID]);
 assert.deepEqual(removeQueueOccurrence(preparedABA.tracks, aSecond, aFirst).queue.map((entry) => entry.occurrenceID), [aFirst.occurrenceID, bEntry.occurrenceID], "removing the other repetition must preserve active A");

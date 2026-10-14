@@ -34,6 +34,7 @@ import { InterfaceRenderBoundary } from "./components/InterfaceRenderBoundary";
 import { WorkspaceRail, WorkspaceRailPanel } from "./components/WorkspaceRail";
 import { StatusPanel } from "./components/StatusPanel";
 import { LibrarySurface } from "./components/LibrarySurface";
+import { LibraryPresentationNavigation } from "./components/LibraryPresentationNavigation";
 import { ActivitySurface } from "./components/ActivitySurface";
 import { DuplicatesSurface } from "./components/DuplicatesSurface";
 import { TagsSurface } from "./components/TagsSurface";
@@ -317,6 +318,16 @@ function App() {
   const originalTakeoutBusy = ["planning", "downloading", "preparing"].includes(originalTakeout.status);
   const presentationRoot = libraryPageForMode(view.presentationMode);
   const presentationRootKey = presentationRoot ? libraryPageRoot(presentationRoot)?.id ?? presentationRoot.id : "content";
+  // Only the active library projection may select immersive/focused chrome. A
+  // workspace view (sources/activity/tags/notes/duplicates) keeps its normal
+  // shell even when a domain presentation is still remembered, so the focused
+  // host header can never mount the same rail the frame or panel already owns.
+  const activePresentationPage = (view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || Boolean(libraryPageForMode(view.viewMode))) ? libraryPageForMode(view.presentationMode) : undefined;
+  // Page metadata controls the content frame and rail ownership. Every host
+  // destination shares the same header; management screens belong to Library
+  // even when a domain presentation is remembered.
+  const focusedChrome = activePresentationPage?.composition === "focused";
+  const headerDestination = activePresentationPage || view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" ? view.presentationMode : "content";
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [presentationRootKey]);
 
   // Hiding a library lens changes presentation only. Keep the inspected subject
@@ -676,11 +687,13 @@ function App() {
   return <div className="app-shell client-host">
     <InterfaceRenderBoundary
       interfaceId={appearance.preference.interfaceId}
-      immersive={(view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || Boolean(libraryPageForMode(view.viewMode))) && libraryPageForMode(view.presentationMode)?.chrome === "immersive"}
+      immersive={activePresentationPage?.chrome === "immersive"}
+      focused={focusedChrome}
       onFallbackToWorkspace={() => appearance.updatePreference({ ...appearance.preference, interfaceId: "workspace" })}
       onOpenSettings={(trigger) => openSettings(trigger)}
       header={<TopBar
         t={t}
+        onHome={() => openLibrarySurface("content")}
         query={query}
         busy={busy}
         status={status}
@@ -692,6 +705,10 @@ function App() {
         snapshotRef={snapshotRef}
         search={topBarSearch}
         compact={compactLayout}
+        focused={focusedChrome}
+        destinationHeader
+        presentationNavigation={<LibraryPresentationNavigation t={t} mode={headerDestination} enabledPageIds={libraryViews.enabledViewIds} onNavigate={openLibrarySurface} variant="domains" />}
+        navigation={rail}
         onOpenRail={openRail}
         railTriggerRef={railTriggerRef}
         onRefresh={() => void refresh()}
@@ -754,14 +771,14 @@ function App() {
           onClearNotice={() => setNotice(undefined)}
           onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
           onOpenHit={(hit) => void details.loadDetails(hit)}
-          onFocusSearch={() => search.searchInputRef.current?.focus()}
+          onFocusSearch={() => search.focusSearchField()}
           libraryListRef={libraryListRef}
           onPlayTrack={(track) => void audioPlayback.play(track)}
           onQueueTrack={audioPlayback.addToQueue}
           onPlayTracks={(tracks) => { void audioPlayback.playQueue(tracks); }}
           musicMetadata={musicMetadata}
           favoriteControls={favoriteControls}
-          musicQueueControls={{ count: audioPlayback.queue.length, addTracks: (tracks) => { audioPlayback.addTracksToQueue(tracks); }, show: audioPlayback.showQueue }}
+          musicQueueControls={{ count: audioPlayback.queue.length, addTracks: (tracks) => { audioPlayback.addTracksToQueue(tracks); }, addNext: (track) => { audioPlayback.addNextToQueue(track); }, show: audioPlayback.showQueue }}
           focusedSubjectRef={focusedSubjectRef}
           onFocusSubject={setFocusedSubjectRef}
           retrievalFlow={exportFlow}
@@ -812,7 +829,7 @@ function App() {
     />
     <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => { const hit = library.libraryItems.find((item) => item.entry_id === track.entryID); if (hit) void details.loadDetails(hit); }} />
     <OriginalTakeoutStatus takeout={originalTakeout} t={t} />
-    {compactLayout && railOpen && railPanel}
+    {compactLayout && !focusedChrome && railOpen && railPanel}
     {settingsOpen && <SettingsDialog
       t={t}
       locale={locale}

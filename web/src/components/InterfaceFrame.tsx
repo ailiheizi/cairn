@@ -7,6 +7,12 @@ import { interfaceCatalog, interfaceForId } from "../lib/interfaceCatalog";
 export interface InterfaceFrameProps {
   interfaceId: InterfaceId;
   immersive?: boolean;
+  /**
+   * Registered focused composition: the host header owns navigation and the
+   * trusted status menu, so the immersive frame must not also render its own
+   * separate navigation disclosure. Presentation only.
+   */
+  focused?: boolean;
   header: ReactNode;
   navigation: ReactNode;
   content: ReactNode;
@@ -54,10 +60,10 @@ function ShowcaseFrame({ header, navigation, content, details, compact, detailAc
 }
 
 /** Immersive pages still expose the same host navigation, search and inspector. */
-function ImmersiveFrame({ header, navigation, content, details, compact, detailActive, t, onDragOver, onDrop }: InterfaceFrameProps) {
-  return <div className="interface-frame interface-immersive" data-chrome="immersive">
+function ImmersiveFrame({ header, navigation, content, details, compact, detailActive, focused, t, onDragOver, onDrop }: InterfaceFrameProps) {
+  return <div className="interface-frame interface-immersive" data-chrome="immersive" data-composition={focused ? "focused" : undefined}>
     {header}
-    {!compact && <details className="immersive-navigation">
+    {!focused && !compact && <details className="immersive-navigation">
       <summary>{t("Browse tools")}</summary>
       <div className="immersive-navigation-content">{navigation}</div>
     </details>}
@@ -82,7 +88,10 @@ for (const slot of shellRenderers.keys()) {
 export function InterfaceFrame(props: InterfaceFrameProps) {
   const definition = interfaceForId(props.interfaceId);
   if (!definition) throw new Error(`Unknown interface: ${props.interfaceId}`);
-  if (props.immersive) return <ImmersiveFrame {...props} />;
+  // A focused composition always uses the immersive frame: the host header owns
+  // the single navigation/status menu, so a second inline rail (workspace or
+  // showcase) must never mount beside it.
+  if (props.immersive || props.focused) return <ImmersiveFrame {...props} />;
   const Frame = shellRenderers.get(definition.renderSlot)!;
   return <Frame {...props} />;
 }

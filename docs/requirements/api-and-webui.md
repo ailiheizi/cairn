@@ -76,6 +76,25 @@ persisted TOML profile enable it; `--api-listen` is a one-shot override. The
 adapter has no database, repository, filesystem, job, or recovery state of its
 own. The React/Vite client under `web/` uses only these endpoints.
 
+### 2.2 Familiar browser intake refinement
+
+The existing local browser intake MAY automatically prepare an ingest plan
+after a successful, fully reported upload into its request-scoped staging
+directory. It MUST keep the ordinary user in one file-oriented review surface,
+not require a staging path handoff. A failed, partial or unknown upload MUST
+remain visibly unresolved; reviewing a known accepted subset requires an
+explicit action. Plan preparation is not saving: only the existing explicit,
+digest-bound confirmation may invoke `plan.apply`.
+
+The default surface SHOULD lead with file selection/drop, names, sizes and a
+concise confirmation. Server-directory import remains a secondary explicit
+choice. Internal paths, hashes and detailed savings MAY be disclosed on demand;
+blocked entries, renamed/refused files, warnings and unknown outcomes MUST
+remain visible. Unknown apply results retain the existing status-check path
+and MUST NOT offer another save. A late upload response after the panel closes
+MUST NOT start an invisible review or save. This is presentation/composition
+maintenance of existing operations, not a new intake endpoint or lifecycle.
+
 ## 3. Canonical-operation mapping
 
 Every adapter operation MUST map to one registered typed core operation. The REST adapter MUST NOT expose:

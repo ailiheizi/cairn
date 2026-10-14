@@ -4,6 +4,15 @@
 
 Cairn is a **single-person self-hosted personal-content platform** for NAS and home-storage hobbyists: keep readable originals in one place, find them, use them through suitable domain experiences, and take them with you. Its trusted kernel remains a content-first managed data layer for large heterogeneous collections. `RW-MVP-1` qualifies the first read-only managed archive and multi-dimensional discovery profile; later NAS and enterprise profiles qualify their own additional consistency and recovery semantics.
 
+The operator selected **a better self-hosted private drive** as the familiar
+user-facing category on 2026-10-12. The default experience MUST prioritize
+ordinary file addition, finding, preview/use and original takeout. Technical
+source paths, digests and storage accounting belong to secondary diagnostics
+unless an explicit server-directory or recovery task needs them. This category
+clarifies the product experience; it does not change the immutable-content,
+single-owner trust, exact-save or phase contracts, nor advertise unimplemented
+folder mutation, sync, sharing or media functions.
+
 Complete Photos and Music workflows are product targets, including photo
 albums and music artist/album navigation, queues and playlists. Their first
 bounded local client slice is explicitly admitted by

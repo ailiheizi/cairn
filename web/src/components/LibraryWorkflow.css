@@ -1,0 +1,198 @@
+/* Standard library workflow (non-focused compositions only).
+ * Every selector is scoped to a class introduced for this workflow, so the
+ * focused Photos/Music/Exhibition header, SelectionBar and ResultList keep
+ * their existing styles. Light and dark mode use the shared tokens. */
+
+.library-workflow-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 0;
+}
+
+.library-workflow-bar > .library-presentation-navigation,
+.library-workflow-bar > .library-presentation-navigation.library-presentation-navigation--complete {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.library-workflow-bar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.library-workflow-bar > .library-view-options { margin-left: auto; }
+
+.library-view-options .library-workflow-disclosure-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-view-options .library-presentation-navigation__layouts {
+  flex-wrap: wrap;
+}
+
+.library-workflow-bar .result-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.library-workflow-bar > .result-count {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.library-workflow-bar button,
+.library-workflow-bar select,
+.library-workflow-bar .layout-switch button,
+.library-workflow-bar .sort-direction {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.library-workflow-bar select.sort-field {
+  min-width: 0;
+  min-height: 44px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0 8px;
+}
+
+.library-workflow-bar .layout-switch button {
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.library-workflow-bar .library-workflow-select-all {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.library-workflow-disclosures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.library-workflow-disclosure {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.library-workflow-disclosure[open] {
+  flex: 1 1 100%;
+}
+
+.library-workflow-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 12px;
+}
+
+.library-workflow-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.library-workflow-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.library-workflow-disclosure > summary > svg:last-child {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.library-workflow-disclosure[open] > summary > svg:last-child {
+  transform: rotate(90deg);
+}
+
+.library-workflow-disclosure-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 12px 12px;
+  overflow-wrap: anywhere;
+}
+
+.library-workflow-disclosure-body .secondary-button,
+.library-workflow-disclosure-body button {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.library-workflow-disclosure-body .tag-filter-list {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .library-workflow-bar,
+  .library-workflow-bar-end {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .library-workflow-bar > .library-view-options { margin-left: 0; }
+
+  .library-workflow-bar > .result-count {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  /* Closed summaries sit inline side by side; only an open disclosure takes a full row. */
+  .library-workflow-disclosure:not([open]) {
+    flex: 0 1 auto;
+  }
+
+  .library-workflow-disclosure[open] {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-workflow-disclosure > summary > svg:last-child {
+    transition: none;
+  }
+}

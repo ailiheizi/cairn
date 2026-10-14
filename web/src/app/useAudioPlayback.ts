@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchVerifiedAudio, type AudioQueueEntry, type AudioTrack } from "../lib/audioPlayback";
-import { isPlayableQueueTrack, MAX_AUDIO_QUEUE_ENTRIES, moveQueueTrack, preparePlayableQueue, removeQueueOccurrence, resolveQueueAdvance, sameQueueOccurrence, shuffleUpcomingTracks, type QueueTrack, type RepeatMode } from "../lib/playbackQueue";
+import { insertQueueTrackNext, isPlayableQueueTrack, MAX_AUDIO_QUEUE_ENTRIES, moveQueueTrack, preparePlayableQueue, removeQueueOccurrence, resolveQueueAdvance, sameQueueOccurrence, shuffleUpcomingTracks, type QueueTrack, type RepeatMode } from "../lib/playbackQueue";
 
 type Playback = { queue: AudioQueueEntry[]; queueOpen: boolean; queueSkippedCount: number; queueNotice?: string; repeatMode: RepeatMode; track?: QueueTrack; url?: string; loading: boolean; error?: string; playing: boolean; currentTime: number; duration: number };
 const initial: Playback = { queue: [], queueOpen: false, repeatMode: "off", queueSkippedCount: 0, loading: false, playing: false, currentTime: 0, duration: 0 };
@@ -111,6 +111,20 @@ export function useAudioPlayback(workspaceID: string) {
     return { queuedCount: prepared.tracks.length, skippedCount: prepared.omittedCount };
   }, [commitQueue, workspaceID]);
   const addToQueue = useCallback((track: AudioTrack) => addTracksToQueue([track]), [addTracksToQueue]);
+  const addNextToQueue = useCallback((track: AudioTrack): QueueActionResult => {
+    const prepared = preparePlayableQueue([track], workspaceID, undefined, MAX_AUDIO_QUEUE_ENTRIES - queueRef.current.length);
+    if (prepared.limitExceeded) {
+      setState((current) => ({ ...current, queueSkippedCount: prepared.omittedCount, queueNotice: "The queue limit is 1,000 entries; existing queue and playback were left unchanged." }));
+      return { queuedCount: 0, skippedCount: prepared.omittedCount, reason: "queue-limit" };
+    }
+    if (!prepared.tracks.length) {
+      setState((current) => ({ ...current, queueSkippedCount: prepared.omittedCount, queueNotice: "No tracks from this set could be queued; the current queue and playback were left unchanged." }));
+      return { queuedCount: 0, skippedCount: prepared.omittedCount, reason: "no-supported-tracks" };
+    }
+    const queue = insertQueueTrackNext(queueRef.current, prepared.tracks[0], state.track);
+    commitQueue(queue, { queueSkippedCount: 0, queueNotice: undefined });
+    return { queuedCount: 1, skippedCount: 0 };
+  }, [commitQueue, state.track, workspaceID]);
   const removeFromQueue = useCallback((track: AudioQueueEntry) => {
     const result = removeQueueOccurrence(queueRef.current, track, state.track);
     if (result.activeRemovalRequired) {
@@ -180,5 +194,5 @@ export function useAudioPlayback(workspaceID: string) {
     setState((current) => generationRef.current === generation ? initial : current);
     return () => { generationRef.current += 1; clearMedia(); };
   }, [workspaceID, clearMedia]);
-  return { ...state, audioRef, play, playQueue, stop, toggle, fail, addToQueue, addTracksToQueue, removeFromQueue, clearQueue, moveQueuedTrack, shuffleUpcoming, setRepeatMode, cycleRepeatMode, playNext, handleEnded, playPrevious, canPlayPrevious, canPlayNext, canRepeatOne: Boolean(state.track && state.url), setCurrentTime: (currentTime: number) => setState((s) => ({ ...s, currentTime })), setDuration: (duration: number) => setState((s) => ({ ...s, duration })), setError: (error: string) => fail(error), syncPlaying: (playing: boolean) => setState((s) => ({ ...s, playing })), setQueueOpen, showQueue };
+  return { ...state, audioRef, play, playQueue, stop, toggle, fail, addToQueue, addTracksToQueue, addNextToQueue, removeFromQueue, clearQueue, moveQueuedTrack, shuffleUpcoming, setRepeatMode, cycleRepeatMode, playNext, handleEnded, playPrevious, canPlayPrevious, canPlayNext, canRepeatOne: Boolean(state.track && state.url), setCurrentTime: (currentTime: number) => setState((s) => ({ ...s, currentTime })), setDuration: (duration: number) => setState((s) => ({ ...s, duration })), setError: (error: string) => fail(error), syncPlaying: (playing: boolean) => setState((s) => ({ ...s, playing })), setQueueOpen, showQueue };
 }

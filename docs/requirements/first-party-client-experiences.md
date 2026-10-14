@@ -457,7 +457,61 @@ the same-workspace queue and player. Verify queue limit and unsupported
 omissions without mutation. This advances listening, not durable playlist
 save/reopen/edit or full Music acceptance.
 
-## 14. Implementation order and evidence
+## 14. UX-D1: Full-page Photos and Music composition
+
+Admitted 2026-10-12 following the operator's request for immersive, complete
+page layouts for the existing Photos and Music destinations. This refines the
+compiled page and immersive-chrome seams in §§7/10; it adds no new domain,
+query authority, backend operation, durable schema or runtime extension.
+
+Photos and Music MUST have focused full-page composition. Their normal first
+screen prioritizes domain content, domain navigation and relevant controls.
+The generic library rail, sorting/export/retrieval tools and system-field
+filters MUST NOT surround them as permanently expanded chrome. The host MAY
+place those existing actions in explicitly labelled, keyboard-reachable
+disclosures. Host search, navigation, selection, Details/Notes, original
+actions, trusted status and the one shared player MUST remain reachable.
+Connection errors and actionable unavailable outcomes MUST remain visible.
+
+Each destination keeps its registered route and enabled/disabled preferences;
+old deep links continue to resolve. Composition is selected through compiled
+page metadata, not a second routing or policy authority. Entering a page MUST
+NOT start playback. Returning to the library uses ordinary client navigation,
+not a document reload. The shared player and its current original remain alive
+through page composition changes. Existing draft guards and scope replacement
+rules remain in force.
+
+Current keyword/tag restrictions and incomplete listing states MUST remain
+legible even when generic tools are collapsed. A local Music filter is still
+a filter over the displayed/loaded scope, not a new exhaustive music query.
+Switching presentation MUST NOT silently clear or rerun the host query.
+Condensed action labels MUST retain truthful displayed/selected counts and
+unsupported/hidden-selection notices. No missing album, artwork, capture-date
+or playlist capability may be fabricated to fill the layout.
+
+Both light and dark appearances MUST keep names, controls and failure messages
+readable. Existing photo read/window budgets, result pagination/windowing,
+exact audio verification and transient queue semantics remain unchanged.
+
+The focused host MAY consolidate domain navigation and utility entry points
+in a compact floating header. Global search MAY be disclosed on demand, but
+MUST retain one mounted host input: its existing focus shortcuts and actions
+open the disclosure before focusing, without executing or replacing a query.
+Closing a disclosure retains field text and result scope. Menus MUST remain
+keyboard-reachable, dismissible and bounded to the viewport; relevant failures
+MUST remain visible outside closed menus. Top-level domain navigation and
+in-domain presentation choices SHOULD have distinct placements so the same
+switcher does not surround the content twice.
+
+**Exit:** direct Photos/Music links open focused pages -> domain navigation and
+existing actions remain usable -> enter Music and explicitly play an original
+-> switch to Photos and back with the same player/source/paused position ->
+reach shared search, library, management, Details/Notes and original actions ->
+preserve or visibly guard active scope/drafts -> verify readable 390 px and
+1280 px layouts in light/dark without horizontal overflow. This is local client
+implementation evidence, not full Photos/Music or release qualification.
+
+## 15. Implementation order and evidence
 
 This bounded client track MAY run in parallel with existing Phase 4/5 work
 after the admitted Phase 3 portable shapes are frozen. It grants no phase

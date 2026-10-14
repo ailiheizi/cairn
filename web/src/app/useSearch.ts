@@ -6,7 +6,7 @@ import { operations } from "../lib/operations";
 import {
   completedOperatorToken, completedProtectionToken, completedTagToken, contentIDMatchesPrefix,
   operatorSuggestions, parseSearchQuery, rewriteSearchText, searchCompletionContext, searchPlan,
-  SEARCH_PROTECTION_MODES,
+  SEARCH_OPERATOR_NAMES, SEARCH_PROTECTION_MODES,
 } from "../lib/searchops";
 import type { ParsedSearchQuery, SearchOperatorInfo, SearchParseError, SearchPlan } from "../lib/searchops";
 import { exactIdentityKey } from "../lib/format";
@@ -66,6 +66,7 @@ export type SearchFlow = {
   recentSearches: string[];
   searchFocused: boolean;
   searchRecentsOpen: boolean;
+  toggleSearchRecents: () => void;
   searchInputRef: { current: HTMLInputElement | null };
   focusSearchField: () => void;
   clearSearchText: () => void;
@@ -189,7 +190,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   // convenience only: they never record a query as a durable saved view, and
   // they are never read back as authority.
   const [searchFocused, setSearchFocused] = useState(false);
-  const [recentsDismissed, setRecentsDismissed] = useState(false);
+  const [searchRecentsOpen, setSearchRecentsOpen] = useState(false);
   const [caret, setCaret] = useState(0);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState("");
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
@@ -213,7 +214,13 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   const suggestions = useMemo<SearchSuggestion[]>(() => {
     if (suggestionsDismissed && suggestionsDismissed === query) return [];
     if (completion.kind === "operator") {
-      return operatorSuggestions(completion.prefix).map((operator: SearchOperatorInfo) => ({
+      // An unqualified word, including a partial operator prefix, remains
+      // ordinary search text. Offer operator choices after an exact name.
+      const operatorName = completion.prefix.replace(/^-/, "").toLowerCase();
+      if (!SEARCH_OPERATOR_NAMES.includes(operatorName as (typeof SEARCH_OPERATOR_NAMES)[number])) return [];
+      return operatorSuggestions(completion.prefix.slice(0, -1))
+        .filter((operator: SearchOperatorInfo) => operator.name === operatorName)
+        .map((operator: SearchOperatorInfo) => ({
         kind: "operator" as const,
         key: `operator:${operator.name}`,
         token: completedOperatorToken(completion.prefix, operator),
@@ -297,30 +304,34 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     cancelEdit() { setEditing(undefined); focusSearchField(); },
   };
 
-  // The local recents list appears only while the search field is focused and
-  // empty, and it never sits behind a drawer, the image viewer, or the settings
-  // dialog.
-  const searchRecentsOpen = searchFocused && !query.trim() && recents.recentSearches.length > 0 && !recentsDismissed && !drawerOpen && !settingsOpen;
+  // Recent history is an explicit convenience disclosure. It is available only
+  // for an empty query and never sits behind a drawer or settings dialog.
+  const showSearchRecents = searchRecentsOpen && !query.trim() && !drawerOpen && !settingsOpen;
 
   // The search field is the one query surface, so the shortcut only moves
   // focus. It never runs a query, never leaves the drawers, the image viewer,
   // or the settings dialog (which own their focus traps), and never touches the
-  // selected batch.
+  // selected batch. A focused page keeps that one form inside a native
+  // disclosure, so opening the closest details keeps the shortcut from
+  // focusing a hidden field; nothing else about the field or its grammar moves.
   function focusSearchField() {
-    searchInputRef.current?.focus({ preventScroll: true });
+    const field = searchInputRef.current;
+    const disclosure = field?.closest("details");
+    if (disclosure && !disclosure.open) disclosure.open = true;
+    field?.focus({ preventScroll: true });
   }
   function clearSearchText() {
     // Emptying the field is not a search: the current result set stays until
     // the operator submits, or returns to the full library explicitly.
     setQuery("");
-    setRecentsDismissed(false);
+    setSearchRecentsOpen(false);
     setSuggestionsDismissed("");
     setEditing(undefined);
     focusSearchField();
   }
   function pickRecentSearch(value: string) {
     setQuery(value);
-    setRecentsDismissed(false);
+    setSearchRecentsOpen(false);
     setSuggestionsDismissed("");
     void runSearch(undefined, value);
   }
@@ -332,16 +343,20 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     recents.clearRecentSearches();
     focusSearchField();
   }
+  function toggleSearchRecents() {
+    if (query.trim() || !recents.recentSearches.length) return;
+    setSearchRecentsOpen((open) => !open);
+  }
   function handleSearchFieldFocus(target: EventTarget | null) {
     setSearchFocused(true);
-    if (target === (searchInputRef.current as EventTarget | null)) setRecentsDismissed(false);
+    if (target === (searchInputRef.current as EventTarget | null)) setActiveSuggestion(-1);
   }
   function handleSearchFieldBlur(stillInside: boolean) {
-    if (!stillInside) { setSearchFocused(false); setActiveSuggestion(-1); }
+    if (!stillInside) { setSearchFocused(false); setSearchRecentsOpen(false); setActiveSuggestion(-1); }
   }
   function handleSearchFieldChange(value: string, nextCaret?: number) {
     setQuery(value);
-    setRecentsDismissed(false);
+    setSearchRecentsOpen(false);
     setSuggestionsDismissed("");
     setActiveSuggestion(-1);
     if (typeof nextCaret === "number") setCaret(nextCaret);
@@ -364,16 +379,16 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         setActiveSuggestion(-1);
         return;
       }
-      if (searchRecentsOpen) {
+      if (showSearchRecents) {
         event.preventDefault(); event.stopPropagation();
-        setRecentsDismissed(true);
+        setSearchRecentsOpen(false);
         focusSearchField();
         return;
       }
       if (query) {
         event.preventDefault(); event.stopPropagation();
         setQuery("");
-        setRecentsDismissed(false);
+        setSearchRecentsOpen(false);
         focusSearchField();
       }
       return;
@@ -390,7 +405,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       ops.acceptSuggestion(activeSuggestion);
       return;
     }
-    if (event.key === "ArrowDown" && searchRecentsOpen) {
+    if (event.key === "ArrowDown" && showSearchRecents) {
       event.preventDefault();
       event.currentTarget.querySelector<HTMLElement>(".search-recent-entry")?.focus({ preventScroll: true });
     }
@@ -400,7 +415,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   function handleRecentsListKeyDown(event: ReactKeyboardEvent<HTMLUListElement>) {
     if (event.key === "Escape") {
       event.preventDefault(); event.stopPropagation();
-      setRecentsDismissed(true);
+      setSearchRecentsOpen(false);
       focusSearchField();
       return;
     }
@@ -455,7 +470,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // A submitted query that the daemon answered is recorded exactly once:
       // case-insensitive de-duplication moves a repeat to the front instead of
       // appending a second entry. This is local history, not a saved view.
-      setRecentsDismissed(false);
+      setSearchRecentsOpen(false);
       setSuggestionsDismissed("");
       setActiveSuggestion(-1);
       setEditing(undefined);
@@ -510,7 +525,8 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   return {
     recentSearches: recents.recentSearches,
     searchFocused,
-    searchRecentsOpen,
+    searchRecentsOpen: showSearchRecents,
+    toggleSearchRecents,
     searchInputRef,
     focusSearchField,
     clearSearchText,

@@ -1,14 +1,28 @@
 # Content-First Product Decision
 
-> Status: informative product decision, recorded 2026-10-05 and aligned 2026-10-06. It clarifies the
+> Status: informative product decision, recorded 2026-10-05 and updated 2026-10-12. It clarifies the
 > presentation and prioritization of the existing product contract. It does not
 > add requirements, alter phase order, close a gate, or award completion credit.
 > Normative requirements and the [Core MVP Execution Plan](core-mvp-execution-plan.md)
 > remain authoritative.
 >
-> Decision records: ADR-017 through ADR-024, linked in the current decision map below.
+> Decision records: the dated ADRs below, including the current ADR-035 public positioning and intake decision.
 
 ## Product promise
+
+**2026-10-12 presentation decision:** the operator selected the familiar
+category **a better self-hosted private drive**. Keep one personal space for
+files, shared discovery/takeout and focused photo/music experiences. Ordinary
+adding must feel like choosing files, not configuring a storage engine. See
+[ADR-035](build-stack-and-architecture-selection.md#adr-035-private-drive-positioning-and-file-oriented-intake)
+and the [mature interface reference review](../research/private-drive-interface-reference-20261012.md).
+This supersedes the older public descriptor while preserving the trusted
+kernel, declared capability limits and phase order.
+
+The [ADR-036 library decision](build-stack-and-architecture-selection.md#adr-036-everyday-library-actions-over-the-shared-returned-scope)
+turns this into the next existing-client slice: readable shared scope, easy
+selection, one primary original-takeout action and secondary tools on demand.
+Dedicated domain pages retain the same host authority and common actions.
 
 **Audience:** one self-hosted operator using a NAS or home storage for their
 own content. This is a selected direction, not validated market demand. Keep
@@ -59,8 +73,8 @@ completion. Deferred work need not ship in the first version.
 
 | Horizon | Work |
 | --- | --- |
-| **Now** | Polish the two bundled interface experiences around mixed-file intake, retrieval, and original export; retain bounded keyboard, responsive, preview-state, and broader browser checks. The current local acceptance covers injected rendering-error recovery and shared App state during a held status read. Continue the core only in execution-plan order. |
-| **Next** | After core gates and reviewed contracts, prioritize a gallery, then music. Design and prototypes do not authorize album/player features, new schema, or LinkGroup implementation. |
+| **Now** | Complete useful admitted Library/Photos/Music operations around intake, finding, organization, playback and original takeout. The operator's 2026-10-13 reset puts functionality before further visual redesign; ADR-041 and the functional target map below define the next work. Continue the core only in execution-plan order. |
+| **Next** | Finish the remaining admitted daily journeys, then review curated albums and durable playlists against their data/recovery contracts and applicable gates. Existing dedicated gallery and bounded player implementations are early domain slices, not complete-domain acceptance. |
 | **Blocked / deferred** | Full player, music video, listen/watch together, maps, free-form dashboards, URL capture, and broader media-platform behavior. Existing ADRs remain historical decisions; they do not override current priorities or implementation locks. |
 
 This experience queue does not remove or reduce any normative MVP requirement.
@@ -138,7 +152,7 @@ gate or implemented status.
 
 ## Ordered next work
 
-1. **Immediate client maintenance:** maintain both layouts for the actual mixed-file loop. Rendering-error recovery and switching during a held App status request now have bounded passing evidence; an isolated held Notes save commits exactly once. Continue broader browser, accessibility, preview-state, and real-user workflow checks from the limits in the current acceptance record.
+1. **Immediate client functionality:** complete the admitted operations in the 2026-10-13 functional target map below. Local Luna agents own bounded implementation and proportional verification; the primary agent reviews decisions, diffs and evidence. Run checks for the changed journey and concrete residual defects. Earlier passing matrices retain their dated evidence.
 2. **Core gates in parallel where permitted:** preserve the implemented and tested Phase 3 admitted development profile and continue from the current execution-plan checkpoint. Only after its portable record shapes are frozen may Phase 4 discovery packaging and supported-host/search qualification proceed alongside Phase 5 representative recoverable storage qualification. Existing implementation and candidate artifacts are inputs to that qualification, not permission to repeat completed work or claim release completion. Phase 6 LinkGroup work remains behind both Phase 4 and 5.
 3. **Development preview and feedback:** start with a reproducible local trial on the current Mac, as clarified by the operator on 2026-10-06. Exercise deployment, add/find/use/export, and backup/restore without waiting for a Linux or NAS host. Collect actual supported-host evidence before making later Linux/NAS support claims; local trial results are development evidence, not release qualification.
 4. **Later product polish:** gallery first, then music, after reviewed contracts and applicable core gates. Do not infer albums, players, new schema, or LinkGroup implementation from design work. Revisit runtime frameworks or interface counts only when a real workflow requires them.
@@ -274,3 +288,36 @@ already-admitted extension seam for first-party/reviewed implementations and
 are not affected by this addendum. MCP/CLI/AI-harness integration is deferred
 until after this convergence phase. See `AGENTS.md` for the current
 guardrails.
+
+## Functional target map — 2026-10-13
+
+The operator asked to finish missing functionality before another visual
+redesign. [ADR-041](build-stack-and-architecture-selection.md#adr-041-complete-useful-client-operations-before-further-visual-redesign)
+records the decision. This map retains the complete product target while
+distinguishing client work that can run now from work requiring a reviewed
+successor; it grants no admission or completion by itself.
+
+| User job | Next concrete capability | Implementation boundary |
+| --- | --- | --- |
+| Organize the same files from any destination | Add an absent tag, remove a chosen tag, explicitly favorite/unfavorite a captured selection; ordinary-Library inclusive range selection | Existing annotation commands, complete reads, expected revisions and shared selection; current functional wave |
+| Listen comfortably to the files already saved | Local title/artist/album/track/duration/size order, readable eligibility filter, insert as next occurrence | Existing recorded facts and bounded verified original player; current functional wave |
+| Use a selected photo set without leaving the journey | Reach the one host batch-action surface from the photo workflow and focused exhibition | Next admitted ergonomics slice; retain one selection, export path and current read budgets |
+| Find a useful set again | Reach existing saved retrieval beside Library search/results | Next admitted ergonomics slice; reuse current view commands and supported-query/refusal semantics |
+| Keep curated photo albums | Named membership, understandable missing members, organization and original takeout | Separate reviewed domain successor; do not represent ordinary tags as durable albums or implement gated LinkGroup prematurely |
+| Keep permanent playlists | Named ordered entries, repeated-track semantics, unavailable entries and restoration after restart | Separate reviewed persistence/recovery successor; the transient queue remains visibly transient |
+| Watch a personal video/anime library | Dedicated library and episode journey, optional Bangumi metadata and danmaku | Candidate in ADR-037 and the media/anime review; needs its own admitted client/read/enrichment contracts |
+| Add alternative enjoyable presentations | Compiled first-party presentations or ADR-032 build/install composition over host slots | Existing presentation-plane boundary; no runtime third-party code or recovery access |
+| Trust the complete product | Real semantic discovery, recoverable storage, grouping/export and release qualification | Existing normative core plan and gates; local client results cannot close them |
+
+The selected immediate sequence is the current functional wave, photo batch
+action access, then saved retrieval access. Persistent albums/playlists and
+video remain visible targets with their dependencies; no temporary substitute
+is counted as their completion. Each implementation slice still states its
+normative requirement and executable exit. The todo ledger records only
+reviewed, current evidence and keeps the parent domain journeys partial.
+
+The [functional client acceptance](functional-client-acceptance-20261013.md)
+records the local 2026-10-13/14 implementation of that immediate sequence,
+including source review, final build identity, actual browser cases and
+injected-only read refusal. It leaves the full-domain persistence/media targets
+and the expressly unrun fault/large-queue combinations open.

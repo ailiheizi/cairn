@@ -11,6 +11,12 @@
 // fallback.
 
 export const searchops: Record<string, string> = {
+  "Recent searches": "最近搜索",
+  "Search help": "搜索帮助",
+  "Search by words in names, notes, tags, and recorded facts. Add a field when you need to narrow the results.": "直接搜索名称、备注、标签或已记录的信息；需要缩小范围时，再添加条件。",
+  "Examples: tag:family · type:image · name:report · size:>10MB": "示例：tag:family · type:image · name:report · size:>10MB",
+  "Search text is kept as entered. A field that cannot be parsed shows an error and is not submitted.": "搜索按原文执行；无法识别的条件会显示错误并阻止提交。",
+  "Select a predicate to edit it, or remove it to rewrite the search text.": "点击条件可编辑，移除条件会同步修改搜索文字。",
   // The selection bar's image query action: it submits search.query with the
   // selected image's stable subject as the image dimension's query material.
   "Search by this image": "以这张图搜索",

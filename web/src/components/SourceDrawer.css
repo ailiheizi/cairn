@@ -1,0 +1,272 @@
+/* The ordinary file-first add-content surface.
+ *
+ * `SourceDrawer.tsx` imports this file; `styles/index.css` loads the shared
+ * `drawer.css` afterwards, so every rule here compounds a class
+ * (`.drawer.source-drawer--upload`, `.drawer-backdrop.source-drawer-backdrop`)
+ * to win the cascade without editing the shared drawer stylesheet. The
+ * server-folder and recheck paths keep the shared right-side sheet untouched.
+ */
+
+/* Desktop: a centered modal card, auto height, bounded inner scroll with the
+   existing sticky action bar pinned to its bottom edge. */
+.drawer-backdrop.source-drawer-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.drawer.source-drawer--upload {
+  width: min(600px, calc(100vw - 48px));
+  height: auto;
+  max-height: calc(100dvh - 48px);
+  border: 1px solid var(--hairline);
+  border-radius: var(--card-radius);
+  animation: none;
+}
+
+.source-drawer--upload .drawer-action-bar .source-action-primary,
+.source-drawer--upload .drawer-action-bar .secondary-button { min-height: 44px; }
+
+.source-drawer--upload .source-drawer-scroll {
+  padding: 26px 26px 16px;
+}
+
+/* The large drop / choose area. The label itself is the click target; the
+   file input overlays it (shared `.upload-picker input` rule). */
+.source-drawer--upload .upload-zone--drop {
+  display: block;
+}
+
+.source-drawer--upload .upload-picker {
+  min-height: 176px;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  padding: 22px 18px;
+  border-radius: var(--card-radius-sm);
+  text-align: center;
+}
+
+.source-drawer--upload .upload-zone--drop.dragging .upload-picker {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.source-drawer--upload .upload-zone--drop.has-rows .upload-picker {
+  min-height: 96px;
+}
+
+.source-drawer--upload .upload-picker > svg {
+  color: var(--accent);
+}
+
+.source-drawer--upload .upload-picker > span {
+  font-size: 14px;
+}
+
+.source-drawer--upload .upload-picker > small {
+  font-size: 11px;
+}
+
+/* The derived status of the one mounted surface. It reports an existing
+   upload/plan phase only; it never invents a percentage or a new machine. */
+.source-drawer--upload .upload-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--card-radius-sm);
+  padding: 11px 12px;
+  color: var(--muted);
+  background: var(--card-fill-quiet);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.source-drawer--upload .upload-status svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.source-drawer--upload .upload-status[data-phase="saved"],
+.source-drawer--upload .upload-status[data-phase="uptodate"] {
+  border-color: var(--health);
+  color: var(--health);
+}
+
+.source-drawer--upload .upload-status[data-phase="saved"] svg,
+.source-drawer--upload .upload-status[data-phase="uptodate"] svg {
+  color: var(--health);
+}
+
+.source-drawer--upload .upload-status[data-phase="blocked"],
+.source-drawer--upload .upload-status[data-phase="unknown"],
+.source-drawer--upload .upload-status[data-phase="blocked"] svg,
+.source-drawer--upload .upload-status[data-phase="unknown"] svg {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.source-drawer--upload .upload-error,
+.source-drawer--upload .upload-partial {
+  margin-top: 12px;
+  box-shadow: none;
+}
+
+/* Per-file rows: ordinary name and server-reported size stay visible, while
+   full hashes and the staging path live in a native disclosure. Refusals and
+   renames are never inside a closed disclosure. */
+.source-drawer--upload .upload-row-body {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.source-drawer--upload .upload-row-size {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.source-drawer--upload .upload-row-refusal,
+.source-drawer--upload .upload-row-rename {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.source-drawer--upload .upload-row-refusal {
+  color: var(--gold);
+}
+
+.source-drawer--upload .upload-row-refusal svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.source-drawer--upload .upload-row-rename {
+  color: var(--muted);
+}
+
+.source-drawer--upload .upload-row-details,
+.source-drawer--upload .upload-staging-details {
+  margin-top: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--card-radius-sm);
+  background: var(--card-fill-quiet);
+}
+
+.source-drawer--upload .upload-row-details summary,
+.source-drawer--upload .upload-staging-details summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 680;
+  list-style: none;
+  cursor: pointer;
+}
+
+.source-drawer--upload .upload-row-details summary::-webkit-details-marker,
+.source-drawer--upload .upload-staging-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-drawer--upload .upload-row-details code,
+.source-drawer--upload .upload-staging-details code {
+  display: block;
+  padding: 0 10px 10px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.source-drawer--upload .upload-handoff {
+  margin-top: 12px;
+  justify-items: stretch;
+}
+
+.source-drawer--upload .upload-handoff .secondary-button {
+  justify-content: center;
+}
+
+/* The secondary explicit entry into the existing server-folder sheet. */
+.source-drawer--upload .upload-server-entry,
+.source-drawer .source-upload-entry {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 14px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--card-radius-sm);
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--card-fill-quiet);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.source-drawer--upload .upload-server-entry:hover,
+.source-drawer .source-upload-entry:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.source-drawer--upload .upload-server-entry:disabled,
+.source-drawer .source-upload-entry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action buttons and the file picker meet the 44px touch target. */
+.source-drawer--upload button,
+.source-drawer--upload .upload-picker,
+.source-drawer--upload input[type="file"] {
+  min-height: 44px;
+}
+
+.source-drawer--upload .icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Phone: the same centered modal inset 12px from every edge instead of a
+   full-width bottom sheet. */
+@media (max-width: 640px) {
+  .drawer-backdrop.source-drawer-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .drawer.source-drawer--upload {
+    width: min(600px, calc(100vw - 24px));
+    height: auto;
+    max-height: calc(100dvh - 24px);
+    border: 1px solid var(--hairline);
+    border-radius: var(--card-radius);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.24);
+  }
+
+  .source-drawer--upload .source-drawer-scroll {
+    padding: 20px 16px 14px;
+  }
+
+  .source-drawer--upload .upload-picker {
+    min-height: 150px;
+  }
+
+  .source-drawer--upload .drawer-action-bar {
+    padding: 11px 16px calc(11px + env(safe-area-inset-bottom));
+  }
+}

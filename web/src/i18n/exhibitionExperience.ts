@@ -9,6 +9,7 @@ export const exhibitionExperience: Record<string, string> = {
   "A WALK THROUGH YOUR IMAGES": "漫步于你的影像",
   "Exhibition": "展览",
   "Explore saved images as a focused gallery. Search, tags, and Notes stay shared with your library.": "以沉浸式画廊浏览已保存的图片。搜索、标签和备注仍与内容库共享。",
+  "{{current}} / {{total}} loaded photos": "{{current}} / {{total}} 张已加载照片",
   "Return to photo wall": "返回照片墙",
   "Image {{current}} of {{total}} in this loaded context. Up to five nearby thumbnails are shown at once.": "当前加载内容中的第 {{current}} 张，共 {{total}} 张。每次最多显示附近五张缩略图。",
   "Showing {{count}} image files in this loaded context.": "在当前加载内容中展示 {{count}} 个图片文件。",
@@ -25,5 +26,7 @@ export const exhibitionExperience: Record<string, string> = {
   "Recorded filename · no date inferred": "记录的文件名 · 未推断日期",
   "Select": "选择",
   "Use Left and Right Arrow keys to move. Open Details to add Notes or tags, or download the exact original.": "使用左右方向键浏览。打开详情可添加备注或标签，也可下载精确原件。",
+  "Browsing help": "浏览说明",
+  "Only the current photo and nearby previews are shown. Use the previous and next buttons or arrow keys to browse all loaded photos. Select the center photo to inspect it. Use Details to add Notes or tags and download the original.": "每次只展示当前照片与邻近预览。使用上一张、下一张或方向键可浏览全部已加载照片。点击中央照片查看大图，在详情中添加备注、标签或下载原件。",
   "This page could not be displayed. Your shared content and selection remain available in the standard results list.": "无法显示此页面。你的共享内容和选择仍可在标准结果列表中使用。",
 };

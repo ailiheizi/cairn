@@ -193,6 +193,11 @@
 .immersive-navigation-content { padding: 12px; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); }
 .immersive-navigation-content .workspace-sidebar { position: static; min-height: 0; }
 .immersive-workspace { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 16px var(--page-gutter) 96px; align-items: start; }
+/* UX-D1: a focused page carries its navigation and trusted status in the one
+   host capsule above, so its content starts right under that single floating
+   header. Scoped to the focused composition; every other immersive page keeps
+   its own "Browse tools" disclosure and 16px top padding. */
+.interface-immersive[data-composition="focused"] .immersive-workspace { padding-top: 10px; gap: 16px; }
 .immersive-content, .immersive-details { min-width: 0; }
 .immersive-content > .content-column { width: 100%; max-width: none; margin: 0; }
 .immersive-details { max-width: 800px; width: 100%; justify-self: center; }

@@ -1358,3 +1358,78 @@ selection bar, and the details inspector column. */
   .content-column[data-presentation] > .first-use-next-step { padding: 7px 12px; margin-bottom: 10px; }
   .content-column[data-presentation] > .result-list { padding-top: 0; }
 }
+
+/* UX-D1 focused full-page composition (Photos, Music, Exhibition).
+ *
+ * Registered page metadata (`composition: "focused"`) selects this arrangement.
+ * The top-level domain capsule lives once in the host header; this bar carries
+ * only the active domain's alternative renderers (none for Music), the labelled
+ * "Library tools" disclosure and a compact count. The generic library tools
+ * (sort, export, saved retrieval, tags and system fields) open on demand.
+ * Active filter/saved-search scope, incomplete-listing progress and hidden
+ * selection stay outside the closed tools, so a collapsed tool never hides an
+ * active query, tag or partial listing. Presentation only; existing
+ * --ink/--surface tokens are reused. */
+.content-column[data-presentation] > .library-controls--focused {
+  display: block;
+  margin: 0 0 6px;
+}
+.library-focused-bar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.library-focused-bar > .library-presentation-navigation { flex: 0 1 auto; width: auto; }
+.library-focused-bar > .result-count { margin: 0; }
+.library-tools { min-width: 0; flex: 0 1 auto; }
+/* An opened tools panel takes its own full row instead of crowding the bar. */
+.library-tools[open] { flex: 1 1 100%; }
+.library-tools-summary {
+  width: fit-content;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--card-radius-sm);
+  padding: 6px 13px;
+  color: var(--ink);
+  background: var(--surface-container-low);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.library-tools-summary::-webkit-details-marker { display: none; }
+.library-tools-summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 58%, transparent); outline-offset: 2px; }
+.library-tools-body {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--card-radius-sm);
+  color: var(--ink);
+  background: var(--surface-container-low);
+}
+.library-tools-body > .heading-actions { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.library-tools-body > .tag-browser { margin: 0; border-top: 0; border-bottom: 0; padding: 0; }
+
+@media (min-width: 641px) {
+  /* The focused bar keeps the domain's own renderer choices on the left and
+     sends the compact count and Library tools to the right edge without a
+     full-width band; when Music has no renderer choice the row stays short. */
+  .library-focused-bar > .result-count { margin-left: auto; }
+  .content-column[data-presentation] > .library-controls--focused .library-presentation-navigation__domain,
+  .content-column[data-presentation] > .library-controls--focused .library-presentation-navigation__presentation { min-height: 28px; }
+}
+
+@media (max-width: 390px) {
+  .library-focused-bar { align-items: stretch; }
+  .library-focused-bar > .library-presentation-navigation { flex-basis: 100%; }
+  .library-tools-body { padding: 10px; }
+}

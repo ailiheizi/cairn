@@ -1,0 +1,94 @@
+/* Result-row selection affordance for the shared library wall and list.
+   Scoped to `.result-list .result-row` and its `.result-select` control so
+   host SelectionBar and domain renderers (Photos, Music tracks) keep their own
+   styles. Music track rows reuse these class names and are excluded here. */
+
+/* A real 44x44 target. The visible box is a 22px indicator drawn on the
+   button's pseudo-element, so the pointer and touch target stays large while
+   the mark stays small and quiet. */
+.result-list .result-row:not(.music-track) .result-select {
+  position: absolute; top: 2px; right: 2px; z-index: 2;
+  width: 44px; height: 44px; margin: 0; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 14px;
+  color: var(--primary-ink); background: transparent; box-shadow: none;
+  opacity: 0; pointer-events: none; cursor: pointer;
+  transition: opacity 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.result-list .result-row:not(.music-track) .result-select::before {
+  content: ""; position: absolute; top: 11px; left: 11px;
+  width: 22px; height: 22px; box-sizing: border-box;
+  border: 1.5px solid var(--line-strong); border-radius: 7px;
+  background: var(--card-fill); box-shadow: var(--card-shadow-soft);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.result-list .result-row:not(.music-track) .result-select svg {
+  position: relative; z-index: 1; pointer-events: none;
+  stroke-width: 3;
+}
+
+/* Shown on hover, keyboard focus inside the row, and whenever the row is
+   selected, so the selection state stays readable while a selection exists. */
+.result-list .result-row:not(.music-track):hover .result-select,
+.result-list .result-row:not(.music-track):focus-within .result-select,
+.result-list .result-row:not(.music-track) .result-select[aria-checked="true"] {
+  opacity: 1; pointer-events: auto;
+}
+
+/* During an active batch selection every mounted row shows its control, so the
+   user can see which rows are selectable. The count is the host's own
+   data-selection-count on the list container; zero means no batch is active. */
+.result-list[data-selection-count]:not([data-selection-count="0"]) .result-row:not(.music-track) .result-select {
+  opacity: 1; pointer-events: auto;
+}
+
+/* Checked: the indicator fills with the shared accent, and the check reads
+   against the primary ink on both light and dark appearances. */
+.result-list .result-row:not(.music-track) .result-select[aria-checked="true"]::before {
+  border-color: var(--accent); background: var(--accent);
+}
+.result-list .result-row:not(.music-track) .result-select[aria-checked="true"] svg {
+  color: var(--primary-ink);
+}
+
+/* Keyboard focus on the checkbox itself: a visible ring around the 44px target. */
+.result-list .result-row:not(.music-track) .result-select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.result-list .result-row:not(.music-track) .result-select:focus-visible::before {
+  border-color: var(--accent);
+}
+
+/* Dense list: the target sits inline at the row start so the filename and
+   metadata keep their full width. */
+/* Position relative (not static) keeps the absolutely placed indicator anchored
+   to this 44px button instead of the whole row. */
+.result-list.list-mode .result-row:not(.music-track) .result-select {
+  position: relative; top: auto; right: auto; width: 44px; height: 44px; flex: 0 0 auto; box-shadow: none;
+}
+.result-list.list-mode .result-row:not(.music-track) .result-select::before {
+  top: 11px; left: 11px;
+}
+
+/* Phone widths keep the control visible without hover, since touch has no
+   hover state to reveal it. */
+@media (max-width: 640px) {
+  .result-list .result-row:not(.music-track) .result-select {
+    opacity: 1; pointer-events: auto;
+  }
+}
+@media (hover: none) {
+  .result-list .result-row:not(.music-track) .result-select {
+    opacity: 1; pointer-events: auto;
+  }
+}
+
+/* Selected card and list rows keep a readable accent state with the shared
+   tokens, including the keyboard focus ring for the row itself. */
+.result-list .result-row:not(.music-track).multi-selected {
+  border-color: var(--accent); background: var(--accent-soft);
+}
+.result-list .result-row:not(.music-track).multi-selected .result-open-copy strong {
+  color: var(--ink);
+}

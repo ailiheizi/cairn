@@ -24,6 +24,14 @@
 > UX-Q1 makes the existing transient listening queue occurrence-aware and adds
 > batch actions over displayed Music selections. It retains one player and
 > admits no persistent playlist or backend/recovery change.
+> UX-D1 refines the existing Photos/Music destinations into focused full-page
+> compositions with reachable host tools and unchanged shared state/budgets.
+> It is a client presentation slice and grants no core phase or release credit.
+>
+> **2026-10-12 intake maintenance:** [API and WebUI §2.2](../requirements/api-and-webui.md#22-familiar-browser-intake-refinement)
+> permits automatic preparation after a completely reported staged upload and
+> one file-oriented review/explicit-save surface. This composes existing
+> operations, adds no endpoint or lifecycle, and changes no core phase gate.
 
 ## 1. What We Are Building
 

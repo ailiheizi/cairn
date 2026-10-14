@@ -4,10 +4,29 @@
 .library-presentation-navigation__domains { border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface-raised); }
 .library-presentation-navigation__presentations { margin-left: auto; }
 .library-presentation-navigation__layouts { display: inline-flex; min-width: 0; gap: 4px; border-left: 1px solid var(--line); padding-left: 8px; }
-.library-presentation-navigation__domain, .library-presentation-navigation__presentation { min-height: 32px; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.library-presentation-navigation__domain, .library-presentation-navigation__presentation { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid transparent; border-radius: 999px; padding: 5px 9px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.library-presentation-navigation__domain svg, .library-presentation-navigation__presentation svg { flex: 0 0 auto; }
+.library-presentation-navigation__domain--library { color: var(--ink); }
 .library-presentation-navigation__domain.is-active { border-color: var(--line); background: var(--surface-container); color: var(--ink); font-weight: 700; }
 .library-presentation-navigation__presentation.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .library-presentation-navigation button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 58%, transparent); outline-offset: 2px; }
+/* Variant hooks. `--domains` is the host's single top-level capsule (the host
+   owns its glass/placement styling); `--presentations` is a focused page's
+   restrained alternative-renderer choice. `complete` keeps the standard
+   library navigation above, unchanged. */
+.library-presentation-navigation--presentations { flex-basis: auto; width: auto; justify-content: flex-start; }
+.library-presentation-navigation--presentations .library-presentation-navigation__presentations {
+  margin-left: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--surface-soft);
+}
+.library-presentation-navigation--domains { justify-content: center; }
+.library-presentation-navigation--layouts { width: auto; justify-content: flex-start; }
+.library-presentation-navigation--layouts .library-presentation-navigation__layouts { border: 0; padding: 0; }
+.library-presentation-navigation--layouts .library-presentation-navigation__presentation { border-color: var(--line); background: var(--surface-soft); }
+.library-presentation-navigation--layouts .library-presentation-navigation__presentation.is-active { border-color: var(--accent); background: var(--accent-soft); }
 .library-view-preference-group { display: grid; gap: 8px; }
 .library-view-preference-group h4 { margin: 8px 2px 0; color: var(--ink); font-size: 12px; font-weight: 720; }
 .library-view-preference-group + .library-view-preference-group { margin-top: 8px; }
@@ -128,4 +147,5 @@
   .library-presentation-navigation { align-items: stretch; flex-direction: column; }
   .library-presentation-navigation__presentations { margin-left: 0; }
   .library-presentation-navigation__layouts { border-left: 0; padding-left: 0; }
+  .library-presentation-navigation--domains { align-items: center; }
 }

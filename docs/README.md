@@ -4,7 +4,7 @@ All project documentation is written in English.
 
 > **Documentation status — unreleased core preview after `v0.1.0-prealpha.1`.** The current tree runs and tests the local inspect/protect/search/verify/restore workflow, including an explicit development-time installer for the fixed BGE/ONNX + zvec bundle and an optional browser client. The installer downloads pinned artifacts, verifies their digests, publishes the bundle atomically, and exposes the required restart and index-rebuild steps. A deterministic candidate-only offline artifact assembler now combines prebuilt daemon/CLI/Web assets with a retained semantic bundle and verifiable license/checksum evidence; it is not a supported installer or release qualification. Cairn does not yet provide a qualified production repository or a release-qualified workflow/profile.
 
-Cairn is positioned as **a self-hosted home for your personal content**: “Keep it in your space. Find it, use it, take it with you.” Its first target is NAS and home-storage hobbyists. The formal product remains a content, description, discovery, export, and recovery plane; `RW-MVP-1` is a read-only managed archive and discovery profile. A shared content library and complete Photos/Music workflows are the product target. The admitted RW-PERSONAL-UX-1 client slice supplies dedicated Photos/Music pages, bounded original playback and transient queues; recorded artist/album navigation and transient queue controls are admitted client work; curated albums, new extraction and durable playlists remain outstanding. Video and document readers remain future work. Later NAS and enterprise profiles must qualify additional writable and distributed semantics separately. The project is not defined by a particular NAS vendor, repository engine, search engine, or AI runtime.
+Cairn is positioned as **a better self-hosted private drive**: “Keep it in your space. Find it, use it, take it with you.” Its first target is NAS and home-storage hobbyists. The formal product remains a content, description, discovery, export, and recovery plane; `RW-MVP-1` is a read-only managed archive and discovery profile. A shared content library and complete Photos/Music workflows are the product target. The admitted RW-PERSONAL-UX-1 client slice supplies dedicated Photos/Music pages, bounded original playback and transient queues; recorded artist/album navigation and transient queue controls are admitted client work; curated albums, new extraction and durable playlists remain outstanding. Video and document readers remain future work. Later NAS and enterprise profiles must qualify additional writable and distributed semantics separately. The project is not defined by a particular NAS vendor, repository engine, search engine, or AI runtime.
 
 For the current product decisions and next-work map, start with the
 [Content-First Product Decision](technical/content-first-product-decision.md).
@@ -13,7 +13,55 @@ module boundaries, ADR links, and product priorities. The normative contracts
 and Core MVP Execution Plan below continue to govern scope and implementation
 order; older experience boards are not an independent queue.
 
-Keep Cairn as the working name and use the public descriptor **“A self-hosted home for your personal content.”** Its Chinese slogan is **“存进自己的空间，找得到、用得上、带得走”**. “Weave” is also used by an App Store application; no trademark clearance is claimed. See the informative [NAS content-hub product direction](technical/nas-content-hub-product-direction.md) and [ADR-018](technical/build-stack-and-architecture-selection.md#adr-018-nas-first-content-hub-positioning-and-deferred-media-views) for the experience boundary and evidence. Recovery remains the trust contract behind the product.
+The operator's 2026-10-13 priority is to complete useful functionality before
+further visual redesign. [ADR-041](technical/build-stack-and-architecture-selection.md#adr-041-complete-useful-client-operations-before-further-visual-redesign)
+and the [functional target map](technical/content-first-product-decision.md#functional-target-map--2026-10-13)
+record the immediate Library/Photos/Music operations, the next admitted
+ergonomics slices, and the separate persistence/media contracts still needed.
+The complete domain targets remain open until their own evidence exists.
+The [functional client acceptance](technical/functional-client-acceptance-20261013.md)
+records the reviewed Music, batch organization, photo-selection and existing
+retrieval continuation, final served-build evidence and unrun limits.
+
+Keep Cairn as the working name and use the public descriptor **“A self-hosted personal drive, made for finding and using your files.”** Its Chinese descriptor is **“自部署、更好用的私人网盘”** and slogan is **“存进自己的空间，找得到、用得上、带得走”**. The 2026-10-12 choice is recorded in [ADR-035](technical/build-stack-and-architecture-selection.md#adr-035-private-drive-positioning-and-file-oriented-intake); the [interface reference review](research/private-drive-interface-reference-20261012.md) turns mature product patterns into a bounded experience queue. Recovery remains the trust contract behind the product.
+
+The [private-drive intake acceptance](technical/private-drive-intake-acceptance-20261012.md)
+records file choice/drop, automatic review preparation, one explicit save and
+actual original downloads. It is bounded local client evidence; the
+[product todo](technical/product-experience-todo.md#private-drive-daily-loop--2026-10-12)
+keeps library productivity and dedicated photo/music use as the next slices.
+The [library-productivity continuation](technical/library-productivity-acceptance-20261012.md)
+and [ADR-036](technical/build-stack-and-architecture-selection.md#adr-036-everyday-library-actions-over-the-shared-returned-scope)
+record the shared browse/selection/takeout refinement. Its integrated evidence
+is recorded separately; client layout changes grant no core-phase credit.
+
+The [media/anime candidate review](research/media-and-anime-experience-20261013.md)
+compares Animeko, Kazumi, Jellyfin metadata and danmaku patterns.
+[ADR-037](technical/build-stack-and-architecture-selection.md#adr-037-complete-existing-domain-journeys-then-review-a-personal-video-successor)
+prioritizes comfortable existing Photos/Music journeys before a separately
+reviewed retained-video experience and optional Bangumi/danmaku enrichment.
+These media candidates are proposals, not implemented or admitted capabilities.
+The [2026-10-13 domain-polish acceptance](technical/domain-polish-acceptance-20261013.md)
+records the local Luna Photos/Music refinements, primary review, current-build
+headless browser journeys and final clean light/dark screenshot matrix.
+The operator's supplied AutoBangumi reference is covered in that research
+review. [ADR-038](technical/build-stack-and-architecture-selection.md#adr-038-explicit-app-destinations-with-one-stable-host-header)
+distinguishes global app destinations from type filters and in-domain render
+styles, with a stable shared header and an explicit full-listing action.
+The [navigation acceptance](technical/destination-navigation-acceptance-20261013.md)
+records the local implementation, retained search/tag/player/draft behavior,
+current-build screenshot matrix and preserved preview profile.
+The subsequent [ADR-039](technical/build-stack-and-architecture-selection.md#adr-039-library-layouts-and-on-demand-search-assistance)
+places Overview inside Library's View options and makes search history/help
+explicit disclosures. Library, Photos and Music remain the global entries;
+active restrictions, incomplete scope and refusals remain visible.
+Its [local acceptance](technical/progressive-disclosure-acceptance-20261013.md)
+records current-build navigation/search checks, the final screenshot matrix
+and the boundaries of the tested slice.
+The subsequent [ADR-040](technical/build-stack-and-architecture-selection.md#adr-040-exhibition-as-a-focused-gallery-over-the-existing-photos-scope)
+and [Exhibition acceptance](technical/exhibition-gallery-acceptance-20261013.md)
+record the existing Photos gallery's centered images, compact actions,
+responsive appearances, bounded navigation and visible unavailable outcomes.
 
 The initial product direction is **one person self-hosting for their own use**.
 The [whole-product delivery target](technical/whole-product-delivery-target.md)
@@ -134,6 +182,18 @@ is pending integrated browser evidence; no persistent playlist or core-phase
 credit follows from queue work.
 
 ## Recommended reading order
+
+The admitted [UX-D1 full-page Photos/Music composition](requirements/first-party-client-experiences.md#14-ux-d1-full-page-photos-and-music-composition)
+and [ADR-034](technical/build-stack-and-architecture-selection.md#adr-034-focused-full-page-domain-layouts-over-shared-host-state)
+give the existing domain pages focused chrome over one host authority. The
+[2026-10-12 local acceptance](technical/full-page-domain-layouts-acceptance-20261012.md)
+records real browser layout, player, scope, draft and original-download evidence,
+plus final asset identity and remaining limits. This adds no durable albums,
+playlists, new queries or phase/release completion.
+The subsequent [immersive host-header acceptance](technical/immersive-host-header-acceptance-20261012.md)
+records the compact Blog-inspired capsule, disclosed search/menu, visible
+failure states, keyboard focus and shared-player/query/draft continuity. It
+supersedes the earlier header arrangement and records the current asset identity.
 
 1. [Product Requirements](requirements/product-requirements.md) defines the product, target users, product promise, functional scope, and roadmap.
 2. [Content Store, Views, and Export Requirements](requirements/content-store-views-and-exports.md) freezes the content-first storage model, default deduplication, embedding policy, view/export semantics, and replaceable seams.

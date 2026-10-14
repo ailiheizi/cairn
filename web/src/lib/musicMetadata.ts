@@ -1,5 +1,5 @@
 import type { SearchHit } from "./types";
-import { audioIdentityDigest, audioMime, type AudioTrack } from "./audioPlayback";
+import { AUDIO_PLAYBACK_LIMIT, audioIdentityDigest, audioMime, type AudioTrack } from "./audioPlayback";
 import { mediaClassFromSuffix } from "./format";
 
 /** The existing audio.list projection, restricted to facts recorded by the daemon. */
@@ -86,9 +86,75 @@ export function orderRecordedAlbumTracks<T extends { index: number; facts?: Pick
   });
 }
 
+export type MusicSortField = "original" | "title" | "artist" | "album" | "track" | "duration" | "size";
+export type MusicSortDirection = "asc" | "desc";
+export type MusicPlaybackReason = "unsupported-format" | "identity-unavailable" | "size-unavailable" | "size-limit" | "workspace-unavailable";
+export type MusicPlaybackEligibility = { playable: true } | { playable: false; reason: MusicPlaybackReason };
+
+/** Single source for the current Music playback guard and its user-facing reason code. */
+function playbackEligibilityReason(hit: SearchHit, workspaceID?: string): MusicPlaybackReason | undefined {
+  const name = hit.name || "";
+  if (hit.entry_type !== "REGULAR_FILE" || mediaClassFromSuffix(name.split(".").pop() || "") !== "audio" || !audioMime(name)) return "unsupported-format";
+  if (!workspaceID?.trim()) return "workspace-unavailable";
+  if (!hit.entry_id || audioIdentityDigest(hit.content_id) === undefined) return "identity-unavailable";
+  if (!Number.isSafeInteger(hit.logical_size) || (hit.logical_size ?? -1) < 0) return "size-unavailable";
+  if ((hit.logical_size ?? Infinity) > AUDIO_PLAYBACK_LIMIT) return "size-limit";
+  return undefined;
+}
+
+/** Pure client projection: report only the existing bounded-playback guards. */
+export function musicPlaybackEligibility(hit: SearchHit, workspaceID?: string): MusicPlaybackEligibility {
+  const reason = playbackEligibilityReason(hit, workspaceID);
+  return reason ? { playable: false, reason } : { playable: true };
+}
+
+/** Local ordering for the current loaded Music rows; missing facts stay last in both directions. */
+export function sortMusicRows<T extends { index: number; hit: Pick<SearchHit, "name" | "logical_size">; facts?: Pick<MusicTrackFacts, "title" | "artist" | "album" | "track" | "durationMS"> }>(
+  rows: readonly T[], field: MusicSortField, direction: MusicSortDirection, locale?: string,
+): T[] {
+  if (field === "original") return [...rows];
+  const sign = direction === "asc" ? 1 : -1;
+  const textValue = (row: T): string | undefined => {
+    if (field === "title") return row.facts?.title?.trim() || row.hit.name?.trim() || undefined;
+    if (field === "artist") return row.facts?.artist?.trim() || undefined;
+    if (field === "album") return row.facts?.album?.trim() || undefined;
+    return undefined;
+  };
+  const numberValue = (row: T): number | undefined => {
+    if (field === "track") return Number.isSafeInteger(row.facts?.track) && (row.facts?.track ?? 0) > 0 ? row.facts!.track : undefined;
+    if (field === "duration") return Number.isSafeInteger(row.facts?.durationMS) && (row.facts?.durationMS ?? 0) > 0 ? row.facts!.durationMS : undefined;
+    return row.hit.logical_size;
+  };
+  return [...rows].sort((left, right) => {
+    let comparison = 0;
+    if (["title", "artist", "album"].includes(field)) {
+      const a = textValue(left), b = textValue(right);
+      if (!a && !b) comparison = 0;
+      else if (!a) return 1;
+      else if (!b) return -1;
+      else comparison = a.localeCompare(b, locale, { sensitivity: "base", numeric: true });
+    } else {
+      const a = numberValue(left), b = numberValue(right);
+      const knownA = Number.isSafeInteger(a) && a! >= 0;
+      const knownB = Number.isSafeInteger(b) && b! >= 0;
+      if (!knownA && !knownB) comparison = 0;
+      else if (!knownA) return 1;
+      else if (!knownB) return -1;
+      else comparison = a! - b!;
+    }
+    return comparison === 0 ? left.index - right.index : comparison * sign;
+  });
+}
+
 /** The same loaded-original guard used by individual play actions. */
 export function playableMusicTrack(hit: SearchHit, workspaceID?: string): AudioTrack | undefined {
   const name = hit.name || "";
-  if (hit.entry_type !== "REGULAR_FILE" || mediaClassFromSuffix(name.split(".").pop() || "") !== "audio" || !audioMime(name) || !workspaceID || !hit.entry_id || audioIdentityDigest(hit.content_id) === undefined || !Number.isSafeInteger(hit.logical_size) || (hit.logical_size ?? -1) < 0 || (hit.logical_size ?? Infinity) > 32 * 1024 * 1024) return undefined;
-  return { workspaceID, entryID: hit.entry_id, name, contentID: hit.content_id!, logicalSize: hit.logical_size! };
+  if (playbackEligibilityReason(hit, workspaceID)) return undefined;
+  const entryID = hit.entry_id;
+  const contentID = hit.content_id;
+  const logicalSize = hit.logical_size;
+  if (typeof workspaceID !== "string" || !workspaceID.trim()) return undefined;
+  if (typeof entryID !== "string" || !entryID || typeof contentID !== "string" || audioIdentityDigest(contentID) === undefined) return undefined;
+  if (typeof logicalSize !== "number" || !Number.isSafeInteger(logicalSize) || logicalSize < 0 || logicalSize > AUDIO_PLAYBACK_LIMIT) return undefined;
+  return { workspaceID, entryID, name, contentID, logicalSize };
 }

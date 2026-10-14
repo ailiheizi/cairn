@@ -9,7 +9,14 @@
 > [Product Experience Plan](product-experience-plan.md); item constraints live
 > in [Product Experience Backlog](product-experience-backlog.md).
 
-Last updated 2026-10-11 (SP-2 large-library behaviour re-measured on the real 11,561-item library: the first screen's cost was the client's own startup sequence, not the listing — `status.get` 6,892 → 1,437 ms and the shell's restore-point read 8,080 → 1,785 ms after the kernel stopped walking every publication's manifest to answer a count, with the wall load 21,368 → 7,584 ms on the identical library; the earlier 2026-10-11 9,138-item measurements and the SP-1/saved-view fixes keep their own date and are superseded only where a row says so).
+Last updated 2026-10-14: bounded functionality-first client acceptance for the
+2026-10-13 cohort; local Photos/Music refinements and media/anime candidate review.
+Earlier SP-2 evidence remains dated 2026-10-11: on the real 11,561-item
+library, `status.get` changed from 6,892 to 1,437 ms, the shell's restore-point
+read from 8,080 to 1,785 ms, and wall load from 21,368 to 7,584 ms after the
+kernel stopped walking every publication manifest for a count. Those results,
+the earlier 9,138-item measurements and SP-1/saved-view fixes retain their own
+candidate identity; this update does not re-qualify their performance.
 
 ## Convergence-phase priority order
 
@@ -17,28 +24,32 @@ The project is in a convergence phase (see `AGENTS.md`): close existing gaps
 in the admitted core loop and admitted client surfaces before adding scope.
 Within this ledger, work in this order:
 
-1. **P0** — rows blocking a real user-visible correctness or trust issue in
-   an already-admitted surface. Closed here on 2026-10-10 with real-Chrome
-   evidence: the SP-1 first-viewport regression (1280 px target back to 231 px,
-   both harnesses green), P5 (narrow-screen original download), P3 (photo
-   viewer keyboard/touch matrix, including a fit/actual-size defect found while
-   verifying), and the saved-view kernel fail-open. The remaining P0 items are
-   M4 (queue edge states, whose code review passes but whose live
-   unsupported-format exercise is still unrun) and the saved-view client
-   defects recorded under R1.4 — a recall that can mislabel its own result set,
-   a client that hides a stored-but-unsupported condition from the operator, a
-   recall that never reconciles the stored scope with the current workspace,
-   and persisted fields that evaluation ignores.
-2. **P1** — rows that close an admitted surface's remaining test matrix
-   without new scope: R1.4 (saved-retrieval cross-context verification), whose
-   kernel fail-open was found and closed but which still needs a second-context
-   run, and the UX-C1/C2/F1/Q1 negative branches, which are currently blocked on
-   a stale fault-injection harness rather than on product code.
-3. **P2** — documentation consistency (this file, `AGENTS.md`,
-   `content-first-product-decision.md`, `docs/README.md`) and backlog
-   grooming; no code change.
-4. **P3** — anything requiring new scope admission (MCP/CLI/AI-harness,
-   runtime extension loading) stays deferred until this phase closes.
+1. **P0** — concrete user-visible correctness/trust failures in an admitted
+   surface. Follow each detailed row's dated evidence. The older summary that
+   called unsupported-format playback and the R1.4 client mislabels untested
+   or open was stale: their rows record actual fixes and browser verification.
+   They must not send implementation back to already-closed defects. R1.4 and
+   M4 remain partial only for the residual scope their rows explicitly name.
+2. **P1** — the selected daily product loop: simpler intake, productive shared
+   library actions, and focused Photos/Music use. The private-drive section
+   below sets this client sequence; it changes no core phase order or admission.
+   The operator's latest reset puts missing useful operations before another
+   appearance round; [ADR-041](build-stack-and-architecture-selection.md#adr-041-complete-useful-client-operations-before-further-visual-redesign)
+   and the [functional target map](content-first-product-decision.md#functional-target-map--2026-10-13)
+   retain the immediate sequence and the separate full-domain dependencies.
+3. **P1 validation** — focused evidence for the slice being changed and the
+   genuine residual matrix in its row. Existing fixture/harness entries now
+   carry later evidence; do not keep treating the earlier stale harness as a
+   current blocker or repeatedly run completed matrices without a new reason.
+   Cross-context SavedView access and remaining playback failure branches
+   retain their explicit limits.
+4. **P2** — documentation consistency and backlog grooming alongside the
+   implementation that changes evidence. This summary aligns earlier dated
+   records; it is not a new run or completion award.
+5. **Outside this convergence queue** — new integration scope needs direct
+   authorization and its own contract. Runtime third-party loading and a plugin
+   store remain explicit non-goals; build/install-time presentation composition
+   follows ADR-032's separate boundary.
 
 The [whole-product delivery target](whole-product-delivery-target.md) carries
 the entire-product outcome map and current parallel cohort. This ledger records
@@ -59,6 +70,136 @@ skipped. When a harness can skip, the row says so.
 
 ## Active product todo — 2026-10-09
 
+### Private-drive daily loop — 2026-10-12
+
+The current product category is **a better self-hosted private drive** for one
+owner. [ADR-035](build-stack-and-architecture-selection.md#adr-035-private-drive-positioning-and-file-oriented-intake)
+records the decision. The operator selected easier Add and mature interface
+patterns; the [reference review](../research/private-drive-interface-reference-20261012.md)
+separates documented patterns from Cairn's design choices. This is an admitted
+client-maintenance queue, not a replacement core execution plan.
+
+- [x] Lead Add with file choice/drop, automatically prepare a fully reported
+  uploaded batch, and keep review/explicit save in the same file-oriented panel.
+- [x] Make names/count and the next action prominent; disclose temporary paths,
+  digests and storage accounting. Keep refusals, renamed names, warnings and
+  unresolved outcomes visible, using the existing check path.
+- [x] Return from successful saving to the unified library and verify actual
+  original downloads for text, image and audio inputs.
+
+Executable evidence: [private-drive intake acceptance](private-drive-intake-acceptance-20261012.md).
+DeepSeek Harness Flash implemented the two component scopes; the primary
+reviewer accepted the diffs and Luna owns the remaining browser/screenshots
+review. This is tested local intake, not full-product or release completion.
+
+Next product slices, within their existing admissions:
+
+- [~] **Library productivity:** give browse, selection, Details and takeout a
+  consistent action hierarchy. Reuse existing tags/favorites, filters and batch
+  originals; the exit is find → select → use/download, including an empty
+  result and an unavailable original. Do not create a new folder/sync model.
+  The 2026-10-12 bounded client slice is implemented and locally tested:
+  standard tools/disclosures, batch action hierarchy and row-selection
+  affordances were delegated to three independent DeepSeek Harness
+  `sub2api / claude-haiku-5-5` sessions. Build, registry, browser flow and
+  exact-byte ZIP checks passed; see [library acceptance](library-productivity-acceptance-20261012.md)
+  and the locally retained QA report at
+  `dist/library-productivity-20261012/validation/qa-report.md`.
+  Keep this row partial: empty-result selection and unavailable-original
+  outcomes, light captures at the exact target dimensions, and broader
+  large-library behavior remain unverified.
+- [~] **Photos use:** make selection, inspection and original takeout feel like
+  one dedicated photo application. Retain the same loaded result scope,
+  original identities, incomplete-scope notices and bounded rendition budget.
+  The [2026-10-13 bounded polish acceptance](domain-polish-acceptance-20261013.md)
+  records the clearer wall/names/controls and real local inspection/selection
+  checks; original takeout keeps its earlier separate evidence. Complete
+  curated organization and large-library/real-device behavior remain open.
+- [~] **Music use:** coordinate recorded track/artist/album browsing with the
+  single verified player and transient queue. Finish existing queue failure
+  states before admitting persistent playlists or media services.
+  The same acceptance records the coherent browse/action row, native keyboard
+  selection, decoded original and shared-player continuity. Persistent
+  playlists and the residual playback/failure scope remain open.
+
+Each slice still needs its own normative requirement and executable exit.
+Persistent albums/playlists, richer grouping, folder mutation, sharing and
+sync are separate decisions; this category wording does not admit them.
+The existing correctness gaps and core/recovery gates remain in force.
+
+Future media candidates, outside the admitted implementation queue:
+[video/anime, Bangumi and danmaku review](../research/media-and-anime-experience-20261013.md)
+and [ADR-037](build-stack-and-architecture-selection.md#adr-037-complete-existing-domain-journeys-then-review-a-personal-video-successor)
+record the operator's 2026-10-13 request, useful domain journeys, optional
+enrichment and proposed exits. They do not create a new surface or gate credit.
+
+Dedicated-entry refinement of the current daily loop:
+
+- [x] Give Library/Photos/Music explicit global destination entries and a
+  consistent host header; keep type filtering and in-domain render styles
+  separate. Label the full-listing rail action All content.
+- [x] Verify retained query/tag scope without a repeated search, the same
+  decoded player across the destination cycle, draft cancellation and old
+  direct links; review clean 390/1280 light/dark and Showcase layouts.
+
+Executable evidence: [destination navigation acceptance](destination-navigation-acceptance-20261013.md)
+records local Luna implementation, primary review, current-build headless
+browser checks and the preserved fixture restart. It grants no native-device,
+new media or core/release completion.
+
+Progressive-disclosure refinement of the same daily loop:
+
+- [x] Place the compiled Overview inside Library's View options, retaining
+  Library/Photos/Music as global destinations and Library's active state.
+- [x] Disclose search history/help and secondary Library controls on demand;
+  keep active restrictions, incomplete scope and grammar errors visible.
+- [x] Review the final 390/1280 light/dark default/search layouts and exercise
+  one search → Overview → File view without another query, plus plain/exact
+  completion and refused invalid text.
+
+Executable evidence: [progressive-disclosure acceptance](progressive-disclosure-acceptance-20261013.md)
+records reviewed local Luna implementation, final served assets, screenshots
+and three bounded browser assertions. History mutation and broader keyboard,
+media, large-library and release coverage were not rerun. The parent Library,
+Photos and Music rows remain partial.
+
+Exhibition gallery refinement of the existing Photos presentation:
+
+- [x] Prioritize the current photo with a stable center, quiet adjacent
+  previews, compact heading, one current action row and disclosed help.
+- [x] Verify first/middle/last and keyboard navigation, bounded mounts,
+  neighbor focus, inspector/Details entry, selection return and a real
+  unavailable preview; review 390/1280 light/dark final screenshots.
+
+Executable evidence: [Exhibition gallery acceptance](exhibition-gallery-acceptance-20261013.md)
+records reviewed local Luna implementation and headless browser checks.
+It adds no photo organization, provider, core-phase or release qualification.
+
+Functional continuation of the admitted daily loop (2026-10-13 cohort):
+
+- [x] Add local Music title/artist/album/track/duration/size ordering and honest
+  playback-eligibility filtering, retaining original subject mapping and
+  unknown facts. Final keyboard trace follows the displayed sorted rows.
+- [x] Insert one distinct queue occurrence after the current track without
+  replacing its verified Blob or playback position; close/refocus the row
+  queue menu after an action. Keep the queue transient and bounded.
+- [x] Select an inclusive ordinary-Library range; add/reuse/remove an exact
+  TAG and explicitly favorite/unfavorite captured subjects. Complete reads,
+  revision checks, reread results, draft preservation and injected refusal
+  checks retain unrelated annotations and report unavailable outcomes.
+- [x] Select/deselect inside Photos and Exhibition inspection, show the same
+  selected-item count, and reach the one existing batch-action region.
+- [x] Expose the existing Saved retrieval entry directly in File/Overview;
+  retain the media-scope save refusal inside opened domain tools.
+
+Executable evidence: [functional client acceptance](functional-client-acceptance-20261013.md)
+and its retained QA report distinguish earlier v2 evidence, final v5 build and
+browser checks, and injected-only read failures. Go regression ran once;
+served JS/CSS match the final build. Real 1,000-entry UI saturation, async
+Details switching, uncertain-write reconciliation and additional saved-query
+combinations remain unrun. Library, Photos and Music stay partial; curated
+albums, durable playlists and video remain separate targets in ADR-041.
+
 ### UX-D1 — focused full-page Photos and Music (2026-10-12)
 
 The operator explicitly selected this current presentation slice on 2026-10-12.
@@ -68,18 +209,42 @@ The normative boundary is
 with the rationale in
 [ADR-034](build-stack-and-architecture-selection.md#adr-034-focused-full-page-domain-layouts-over-shared-host-state).
 
-- [~] Give Photos/Music full-page composition selected by compiled metadata,
+- [x] Give Photos/Music full-page composition selected by compiled metadata,
   with compatible direct links and no permanently expanded generic rail/tools.
-- [~] Keep management, trusted status, shared search and original actions
+- [x] Keep management, trusted status, shared search and original actions
   reachable; active restrictions and incomplete listing states stay legible.
-- [~] Refine readable light/dark domain content and concise Music batch actions
+- [x] Refine readable light/dark domain content and concise Music batch actions
   without changing their displayed-scope counts, omissions or transient queue.
-- [ ] Accept the integrated browser journey at 390/1280: direct links, controls,
+- [x] Accept the integrated browser journey at 390/1280: direct links, controls,
   shared player through navigation, guarded drafts, scope and original actions.
 
+Executable evidence: [local full-page acceptance](full-page-domain-layouts-acceptance-20261012.md)
+records the captured light/dark layouts, one-player source/position retention,
+filtered selected append, client home/management/search navigation, actual
+cancelled Notes confirmation and SHA-256-matched browser original download.
+The final build, registry/i18n checks, broad Go run and served-byte verification
+passed. Large-library, real-device and all fault branches remain outside this
+acceptance; existing incomplete-listing rendering was preserved rather than
+re-qualified on the large corpus.
+
+Header refinement of the same UX-D1 slice:
+
+- [x] Replace the stacked search/navigation strips with one compact host
+  capsule and separate in-domain display choices; keep standard Library chrome.
+- [x] Accept disclosed search and management on keyboard and pointer paths,
+  retaining field text, result scope, draft protection and the shared player.
+- [x] Capture light/dark 390/1280 layouts and bind checks to the served assets.
+
+Executable evidence: [immersive host-header acceptance](immersive-host-header-acceptance-20261012.md)
+records eight final layouts, native search/history/operator visibility, all
+three focus shortcuts, retained query text/scope, settings return focus,
+cancelled Notes confirmation, visible browser-offline fallback/reconnection,
+and the same unpaused original across Music → Photos → Music. Build,
+registry/i18n, broad cached Go, served-byte identity and whitespace checks pass.
+
 Implementation has been delegated through DeepSeek Harness to the explicitly
-selected `sub2api / deepseek-v4.1-flash` route. Primary review and acceptance
-remain required. This row grants no album/playlist, runtime package, new query,
+selected `sub2api / deepseek-v4.1-flash` route. Primary review and local browser
+acceptance are recorded above. This row grants no album/playlist, runtime package, new query,
 core-phase or release completion.
 
 This ledger now tracks the parallel RW-PERSONAL-UX-1 client cohort admitted by
@@ -162,7 +327,7 @@ This does not complete the Music domain.
 ### Open-ended page and interface successor
 
 - [x] E1 Independently registered compiled pages and shell renderers reject ID/route/slot collisions; compatible Photos/Music aliases and Exhibition route resolve. This is trusted source registration, not a runtime plugin loader.
-- [x] E2 Photo Exhibition navigates the complete loaded image context with at most five nearby 1 MiB thumbnails mounted. Real PNG browser checks cover selection, keyboard steps and 390 px layout; visual transforms stay on artwork so controls remain clickable.
+- [x] E2 Photo Exhibition navigates the complete loaded image context with at most five previews from the existing bounded thumbnail pipeline mounted. Real PNG browser checks cover selection, keyboard steps and 390 px layout; visual transforms stay on artwork so controls remain clickable. The [2026-10-13 gallery refinement](exhibition-gallery-acceptance-20261013.md) records centered first/middle/last images, ordinary-photo and unavailable outcomes under the existing UX-P2 limits, and refreshed light/dark layouts.
 - [x] E3 Photos ↔ Exhibition retains shared subject focus, batch selection and an unsaved Notes draft. MP3 playback retains the same Blob/time through page switches. An isolated fault bundle exercises actual page/shell boundaries and one workspace fallback; it is not real-content or plugin-isolation evidence.
 - [x] E4 ADR-026 and the source contribution guide record why the host stays authoritative and why whole shells are distinct from colors. Two DSH CLI Opus5.5 consultation turns are retained as advisory evidence.
 - [ ] E5 Review and admit RW-MEDIA-2 photo renditions/facts/covers and curated album/ordered-playlist contracts, then implement their declared journeys. The successor proposal is ready, not admitted or delivered.

@@ -63,6 +63,15 @@ export function moveQueueTrack(queue: AudioQueueEntry[], target: QueueTrack, del
   return next;
 }
 
+/** Insert one prepared occurrence directly after the current occurrence.
+ * If playback is idle or the active file is not queued, put it at the front.
+ */
+export function insertQueueTrackNext(queue: AudioQueueEntry[], track: AudioQueueEntry, current?: QueueTrack): AudioQueueEntry[] {
+  const currentIndex = current ? queue.findIndex((candidate) => sameQueueOccurrence(candidate, current)) : -1;
+  const insertionIndex = currentIndex < 0 ? 0 : currentIndex + 1;
+  return [...queue.slice(0, insertionIndex), track, ...queue.slice(insertionIndex)];
+}
+
 export type RemoveQueueOccurrenceResult = { queue: AudioQueueEntry[]; removed: boolean; activeRemovalRequired: boolean };
 export function removeQueueOccurrence(queue: AudioQueueEntry[], target: QueueTrack, current?: QueueTrack): RemoveQueueOccurrenceResult {
   if (current && sameQueueOccurrence(current, target)) return { queue, removed: false, activeRemovalRequired: true };

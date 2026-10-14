@@ -38,7 +38,7 @@ export function WorkspaceRail({ t, viewMode, hasActiveFilters, libraryCount, sou
   return <aside className="workspace-sidebar" aria-label={t("Navigation")}>
     <div className="workspace-sidebar-group">
       <p className="workspace-sidebar-label">{t("ORGANIZE")}</p>
-      <button type="button" className={`workspace-nav-item ${["content", "search", "tag"].includes(viewMode) || libraryPageForMode(viewMode as ViewMode) ? "active" : ""}`} onClick={onLibrary}><Home size={16} /><span>{t("Library")}</span><small>{libraryCount || 0}</small></button>
+      <button type="button" className={`workspace-nav-item ${["content", "search", "tag"].includes(viewMode) || libraryPageForMode(viewMode as ViewMode) ? "active" : ""}`} onClick={onLibrary}><Home size={16} /><span>{t("All content")}</span><small>{libraryCount || 0}</small></button>
       <button type="button" ref={tagsRef} data-view="tags" className={`workspace-nav-item ${viewMode === "tags" ? "active" : ""}`} onClick={onTags}><Tags size={16} /><span>{t("Tags")}</span></button>
       <button type="button" ref={notesRef} data-view="notes" className={`workspace-nav-item ${viewMode === "notes" ? "active" : ""}`} onClick={onNotes}><StickyNote size={16} /><span>{t("Notes")}</span></button>
     </div>

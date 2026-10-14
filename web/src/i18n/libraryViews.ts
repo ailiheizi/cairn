@@ -8,6 +8,6 @@ export const libraryViews: Record<string, string> = {
   "Display style": "显示方式",
   "Photo wall": "照片墙",
   "Library layouts": "浏览布局",
-  "Content overview": "资料总览",
+  "Content overview": "分类总览",
   "Photos, music and other content together in the current Library scope.": "在当前内容范围内，一起浏览照片、音乐和其他资料。",
 };

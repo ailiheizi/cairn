@@ -4,5 +4,6 @@ import type { AudioTrack } from "./audioPlayback";
 export type MusicQueueControls = {
   count: number;
   addTracks: (tracks: AudioTrack[]) => void;
+  addNext?: (track: AudioTrack) => void;
   show: () => void;
 };

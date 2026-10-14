@@ -19,6 +19,13 @@ export type LibraryPageDefinition = {
   /** Label used when this renderer appears beside its sibling presentations. */
   presentationLabel?: string;
   chrome?: "standard" | "immersive";
+  /**
+   * Host composition for a registered domain root. `focused` lets the page own
+   * most of the viewport and moves the generic library tool bands into a
+   * keyboard-reachable disclosure. It is presentation metadata, not a routing
+   * or selection authority.
+   */
+  composition?: "focused";
   mediaClass?: "image" | "audio" | "all";
   /** Aggregate layouts stay separate from media-domain destinations. */
   navigationKind?: "domain" | "layout";
@@ -62,6 +69,7 @@ export function validateLibraryPages(pages: readonly LibraryPageDefinition[]): v
     if (!page.label.trim()) throw new Error(`Library page label is empty: ${page.id}`);
     if (page.presentationLabel !== undefined && !page.presentationLabel.trim()) throw new Error(`Library presentation label is empty: ${page.id}`);
     if (page.chrome !== undefined && page.chrome !== "standard" && page.chrome !== "immersive") throw new Error(`Invalid library page chrome: ${page.id}`);
+    if (page.composition !== undefined && page.composition !== "focused") throw new Error(`Invalid library page composition: ${page.id}`);
     if (page.navigationKind !== undefined && page.navigationKind !== "domain" && page.navigationKind !== "layout") throw new Error(`Invalid library page navigation kind: ${page.id}`);
     if (page.navigationKind === "layout" && (page.presentationOf || page.mediaClass !== "all")) throw new Error(`Aggregate library layouts must be all-types roots: ${page.id}`);
     if (reservedModes.has(page.mode)) throw new Error(`Library page mode is reserved by the host: ${page.mode}`);
@@ -102,9 +110,9 @@ export function validateLibraryRendererIDs(pages: readonly LibraryPageDefinition
 
 /** Compiled first-party metadata. Renderer implementations are bound by LibraryPageHost. */
 export const libraryPages: readonly LibraryPageDefinition[] = [
-  { id: "cairn:photos", mode: "photos", route: "photos", slot: "page.cairn.photos", label: "Photos", presentationLabel: "Photo wall", description: "Photos shows image files saved in your Library.", context: "loaded-library", mediaClass: "image" },
-  { id: "cairn:music", mode: "music", route: "music", slot: "page.cairn.music", label: "Music", description: "Audio shows files in your Library; browsing does not play them.", context: "loaded-library", mediaClass: "audio" },
-  { id: "cairn:exhibition", mode: "page:cairn:exhibition", route: "exhibition", slot: "page.cairn.exhibition", label: "Exhibition", presentationOf: "cairn:photos", presentationLabel: "Exhibition", description: "Walk through your saved images in a focused gallery.", context: "loaded-library", chrome: "immersive", mediaClass: "image" },
+  { id: "cairn:photos", mode: "photos", route: "photos", slot: "page.cairn.photos", label: "Photos", presentationLabel: "Photo wall", description: "Photos shows image files saved in your Library.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "image" },
+  { id: "cairn:music", mode: "music", route: "music", slot: "page.cairn.music", label: "Music", description: "Audio shows files in your Library; browsing does not play them.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "audio" },
+  { id: "cairn:exhibition", mode: "page:cairn:exhibition", route: "exhibition", slot: "page.cairn.exhibition", label: "Exhibition", presentationOf: "cairn:photos", presentationLabel: "Exhibition", description: "Walk through your saved images in a focused gallery.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "image" },
   { id: "cairn:overview", mode: "page:cairn:overview", route: "overview", slot: "page.cairn.overview", label: "Content overview", description: "Photos, music and other content together in the current Library scope.", context: "loaded-library", mediaClass: "all", navigationKind: "layout" },
 ];
 

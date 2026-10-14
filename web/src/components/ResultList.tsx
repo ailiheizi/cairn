@@ -6,6 +6,7 @@ import { ContentPreview, previewThumbBudget, previewThumbKind } from "./ContentP
 import { useResultWindow } from "./ResultWindow";
 import { exactIdentityKey, formatBytes, formatEntryType, formatFacetValue, mediaClassFromSuffix, previewUnicodeText, searchSegmentSourceLabel, sortableSize } from "../lib/format";
 import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, SortField, ViewMode } from "../lib/types";
+import "./ResultList.css";
 
 // The library result list: one grid of tiles or one dense list, both rendered
 // from the same loaded projection. The listing never invents content: a tile
@@ -26,7 +27,7 @@ import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, S
 // asks for the next page (`onLoadMore`), so a page boundary is not the end of
 // the listing.
 
-export function ResultRow({ hit, index, roving, duplicateCount, selected, multiSelected, userTags, sizeSort, t, command, workspaceId, locale, showThumb = true, showMatch = false, onRowClick, onToggleSelection }: { hit: SearchHit; index: number; roving: boolean; duplicateCount: number; selected: boolean; multiSelected: boolean; userTags: string[]; sizeSort: boolean; t: Translator; command: Command; workspaceId: string; locale: Locale; showThumb?: boolean; showMatch?: boolean; onRowClick: (index: number, event: RowClickEvent) => void; onToggleSelection: (index: number) => void }) {
+export function ResultRow({ hit, index, roving, duplicateCount, selected, multiSelected, userTags, sizeSort, t, command, workspaceId, locale, showThumb = true, showMatch = false, onRowClick, onToggleSelection, onExtendSelection }: { hit: SearchHit; index: number; roving: boolean; duplicateCount: number; selected: boolean; multiSelected: boolean; userTags: string[]; sizeSort: boolean; t: Translator; command: Command; workspaceId: string; locale: Locale; showThumb?: boolean; showMatch?: boolean; onRowClick: (index: number, event: RowClickEvent) => void; onToggleSelection: (index: number) => void; onExtendSelection?: (index: number) => void }) {
   const directory = hit.entry_type === "DIRECTORY";
   const matchedSegments = showMatch ? (hit.segments ?? []).filter((segment) => Boolean(segment.matched_text?.trim())) : [];
   const visibleSegments = matchedSegments.slice(0, 1);
@@ -49,14 +50,23 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
   const metaText = `${sizeLabel} · ${entryTypeLabel}${format ? ` · ${format.toUpperCase()}` : ""}`;
   const visibleTags = userTags.slice(0, 2);
   return <div className={`result-row ${selected ? "selected" : ""} ${multiSelected ? "multi-selected" : ""} ${showImageThumb ? "has-thumb" : directory ? "is-folder" : "is-file"}`} role="group" aria-label={title} data-result-index={index} onClick={(event) => onRowClick(index, event)}>
-    <span className="result-select" role="checkbox" aria-checked={multiSelected} tabIndex={-1} aria-label={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} title={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} onClick={(event) => { event.stopPropagation(); onToggleSelection(index); }}>{multiSelected && <Check size={13} />}</span>
+    <button type="button" className="result-select" role="checkbox" aria-checked={multiSelected} tabIndex={-1} aria-label={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} title={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} onClick={(event) => { event.stopPropagation(); if (event.shiftKey && onExtendSelection) onExtendSelection(index); else onToggleSelection(index); }} onKeyDown={(event) => {
+      // A focused checkbox owns its Enter/Space: it toggles this row once and
+      // never bubbles into the list's roving Space/Enter or row-open handling.
+      // preventDefault on keydown/keyup also suppresses the native button click,
+      // so the keyboard path cannot toggle a second time.
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) onToggleSelection(index);
+    }} onKeyUp={(event) => { if (event.key === " ") { event.preventDefault(); event.stopPropagation(); } }}>{multiSelected && <Check size={14} />}</button>
     <span className={`file-icon ${directory ? "is-folder" : showImageThumb ? "is-image" : `is-file is-${typeCue}`}`}>
       {directory ? <Folder size={48} /> : <TypeIcon size={44} />}
       {showImageThumb && <ContentPreview variant="thumb" command={command} locale={locale === "zh-CN" ? "zh-CN" : "en"} workspaceId={workspaceId} entryId={hit.entry_id} subjectRef={hit.subject_ref} contentId={hit.content_id} name={title} logicalSize={hit.logical_size} />}
       {!directory && format && <span className="result-format" aria-label={t("Filename format {{format}}", { format: format.toUpperCase() })}>{format.toUpperCase()}</span>}
       {duplicateCount > 1 && <span className="result-duplicate" title={t("Loaded content contains {{count}} entries with the same SHA-256 and length", { count: duplicateCount })}>{duplicateCount}</span>}
     </span>
-    <button type="button" className="result-open-copy" tabIndex={roving ? 0 : -1} onClick={(event) => { event.stopPropagation(); onRowClick(index, event); }}><strong>{title}</strong></button>
+    <button type="button" className="result-open-copy" title={title} tabIndex={roving ? 0 : -1} onClick={(event) => { event.stopPropagation(); onRowClick(index, event); }}><strong>{title}</strong></button>
     {(!directory || sizeSort) && <span className="result-meta" title={metaText}><span>{metaText}</span></span>}
     {visibleSegments.map((segment, index) => {
       const segmentKey = `${segment.semantic_segment_id || segment.source_id || segment.source_type || "segment"}-${segment.ordinal ?? index}-${index}`;
@@ -67,7 +77,7 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
   </div>;
 }
 
-export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sortDirection, selectionCount, rovingRow, selectedRef, selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection, onKeyDown, listingPositions, onLoadMore }: {
+export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sortDirection, selectionCount, rovingRow, selectedRef, selectionRefs, identityCounts, tagsBySubject, viewMode, locale, t, command, workspaceID, onRowClick, onToggleSelection, onExtendSelection, onKeyDown, listingPositions, onLoadMore }: {
   hits: SearchHit[];
   libraryListRef: RefObject<HTMLDivElement | null>;
   libraryLayout: LibraryLayout;
@@ -86,6 +96,8 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
   workspaceID: string;
   onRowClick: (index: number, event: RowClickEvent) => void;
   onToggleSelection: (index: number) => void;
+  /** Optional range selection for the ordinary Library list only. */
+  onExtendSelection?: (index: number) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   /** The exact total position count of the projection this wall shows, when the
    *  daemon reported one. Positions at or past `hits.length` are not loaded yet
@@ -128,7 +140,7 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
   for (let position = startIndex; position < endIndex; position += 1) {
     const hit = hits[position];
     positionsToRender.push(hit
-      ? <ResultRow key={hit.subject_ref ?? position} index={position} roving={position === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={position < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} />
+      ? <ResultRow key={hit.subject_ref ?? position} index={position} roving={position === rovingRow} hit={hit} duplicateCount={identityCounts.get(exactIdentityKey(hit)) ?? 1} selected={selectedRef === hit.subject_ref} multiSelected={Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))} userTags={hit.subject_ref ? tagsBySubject.get(hit.subject_ref) ?? [] : []} sizeSort={sortField === "size"} t={t} command={command} workspaceId={workspaceID} locale={locale} showThumb={position < 48} showMatch={viewMode === "search"} onRowClick={onRowClick} onToggleSelection={onToggleSelection} onExtendSelection={onExtendSelection} />
       : <div className="result-pending" key={`pending-${position}`} style={rowHeight} data-result-pending={position} role="presentation" aria-hidden="true" />);
   }
   return <div ref={libraryListRef} className={`result-list ${libraryLayout === "list" ? "list-mode" : ""} ${sortField === "size" ? "sort-by-size" : ""} ${window.containerClass}`} style={window.containerStyle} role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move between tiles, Space to select the focused tile, Enter to open its details, and Escape to clear the selection.")} data-sort-field={sortField} data-sort-direction={sortDirection} data-selection-count={selectionCount} data-rendered-from={startIndex} data-rendered-to={endIndex} data-listing-count={hits.length} data-listing-total={positions} onKeyDown={onKeyDown}>{positionsToRender}</div>;

@@ -130,7 +130,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
 
   .top-actions { width: max-content; min-width: 0; display: flex; flex-wrap: nowrap; position: static; grid-column: 2; grid-row: 1; align-self: center; justify-self: end; justify-content: flex-end; gap: 2px; margin-left: 0; }
 
-  .top-actions button, .top-actions .icon-button { width: 32px; min-width: 32px; min-height: 32px; flex: 0 0 32px; padding: 6px; }
+  .top-actions > button, .top-actions > .icon-button { width: 32px; min-width: 32px; min-height: 32px; flex: 0 0 32px; padding: 6px; }
 
   .global-search { width: 100%; grid-column: 1 / -1; grid-row: 2; order: initial; flex-basis: auto; }
 
@@ -139,7 +139,36 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
 /* Search convenience: a focus shortcut, a clear control, and a local recents
    list. The recents panel is browser-only history; the durable form of a query
    is a saved view (`view.save`), which this panel never creates or mirrors. */
-.global-search { position: relative; }
+.global-search { position: relative; flex-wrap: wrap; }
+.global-search .search-assistance {
+  min-width: 0; flex: 1 0 100%; display: flex; align-items: center; gap: 14px;
+  padding: 1px 4px 2px; color: var(--quiet); font-size: 11px;
+}
+.global-search .search-assistance-toggle,
+.global-search .search-help > summary {
+  min-height: 28px; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; border-radius: 999px; padding: 4px 8px; color: var(--muted);
+  background: transparent; font: inherit; font-weight: 620; cursor: pointer;
+}
+.global-search .search-assistance-toggle:hover,
+.global-search .search-help > summary:hover { color: var(--ink); background: var(--accent-soft); }
+.global-search .search-assistance-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.global-search .search-help { position: relative; }
+.global-search .search-help > summary { list-style: none; }
+.global-search .search-help > summary::-webkit-details-marker { display: none; }
+.global-search .search-help[open] > summary { color: var(--ink); background: var(--accent-soft); }
+.global-search .search-help-content {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 8;
+  width: min(360px, calc(100vw - 48px)); display: grid; gap: 7px;
+  padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 14px;
+  color: var(--muted); background: var(--surface-container-high); box-shadow: var(--shadow-soft);
+  font-size: 11px; line-height: 1.5;
+}
+.global-search .search-help-content p { margin: 0; }
+.global-search .search-help-wires { display: grid; gap: 5px; padding-top: 7px; border-top: 1px solid var(--line); }
+.global-search .search-help-wires > p { display: flex; align-items: baseline; gap: 7px; }
+.global-search .search-help-wires code { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+.global-search .search-help-wires > p > span { color: var(--quiet); }
 .global-search .search-clear { width: 30px; min-height: 30px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 999px; color: var(--muted); background: transparent; font-weight: 600; }
 .global-search .search-clear:hover { border-color: var(--line-strong); color: var(--ink); background: var(--accent-soft); }
 .global-search .search-recents { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 6; display: grid; gap: 8px; padding: 12px 14px 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-container-high); box-shadow: var(--shadow-soft); }
@@ -165,7 +194,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
 @media (min-width: 641px) and (max-width: 1079px) {
   .topbar { gap: 9px; }
   .brand > span:last-child { display: inline; font-size: 14px; }
-  .top-actions .icon-button, .top-actions .restore-button { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 6px; }
+  .top-actions > .icon-button, .top-actions > .restore-button { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 6px; }
   .top-actions > .add-button { width: max-content; min-width: max-content; flex: 0 0 auto; padding: 8px 12px; white-space: nowrap; }
 }
 @media (max-width: 640px) {
@@ -174,7 +203,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
   .brand > span:last-child { display: inline; }
   .global-search { min-height: 42px; }
   .top-actions { width: 100%; grid-column: 1; grid-row: 2; flex-wrap: wrap; justify-content: space-between; gap: 2px; margin-left: 0; }
-  .top-actions button, .top-actions .icon-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; padding: 8px; }
+  .top-actions > button, .top-actions > .icon-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; padding: 8px; }
   .top-actions > .add-button { width: max-content; min-width: max-content; flex: 0 0 auto; padding: 8px 6px; font-size: 13px; white-space: nowrap; }
   .top-actions > .add-button span { display: inline; }
   .global-search { grid-column: 1; grid-row: 3; }
@@ -202,7 +231,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
     grid-column: 2; grid-row: 1; width: max-content; max-width: 100%;
     flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 2px; margin: 0;
   }
-  .top-actions button, .top-actions .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; flex: 0 0 36px; padding: 6px; }
+  .top-actions > button, .top-actions > .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; flex: 0 0 36px; padding: 6px; }
   .top-actions > .add-button { width: 36px; min-width: 36px; flex: 0 0 36px; padding: 6px; }
   .top-actions > .add-button span { display: none; }
   .global-search { grid-column: 1 / -1; grid-row: 2; min-height: 40px; padding: 4px 5px 4px 12px; }
@@ -217,4 +246,170 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible), textarea:focu
   .brand-mark { width: 30px; height: 30px; }
   .global-search { min-height: 38px; padding: 3px 5px 3px 12px; }
   .global-search button { min-height: 30px; padding: 6px 14px; }
+}
+
+/* Shared destination header for UX-D1 focused pages and the standard Library.
+ *
+ * A focused page or the standard Library uses one stable destination header
+ * instead of swapping between unrelated host affordances. The header is one
+ * floating glass capsule: a small brand, the centred top-level domain
+ * navigation, a native search disclosure, the Add entry and one
+ * navigation/status disclosure. The shared rail, restore/refresh/settings and
+ * the trusted status live in that one bounded overlay, so no full-width
+ * navigation or status band surrounds the content. The single search form and
+ * the shared rail components are reused, never re-mounted. Presentation only;
+ * Blog's local GlassNavigation informed the spacing and translucent treatment,
+ * with no Blog code, dependency or animation machinery imported.
+ *
+ * Every rule is scoped to `.topbar--destinations`, so only TopBar instances
+ * opting into this header receive the capsule styles; the workspace/showcase
+ * content frames remain unchanged. The modifier also outranks earlier `.topbar`
+ * composer/media rules. */
+.topbar.topbar--destinations {
+  position: sticky; top: 10px; z-index: 7;
+  width: min(1120px, calc(100% - 2 * var(--page-gutter)));
+  min-height: 0; margin: 10px auto 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; padding: 7px 10px 7px 14px;
+  border: 1px solid var(--hairline-strong); border-radius: 999px;
+  /* Opaque readable fallback; the translucent glass is opt-in below. */
+  background: var(--surface-container-high);
+  box-shadow: var(--card-shadow-soft), inset 0 1px var(--hairline);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .topbar.topbar--destinations {
+    background: var(--glass);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+}
+/* The destination capsule keeps base.css's accessibility fallbacks even though
+   its scoped class outranks that file's `.topbar` rules. */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar.topbar--destinations { background: var(--surface-dim); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .topbar.topbar--destinations { border-color: currentColor; background: var(--surface-dim); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .topbar--destinations .topbar-entry, .topbar--destinations .top-actions--focused > button { border-color: currentColor; }
+}
+.topbar--destinations .brand--focused { min-width: 0; gap: 9px; padding: 2px 4px; font-size: 15px; }
+.topbar--destinations .brand--focused .brand-mark { width: 34px; height: 34px; border-radius: 10px; }
+.topbar--destinations .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-focused-domains { min-width: 0; display: flex; justify-content: center; }
+.topbar--destinations .library-presentation-navigation { width: auto; flex-basis: auto; justify-content: center; flex-wrap: nowrap; }
+/* Let the active domain read as the selected pill inside the glass instead of
+   nesting a second surface behind it. */
+.topbar--destinations .library-presentation-navigation__domains { border: 0; padding: 0; background: transparent; }
+.topbar--destinations .library-presentation-navigation__domain,
+.topbar--destinations .library-presentation-navigation__presentation { min-height: 44px; padding-inline: 14px; }
+.topbar--destinations .library-presentation-navigation__domain.is-active { box-shadow: inset 0 0 0 1px var(--hairline), 0 0 14px var(--accent-soft); }
+.top-actions--focused { margin-left: 0; gap: 6px; }
+.topbar--destinations .top-actions--focused > button,
+.topbar--destinations .topbar-entry {
+  min-width: 44px; min-height: 44px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid transparent; border-radius: 999px; padding: 10px 14px;
+  color: var(--ink); background: transparent;
+  font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer;
+}
+.topbar--destinations .topbar-entry:hover,
+.topbar--destinations .topbar-entry:focus-visible { border-color: var(--hairline-strong); background: var(--accent-soft); }
+.topbar--destinations .top-actions--focused > .add-button { color: var(--primary-ink); background: var(--primary); border-color: var(--hairline-strong); }
+.topbar--destinations .top-actions--focused > .add-button:hover { background: var(--primary-deep); }
+.topbar--destinations .topbar-entry-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.topbar--destinations .topbar-entry-alert { flex: 0 0 auto; color: var(--coral); }
+.topbar--destinations .topbar-disclosure { position: static; }
+.topbar--destinations .topbar-disclosure > summary { list-style: none; }
+.topbar--destinations .topbar-disclosure > summary::-webkit-details-marker { display: none; }
+.topbar--destinations .topbar-disclosure[open] > .topbar-entry { border-color: var(--hairline-strong); background: var(--accent-soft); }
+/* The overlay panels float under the capsule, bounded to the viewport with
+   their own scrolling, so the content stays the page's main focus. */
+.topbar--destinations .topbar-overlay {
+  position: absolute; top: calc(100% + 10px); z-index: 8;
+  max-height: min(74vh, 660px); overflow-y: auto;
+  padding: 14px; border: 1px solid var(--line-strong); border-radius: 18px;
+  color: var(--ink); background: var(--surface-container-high); box-shadow: var(--card-shadow);
+}
+.topbar--destinations .topbar-search-overlay { left: 0; right: auto; width: min(600px, calc(100vw - 2 * var(--page-gutter))); }
+.topbar--destinations .topbar-menu-overlay { right: 0; left: auto; width: min(540px, calc(100vw - 2 * var(--page-gutter))); }
+.topbar--destinations .topbar-search-overlay .global-search { width: 100%; min-height: 46px; }
+.topbar--destinations .topbar-search-overlay .global-search { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; }
+.topbar--destinations .topbar-search-overlay .global-search > svg { grid-column: 1; grid-row: 1; }
+.topbar--destinations .topbar-search-overlay .global-search > input { grid-column: 2; grid-row: 1; width: 100%; min-width: 0; }
+.topbar--destinations .topbar-search-overlay .search-clear { grid-column: 3; grid-row: 1; }
+.topbar--destinations .topbar-search-overlay .search-submit { grid-column: 4; grid-row: 1; }
+.topbar--destinations .topbar-search-overlay .search-assistance { grid-column: 1 / -1; grid-row: 2; }
+.topbar--destinations .topbar-search-overlay .search-help-content { position: static; width: auto; box-shadow: none; }
+/* Suggestions join the panel's flow so the bounded overlay grows to show
+   them instead of clipping an absolute popup below a one-row form. */
+.topbar--destinations .topbar-search-overlay .search-recents,
+.topbar--destinations .topbar-search-overlay .search-suggest {
+  position: static; grid-column: 1 / -1; width: auto; min-width: 0;
+  margin-top: 8px; max-height: none;
+}
+.topbar-focused-status { grid-column: 1 / -1; min-width: 0; padding: 0 6px 4px; }
+.topbar--destinations .topbar-focused-status .connection { min-width: 0; white-space: normal; }
+.topbar--destinations .topbar-focused-status .connection > span { display: inline; overflow-wrap: anywhere; }
+.topbar--destinations .topbar-search-overlay .search-ops { margin: 10px 0 0; }
+.topbar--destinations .topbar-menu-navigation .workspace-sidebar {
+  position: static; min-height: 0;
+  flex-direction: row; flex-wrap: wrap; align-items: flex-start;
+  gap: 10px 26px; padding: 0;
+}
+.topbar--destinations .topbar-menu-navigation .workspace-sidebar-group { min-width: 150px; }
+.topbar--destinations .topbar-menu-navigation .workspace-sidebar-group-management { margin-top: 0; padding-top: 0; border-top: 0; }
+.topbar--destinations .topbar-menu-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.topbar--destinations .topbar-menu-actions .secondary-button { min-height: 44px; }
+.topbar--destinations .topbar-menu-actions .icon-button { width: 44px; height: 44px; min-height: 44px; }
+.topbar--destinations .topbar-menu-overlay .status-panel { overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); background: var(--surface-container-low); }
+.topbar--destinations .topbar-menu-overlay .status-panel-summary { padding-inline: 12px; }
+.topbar--destinations .topbar-menu-overlay .status-panel-body { padding-inline: 12px; }
+
+@media (max-width: 1079px) {
+  .topbar--destinations .topbar-entry-label { display: none; }
+  .topbar--destinations .top-actions--focused > button,
+  .topbar--destinations .topbar-entry { padding: 10px 12px; }
+}
+
+/* Showcase has a persistent side rail, leaving a narrower header column even
+   on wide displays. Keep its global destinations legible and save width for
+   the three actions by using their accessible icon names. */
+.interface-showcase .topbar--destinations .topbar-entry-label { display: none; }
+.interface-showcase .topbar--destinations .library-presentation-navigation__domain,
+.interface-showcase .topbar--destinations .library-presentation-navigation__presentation { padding-inline: 9px; }
+
+/* Phone: the brand and the three actions share the first row and the domain
+   capsule drops to a second row only when it needs one. The labels collapse to
+   the same 44px icon targets, and both overlays span the capsule width. */
+@media (max-width: 640px) {
+  .topbar.topbar--destinations {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 8px; padding: 7px 10px; border-radius: 22px;
+  }
+  .topbar--destinations .brand--focused { grid-column: 1; grid-row: 1; }
+  .topbar--destinations .top-actions--focused { grid-column: 2; grid-row: 1; justify-self: end; }
+  .topbar-focused-domains { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .topbar--destinations .library-presentation-navigation { justify-content: flex-start; flex-wrap: wrap; }
+  .topbar--destinations .library-presentation-navigation__domain,
+  .topbar--destinations .library-presentation-navigation__presentation { padding-inline: 8px; }
+  .topbar--destinations .topbar-entry-label { display: none; }
+  .topbar--destinations .top-actions--focused > button,
+  .topbar--destinations .topbar-entry { width: 44px; min-width: 44px; padding: 10px; }
+  .topbar--destinations .top-actions--focused > .add-button { width: 44px; min-width: 44px; padding: 10px; }
+  .topbar--destinations .topbar-search-overlay,
+  .topbar--destinations .topbar-menu-overlay { left: 0; right: 0; width: auto; }
+  .topbar--destinations .topbar-overlay { max-height: 72vh; }
+}
+
+/* library-views.css stacks every presentation navigation below 391px; inside
+   the capsule the domains stay one wrapping row instead of a tall column. */
+@media (max-width: 390px) {
+  .topbar--destinations .library-presentation-navigation { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar--destinations .topbar-entry,
+  .topbar--destinations .top-actions--focused > button,
+  .topbar--destinations .library-presentation-navigation__domain { transition: none; }
 }

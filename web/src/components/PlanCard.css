@@ -1,0 +1,63 @@
+/* Compact "ordinary upload" presentation for the add-source plan review.
+   Every rule is scoped under `.plan-card.compact` so the standard
+   server-path/recheck PlanCard in drawer.css is unchanged. Colors come from
+   the shared appearance tokens, so light and dark appearances both apply. */
+
+.plan-card.compact { display: grid; gap: 12px; }
+.plan-card.compact .plan-title { align-items: center; }
+.plan-card.compact .plan-title h3 { font-size: 17px; line-height: 1.25; }
+.plan-card.compact .plan-warning { margin: 0; }
+.plan-card.compact .plan-stats { margin: 0; }
+
+.plan-compact-heading.ready,
+.plan-compact-heading.saved { color: var(--health); }
+.plan-compact-heading.pending { color: var(--accent); }
+.plan-compact-heading.warn { color: var(--gold); }
+
+.plan-compact-summary { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px; margin: 0; color: var(--muted); font-size: 12px; }
+.plan-compact-summary strong { color: var(--ink); font-size: 15px; font-weight: 760; }
+.plan-compact-size { min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
+.plan-compact-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+.plan-compact-files { min-width: 0; display: grid; gap: 6px; }
+.plan-compact-files-label { min-width: 0; display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 11px; font-weight: 720; }
+.plan-compact-files-label svg { flex: 0 0 auto; color: var(--accent); }
+.plan-compact-files-label b { flex: 0 0 auto; margin-left: auto; border: 1px solid var(--hairline); border-radius: 6px; padding: 1px 7px; color: var(--ink); background: var(--card-fill-quiet); font-size: 10px; }
+/* The list is bounded and scrollable, but the count above always states the
+   full number of rows; no filename is silently dropped. */
+.plan-compact-file-list { min-width: 0; max-height: 170px; display: grid; gap: 0; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); list-style: none; }
+.plan-compact-file-list li { min-width: 0; display: flex; align-items: flex-start; gap: 6px; border-bottom: 1px solid var(--hairline); padding: 6px 10px; color: var(--ink); font-size: 11px; line-height: 1.4; }
+.plan-compact-file-list li:last-child { border-bottom: 0; }
+.plan-compact-file-list li span { min-width: 0; overflow-wrap: anywhere; }
+
+.plan-compact-blocked ul { margin: 0; padding-left: 18px; }
+.plan-compact-blocked li { display: grid; gap: 2px; }
+.plan-compact-blocked li strong { overflow-wrap: anywhere; font-size: 11px; }
+.plan-compact-blocked li span { overflow-wrap: anywhere; }
+
+.plan-compact-check { display: grid; gap: 8px; justify-items: start; }
+/* Higher specificity than the shared `.secondary-button` rule so the compact
+   check action keeps a 44px touch target in either appearance. */
+.plan-card.compact .plan-check-button { min-width: 0; min-height: 44px; }
+
+.plan-compact-details { min-width: 0; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); background: var(--card-fill-quiet); }
+.plan-compact-details > summary { min-height: 44px; display: flex; align-items: center; gap: 7px; padding: 8px 12px; color: var(--ink); font-size: 11px; font-weight: 720; list-style: none; cursor: pointer; }
+.plan-compact-details > summary::-webkit-details-marker { display: none; }
+.plan-compact-details > summary svg:first-child { flex: 0 0 auto; color: var(--accent); }
+.plan-compact-details > summary svg:last-child { flex: 0 0 auto; margin-left: auto; color: var(--quiet); transition: transform 150ms ease; }
+.plan-compact-details[open] > summary { border-bottom: 1px solid var(--hairline); }
+.plan-compact-details[open] > summary svg:last-child { transform: rotate(90deg); }
+.plan-compact-details-body { min-width: 0; display: grid; gap: 12px; padding: 12px; }
+.plan-compact-details-body .plan-disclosure { margin: 0; }
+.plan-detail-file-list { min-width: 0; display: grid; overflow: hidden; border: 1px solid var(--hairline); border-radius: 8px; }
+
+@media (max-width: 420px) {
+  .plan-compact-summary strong { font-size: 14px; }
+  .plan-compact-file-list { max-height: 140px; }
+  .plan-card.compact .plan-stats { gap: 10px; }
+  .plan-compact-details-body { gap: 10px; padding: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-compact-details > summary svg:last-child { transition: none; }
+}
