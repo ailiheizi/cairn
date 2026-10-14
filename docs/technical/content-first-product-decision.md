@@ -8,6 +8,32 @@
 >
 > Decision records: the dated ADRs below, including the current ADR-035 public positioning and intake decision.
 
+## Operator priority update (2026-10-14)
+
+The operator's product priority is to help one owner **find content, use it or
+take out exact originals, then tailor the client to personal habits**. Intake
+and exact deduplication support that user loop. This restates presentation and
+priority only; it adds no durable organization, backend/API behavior, or new
+surface. Existing compiled layouts, registered Photos/Music presentations, and
+selectable JSON color-theme packages are current client capabilities. Broader
+packages that add pages or whole-interface compositions remain the bounded
+design direction in
+[ADR-032](build-stack-and-architecture-selection.md#adr-032-presentation-plane-extensions-with-a-closed-recovery-plane),
+consistent with the shared client flows in
+[ADR-021](build-stack-and-architecture-selection.md#adr-021-replaceable-bundled-interface-experiences-over-shared-client-flows)
+and the fixed presentation composition boundary in
+[ADR-028](build-stack-and-architecture-selection.md#adr-028-domain-presentations-and-fixed-template-composition).
+It does not mean runtime third-party loading, a plugin marketplace, or any
+extension of the trusted recovery plane. This note does not change phase order
+or grant implementation or completion credit.
+
+The longer product direction is to make retrieval feel easier, make Photos and
+Music more complete (including curated albums and persistent playlists), add a
+dedicated retained-video experience, and give the operator more ways to shape
+the whole client through presentation-only packages. These are future product
+directions, not shipped capabilities or new implementation admission; any work
+continues to require its existing contract and phase gates.
+
 ## Product promise
 
 **2026-10-12 presentation decision:** the operator selected the familiar

@@ -4,7 +4,7 @@ All project documentation is written in English.
 
 > **Documentation status — unreleased core preview after `v0.1.0-prealpha.1`.** The current tree runs and tests the local inspect/protect/search/verify/restore workflow, including an explicit development-time installer for the fixed BGE/ONNX + zvec bundle and an optional browser client. The installer downloads pinned artifacts, verifies their digests, publishes the bundle atomically, and exposes the required restart and index-rebuild steps. A deterministic candidate-only offline artifact assembler now combines prebuilt daemon/CLI/Web assets with a retained semantic bundle and verifiable license/checksum evidence; it is not a supported installer or release qualification. Cairn does not yet provide a qualified production repository or a release-qualified workflow/profile.
 
-Cairn is positioned as **a better self-hosted private drive**: “Keep it in your space. Find it, use it, take it with you.” Its first target is NAS and home-storage hobbyists. The formal product remains a content, description, discovery, export, and recovery plane; `RW-MVP-1` is a read-only managed archive and discovery profile. A shared content library and complete Photos/Music workflows are the product target. The admitted RW-PERSONAL-UX-1 client slice supplies dedicated Photos/Music pages, bounded original playback and transient queues; recorded artist/album navigation and transient queue controls are admitted client work; curated albums, new extraction and durable playlists remain outstanding. Video and document readers remain future work. Later NAS and enterprise profiles must qualify additional writable and distributed semantics separately. The project is not defined by a particular NAS vendor, repository engine, search engine, or AI runtime.
+Cairn is positioned as **a better self-hosted private drive**: “Keep it in your space. Find it, use it, take it with you.” Its first target is NAS and home-storage hobbyists. The user-facing priority is to find content, use it or take out exact originals, then tailor the existing client presentation to personal habits; file intake and exact deduplication support that loop. The formal product remains a content, description, discovery, export, and recovery plane; `RW-MVP-1` is a read-only managed archive and discovery profile. A shared content library and complete Photos/Music workflows are the product target. The admitted RW-PERSONAL-UX-1 client slice supplies dedicated Photos/Music pages, bounded original playback and transient queues; recorded artist/album navigation and transient queue controls are admitted client work; curated albums, new extraction and durable playlists remain outstanding. Video and document readers remain future work. Later NAS and enterprise profiles must qualify additional writable and distributed semantics separately. The project is not defined by a particular NAS vendor, repository engine, search engine, or AI runtime.
 
 For the current product decisions and next-work map, start with the
 [Content-First Product Decision](technical/content-first-product-decision.md).
@@ -73,7 +73,13 @@ self-deployment in one outcome map while preserving the core phase gates.
 [ADR-020](technical/build-stack-and-architecture-selection.md#adr-020-curated-color-palettes-as-a-presentation-sublayer),
 and [ADR-021](technical/build-stack-and-architecture-selection.md#adr-021-replaceable-bundled-interface-experiences-over-shared-client-flows)
 record official bundled-module boundaries, conflict handling, replaceable client
-interfaces, and their secondary color palettes. The [research report](research/single-operator-plugins-and-themes-20261006.md)
+interfaces, and their secondary color palettes. The current client includes two
+compiled built-in layouts, registered Photos/Music presentations, and selectable
+JSON color-theme packages. Broader packages that add pages or whole interface
+compositions remain a bounded design direction under
+[ADR-032](technical/build-stack-and-architecture-selection.md#adr-032-presentation-plane-extensions-with-a-closed-recovery-plane),
+not a shipped arbitrary-plugin system: runtime third-party code, a kernel ABI,
+and recovery-plane access remain out of scope. The [research report](research/single-operator-plugins-and-themes-20261006.md)
 compares DSH/Cordis and other extension/theme systems. These documents are
 informative planning; they add no runtime, remote-user profile, or phase credit. The
 [bounded client acceptance](technical/client-appearance-and-views-acceptance-20261006.md)

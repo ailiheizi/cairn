@@ -65,9 +65,7 @@
 //   node scripts/web-presentation-package-check.mjs
 //
 // Environment:
-//   RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH  Chrome/Chromium binary
-//   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH         the name the neighbouring browser
-//                                            harnesses read; accepted as well
+//   CAIRN_PLAYWRIGHT_EXECUTABLE_PATH         Chrome/Chromium binary
 //   CAIRN_PRESENTATION_WEB_ROOT              built client root (default
 //                                            <repository>/web/dist)
 //
@@ -89,8 +87,7 @@ const webRoot = resolve(process.env.CAIRN_PRESENTATION_WEB_ROOT || join(repo, "w
 // into the served output, so the same bytes must appear in both places.
 const sourcePackageRoot = join(repo, "web", "public", "presentation-packages");
 const chrome = (
-  process.env.RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH
-  || process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH
+  process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH
   || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 ).trim();
 const tempPrefix = join(tmpdir(), "cairn-presentation-package-");
@@ -877,7 +874,7 @@ async function scenarioPerAppearanceRefused(packagesDirectory, declaredVersion) 
 
 try {
   require(existsSync(join(webRoot, "index.html")), `the built client is missing at ${webRoot}.\n      Build it first:  cd web && npm ci && npm run build\n      or set CAIRN_PRESENTATION_WEB_ROOT to an absolute built client root.`);
-  require(existsSync(chrome), `Chrome/Chromium was not found at ${chrome}.\n      Set RESTOREWEAVE_PLAYWRIGHT_EXECUTABLE_PATH to a Chrome/Chromium binary.`);
+  require(existsSync(chrome), `Chrome/Chromium was not found at ${chrome}.\n      Set CAIRN_PLAYWRIGHT_EXECUTABLE_PATH to a Chrome/Chromium binary.`);
   const playwright = await import("../web/node_modules/playwright/index.mjs").catch(() => {
     throw new Error("Playwright is not installed in web/node_modules.\n      Install the web toolchain first:  cd web && npm ci");
   });

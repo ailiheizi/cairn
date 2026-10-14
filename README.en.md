@@ -13,7 +13,7 @@
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26-79c2ff?style=flat-square" alt="Go 1.26"></a>
 </p>
 
-> Cairn is for NAS and home-storage hobbyists: keep files in your own space, find them through one search, use them through comfortable photo, music and library experiences, and download originals. Current `main` is an unreleased development preview after `v0.1.0-prealpha.1`, not a production release. A supported installer, production repository qualification, LinkGroup, and complete multi-platform guarantees remain open.
+> Cairn is for NAS and home-storage hobbyists: find your content, use it through Photos, Music and Library, or take out and verify the originals; existing built-in layouts and dedicated interfaces make daily work fit personal habits. File-first intake and exact deduplication support that loop. Current `main` is an unreleased development preview after `v0.1.0-prealpha.1`, not a production release. A supported installer, production repository qualification, LinkGroup, and complete multi-platform guarantees remain open.
 
 <p align="center">
   <img src="docs/assets/screenshots/unreleased/library-en.png" alt="Cairn library preview with content search, Notes, batch tags, and index status" width="1100">
@@ -24,12 +24,23 @@
 
 ## Core capabilities
 
-- **Easy intake:** choose or drop files, review the automatically prepared batch and confirm saving originals; importing an existing NAS directory remains available.
 - **Find content:** keywords, structured filters, tags, and Notes work together; semantic search is available after an explicitly provisioned and verified local BGE bundle.
+- **Use or take out originals:** work with content in Photos, Music or Library, download original files, or export and verify their bytes.
+- **Make it your tool:** choose Workspace or Content showcase, then use dedicated interfaces such as Photos and Music in ways that fit your habits; over time, we hope to offer more ways to combine pages, layouts and presentations.
 - **Keep context:** names, source paths, file facts, multiple tags, and one Notes surface stay with the content.
 - **Organize in batches:** add or remove tags and favorite selected content; the ordinary Library list supports range selection in displayed row order.
-- **Take originals with you:** preview supported content, download original files, or export and verify their bytes.
+- **Easy intake:** choose or drop files, review the automatically prepared batch and confirm saving originals; importing an existing NAS directory remains available.
 - **Reduce duplicates:** SHA-256 of the complete content plus logical length identifies exact matches, so duplicate content is stored once.
+
+### Future directions
+
+We want to make content easier to find, use and take out, then help each person shape the whole tool into something they enjoy using. Here are experiences we hope to expand beyond the current preview:
+
+- Make the path from search to using or downloading an original feel more natural and take fewer steps.
+- Make Photos and Music journeys more complete, with curated albums and persistent playlists, and give video a dedicated browsing and playback experience.
+- Let people combine more pages, layouts and presentations into a tool they enjoy, beyond changing colors alone.
+
+Different interfaces will continue to share the same content, tags and search, keeping originals and recovery records reliable.
 
 Cairn keeps original files together with their descriptions, discovery, export and recovery in one self-hosted library. Photos and Music have dedicated interfaces; other files use the general Library for retrieval and takeout. Recognized file formats are not guaranteed to preview or play. Video does not yet have a dedicated media experience; see below. Daily organization centers on content, tags and discovery, with original directories retained as provenance and recovery references.
 
@@ -49,8 +60,8 @@ configure your space once
 Use Go 1.26 (or the version declared by `go.mod`) and a Node.js version supported by Vite 7:
 
 ```bash
-git clone https://github.com/ailiheizi/restoreweave.git
-cd restoreweave
+git clone https://github.com/ailiheizi/cairn.git
+cd cairn
 go build -tags=purego -o bin/cairnd ./server/cmd/cairnd
 go build -o bin/cairn ./client/cmd/cairn
 bin/cairn config init --path ./cairn.toml
@@ -115,15 +126,15 @@ The local development preview includes a photo wall, continuous viewer and Exhib
 
 The wall and Exhibition are Photos presentations over the same search/tag results. Selection in the photo viewer and Exhibition is shared with the existing batch-action area. Music presents tracks and recorded audio facts within the same returned-result scope. Workspace and Content showcase are a separate whole-interface layout layer. Pages and layouts use in-repository code compiled into the first-party client; there is no runtime third-party package loader or isolation boundary.
 
-Shift-click in the ordinary Library list selects an inclusive range in the currently displayed row order; local Photos/Music filtering does not widen that range. Batch add reuses an exact existing tag on a selected item, and remove affects matching `TAG` records only, preserving other tags and Notes. Stars and the shared Only favorites filter in Photos, Music and Content overview use the ordinary visible `Favorite` tag. This is a daily tag shortcut, not album or playlist membership. Each change does not immediately create a new signed portable backup. Curated albums and persistent repeat-capable playlists still need independent organization, recovery and export contract review.
+Shift-click in the ordinary Library list selects an inclusive range in the currently displayed row order; local Photos/Music filtering does not widen that range. Batch add reuses an exact existing tag on a selected item, and remove affects matching `TAG` records only, preserving other tags and Notes. Stars and the shared Only favorites filter in Photos, Music and Content overview use the ordinary visible `Favorite` tag. This is a daily tag shortcut, not album or playlist membership. Each change does not immediately create a new signed portable backup. Fuller album and playlist experiences are part of the future direction above.
 
 Content overview combines photos, audio and other content within the same search/tag scope, with shared selection, Details and playback. Each section previews at most six items and distinguishes displayed counts from scope totals; domain switches do not rerun search. Library and Overview expose the existing Saved retrieval panel directly; Photos and Music retain it in Library tools. Saving accepts only submitted, supported query conditions; media display choices and other unsupported active conditions are refused. Recall reruns a dynamic lexical query and discloses empty, degraded or foreign-scope results; it is not a frozen semantic result. Curated albums and durable playlists have a [candidate design](docs/technical/durable-media-organization-design.md) but remain unimplemented. See the [overview acceptance](docs/technical/fixed-overview-acceptance-20261009.md).
 
-Selected originals can be downloaded in one ZIP with per-file identity checks, progress and cancellation. Photos and Exhibition provide transient PNG/JPEG thumbnails up to 8 MiB/12 million pixels and direct large-image inspection. The ZIP budget is 32 files, 32 MiB per file and 64 MiB total; larger takeout retains single-original downloads and server-directory export. Explicit image inspection remains capped at 8 MiB and original audio playback at 32 MiB. Curated albums, capture-date/EXIF extraction, retained derivatives, cover extraction, durable playlists and the full mobile journey remain open.
+Selected originals can be downloaded in one ZIP with per-file identity checks, progress and cancellation. Photos and Exhibition provide transient PNG/JPEG thumbnails up to 8 MiB/12 million pixels and direct large-image inspection. The ZIP budget is 32 files, 32 MiB per file and 64 MiB total; larger takeout retains single-original downloads and server-directory export. Explicit image inspection remains capped at 8 MiB and original audio playback at 32 MiB. Richer photo facts and thumbnails, Music artwork and mobile experiences remain future directions.
 
 ### Video and other files
 
-Video files currently use the general Library for preservation, search and original takeout. There is no dedicated video/media library or video playback, and no series/episode organization, subtitles, viewing progress, Bangumi or danmaku integration. Preview of other formats depends on actual support. These dedicated video capabilities are not implemented.
+Video files currently use the general Library for preservation, search and original takeout; there is no dedicated video library or playback. Preview of other formats depends on actual support. A dedicated video experience is a future direction above.
 
 These Photos/Music and takeout capabilities are part of the local [RW-PERSONAL-UX-1](docs/requirements/first-party-client-experiences.md) development scope; the full product and release qualification remain unfinished. See [ADR-027](docs/technical/build-stack-and-architecture-selection.md#adr-027-frozen-original-zip-takeout-and-transient-ordinary-photo-renditions), the [extension contribution guide](docs/technical/client-experience-extension-guide.md) and [current acceptance](docs/technical/takeout-photo-acceptance-20261009.md).
 
@@ -134,18 +145,17 @@ These Photos/Music and takeout capabilities are part of the local [RW-PERSONAL-U
 - Real BGE-small-zh + ONNX + zvec components run with an explicitly provisioned bundle; without one, the service honestly degrades to ordinary search.
 - SavedView, ExportManifest, materialize/verify, signed recovery, clean reader, tamper rejection, migration, and cross-process safety evidence for the local development scope.
 - Library batch organization: idempotently add tags to captured selections, remove matching tags, favorite/unfavorite in batches, and select inclusive ranges in ordinary displayed row order.
-- Local Photos/Music slices: selection shared from photo inspection to batch actions, recorded artist/album browsing, bounded identity-checked original playback, loaded-list Music sorting/eligibility filters, and transient queue append/insert-next/order/shuffle/repeat. Curated photo albums, durable playlists and the complete mobile workflow remain open.
+- Local Photos/Music slices: selection shared from photo inspection to batch actions, recorded artist/album browsing, bounded identity-checked original playback, loaded-list Music sorting/eligibility filters, and transient queue append/insert-next/order/shuffle/repeat. Fuller photo and music journeys are described under Future directions.
 - Library and Overview directly open existing SavedView retrieval; Photos/Music keep it in Library tools. Supported queries recall dynamically, with visible refusals, empty/degraded outcomes and foreign stored scopes.
 - Photos, Music and Content overview share the existing `Favorite` TAG star and filter. It creates no album/playlist membership and does not promise an immediate signed backup on each click.
 - React WebUI and the loopback `/api/v1` convenience adapter, with responsive layout and Chinese localization.
 - Settings → Appearance switches between bundled Workspace and Content showcase layouts over shared content, search, and Notes; palettes are independent secondary choices. See the [local acceptance record](docs/technical/client-interface-experiences-acceptance-20261006.md).
 
-### Candidate, planned, or explicitly out of scope
+### Core qualification and technical boundaries
 
 - `local-zstd-v1` is a runnable whole-file compression candidate, not a production repository; Restic/Kopia/Plakar have not been selected as a default engine.
 - Supported offline installers, cross-platform distribution, upgrade/backup workflows, and production qualification still require independent evidence.
-- LinkGroup is the later minimal file-link grouping primitive; it has no user-visible version history and its full workflow is not implemented yet.
-- Video currently has only general content preservation, search and original takeout; a dedicated media library, playback, series/episodes, subtitles, viewing progress, Bangumi and danmaku are not implemented.
+- LinkGroup is the minimal file-link grouping primitive in the core plan; it can enter Phase 6 only after the existing Phase 4/5 gates, and has no user-visible version history or complete workflow today.
 - Image CLIP/SigLIP, acoustic indexing, RWKV/Transformer compression, and destructive GC are not part of the current default core; reachability remains `NON_DESTRUCTIVE_ONLY`.
 
 “Implemented and tested” means evidence for the stated checkout scope, not production support. See the [content, deduplication, search, and export contract](docs/requirements/content-store-views-and-exports.md) and the [core execution plan](docs/technical/core-mvp-execution-plan.md) for the complete status matrix.
