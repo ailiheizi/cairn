@@ -4,11 +4,46 @@
 
 ## Current direction
 
-After the repository review, the owner selected the bounded ML-1 material/Notes/Skill/list client loop as the next delivery. Its [normative admission](../requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots) and [client contract](material-list-client-contract.md) reuse ordinary files, reviewed capture and verified takeout without changing the core phase gates.
+After the repository review, the owner selected the bounded material/Notes/Skill/list client loop. ML-1 snapshots and ML-2 playback/takeout actions are implemented with local evidence below. Their [normative admission](../requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions) and [client contract](material-list-client-contract.md#use-saved-lists-ml-2) reuse ordinary files and host-owned actions without changing the core phase gates.
 
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
 
 The earlier Photos/Music interaction polish is paused, not complete. Its remaining acceptance and delivery state is preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+
+## ML-2 delivery — use the saved result (2026-10-21)
+
+Implemented and locally validated: **open a saved list → listen or take out its files**.
+Implementation belongs to the existing Reader and host actions. It preserves
+supported audio occurrence order/repetition, reports audio omissions, and uses
+unique targets for frozen original takeout with explicit repetition semantics.
+An unresolved member blocks whole-list actions and remains visible.
+
+- [x] Ordered playback and queue append use the current verified player. The
+  journey observed Track B's verified identity and advancing playback, then
+  the six distinct queue occurrences `B,A,B,B,A,B` after append.
+- [x] Unique-original ZIP takeout produced Alpha.txt, Track-A.mp3 and Track-B.mp3
+  once each, with independent SHA-256 and length matches. Server export review
+  opened with those three targets, then closed before preview or output write.
+- [x] The mixed-list journey passed on the final frontend build. A saved list
+  with one unresolved member retained both rows, disabled all four whole-list
+  actions and left the queue unchanged. Root reviewed the code; Luna implemented
+  and ran the shared journey.
+
+Local evidence is in `dist/material-list-20261021/acceptance/ml2/report.md`,
+`journey.log` and screenshots. Both ordinary list files were captured once;
+driver path, text-case and scrolling corrections reused those captures. The
+ZIP click initially obscured by the fixed header had not started an export;
+normal scrolling made it reachable. The final journey passed without product
+source repairs. Only the affected frontend build and user journey ran, with no
+backend rebuild or broad regression suite. The isolated daemon stopped. These
+results grant no core phase or release qualification.
+
+After ML-2, evaluate two focused candidates in order: make ordinary Skill and
+correction-document creation/reuse easier, then define an explicit AI organizer
+that reads selected material/instructions and returns a reviewable candidate.
+They are candidates requiring their own bounded contract, not authorization for
+an AI runner, automatic refresh, a mutable list head or another platform. The
+core phase plan remains the implementation authority.
 
 ## ML-1 material-list delivery — 2026-10-21
 

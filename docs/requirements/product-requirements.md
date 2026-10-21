@@ -19,6 +19,8 @@ Skill text. Manual organization and explicit external-AI copy/paste share the
 same bounded result format. Saving still requires the ordinary capture review;
 reading does not invoke AI. This is not an automatic organizer, persistent
 current-list service or replacement for SavedView, LinkGroup or ExportManifest.
+The [ML-2 client successor](first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions)
+connects saved results to existing verified playback and unique-file takeout.
 
 Complete Photos and Music workflows are product targets, including photo
 albums and music artist/album navigation, queues and playlists. Their first

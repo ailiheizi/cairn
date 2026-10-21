@@ -28,7 +28,7 @@ owning flow before adding a new component or another copy of its state.
 | Frozen takeout, write/verify state and history | `app/useExport.ts`; `components/ExportDrawer.tsx` |
 | Browser original takeout and restore | `app/useOriginalTakeout.ts`, `app/useRestore.ts` |
 | Intake and configured sources | `app/useSources.ts`; `components/SourceDrawer.tsx` |
-| Ordinary list snapshots and Skill context | `components/material/MaterialListComposer.tsx`, `MaterialListReader.tsx`; `lib/materialList.ts`, `lib/materialListIO.ts`; shell-owned draft session and existing intake |
+| Ordinary list snapshots and Skill context | `components/material/MaterialListComposer.tsx`, `MaterialListReader.tsx`; `lib/materialList.ts`, `lib/materialListIO.ts`, `lib/materialListActions.ts`; shell-owned draft session, existing intake/player/takeout |
 | Shared player and recorded music metadata | `app/useAudioPlayback.ts`, `app/useMusicMetadata.ts`; `lib/playbackQueue.ts` |
 | Registered presentation and appearance | `lib/interfaceCatalog.ts`, `lib/presentationPackages.ts`, `app/useAppearance.ts` |
 | Rendering and surface interaction | `components/`; domain pages consume host-owned scope and actions |
@@ -83,6 +83,10 @@ review and capture. The Details reader validates a bounded ordinary file and
 resolves exact identities against the loaded library. It owns no list head,
 membership store, AI runtime or independent takeout policy. See the
 [client contract](material-list-client-contract.md).
+ML-2 adds a pure projection for supported audio occurrences and unique takeout
+targets. The Reader shows eligibility and omissions; the shell reprojects at
+click time before using the existing player or export flows. It does not create
+another query authority, queue, transfer policy or durable list representation.
 
 
 The shell owns only: the locale and translator, the one notice, the busy flag,

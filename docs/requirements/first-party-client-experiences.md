@@ -39,6 +39,23 @@ Unknown, invalid, over-budget and unresolved loaded-scope states MUST remain
 visible. Existing exact capture and takeout verification remain authoritative.
 This successor grants no Phase 4/5/6 or release completion credit.
 
+### ML-2: Use saved lists through existing host actions
+
+The owner's continued delivery instruction on 2026-10-21 admits actions inside
+the existing ML-1 Reader, without another page or durable model. Its incorporated
+[client contract](../technical/material-list-client-contract.md#use-saved-lists-ml-2)
+defines the complete-member check and differing playback/takeout projections.
+Validated list occurrences resolved against the current loaded catalog MAY be
+played or appended through the existing host player. This narrowly extends
+UX-Q1's displayed-Music selection scope to an explicitly opened saved list;
+all original verification, bounded reads, transient occurrences and queue limits
+remain unchanged. Unsupported/non-audio omissions MUST be counted visibly.
+An unresolved member MUST disable whole-list actions without changing the queue
+or saved list. Exact takeout MAY reuse existing ZIP and reviewed server export
+for unique file targets, with repeated targets visibly described as exported
+once. It MUST NOT claim ordered or occurrence-preserving export. No new kernel
+format, endpoint, provider, processor, list head or persistence is admitted.
+
 ## 2. Shared authority and migration analysis
 
 All content, subject/file-version resolution, protection, facts, tags, Notes,

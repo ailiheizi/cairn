@@ -30,6 +30,7 @@ import { useMusicMetadata } from "./app/useMusicMetadata";
 import { useFavorites } from "./app/useFavorites";
 import { useOriginalTakeout } from "./app/useOriginalTakeout";
 import { resolveArchiveSelectionSizes } from "./lib/originalArchive";
+import { projectMaterialListActions, type MaterialListAction } from "./lib/materialListActions";
 import { downloadOriginal } from "./lib/contentDownload";
 import { AudioPlayer } from "./components/AudioPlayer";
 import { OriginalTakeoutStatus } from "./components/OriginalTakeoutStatus";
@@ -643,6 +644,46 @@ function App() {
   function viewSource(sourceItem: SourceSummary) { void sources.viewSource(sourceItem); }
   function recheckSource(sourceItem: SourceSummary, trigger?: EventTarget | null) { sources.openAdd(sourceItem, trigger); }
   function addSource(trigger?: EventTarget | null) { sources.openAdd(undefined, trigger); }
+  function materialListActionsDisabledReason() {
+    if (!workspaceID || !isConnected) return t("Connect to Cairn before using a saved list.");
+    if (isUnavailable) return t("Start the Cairn service before using a saved list.");
+    if (!coreStorageReady || !library.libraryLoaded) return coreStorageMessage || t("The content library is not ready for saved-list actions.");
+    if (drawerOpen || settingsOpen) return t("Close the current panel before using a saved list.");
+    if (sourceIntakeIsPending() || originalTakeoutBusy) return t("Wait until the current operation finishes before using a saved list.");
+    return "";
+  }
+  function useMaterialList(document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) {
+    const capturedWorkspaceID = workspaceID;
+    if (!capturedWorkspaceID || workspaceIDRef.current !== capturedWorkspaceID) return;
+    const blockedReason = materialListActionsDisabledReason();
+    if (blockedReason) { setNotice({ kind: "warning", text: blockedReason }); return; }
+    if (!settings.canLeaveSettings()) return;
+    const projection = projectMaterialListActions(document, library.libraryItems, capturedWorkspaceID);
+    if (!projection.ready || projection.unavailableCount > 0) {
+      setNotice({ kind: "warning", text: t("Whole-list actions are unavailable while {{count}} item(s) are unresolved in the loaded scope.", { count: projection.unavailableCount }) });
+      return;
+    }
+    if (action === "play" || action === "queue") {
+      if (!projection.tracks.length) {
+        setNotice({ kind: "warning", text: t("No supported audio is available in this list.") });
+        return;
+      }
+      const result = action === "play" ? audioPlayback.playQueue(projection.tracks) : audioPlayback.addTracksToQueue(projection.tracks);
+      if (result.reason === "queue-limit") setNotice({ kind: "warning", text: t("The queue limit is 1,000 entries; existing queue and playback were left unchanged.") });
+      else if (result.reason === "no-supported-tracks") setNotice({ kind: "warning", text: t("No tracks from this set could be queued; the current queue and playback were left unchanged.") });
+      return;
+    }
+    if (!projection.originals.length) {
+      setNotice({ kind: "warning", text: t("No original files are available for this list action.") });
+      return;
+    }
+    const originals = resolveArchiveSelectionSizes(projection.originals, library.libraryItems);
+    if (action === "download") {
+      void originalTakeout.start(originals);
+      return;
+    }
+    exportFlow.openExport(trigger, originals);
+  }
   function openMaterialListEditor(subjects: SearchHit[], initialDocument?: MaterialListDocument) {
     if (!workspaceID || !isConnected || isUnavailable || !coreStorageReady || !library.libraryLoaded
       || drawerOpen || settingsOpen || sourceIntakeIsPending()) {
@@ -1203,6 +1244,9 @@ function App() {
         onExport={selected.entry_type !== "DIRECTORY" ? () => exportFlow.openExport() : undefined}
         catalogItems={library.libraryItems}
         onEditMaterialList={(document) => openMaterialListEditor([], document)}
+        onUseMaterialList={useMaterialList}
+        materialListActionsDisabled={Boolean(materialListActionsDisabledReason())}
+        materialListActionsDisabledReason={materialListActionsDisabledReason()}
         onDraft={drafts.setNoteDraft}
         onTagDraft={drafts.setTagDraft}
         onAddTag={() => void details.saveTag()}

@@ -20,6 +20,9 @@ also permits bounded authoring/reading of ordinary list and Skill-text files.
 It reuses existing reviewed capture and verified takeout, changes no kernel
 record, phase order or release gate, and introduces no AI executor or mutable
 list-head authority.
+The [ML-2 successor](first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions)
+permits existing host playback/takeout actions over a validated saved list,
+without another state machine or a change to these gates.
 
 ## 2. One complete product job
 

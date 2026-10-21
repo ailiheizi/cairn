@@ -61,6 +61,9 @@ hints, and unresolved loaded-scope members remain visible. Edits are new
 ordinary captures. Existing Notes, live LinkGroup, dynamic SavedView, frozen
 ExportManifest, authenticated recovery formats and phase gates retain their
 meanings. No processor, model call or new store is required to read the result.
+The [ML-2 client successor](first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions)
+may project a validated saved list into existing playback and exact-takeout
+actions. This adds no kernel membership authority or export format.
 
 ## Visual-search delivery admission (2026-10-20)
 

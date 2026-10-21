@@ -39,6 +39,9 @@
 > permits explicit result snapshots and external-AI copy/paste, with no new
 > kernel record, provider, endpoint or current-list head. This client delivery
 > runs alongside the existing work and does not advance or reorder core gates.
+> The [ML-2 successor](../requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions)
+> connects validated saved lists to existing playback and exact-takeout actions
+> with no kernel change or phase credit.
 
 ## 1. What We Are Building
 

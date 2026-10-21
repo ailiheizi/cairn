@@ -79,6 +79,22 @@ execution is claimed. Loaded-scope unresolved rows remain visible and exact
 takeout retains existing identity verification. Other phase gates and the
 broader list/guide draft remain unchanged.
 
+### ML-2 saved-list actions (2026-10-21)
+
+The owner's continued feature-delivery request admits one client-only successor
+in the existing list Reader: explicitly play or append supported audio members
+through the host-owned verified player, and take out the list's unique files
+through existing frozen ZIP or reviewed server-directory export. Resolve and
+revalidate all occurrences against the current loaded catalog; any unresolved
+member disables whole-list actions. Audio preserves supported occurrence order
+and repetitions, visibly counts non-audio/unsupported omissions, and retains
+the existing 32 MiB playback and 1,000-entry queue ceilings. Takeout uses unique
+existing file targets and states that repeated targets are exported once; it
+does not promise occurrence or output ordering. See the ML-2 section of the
+first-party client contract and incorporated material-list client contract.
+No new endpoint, durable state, list head, AI runner, media server, runtime
+loader or phase/release completion is admitted.
+
 ### CS-1/2/3 document-search admission (2026-10-19)
 
 The owner explicitly approved the narrow PDF/DOCX body-search milestone in

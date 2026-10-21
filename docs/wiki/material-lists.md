@@ -36,6 +36,24 @@ Resolved members offer the ordinary verified original download.
 The list appears before **Original JSON**, whose raw preview stays closed until
 you explicitly open it.
 
+### Use the list directly
+
+The list offers **Play audio in list order** and **Take out unique originals**
+above its members. Playback retains supported audio repetitions and order; the
+display states how many non-audio or unsupported occurrences it will skip.
+**More list actions** contains **Append audio to queue** and **Review
+server-directory export**. The queue is the ordinary transient player queue.
+
+Takeout includes each unique file target once, even when the list repeats it;
+the screen states the repeated-target count. It does not promise ZIP/export
+output order. Browser ZIP retains its 32-file, 32 MiB-per-file and 64 MiB-total
+limits. For larger sets use the existing reviewed server-directory export or
+individual original downloads. Opening server export does not write files.
+
+Whole-list actions require every occurrence to resolve in the loaded library.
+An unresolved row stays visible and blocks those actions rather than silently
+removing a member. Loading the needed library scope can make the actions ready.
+
 A member unresolved in the loaded library stays visible. This is not proof
 that it is missing from the complete catalog. Load the relevant library scope
 and try again; the reader does not substitute different bytes or delete a row.

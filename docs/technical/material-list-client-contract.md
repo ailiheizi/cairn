@@ -78,6 +78,39 @@ digest-bound apply workflow. Preparing a file or uploading it is not saving.
 Unknown or failed outcomes remain owned by that existing intake flow. No new
 writer, recovery format, publication mechanism or data store is introduced.
 
+## Use saved lists (ML-2)
+
+The Reader may offer explicit play, append, original ZIP takeout and reviewed
+server-directory export by handing a validated document to host-owned actions.
+Both the Reader and the host resolve it against the current loaded catalog.
+Empty lists or any unresolved occurrence disable whole-list actions. Resolution
+does not perform remote or catalog-wide lookup, and never changes saved bytes.
+
+Audio uses existing supported-format and identity/length eligibility. The
+supported occurrences retain list order and repetitions in the existing
+transient queue; non-audio or unsupported occurrences are counted visibly before
+the action. No playable occurrences or a queue-limit refusal leaves the queue
+and playback unchanged. Existing 32 MiB per-original verification, native
+decoder failure states, single player and 1,000-entry queue ceiling remain.
+
+Takeout projects all resolved occurrences to unique existing file targets,
+deduplicating repeated subject or entry handles only for this action. The UI
+states how many unique files will be taken out and that repeated targets are
+exported once. Different targets are not merged merely by equal byte digests.
+The saved occurrence sequence is unchanged; ZIP/export does not promise its
+order. Existing ZIP ceilings (32 files, 32 MiB each, 64 MiB total, one transfer)
+and frozen-manifest verification remain authoritative. Over-budget ZIP has the
+existing single-original or reviewed server-directory alternative. Server
+export still requires explicit review and materialization through its existing
+workflow; opening it does not write output.
+
+**Exit:** reopen an ordinary saved mixed-content list with ordered repeated
+audio, play and append through the actual host queue, observe advancing verified
+audio and distinct occurrences, then take out unique originals and independently
+compare their bytes. A list with an unresolved member must retain that row and
+offer no whole-list mutation. These are client composition results, not a native
+playlist, external application adapter, complete media server or phase gate.
+
 ## Acceptance and remaining scope
 
 One current-build journey must save source files and a Note, create and arrange

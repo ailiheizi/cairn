@@ -2855,3 +2855,31 @@ not reject the broader guide/refresh design: persistent heads, concurrent
 replacement and automatic organization need their own reviewed successor.
 The [normative client admission](../requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
 defines limits and one integrated user journey; no phase or release gate closes.
+
+## ADR-069: Consume saved lists through existing playback and takeout
+
+Status: Accepted for the bounded ML-2 client successor, 2026-10-21, following
+the owner's instruction to continue the material/Skill/list direction.
+
+ML-1 makes a result reusable as ordinary data, but downloading members one by
+one leaves the daily-use loop incomplete. Add explicit actions to its existing
+Reader and hand validated members to the current host player and export flows.
+Do not build another media page, player, playlist store or export pipeline.
+The [ML-2 contract](material-list-client-contract.md#use-saved-lists-ml-2)
+narrowly extends UX-Q1's displayed-Music scope to an explicitly opened list.
+
+Playback and takeout intentionally consume different projections. Playback
+keeps each supported occurrence, including repetitions, in list order; it
+visibly counts non-audio and unsupported omissions. Takeout uses the existing
+unique-file selection semantics and states that repeated targets are taken
+out once, with no output-order promise. Equal digests alone do not merge
+different file targets. Any unresolved member blocks whole-list actions so a
+partial result cannot masquerade as the complete list. The stored list stays
+unchanged in every case.
+
+Recompute the projection in the host at click time. Existing player identity,
+byte and queue limits, ZIP budgets, frozen manifest checks and explicit server
+export review remain authoritative. This adds no durable schema or format,
+endpoint, model, processor, scheduler, runtime extension or migration. One
+mixed-list user journey proves playback occurrences and exact takeout; it does
+not close a core phase or qualify a release.
