@@ -26,6 +26,7 @@
 //
 // Usage:
 //   node scripts/web-saved-retrieval-provenance-check.mjs [url]
+//   node scripts/web-saved-retrieval-provenance-check.mjs --candidate-only
 //
 // Environment:
 //   CAIRN_BASE_URL                     default http://127.0.0.1:4648/
@@ -35,12 +36,66 @@
 
 import assert from "node:assert/strict";
 import { chromium } from "../web/node_modules/playwright/index.mjs";
+import { build } from "../web/node_modules/esbuild/lib/main.js";
 
 const base = (process.argv[2] || process.env.CAIRN_BASE_URL || "http://127.0.0.1:4648/").replace(/\/$/, "");
 const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const observed = {};
 let failure;
 let browser;
+
+// Exercise the existing SavedView candidate builder against exact TAG values
+// before the read-only browser provenance scenario below. Build in memory so
+// this check uses the production helper without adding a test framework or
+// generated source file.
+const candidateBundle = await build({
+  entryPoints: [new URL("../web/src/lib/savedRetrievalCandidate.ts", import.meta.url).pathname],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  write: false,
+});
+const candidateModule = await import(`data:text/javascript;base64,${Buffer.from(candidateBundle.outputFiles[0].contents).toString("base64")}`);
+const exactTags = ["  Café / “Q”  ", "研发-Notes\tA"];
+const identityTranslator = (message) => message;
+const tagOnlyCandidate = candidateModule.buildSavedRetrievalCandidate({
+  t: identityTranslator,
+  lastExecutedQuery: "stale previous keyword",
+  viewMode: "content",
+  presentationMode: "content",
+  activeTags: exactTags,
+  activeSystemFacets: {},
+});
+assert.equal(tagOnlyCandidate.query, "", "a tag-only content view must not inherit a previous submitted keyword");
+assert.deepEqual(tagOnlyCandidate.fields, exactTags.map((tag) => `tag=${JSON.stringify(tag)}`), "tag-only fields preserve exact whitespace, case, punctuation and Unicode");
+assert.deepEqual(tagOnlyCandidate.unsupportedConditions, [], "exact nonblank tags are supported SavedView conditions");
+assert.deepEqual(tagOnlyCandidate.fields.map(candidateModule.decodeSavedRetrievalTagField), exactTags, "exact tags decode to their original values");
+assert.equal(candidateModule.decodeSavedRetrievalTagField('tag="unterminated'), undefined, "malformed stored tag syntax remains unlabelled rather than normalized");
+const ordinaryTagViewCandidate = candidateModule.buildSavedRetrievalCandidate({
+  t: identityTranslator,
+  lastExecutedQuery: "stale previous keyword",
+  viewMode: "tag",
+  presentationMode: "content",
+  activeTags: exactTags,
+  activeSystemFacets: {},
+});
+assert.equal(ordinaryTagViewCandidate.query, "", "the ordinary tag-filtered Library mode also stays tag-only");
+assert.deepEqual(ordinaryTagViewCandidate.fields, tagOnlyCandidate.fields, "the actual tag-filter route saves the same exact AND conditions");
+const keywordTagCandidate = candidateModule.buildSavedRetrievalCandidate({
+  t: identityTranslator,
+  lastExecutedQuery: "orchard notes suffix:pdf",
+  viewMode: "search",
+  presentationMode: "content",
+  activeTags: exactTags,
+  activeSystemFacets: {},
+});
+assert.equal(keywordTagCandidate.query, "orchard notes", "search-mode recall retains the submitted keyword");
+assert.deepEqual(keywordTagCandidate.fields, [`suffix=pdf`, ...exactTags.map((tag) => `tag=${JSON.stringify(tag)}`)], "search-mode candidates retain structured filters and attach all exact active tags");
+
+if (process.argv.includes("--candidate-only")) {
+  console.log("PASS: SavedView candidate tag-only and keyword-plus-tag assertions");
+  process.exit(0);
+}
 
 /** Poll a page read until it satisfies `terminal`, then return the last read. */
 async function poll(read, terminal, timeoutMs = 20000, intervalMs = 200) {

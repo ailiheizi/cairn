@@ -34,9 +34,11 @@ type descriptionSourceProvenance struct {
 }
 
 type lexicalSegmentProjection struct {
-	SchemaVersion         int          `json:"schema_version"`
-	DescriptionsFieldHash string       `json:"descriptions_field_sha256"`
-	Segments              []SegmentRef `json:"segments"`
+	SchemaVersion         int             `json:"schema_version"`
+	DescriptionsFieldHash string          `json:"descriptions_field_sha256"`
+	Segments              []SegmentRef    `json:"segments"`
+	DocumentRef           string          `json:"document_ref,omitempty"`
+	SourceCoverage        json.RawMessage `json:"source_coverage,omitempty"`
 }
 
 type descriptionSourceSpan struct {
@@ -91,6 +93,27 @@ func verifiedDescriptionSourceProvenance(document sqlite.DescriptionDocument, su
 	return results
 }
 
+// wholeBodyLegacyDescriptionProvenance accepts the one bounded legacy case
+// where a single durable segment is byte-for-byte the complete description.
+// It derives generation-local span evidence without rewriting catalog data.
+func wholeBodyLegacyDescriptionProvenance(document sqlite.DescriptionDocument, subjectID string, bodyFieldStart int, segments []sqlite.SemanticSegment) []*descriptionSourceProvenance {
+	if len(segments) != 1 || document.Body == "" || segments[0].Text != document.Body ||
+		strings.TrimSpace(string(segments[0].SourceSpan)) != "" ||
+		!utf8.ValidString(document.Body) || document.Revision < 1 || bodyFieldStart < 0 ||
+		strings.TrimSpace(document.WorkspaceID) == "" || strings.TrimSpace(subjectID) == "" ||
+		sha256Text(document.Body) != document.BodyDigest || segments[0].Ordinal != 0 ||
+		segments[0].WorkspaceID != document.WorkspaceID || segments[0].DocumentID != document.ID ||
+		segments[0].DocumentRevision != document.Revision || segments[0].SubjectRef != document.SubjectRef ||
+		segments[0].TextDigest != sha256Text(segments[0].Text) || strings.TrimSpace(segments[0].SegmentationProfileDigest) == "" {
+		return nil
+	}
+	return []*descriptionSourceProvenance{{WorkspaceID: document.WorkspaceID, SubjectID: subjectID,
+		DocumentRevision: document.Revision, SegmentationProfile: segments[0].SegmentationProfileDigest,
+		BodyDigest: document.BodyDigest, BodyFieldStartByte: bodyFieldStart,
+		BodyFieldEndByte: bodyFieldStart + len(document.Body), SourceStartByte: 0,
+		SourceEndByte: len(document.Body), TextDigest: segments[0].TextDigest}}
+}
+
 func decodeDescriptionSourceSpan(raw json.RawMessage) (descriptionSourceSpan, error) {
 	var span descriptionSourceSpan
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -113,11 +136,16 @@ func sha256Text(text string) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func marshalLexicalSegmentProjection(segments []SegmentRef, descriptions string) (string, error) {
+func marshalLexicalSegmentProjection(segments []SegmentRef, descriptions string, sourceCoverage ...json.RawMessage) (string, error) {
+	var coverage json.RawMessage
+	if len(sourceCoverage) > 0 {
+		coverage = sourceCoverage[0]
+	}
 	projection := lexicalSegmentProjection{
 		SchemaVersion:         lexicalSegmentProjectionSchemaV1,
 		DescriptionsFieldHash: sha256Text(descriptions),
 		Segments:              segments,
+		SourceCoverage:        coverage,
 	}
 	data, err := json.Marshal(projection)
 	if err != nil {

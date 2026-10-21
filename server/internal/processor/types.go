@@ -22,6 +22,8 @@ const (
 	CapabilityTextExtract       = "extract.text.v1"
 	CapabilityAudioTags         = "extract.audio.tags.v1"
 	CapabilityBookMeta          = "extract.book.meta.v1"
+	CapabilityPDFTextExtract    = "extract.document.pdf.v1"
+	CapabilityDOCXTextExtract   = "extract.document.docx.v1"
 	CapabilityImageMeta         = "extract.image.meta.v1"
 	CapabilityVideoMeta         = "extract.video.meta.v1"
 	CapabilityAudioFingerprint  = "fingerprint.audio.fixture.v1"
@@ -69,6 +71,7 @@ const (
 // keeps the host default.
 type CapabilityBudget struct {
 	MaxSourceBytes int64
+	MaxOutputBytes int64
 	StageTimeout   time.Duration
 }
 
@@ -299,10 +302,19 @@ func SchemaRefOCRText() string {
 // DefaultProcessors are the in-process EXTRACT pack. Fixture fingerprint
 // and embedding processors are opt-in and are not part of default ingest.
 func DefaultProcessors() []Processor {
-	return []Processor{TextExtract{}, AudioTags{}, BookMeta{}, ImageMeta{}, VideoMeta{}}
+	return []Processor{TextExtract{}, AudioTags{}, BookMeta{}, PDFTextExtract{}, DOCXTextExtract{}, ImageMeta{}, VideoMeta{}}
 }
 
 func ProducerDigest(capabilityID string) string {
-	sum := sha256.Sum256([]byte("processor:" + capabilityID))
+	profile := "processor:" + capabilityID
+	switch capabilityID {
+	case CapabilityOCRImageText:
+		profile = "processor:ocr.image.text.v1|recognition-output=ppocrv4-ctc-softmax-probabilities-v1|probability-range=0..1|row-sum-absolute-tolerance=0.001|source-bytes=67108864|side=20000|pixels=40000000|regions=2048|text-bytes=262144|timeout-ns=20000000000"
+	case CapabilityPDFTextExtract:
+		profile = "processor:extract.document.pdf.v1|parser=github.com/giraffesyo/pdf@v0.5.0|module=h1:xq1gQzlE5W8lW+mJqvu0cB0WkY2AfLCdynPf6t3CN4g=|profile=" + documentTextProfile + "|source=16777216|output=1048576|strict=true|concurrency=1|encryption=reject-authentication-preflight-v1|pages=256|stream=8388608|operators-per-page=250000|glyphs-per-page=50000|form-depth=16|timeout-ns=10000000000"
+	case CapabilityDOCXTextExtract:
+		profile = "processor:extract.document.docx.v1|parser=stdlib-archive-zip-encoding-xml-v1|profile=" + documentTextProfile + "|source=16777216|output=1048576|entries=2048|expanded=33554432|main-xml=16777216|xml-depth=128|timeout-ns=10000000000"
+	}
+	sum := sha256.Sum256([]byte(profile))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }

@@ -14,9 +14,12 @@ require (
 	modernc.org/sqlite v1.55.0
 )
 
+replace github.com/zvec-ai/zvec-go v0.6.1-0.20260721023313-9199195b29da => ./third_party/zvec-go
+
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.1
+	github.com/giraffesyo/pdf v0.5.0
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

@@ -189,6 +189,9 @@ func (s *Service) publishPortableFactClosure(ctx context.Context, workspaceID, s
 	if err != nil {
 		return err
 	}
+	if err := validatePortableFactRecordsAgainstManifest(bundle, parent.Manifest); err != nil {
+		return fmt.Errorf("validate portable facts before placement: %w", err)
+	}
 	bundleBytes, err := CanonicalJSON(bundle)
 	if err != nil {
 		return err
@@ -451,6 +454,23 @@ func (s *Service) buildPortableFactBundleUnplaced(ctx context.Context, workspace
 		if err := add("SUBJECT_MAPPING", entry.ID, entry.SubjectRef, 1, "", mapping, map[string]any{"namespace_root_id": root.ID, "entry_type": entry.EntryType}); err != nil {
 			return bundle, nil, err
 		}
+		if mapping.FileVersionID != "" {
+			witness, err := buildCatalogRelationWitness(ctx, s.Store, workspaceID, snapshotRef, root.ID, mapping)
+			if err != nil {
+				return portableFactBundle{}, nil, fmt.Errorf("build catalog relation witness for subject %q: %w", mapping.StableSubjectRef, err)
+			}
+			fact, err := catalogRelationWitnessFact(workspaceID, snapshotRef, root.ID, mapping.StableSubjectRef, witness)
+			if err != nil {
+				return portableFactBundle{}, nil, err
+			}
+			if err := add("METADATA_FACT", fact.ID, mapping.StableSubjectRef, 1, "", fact, map[string]any{
+				"namespace": catalogRelationWitnessNamespace, "profile_digest": catalogRelationWitnessProfileDigest(),
+				"snapshot_ref": snapshotRef, "namespace_root_id": root.ID,
+				"file_version_id": mapping.FileVersionID,
+			}); err != nil {
+				return portableFactBundle{}, nil, err
+			}
+		}
 		if portableEntry.Facts == nil {
 			return bundle, nil, fmt.Errorf("portable subject %q has no captured facts", entry.ID)
 		}
@@ -468,6 +488,9 @@ func (s *Service) buildPortableFactBundleUnplaced(ctx context.Context, workspace
 		return bundle, nil, err
 	}
 	for _, fact := range facts {
+		if fact.Namespace == catalogRelationWitnessNamespace {
+			return portableFactBundle{}, nil, errors.New("reserved catalog relation witness namespace is occupied by an ordinary metadata fact")
+		}
 		stableSubject, ok := stableByRef[fact.SubjectRef]
 		if !ok || stableSubject == "" {
 			continue
@@ -565,67 +588,104 @@ func (s *Service) buildPortableFactBundleUnplaced(ctx context.Context, workspace
 }
 
 func listPortableFactClosures(ctx context.Context, repo repository.Driver, driver repository.RecordDriver, anchor TrustAnchor, domain, parentDigest string) ([]PortableFactClosureEnvelope, error) {
-	commits, err := listCommitMarkers(ctx, driver, anchor, domain)
+	var result []PortableFactClosureEnvelope
+	err := visitPortableFactClosures(ctx, repo, driver, anchor, domain, parentDigest, func(envelope PortableFactClosureEnvelope, _ string) error {
+		result = append(result, envelope)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	parents := make(map[string]committedPublication, len(commits))
+	return result, nil
+}
+
+// portableFactClosureVisit is the bounded discovery path used when a clean
+// reader needs authenticated descriptors but must not retain every historical
+// bundle body while deciding which portable reference shape fits.
+type portableFactClosureVisit func(PortableFactClosureEnvelope, string) error
+
+type portableFactClosureHeader struct {
+	digest  string
+	closure PortableFactClosureRecord
+}
+
+// visitPortableFactClosures retains only closure headers during discovery,
+// validates the complete selected chain (and strict global record admission),
+// then rereads one selected bundle at a time for the visitor.
+func visitPortableFactClosures(ctx context.Context, repo repository.Driver, driver repository.RecordDriver, anchor TrustAnchor, domain, parentDigest string, visit portableFactClosureVisit) error {
+	if repo == nil || driver == nil {
+		return errors.New("portable fact closure repository and record driver are required")
+	}
+	if visit == nil {
+		return errors.New("portable fact closure visitor is required")
+	}
+	commits, err := listCommitMarkers(ctx, driver, anchor, domain)
+	if err != nil {
+		return err
+	}
+	var parent *committedPublication
 	for i := range commits {
 		preparedBytes, err := readRecord(ctx, driver, repository.RecordPreparedClosure, commits[i].Commit.PreparedObjectDigest)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		var prepared PreparedClosureEnvelope
 		if err := decodeStrictRecord(preparedBytes, &prepared); err != nil {
-			return nil, err
+			return err
 		}
 		manifest, err := validatePreparedEnvelope(ctx, driver, anchor, commits[i].Commit, prepared, int64(len(preparedBytes)))
 		if err != nil {
-			return nil, err
+			return err
 		}
-		commits[i].Prepared = prepared
-		commits[i].Manifest = manifest
-		parents[commits[i].CommitDigest] = commits[i]
+		if commits[i].CommitDigest == parentDigest {
+			selected := commits[i]
+			selected.Prepared = prepared
+			selected.Manifest = manifest
+			parent = &selected
+		}
 	}
 	digests, err := driver.ListRecordDigests(ctx, repository.RecordPortableFactClosure)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var result []PortableFactClosureEnvelope
 	bySequence := make(map[uint64]string)
+	var selected []portableFactClosureHeader
 	for _, digest := range digests {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		payload, err := readRecord(ctx, driver, repository.RecordPortableFactClosure, digest)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		var envelope PortableFactClosureEnvelope
 		if err := decodeStrictRecord(payload, &envelope); err != nil {
-			return nil, err
+			return err
 		}
 		if envelope.Schema != PortableFactClosureEnvelopeSchemaV1 && envelope.Schema != PortableFactClosureEnvelopeSchemaV2 && envelope.Schema != PortableFactClosureEnvelopeSchemaV3 || DigestBytes(payload) != digest {
-			return nil, errors.New("portable fact closure envelope is invalid")
+			return errors.New("portable fact closure envelope is invalid")
 		}
 		closureSchema := PortableFactClosureSchemaV1
 		if envelope.Schema == PortableFactClosureEnvelopeSchemaV2 || envelope.Schema == PortableFactClosureEnvelopeSchemaV3 {
 			closureSchema = PortableFactClosureSchemaV2
 		}
 		if envelope.Closure.Schema != closureSchema {
-			return nil, errors.New("portable fact closure envelope and closure schema differ")
+			return errors.New("portable fact closure envelope and closure schema differ")
 		}
 		if err := openPortableFactBundle(ctx, driver, &envelope); err != nil {
-			return nil, err
+			return err
 		}
 		if err := envelope.Closure.Verify(anchor); err != nil {
-			return nil, err
+			return err
 		}
 		if envelope.Closure.BundleSchema != PortableFactBundleSchemaV1 && envelope.Closure.BundleSchema != PortableFactBundleSchemaV2 ||
 			envelope.Closure.CanonicalizationProfile != "encoding/json-compact-v1" ||
 			!sameStrings(envelope.Closure.RequiredReaderDependencies, portableFactReaderDependenciesForSchema(repo, closureSchema)) {
-			return nil, errors.New("portable fact closure reader dependencies are unavailable")
+			return errors.New("portable fact closure reader dependencies are unavailable")
 		}
 		expectedClosureSchema, _, schemaErr := portableFactClosureSchemas(envelope.Closure.BundleSchema)
 		if schemaErr != nil || expectedClosureSchema != closureSchema {
-			return nil, errors.New("portable fact closure bundle and closure schema differ")
+			return errors.New("portable fact closure bundle and closure schema differ")
 		}
 		if envelope.Closure.PublicationDomain != domain {
 			continue
@@ -633,60 +693,81 @@ func listPortableFactClosures(ctx context.Context, repo repository.Driver, drive
 		if envelope.Closure.ParentCommitDigest != parentDigest {
 			continue
 		}
-		parent, ok := parents[envelope.Closure.ParentCommitDigest]
-		if !ok || parent.Commit.PublicationID != envelope.Closure.PublicationID || parent.Commit.PublicationDomain != envelope.Closure.PublicationDomain || parent.Commit.SnapshotRef != envelope.Closure.SnapshotRef || parent.Commit.ManifestDigest != envelope.Closure.ManifestDigest || parent.Commit.Generation != envelope.Closure.ParentGeneration || parent.Commit.TargetIdentity != envelope.Closure.TargetIdentity || parent.Commit.FenceToken != envelope.Closure.FenceToken || envelope.Closure.SignedAt.Before(parent.Commit.SignedAt) {
-			return nil, errors.New("portable fact closure parent binding mismatch")
+		if parent == nil || parent.Commit.PublicationID != envelope.Closure.PublicationID || parent.Commit.PublicationDomain != envelope.Closure.PublicationDomain || parent.Commit.SnapshotRef != envelope.Closure.SnapshotRef || parent.Commit.ManifestDigest != envelope.Closure.ManifestDigest || parent.Commit.Generation != envelope.Closure.ParentGeneration || parent.Commit.TargetIdentity != envelope.Closure.TargetIdentity || parent.Commit.FenceToken != envelope.Closure.FenceToken || envelope.Closure.SignedAt.Before(parent.Commit.SignedAt) {
+			return errors.New("portable fact closure parent binding mismatch")
 		}
 		bundle, err := validatePortableFactBundle(envelope.Bundle, envelope.Closure.WorkspaceID, envelope.Closure.SnapshotRef)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := validatePortableFactRecords(bundle); err != nil {
-			return nil, err
+			return err
 		}
 		if DigestBytes(envelope.Bundle) != envelope.Closure.BundleDigest || int64(len(envelope.Bundle)) != envelope.Closure.BundleLength || int64(len(bundle.Records)) != envelope.Closure.RecordCount || int64(len(bundle.Attachments)) != envelope.Closure.AttachmentCount {
-			return nil, errors.New("portable fact closure bundle binding mismatch")
+			return errors.New("portable fact closure bundle binding mismatch")
 		}
-		if err := validatePortableFactRecordsAgainstManifest(bundle, parent.Manifest); err != nil {
-			return nil, err
+		if err := validatePortableFactRecordsAgainstManifestOnly(bundle, parent.Manifest); err != nil {
+			return err
 		}
 		for _, attachment := range bundle.Attachments {
 			if attachment.RepositoryID != driver.RepositoryIdentity() || !validExactContentID(attachment.ContentID) || attachment.LogicalLength < 0 {
-				return nil, errors.New("portable fact attachment descriptor is invalid")
+				return errors.New("portable fact attachment descriptor is invalid")
 			}
 			if err := verifyExactObjectReadback(ctx, repo, attachment.ContentID, attachment.LogicalLength); err != nil {
-				return nil, fmt.Errorf("portable fact attachment %s: %w", attachment.AttachmentID, err)
+				return fmt.Errorf("portable fact attachment %s: %w", attachment.AttachmentID, err)
 			}
 		}
 		if err := validateProcessorAttachmentChild(ctx, driver, anchor, envelope.Closure, bundle); err != nil {
-			return nil, err
+			return err
 		}
 		if previous, exists := bySequence[envelope.Closure.ClosureSequence]; exists && previous != envelope.Closure.BundleDigest {
-			return nil, errPortableFactConflict
+			return errPortableFactConflict
 		}
 		bySequence[envelope.Closure.ClosureSequence] = envelope.Closure.BundleDigest
-		result = append(result, envelope)
+		selected = append(selected, portableFactClosureHeader{digest: digest, closure: envelope.Closure})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Closure.ClosureSequence < result[j].Closure.ClosureSequence })
-	for i, envelope := range result {
-		if envelope.Closure.ClosureSequence != uint64(i+1) {
-			return nil, errors.New("portable fact closure sequence is incomplete")
+	sort.Slice(selected, func(i, j int) bool { return selected[i].closure.ClosureSequence < selected[j].closure.ClosureSequence })
+	for i, header := range selected {
+		if header.closure.ClosureSequence != uint64(i+1) {
+			return errors.New("portable fact closure sequence is incomplete")
 		}
 		if i == 0 {
-			if envelope.Closure.PredecessorClosureDigest != "" {
-				return nil, errors.New("portable fact sequence one has a predecessor")
+			if header.closure.PredecessorClosureDigest != "" {
+				return errors.New("portable fact sequence one has a predecessor")
 			}
 			continue
 		}
-		previousDigest, err := result[i-1].Closure.Digest()
-		if err != nil || envelope.Closure.PredecessorClosureDigest != previousDigest {
-			return nil, errors.New("portable fact closure predecessor mismatch")
+		previousDigest, err := selected[i-1].closure.Digest()
+		if err != nil || header.closure.PredecessorClosureDigest != previousDigest {
+			return errors.New("portable fact closure predecessor mismatch")
 		}
-		if envelope.Closure.SignedAt.Before(result[i-1].Closure.SignedAt) {
-			return nil, errors.New("portable fact closure signed time is not monotonic")
+		if header.closure.SignedAt.Before(selected[i-1].closure.SignedAt) {
+			return errors.New("portable fact closure signed time is not monotonic")
 		}
 	}
-	return result, nil
+	for _, header := range selected {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		payload, err := readRecord(ctx, driver, repository.RecordPortableFactClosure, header.digest)
+		if err != nil {
+			return err
+		}
+		if DigestBytes(payload) != header.digest {
+			return errors.New("portable fact closure placement digest mismatch")
+		}
+		var envelope PortableFactClosureEnvelope
+		if err := decodeStrictRecord(payload, &envelope); err != nil {
+			return err
+		}
+		if err := openPortableFactBundle(ctx, driver, &envelope); err != nil {
+			return err
+		}
+		if err := visit(envelope, header.digest); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func portableFactReaderDependencies(repo repository.Driver) []string {
@@ -797,6 +878,8 @@ func (s *Service) ListPortableFactClosures(ctx context.Context, snapshotRef stri
 func validatePortableFactRecords(bundle portableFactBundle) error {
 	v2 := bundle.Schema == PortableFactBundleSchemaV2
 	mappings := make(map[string]struct{})
+	mappingBySubject := make(map[string]subjectMappingPayload)
+	witnessedFileVersions := make(map[string]struct{})
 	attachments := make(map[string]struct{}, len(bundle.Attachments))
 	attachmentByID := make(map[string]portableFactAttachment, len(bundle.Attachments))
 	usedAttachments := make(map[string]struct{}, len(bundle.Attachments))
@@ -842,6 +925,7 @@ func validatePortableFactRecords(bundle portableFactBundle) error {
 				return errors.New("portable subject mapping is duplicated")
 			}
 			mappings[record.StableSubjectRef] = struct{}{}
+			mappingBySubject[record.StableSubjectRef] = mapping
 		}
 	}
 	for _, record := range bundle.Records {
@@ -853,6 +937,22 @@ func validatePortableFactRecords(bundle portableFactBundle) error {
 		}
 		switch record.RecordKind {
 		case "METADATA_FACT":
+			if isCatalogRelationWitnessRecord(record) {
+				mapping, ok := mappingBySubject[record.StableSubjectRef]
+				if !ok {
+					return errors.New("catalog relation witness has no authenticated subject mapping")
+				}
+				witness, err := decodeCatalogRelationWitness(record, bundle, mapping)
+				if err != nil {
+					return err
+				}
+				identity := record.StableSubjectRef + "\x00" + witness.FileVersion.ID
+				if _, exists := witnessedFileVersions[identity]; exists {
+					return errors.New("catalog relation witness is duplicated for a mapped file version")
+				}
+				witnessedFileVersions[identity] = struct{}{}
+				break
+			}
 			if portableCaptureFactRecord(record) {
 				var value ManifestPortableFact
 				if err := decodeStrictRecord(record.Payload, &value); err != nil || strings.TrimSpace(value.Name) == "" || !validPortableFactState(value.State) || strings.TrimSpace(value.SourceProfile) == "" || strings.TrimSpace(value.Authority) == "" || value.CapturedAt.IsZero() || strings.TrimSpace(value.CaptureTimeBasis) == "" || len(value.Value) == 0 || !json.Valid(value.Value) || value.ProvenanceDigest == "" {
@@ -874,8 +974,11 @@ func validatePortableFactRecords(bundle portableFactBundle) error {
 			}
 		case "DESCRIPTION_REVISION":
 			var value descriptionPortablePayload
-			if err := decodeStrictRecord(record.Payload, &value); err != nil || value.ID != record.RecordID || value.WorkspaceID != bundle.WorkspaceID || value.SubjectRef != record.StableSubjectRef || value.Revision != record.Revision || value.PredecessorID != record.PredecessorRecordID || !validExactContentID(value.BodyDigest) || strings.TrimSpace(value.BodyAttachmentID) == "" || strings.TrimSpace(value.ConfigDigest) == "" || strings.TrimSpace(value.ProducerProfileDigest) == "" {
+			if err := decodeStrictRecord(record.Payload, &value); err != nil || value.ID != record.RecordID || value.WorkspaceID != bundle.WorkspaceID || value.SubjectRef != record.StableSubjectRef || value.Revision != record.Revision || value.PredecessorID != record.PredecessorRecordID || !validExactContentID(value.BodyDigest) || strings.TrimSpace(value.BodyAttachmentID) == "" || !validExactContentID(value.ConfigDigest) || strings.TrimSpace(value.ProducerProfileDigest) == "" {
 				return errors.New("portable description revision payload is invalid")
+			}
+			if err := validateDescriptionConfigProvenance(record, value.ConfigDigest); err != nil {
+				return err
 			}
 		case "SEMANTIC_SEGMENT":
 			var value sqlite.SemanticSegment
@@ -945,6 +1048,24 @@ func validatePortableFactRecords(bundle portableFactBundle) error {
 		return err
 	}
 	return validatePortableSemanticSegments(bundle)
+}
+
+func validateDescriptionConfigProvenance(record portableFactRecord, payloadConfigDigest string) error {
+	var provenance map[string]json.RawMessage
+	if err := json.Unmarshal(record.Provenance, &provenance); err != nil || provenance == nil {
+		// Provenance fields are optional. A valid non-object provenance value has
+		// no duplicated config_digest field to compare.
+		return nil
+	}
+	raw, exists := provenance["config_digest"]
+	if !exists {
+		return nil
+	}
+	var provenanceConfigDigest string
+	if err := decodeStrictRecord(raw, &provenanceConfigDigest); err != nil || !validExactContentID(provenanceConfigDigest) || provenanceConfigDigest != payloadConfigDigest {
+		return errors.New("portable description config provenance disagrees with payload")
+	}
+	return nil
 }
 
 func portableCaptureFactRecord(record portableFactRecord) bool {
@@ -1129,6 +1250,14 @@ func validatePortableFactRecordsAgainstManifest(bundle portableFactBundle, manif
 	if err := validatePortableFactRecords(bundle); err != nil {
 		return err
 	}
+	return validatePortableFactRecordsAgainstManifestOnly(bundle, manifest)
+}
+
+// validatePortableFactRecordsAgainstManifestOnly binds a bundle whose
+// portable records have already passed validatePortableFactRecords to its
+// authenticated manifest. Keep the validating wrapper above for callers that
+// have not performed that first pass.
+func validatePortableFactRecordsAgainstManifestOnly(bundle portableFactBundle, manifest Manifest) error {
 	if manifest.SnapshotRef != bundle.SnapshotRef {
 		return errors.New("portable fact manifest snapshot binding mismatch")
 	}
@@ -1166,8 +1295,8 @@ func validatePortableFactRecordsAgainstManifest(bundle portableFactBundle, manif
 			if err := decodeStrictRecord(record.Payload, &description); err != nil {
 				return err
 			}
-			if strings.TrimSpace(description.ConfigDigest) == "" || description.ConfigDigest != manifest.ConfigDigest {
-				return fmt.Errorf("portable description %q config binding differs from manifest", record.RecordID)
+			if !validExactContentID(description.ConfigDigest) {
+				return fmt.Errorf("portable description %q creation config binding is invalid", record.RecordID)
 			}
 		}
 		if record.RecordKind != "SUBJECT_MAPPING" {

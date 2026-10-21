@@ -2,6 +2,8 @@ package search
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -38,9 +40,12 @@ func TestSemanticFeedFiltersDescriptionHistoryButLexicalRetainsIt(t *testing.T) 
 		}
 	}
 	segments := []sqlite.SemanticSegment{
-		{ID: oldSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: oldID, SubjectRef: seed.FileEntryID, Text: documents[0].Body},
-		{ID: unacceptedSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: unacceptedID, SubjectRef: seed.FileEntryID, Text: documents[1].Body},
-		{ID: activeSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: activeID, SubjectRef: seed.FileEntryID, Text: documents[2].Body},
+		{ID: oldSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: oldID, SubjectRef: seed.FileEntryID, Text: documents[0].Body,
+			SourceSpan: json.RawMessage(fmt.Sprintf(`{"start_byte":0,"end_byte":%d}`, len(documents[0].Body)))},
+		{ID: unacceptedSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: unacceptedID, SubjectRef: seed.FileEntryID, Text: documents[1].Body,
+			SourceSpan: json.RawMessage(fmt.Sprintf(`{"start_byte":0,"end_byte":%d}`, len(documents[1].Body)))},
+		{ID: activeSegmentID, WorkspaceID: seed.WorkspaceID, DocumentID: activeID, SubjectRef: seed.FileEntryID, Text: documents[2].Body,
+			SourceSpan: json.RawMessage(fmt.Sprintf(`{"start_byte":0,"end_byte":%d}`, len(documents[2].Body)))},
 	}
 	for _, segment := range segments {
 		if err := store.InsertSemanticSegment(ctx, &segment); err != nil {
@@ -78,6 +83,19 @@ func TestSemanticFeedFiltersDescriptionHistoryButLexicalRetainsIt(t *testing.T) 
 	_, lexical, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Text: "superseded"})
 	if err != nil || len(lexical) != 1 || lexical[0].SubjectID != seed.FileEntryID {
 		t.Fatalf("lexical durable superseded revision = %+v, err=%v", lexical, err)
+	}
+	if len(lexical[0].Segments) != 1 || lexical[0].Segments[0].SourceType != "DESCRIPTION" ||
+		lexical[0].Segments[0].SourceID != oldID || lexical[0].Segments[0].DescriptionDocumentID != oldID ||
+		lexical[0].Segments[0].SegmentID != oldSegmentID || !lexical[0].Segments[0].Accepted {
+		t.Fatalf("superseded lexical source provenance = %+v", lexical[0].Segments)
+	}
+	_, rejected, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Text: "unaccepted"})
+	if err != nil || len(rejected) != 1 || rejected[0].SubjectID != seed.FileEntryID || len(rejected[0].Segments) != 1 {
+		t.Fatalf("lexical durable rejected revision = %+v, err=%v", rejected, err)
+	}
+	if segment := rejected[0].Segments[0]; segment.SourceType != "DESCRIPTION" || segment.SourceID != unacceptedID ||
+		segment.DescriptionDocumentID != unacceptedID || segment.SegmentID != unacceptedSegmentID || segment.Accepted {
+		t.Fatalf("rejected lexical source provenance = %+v", segment)
 	}
 	_, semanticHits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "track"})
 	if err != nil || len(semanticHits) != 1 || len(semanticHits[0].Segments) != 2 {

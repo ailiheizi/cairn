@@ -556,12 +556,13 @@ func ocrRecognitionInput(crop OCRBitmap, height, width int) OCRBitmap {
 	return padded
 }
 
-// ocrCTCDecode greedily decodes one (steps x classes) logit matrix. Class 0 is
-// the CTC blank. The reported confidence is the mean of the kept timesteps'
-// maximum probabilities, which is the PP-OCR recognition score.
-func ocrCTCDecode(logits []float32, steps, classes int, dictionary []string) (string, float64) {
-	if steps <= 0 || classes <= 0 || len(logits) < steps*classes {
-		return "", 0
+// ocrCTCDecode greedily decodes one (steps x classes) probability matrix from
+// PP-OCR's Softmax output. Class 0 is the CTC blank. It rejects tensors that
+// do not satisfy that explicit output contract instead of guessing whether
+// the values are logits.
+func ocrCTCDecode(probabilities []float32, steps, classes int, dictionary []string) (string, float64, error) {
+	if steps <= 0 || classes <= 0 || len(probabilities) < steps*classes {
+		return "", 0, errors.New("OCR recognition probabilities have an invalid shape")
 	}
 	var builder strings.Builder
 	var confidenceTotal float64
@@ -570,19 +571,24 @@ func ocrCTCDecode(logits []float32, steps, classes int, dictionary []string) (st
 	for step := 0; step < steps; step++ {
 		offset := step * classes
 		best := 0
-		bestValue := logits[offset]
+		bestValue := probabilities[offset]
 		for class := 1; class < classes; class++ {
-			if value := logits[offset+class]; value > bestValue {
+			if value := probabilities[offset+class]; value > bestValue {
 				bestValue = value
 				best = class
 			}
 		}
-		// Softmax over the step, computed in a numerically stable form.
 		var total float64
 		for class := 0; class < classes; class++ {
-			total += math.Exp(float64(logits[offset+class] - bestValue))
+			value := probabilities[offset+class]
+			if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) || value < 0 || value > 1 {
+				return "", 0, fmt.Errorf("OCR recognition probability at step %d class %d is outside [0,1] or non-finite", step, class)
+			}
+			total += float64(value)
 		}
-		probability := 1 / total
+		if math.Abs(total-1) > 1e-3 {
+			return "", 0, fmt.Errorf("OCR recognition probabilities at step %d sum to %.6f, want 1", step, total)
+		}
 		if best == 0 {
 			previous = -1
 			continue
@@ -594,13 +600,13 @@ func ocrCTCDecode(logits []float32, steps, classes int, dictionary []string) (st
 		if best < len(dictionary) {
 			builder.WriteString(dictionary[best])
 		}
-		confidenceTotal += probability
+		confidenceTotal += float64(bestValue)
 		kept++
 	}
 	if kept == 0 {
-		return "", 0
+		return "", 0, nil
 	}
-	return builder.String(), confidenceTotal / float64(kept)
+	return builder.String(), confidenceTotal / float64(kept), nil
 }
 
 // ocrEffectiveDeadline combines the OCR per-image ceiling with the host stage

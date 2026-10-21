@@ -418,7 +418,7 @@ func newSignedPublicationFixture(t *testing.T, name string, payload []byte) sign
 		service: &Service{
 			Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 			PublicationDomain: testPublicationDomain, RequireSignedPublication: true,
-			ConfigDigest: "sha256:exact-test-config",
+			ConfigDigest: DigestBytes([]byte("exact-test-config")),
 		},
 		store: store, catalogPath: catalogPath, repo: repo, source: source,
 	}

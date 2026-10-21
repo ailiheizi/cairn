@@ -1,9 +1,10 @@
-// End-to-end browser acceptance check for one honest-fallback rule of the
-// admitted Music client surface (RW-PERSONAL-UX-1; ledger row M4):
+// End-to-end browser acceptance check for the admitted Music client surface
+// (RW-PERSONAL-UX-1; M1/Q1):
 //
 //   A failed or unsupported audio decode must surface an explicit, honest error
-//   through the player's live status region. It must never leave the UI claiming
-//   playback it is not performing, and it must never silently skip a track.
+//   through the player's live status region. Native playback must remain visibly
+//   pending until the actual play() promise settles, and late acknowledgments
+//   must not resurrect playback after Stop or a replacement track.
 //
 // Isolation follows scripts/web-content-visual-e2e.mjs: this file owns a
 // temporary config, catalog, repository, vectors, models, recovery directory and
@@ -12,14 +13,16 @@
 // and launches its own Playwright Chrome against the installed Google Chrome. It
 // never touches a saved user profile or the persistent QA daemon, and it removes
 // its temporary directory on exit. It exercises the prebuilt web/dist bundle
-// exactly like the other browser harnesses; no web build step runs here. Like its
-// neighbours it runs unconditionally; the only knob is the shared
-// CAIRN_PLAYWRIGHT_EXECUTABLE_PATH executable override.
+// exactly like the other browser harnesses; no web build step runs here. Set
+// CAIRN_TEST_WEB_ROOT to exercise a separate absolute candidate bundle without
+// touching web/dist. Like its neighbours it runs unconditionally; the other
+// knob is CAIRN_PLAYWRIGHT_EXECUTABLE_PATH for the browser executable.
 //
-// Fixtures are synthesized deterministically in Node: a real mono 16-bit PCM WAV
-// (the supported control) and a real 8x8 RGB PNG renamed to .mp3 (the non-audio
-// original). Both are ingested through the ordinary plan -> apply path. These
-// fixtures are QA bytes, not a shipped capability or format-support claim.
+// Fixtures are synthesized deterministically in Node: two distinct real mono
+// 16-bit PCM WAVs (supported control and replacement) and a real 8x8 RGB PNG
+// renamed to .mp3 (the non-audio original). They are ingested through the
+// ordinary plan -> apply path. These are QA bytes, not a shipped capability or
+// format-support claim.
 //
 // Honest-assertion notes:
 //  - The player consumes the failure through two concurrent browser signals: the
@@ -35,13 +38,15 @@
 //    which clears `audio.error`. So the harness verifies the undecodable bytes
 //    independently, through the browser's own decoder, using the exact download
 //    URL the app requested.
-//  - The status element's role="status"/aria-live="polite" for an error, and the
-//    fact that it renders a prepared localized sentence rather than an internal
-//    code, ARE exit conditions. They were diagnostics while the player leaked the
-//    code `unsupported-format` in English and left the status line out of the
-//    accessibility tree; both were fixed, so they are now asserted to keep the
-//    fix from regressing. The normative rule the harness also exits on remains
-//    the honest visible outcome.
+//  - The stable, pre-mounted sr-only status node's role="status"/aria-live and
+//    localized announcement for an error are exit conditions. The visible
+//    status line remains plain text; routine loading/ready/playing state must
+//    not populate the live region. The harness captures the node before playback
+//    and checks that the same connected node announces the real decode failure.
+//  - For pending-start/fencing cases, the harness calls the browser's real
+//    HTMLMediaElement.play() immediately and only holds delivery of its actual
+//    promise settlement to the application. It does not fabricate acknowledgments
+//    or media events.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -55,17 +60,19 @@ import { chromium } from "../web/node_modules/playwright/index.mjs";
 
 const repo = resolve(new URL("..", import.meta.url).pathname);
 const chrome = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const webRoot = resolve(process.env.CAIRN_TEST_WEB_ROOT || join(repo, "web", "dist"));
 const port = 4561;
 const supportedName = "Tone-Valid.wav";
+const replacementName = "Tone-Replacement.wav";
 const unsupportedName = "Renamed-Original.mp3";
 // The player's own non-error lifecycle texts, per locale. English has no
 // separate catalogue: createTranslator returns the message key unchanged, so the
 // English strings are the keys themselves.
 const lifecycle = {
-  en: { loading: "Loading and verifying original", ready: "Ready", playing: "Original audio", idle: "Nothing playing", playLabel: "Play", pauseLabel: "Pause" },
-  "zh-CN": { loading: "正在读取并校验原件", ready: "就绪", playing: "原始音频", idle: "未在播放", playLabel: "播放", pauseLabel: "暂停" },
+  en: { loading: "Loading and verifying original", starting: "Starting audio…", ready: "Ready", playing: "Original audio", idle: "Nothing playing", currentTrack: "Current track", nowPlaying: "Now playing", playLabel: "Play", pauseLabel: "Pause" },
+  "zh-CN": { loading: "正在读取并校验原件", starting: "正在开始播放音频…", ready: "就绪", playing: "原始音频", idle: "未在播放", currentTrack: "当前曲目", nowPlaying: "正在播放", playLabel: "播放", pauseLabel: "暂停" },
 };
-const nonErrorStatus = (locale) => new Set([lifecycle[locale].loading, lifecycle[locale].ready, lifecycle[locale].playing, lifecycle[locale].idle, ""]);
+const nonErrorStatus = (locale) => new Set([lifecycle[locale].loading, lifecycle[locale].starting, lifecycle[locale].ready, lifecycle[locale].playing, lifecycle[locale].idle, ""]);
 // The prepared error outcomes the player can render, per locale (English has no
 // separate catalogue, so the rendered English text is the message key, and
 // zh-CN resolves that same sentence through its catalogue). AudioPlayer.tsx
@@ -137,10 +144,9 @@ function pngBytes(size = 8) {
   ]);
 }
 /** A genuinely valid mono 16-bit PCM WAV, so the control really is playable.
- *  Three seconds keeps the control observable: the player stops the queue when
- *  the last occurrence ends, so a very short clip could end inside the settle
- *  window and make the control look like a failure. */
-function wavBytes({ sampleRate = 8000, seconds = 3, frequency = 440 } = {}) {
+ * Twenty seconds keeps a deliberately held native-play acknowledgment from
+ * racing natural completion; this is bounded QA audio, not a product limit. */
+function wavBytes({ sampleRate = 8000, seconds = 20, frequency = 440 } = {}) {
   const frames = Math.floor(sampleRate * seconds);
   const samples = Buffer.alloc(frames * 2);
   for (let index = 0; index < frames; index += 1) {
@@ -163,27 +169,104 @@ function wavBytes({ sampleRate = 8000, seconds = 3, frequency = 440 } = {}) {
   return Buffer.concat([header, samples]);
 }
 
-const supportedBytes = wavBytes();
+const supportedBytes = wavBytes({ seconds: 20, frequency: 440 });
+const replacementBytes = wavBytes({ seconds: 20, frequency: 523 });
 const unsupportedBytes = pngBytes();
+
+// Hold only delivery of the actual native play() promise settlement. The
+// browser's original play() runs immediately and produces its real media
+// events; this gate delays no request, bytes, event or playback state.
+async function installNativePlayAckGate(page) {
+  await page.addInitScript(() => {
+    const nativePlay = HTMLMediaElement.prototype.play;
+    const gate = {
+      armed: false,
+      calls: [],
+      nextID: 1,
+      arm() { this.armed = true; },
+      disarm() { this.armed = false; },
+      release(id) {
+        const call = this.calls.find((entry) => entry.id === id);
+        if (!call || !call.deliver) throw new Error(`native play acknowledgment ${id} is not settled`);
+        call.delivered = true;
+        call.deliver();
+        return true;
+      },
+    };
+    HTMLMediaElement.prototype.play = function(...args) {
+      const actual = nativePlay.apply(this, args);
+      if (!gate.armed) return actual;
+      const call = { id: gate.nextID++, actualState: "pending", delivered: false, deliver: undefined };
+      gate.calls.push(call);
+      return new Promise((resolve, reject) => {
+        Promise.resolve(actual).then((value) => {
+          call.actualState = "fulfilled";
+          call.deliver = () => resolve(value);
+        }, (error) => {
+          call.actualState = "rejected";
+          call.deliver = () => reject(error);
+        });
+      });
+    };
+    Object.defineProperty(window, "__cairnNativePlayAckGate", { value: gate, configurable: false });
+  });
+}
+
+async function armNativePlayAckGate(page) {
+  return page.evaluate(() => {
+    const gate = window.__cairnNativePlayAckGate;
+    gate.arm();
+    return gate.calls.length;
+  });
+}
+
+async function waitForNativePlayAck(page, startingAt, timeout = 20000) {
+  await page.waitForFunction((start) => {
+    const gate = window.__cairnNativePlayAckGate;
+    return gate.calls.slice(start).some((call) => call.actualState === "fulfilled");
+  }, startingAt, { timeout });
+  const calls = await page.evaluate((start) => window.__cairnNativePlayAckGate.calls.slice(start).map(({ id, actualState, delivered }) => ({ id, actualState, delivered })), startingAt);
+  const fulfilled = calls.find((call) => call.actualState === "fulfilled");
+  assert.ok(fulfilled, "the actual browser play() promise fulfills before the app acknowledgment is released");
+  return fulfilled;
+}
+
+async function releaseNativePlayAck(page, id) {
+  return page.evaluate((callID) => window.__cairnNativePlayAckGate.release(callID), id);
+}
+async function readNativePlayAck(page, id) {
+  return page.evaluate((callID) => {
+    const call = window.__cairnNativePlayAckGate.calls.find((entry) => entry.id === callID);
+    return call ? { id: call.id, actualState: call.actualState, delivered: call.delivered } : null;
+  }, id);
+}
 
 // --- page observation --------------------------------------------------------
 const readPlayerState = (page) => page.evaluate(() => {
   const player = document.querySelector(".global-audio-player");
   const status = player?.querySelector(".audio-player-identity small") ?? null;
+  const announcement = document.querySelector(".audio-player-announcement") ?? null;
   const audio = player?.querySelector("audio") ?? null;
   const toggle = player?.querySelector(".audio-player-toggle") ?? null;
   return {
     statusText: status?.textContent?.trim() ?? null,
     statusRole: status?.getAttribute("role") ?? null,
     statusAriaLive: status?.getAttribute("aria-live") ?? null,
+    announcementText: announcement?.textContent?.trim() ?? null,
+    announcementRole: announcement?.getAttribute("role") ?? null,
+    announcementAriaLive: announcement?.getAttribute("aria-live") ?? null,
+    announcementAtomic: announcement?.getAttribute("aria-atomic") ?? null,
     identity: player?.querySelector(".audio-player-identity strong")?.textContent?.trim() ?? null,
     toggleLabel: toggle?.getAttribute("aria-label") ?? null,
-    errorDetailsAction: Boolean(player?.querySelector(".audio-player-details")),
+    toggleDisabled: Boolean(toggle?.disabled),
+    seekDisabled: Boolean(player?.querySelector(':scope > input[type="range"]')?.disabled),
+    stopDisabled: Boolean(player?.querySelector(".audio-player-stop")?.disabled),
+    errorDetailsAction: [...(player?.querySelectorAll(".audio-player-current-actions button") ?? [])].some((button) => !button.classList.contains("audio-player-retry")),
     queueSummary: player?.querySelector(".audio-player-queue summary")?.textContent?.trim() ?? null,
     queueItems: [...(player?.querySelectorAll(".audio-player-queue-item") ?? [])].map((item) => ({
       name: item.querySelector(".audio-queue-play")?.textContent?.trim() ?? "",
       current: item.classList.contains("current"),
-      nowPlaying: item.querySelector(".audio-queue-current")?.textContent?.trim() ?? null,
+      currentLabel: item.querySelector(".audio-queue-current")?.textContent?.trim() ?? null,
     })),
     audio: audio ? {
       paused: audio.paused,
@@ -209,10 +292,16 @@ async function waitForState(page, terminal, timeoutMs = 20000) {
   while (Date.now() < deadline) {
     if (terminal(last)) {
       await page.waitForTimeout(400);
-      return readPlayerState(page);
+      const settled = await readPlayerState(page);
+      if (terminal(settled)) return settled;
+      last = settled;
+      continue;
     }
     await page.waitForTimeout(100);
     last = await readPlayerState(page);
+  }
+  if (!terminal(last)) {
+    throw new Error(`Timed out waiting for player state; last observed=${JSON.stringify(last)}`);
   }
   return last;
 }
@@ -235,6 +324,7 @@ async function observeAttempt(page, locale, record) {
     } catch { /* non-URL request */ }
   });
 
+  await installNativePlayAckGate(page);
   await page.goto(base, { waitUntil: "networkidle" });
   await page.locator(".library-presentation-navigation__domain").first().waitFor({ state: "visible", timeout: 30000 });
   const musicNav = page.locator('.library-presentation-navigation__domain[data-domain$="music"]');
@@ -242,10 +332,50 @@ async function observeAttempt(page, locale, record) {
   await musicNav.first().click();
   await page.locator(".music-library").waitFor({ state: "visible", timeout: 20000 });
 
+  // Capture the persistent live region while the player is idle and before any
+  // queue or playback action. It is a sibling of the hideable player aside.
+  const announcementLocator = page.locator('.audio-player-announcement[role="status"][aria-live="polite"]');
+  await announcementLocator.waitFor({ state: "attached", timeout: 10000 });
+  const announcementBefore = await announcementLocator.elementHandle();
+  assert.ok(announcementBefore, "the stable announcement node is mounted while the player is idle");
+  record.announcementBefore = await announcementBefore.evaluate((node) => {
+    const ancestors = [];
+    let current = node;
+    while (current instanceof HTMLElement) {
+      const style = getComputedStyle(current);
+      ancestors.push({
+        tag: current.tagName.toLowerCase(),
+        className: typeof current.className === "string" ? current.className : "",
+        display: style.display,
+        visibility: style.visibility,
+        hidden: current.hasAttribute("hidden"),
+        inert: current.hasAttribute("inert"),
+        ariaHidden: current.getAttribute("aria-hidden"),
+      });
+      current = current.parentElement;
+    }
+    return {
+      text: node.textContent?.trim() ?? "",
+      role: node.getAttribute("role"),
+      ariaLive: node.getAttribute("aria-live"),
+      ariaAtomic: node.getAttribute("aria-atomic"),
+      ancestors,
+    };
+  });
+  record.announcementExposedAtIdle = record.announcementBefore.ancestors.every((ancestor) =>
+    ancestor.display !== "none" && !["hidden", "collapse"].includes(ancestor.visibility) && !ancestor.hidden && !ancestor.inert && ancestor.ariaHidden !== "true");
+  assert.equal(record.announcementBefore.text, "", "the idle live region is empty before queueing");
+  assert.equal(record.announcementBefore.role, "status", "the idle announcement node exposes status semantics");
+  assert.equal(record.announcementBefore.ariaLive, "polite", "the idle announcement node is polite");
+  assert.equal(record.announcementBefore.ariaAtomic, "true", "the idle announcement is atomic");
+  assert.equal(record.announcementExposedAtIdle, true, "no node in the live region's ancestor chain hides or disables it");
+
   const renamedRow = page.locator(`.music-track[aria-label="${unsupportedName}"]`).first();
   const supportedRow = page.locator(`.music-track[aria-label="${supportedName}"]`).first();
+  const replacementRow = page.locator(`.music-track[aria-label="${replacementName}"]`).first();
   await renamedRow.waitFor({ state: "visible", timeout: 20000 });
   await supportedRow.waitFor({ state: "visible", timeout: 20000 });
+  await replacementRow.waitFor({ state: "visible", timeout: 20000 });
   record.rows = await page.locator(".music-track").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
 
   // The ordinary per-row control. It is enabled for the renamed original because
@@ -256,8 +386,13 @@ async function observeAttempt(page, locale, record) {
 
   // Queue the renamed original FIRST and the supported WAV second, so a silent
   // "advance as if it succeeded" would land on the WAV and be caught.
-  await renamedRow.locator(".music-track-queue").click();
-  await supportedRow.locator(".music-track-queue").click();
+  const addToQueue = async (row) => {
+    const menu = row.locator(".music-track-queue-menu");
+    await menu.locator(":scope > summary").click();
+    await menu.locator(":scope > div > button").first().click();
+  };
+  await addToQueue(renamedRow);
+  await addToQueue(supportedRow);
   await page.locator(".global-audio-player .audio-player-queue summary").click();
   await page.locator(".global-audio-player .audio-player-queue-panel").waitFor({ state: "visible", timeout: 10000 });
   const queued = await waitForState(page, (state) => state.queueItems.length === 2, 10000);
@@ -266,14 +401,36 @@ async function observeAttempt(page, locale, record) {
   assert.equal(record.queueBeforeAttempt.length, 2, "both ingested originals are queued before the attempt");
   assert.equal(record.queueBeforeAttempt[0]?.name, unsupportedName, "the renamed original is the first queued occurrence");
   record.beforeAttempt = queued;
+  const announcementAfterQueue = await announcementLocator.elementHandle();
+  assert.ok(announcementAfterQueue, "the stable announcement node remains mounted after queueing");
+  record.announcementSameAfterQueue = await announcementBefore.evaluate((before, afterQueue) => before === afterQueue, announcementAfterQueue);
+  record.announcementConnectedAfterQueue = await announcementBefore.evaluate((node) => node.isConnected);
+  record.announcementTextAfterQueue = await announcementBefore.evaluate((node) => node.textContent?.trim() ?? "");
+  assert.equal(record.announcementConnectedAfterQueue, true, "the idle announcement node stays connected when the queue is added");
+  assert.equal(record.announcementSameAfterQueue, true, "queueing retains the same idle announcement node");
+  assert.equal(record.announcementTextAfterQueue, "", "routine queue setup does not announce lifecycle text");
 
   await page.locator(".global-audio-player .audio-player-queue-item").first().locator(".audio-queue-play").click();
   const after = await waitForState(page, (state) =>
-    Boolean(state.audio && !state.audio.paused) || state.errorDetailsAction || !quiet.has(state.statusText ?? ""), 20000);
+    Boolean(state.audio && !state.audio.paused) || (!quiet.has(state.statusText ?? "") && Boolean(state.announcementText)), 20000);
   record.afterAttempt = after;
+  const announcementAfter = await announcementLocator.elementHandle();
+  assert.ok(announcementAfter, "the stable announcement node remains mounted after failure");
+  record.announcementSameNode = await announcementBefore.evaluate((before, afterNode) => before === afterNode, announcementAfter);
+  record.announcementConnected = await announcementBefore.evaluate((node) => node.isConnected);
 
   assert.ok(after.statusText, "the player status region must not be silent after a failed attempt");
   assert.ok(!quiet.has(after.statusText), `the status region must show an explicit error outcome, observed ${JSON.stringify(after.statusText)}`);
+  assert.ok(typedOutcomes[locale].has(after.statusText), `the visible status must show the prepared localized failure sentence, observed ${JSON.stringify(after.statusText)}`);
+  assert.equal(after.statusRole, null, "the visible status line stays plain text rather than being a second live region");
+  assert.equal(after.statusAriaLive, null, "the visible status line has no aria-live behavior");
+  assert.ok(after.announcementText, "the stable announcement node announces the failure");
+  assert.equal(after.announcementText, after.statusText, "the stable announcement and visible failure use the same localized sentence");
+  assert.equal(after.announcementRole, "status");
+  assert.equal(after.announcementAriaLive, "polite");
+  assert.equal(after.announcementAtomic, "true");
+  assert.equal(record.announcementConnected, true, "the original announcement node remains connected after the failure");
+  assert.equal(record.announcementSameNode, true, "the failure is announced through the same node mounted before playback");
   assert.ok(after.errorDetailsAction, "an explicit error must offer the Details / Download original fallback action");
   assert.ok(after.audio, "the player must own one audio element");
   assert.equal(after.audio.paused, true, "no audio element may claim to be playing the undecodable original");
@@ -286,7 +443,8 @@ async function observeAttempt(page, locale, record) {
   assert.equal(after.queueItems.filter((item) => item.current).length, 1, "exactly one queue occurrence may be current");
   assert.equal(after.queueItems[0].current, true, "the attempted renamed original stays the current occurrence");
   assert.equal(after.queueItems[1].current, false, "the app must not advance to the next occurrence as if playback had succeeded");
-  assert.equal(after.queueItems[1].nowPlaying, null, "no other queue occurrence may be advertised as now playing");
+  assert.equal(after.queueItems[0].currentLabel, expected.currentTrack, "a failed attempt stays identified as the current track, not as playing");
+  assert.equal(after.queueItems[1].currentLabel, null, "no other queue occurrence may be advertised as current or playing");
 
   // Independent oracle: the exact bytes the app downloaded are rejected by the
   // browser's own media pipeline, so the visible error is honest, not fabricated.
@@ -316,10 +474,131 @@ async function observeAttempt(page, locale, record) {
   // Supported control: a real WAV must still play through the same player in this
   // environment, so the failure above is file-specific rather than a dead player.
   await page.locator(".global-audio-player .audio-player-queue-item").nth(1).locator(".audio-queue-play").click();
-  const control = await waitForState(page, (state) => state.audio?.paused === false, 20000);
+  const control = await waitForState(page, (state) => state.audio?.paused === false && state.audio.readyState >= 2 && state.toggleLabel === expected.pauseLabel, 20000);
   record.supportedControl = control;
-  assert.ok(control.audio && control.audio.paused === false, `a supported WAV must still play through the same player, observed ${JSON.stringify(control.audio)}`);
+  assert.ok(control.audio && control.audio.paused === false && control.audio.readyState >= 2, `a supported WAV must decode and play through the same player, observed ${JSON.stringify(control.audio)}`);
   assert.equal(control.toggleLabel, expected.pauseLabel, "the toggle must offer Pause while the supported original plays");
+  assert.equal(control.announcementText, "", "routine WAV loading and playback do not populate the live announcement node");
+
+  const queueSummary = page.locator(".global-audio-player .audio-player-queue > summary");
+  const closeQueueIfOpen = async () => {
+    const panel = page.locator(".global-audio-player .audio-player-queue-panel");
+    if (await panel.isVisible()) await queueSummary.click();
+    await panel.waitFor({ state: "hidden", timeout: 5000 });
+  };
+  await closeQueueIfOpen();
+
+  const waitForActualStartPending = async (row, label, startAction) => {
+    const start = await armNativePlayAckGate(page);
+    if (startAction) await startAction();
+    else await row.locator(".music-track-play").click();
+    const ack = await waitForNativePlayAck(page, start);
+    assert.equal(ack.delivered, false, "the native promise has settled but its acknowledgment to the app remains held");
+    const pending = await waitForState(page, (state) =>
+      state.identity === label && state.statusText === expected.starting && state.toggleLabel === expected.starting &&
+      state.toggleDisabled && state.seekDisabled && !state.stopDisabled && state.audio?.paused === false && state.audio.readyState >= 2,
+    20000);
+    assert.equal(pending.announcementText, "", "pending native acknowledgment does not announce routine starting status");
+    await page.evaluate(() => window.__cairnNativePlayAckGate.disarm());
+    return { ack, pending };
+  };
+
+  // A fulfilled native promise is deliberately held at the boundary to the app.
+  // The browser has already started the real WAV and emitted real media events;
+  // the UI must remain pending until the actual acknowledgment is released.
+  await page.locator(".global-audio-player .audio-player-toggle").click();
+  await waitForState(page, (state) => state.audio?.paused === true && state.toggleLabel === expected.playLabel, 10000);
+  const resumeSource = await page.locator(".global-audio-player audio").evaluate((audio) => audio.currentSrc);
+  const originalDownloadCount = downloads.length;
+  const pendingStart = await waitForActualStartPending(supportedRow, supportedName, () => page.locator(".global-audio-player .audio-player-toggle").click());
+  assert.equal(pendingStart.pending.audio.currentSrc, resumeSource, "resuming uses the same verified Blob URL");
+  assert.equal(downloads.length, originalDownloadCount, "resuming the same loaded original does not fetch it again");
+  record.nativeStartPending = {
+    actualAck: pendingStart.ack,
+    sameBlobURL: pendingStart.pending.audio.currentSrc === resumeSource,
+    additionalOriginalDownloads: downloads.length - originalDownloadCount,
+    state: {
+      identity: pendingStart.pending.identity,
+      statusText: pendingStart.pending.statusText,
+      toggleLabel: pendingStart.pending.toggleLabel,
+      toggleDisabled: pendingStart.pending.toggleDisabled,
+      seekDisabled: pendingStart.pending.seekDisabled,
+      stopDisabled: pendingStart.pending.stopDisabled,
+      audio: pendingStart.pending.audio,
+      announcementText: pendingStart.pending.announcementText,
+    },
+  };
+  await releaseNativePlayAck(page, pendingStart.ack.id);
+  record.nativeStartReleased = await waitForState(page, (state) =>
+    state.identity === supportedName && state.audio?.paused === false && state.audio.readyState >= 2 && state.toggleLabel === expected.pauseLabel,
+  10000);
+  record.nativeStartAckAfterRelease = await readNativePlayAck(page, pendingStart.ack.id);
+  assert.equal(record.nativeStartAckAfterRelease.delivered, true);
+  assert.equal(record.nativeStartReleased.statusText, expected.playing);
+
+  // Stop fences a real, already-fulfilled but not-yet-delivered play() result.
+  await closeQueueIfOpen();
+  await page.locator(".global-audio-player .audio-player-toggle").click();
+  await waitForState(page, (state) => state.audio?.paused === true && state.toggleLabel === expected.playLabel, 10000);
+  let start = await armNativePlayAckGate(page);
+  await supportedRow.locator(".music-track-play").click();
+  const stopAck = await waitForNativePlayAck(page, start);
+  const stopping = await waitForState(page, (state) => state.identity === supportedName && state.statusText === expected.starting && state.audio?.paused === false, 10000);
+  assert.equal(stopping.toggleDisabled, true);
+  assert.equal(stopping.stopDisabled, false, "Stop remains available while native acknowledgment is pending");
+  await page.evaluate(() => window.__cairnNativePlayAckGate.disarm());
+  await page.locator(".global-audio-player .audio-player-stop").click();
+  const stoppedBeforeLateAck = await waitForState(page, (state) => state.identity === expected.idle && state.audio?.paused === true && state.audio.srcAttribute === null, 10000);
+  await releaseNativePlayAck(page, stopAck.id);
+  await page.waitForTimeout(150);
+  record.stopLateAck = {
+    actualAck: stopAck,
+    ackAfterRelease: await readNativePlayAck(page, stopAck.id),
+    beforeRelease: { identity: stoppedBeforeLateAck.identity, audio: stoppedBeforeLateAck.audio, queueItems: stoppedBeforeLateAck.queueItems },
+    afterRelease: await readPlayerState(page),
+  };
+  assert.equal(record.stopLateAck.ackAfterRelease?.delivered, true);
+  assert.equal(record.stopLateAck.afterRelease.identity, expected.idle, "a late fulfilled acknowledgment cannot resurrect audio after Stop");
+  assert.equal(record.stopLateAck.afterRelease.audio?.srcAttribute, null);
+  assert.equal(record.stopLateAck.afterRelease.audio?.paused, true);
+  assert.equal(record.stopLateAck.afterRelease.queueItems.filter((item) => item.current).length, 0, "Stop retains the queue but clears its current occurrence");
+
+  // Replacing A with B while A's fulfilled acknowledgment is held must not let
+  // A's callback clear B's pending state or replace B's current identity.
+  start = await armNativePlayAckGate(page);
+  await supportedRow.locator(".music-track-play").click();
+  const oldAck = await waitForNativePlayAck(page, start);
+  const oldPending = await waitForState(page, (state) => state.identity === supportedName && state.statusText === expected.starting && state.audio?.paused === false, 10000);
+  start = await page.evaluate(() => window.__cairnNativePlayAckGate.calls.length);
+  await replacementRow.locator(".music-track-play").click();
+  const replacementAck = await waitForNativePlayAck(page, start);
+  const replacementPending = await waitForState(page, (state) => state.identity === replacementName && state.statusText === expected.starting && state.audio?.paused === false && state.audio.readyState >= 2, 20000);
+  await page.evaluate(() => window.__cairnNativePlayAckGate.disarm());
+  await releaseNativePlayAck(page, oldAck.id);
+  await page.waitForTimeout(150);
+  const afterOldAck = await readPlayerState(page);
+  assert.equal(afterOldAck.identity, replacementName, "the stale acknowledgment for A cannot replace B's identity");
+  assert.equal(afterOldAck.statusText, expected.starting, "A's stale acknowledgment cannot clear B's pending state");
+  assert.equal(afterOldAck.toggleDisabled, true, "B's start control remains fenced after A settles");
+  assert.equal(afterOldAck.audio?.paused, false);
+  await releaseNativePlayAck(page, replacementAck.id);
+  record.replacementLateAck = {
+    oldActualAck: oldAck,
+    oldAckAfterRelease: await readNativePlayAck(page, oldAck.id),
+    replacementActualAck: replacementAck,
+    replacementAckAfterRelease: await readNativePlayAck(page, replacementAck.id),
+    beforeReplacement: { identity: oldPending.identity, statusText: oldPending.statusText },
+    replacementPending: { identity: replacementPending.identity, statusText: replacementPending.statusText, readyState: replacementPending.audio?.readyState },
+    afterOldAck,
+    afterReplacementAck: await waitForState(page, (state) => state.identity === replacementName && state.audio?.paused === false && state.audio.readyState >= 2 && state.toggleLabel === expected.pauseLabel, 10000),
+  };
+  assert.equal(record.replacementLateAck.oldAckAfterRelease?.delivered, true);
+  assert.equal(record.replacementLateAck.replacementAckAfterRelease?.delivered, true);
+  assert.equal(record.replacementLateAck.afterReplacementAck.identity, replacementName, "B remains current after its own acknowledgment is delivered");
+  assert.equal(record.replacementLateAck.afterReplacementAck.statusText, expected.playing);
+  assert.equal(record.replacementLateAck.afterReplacementAck.announcementText, "", "routine replacement playback remains silent to the live region");
+  await page.locator(".global-audio-player .audio-player-stop").click();
+  record.repeatPath = { outcome: "NOT RUN", reason: "The bounded lifecycle flow does not exercise queue repeat mode." };
 }
 
 try {
@@ -342,6 +621,7 @@ try {
     const source = join(temp, "qa-source");
     await mkdir(source);
     await writeFile(join(source, supportedName), supportedBytes);
+    await writeFile(join(source, replacementName), replacementBytes);
     await writeFile(join(source, unsupportedName), unsupportedBytes);
 
     const config = join(temp, "config.toml");
@@ -349,7 +629,7 @@ try {
     assert.equal(init.status, 0, "initialize temporary config");
     const env = { ...process.env, CAIRN_CATALOG: join(temp, "catalog.sqlite"), CAIRN_REPOSITORY: join(temp, "repository"), CAIRN_VECTORS: join(temp, "vectors"), CAIRN_MODELS: join(temp, "models"), CAIRN_RECOVERY_RECORDS: join(temp, "recovery") };
     const daemonLogFD = openSync(join(temp, "daemon.log"), "a");
-    daemon = spawn(daemonBin, ["--config", config, "--socket", join(temp, "daemon.sock"), "--api-listen", `127.0.0.1:${port}`, "--web-root", join(repo, "web/dist")], { cwd: repo, env, stdio: ["ignore", daemonLogFD, daemonLogFD] });
+    daemon = spawn(daemonBin, ["--config", config, "--socket", join(temp, "daemon.sock"), "--api-listen", `127.0.0.1:${port}`, "--web-root", webRoot], { cwd: repo, env, stdio: ["ignore", daemonLogFD, daemonLogFD] });
     await new Promise((resolveSpawn, rejectSpawn) => { daemon.once("spawn", resolveSpawn); daemon.once("error", rejectSpawn); });
     base = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 120; i += 1) {
@@ -398,7 +678,8 @@ for (const locale of ["en", "zh-CN"]) {
   console.log(`  renamed row play enabled  : ${record.unsupportedRowPlayEnabled}`);
   console.log(`  queue before attempt      : ${JSON.stringify(record.queueBeforeAttempt)} (${JSON.stringify(record.queueSummaryBeforeAttempt)})`);
   console.log(`  status text               : ${JSON.stringify(record.afterAttempt?.statusText)}`);
-  console.log(`  status region             : role=${JSON.stringify(record.afterAttempt?.statusRole)} aria-live=${JSON.stringify(record.afterAttempt?.statusAriaLive)}`);
+  console.log(`  visible status attributes : role=${JSON.stringify(record.afterAttempt?.statusRole)} aria-live=${JSON.stringify(record.afterAttempt?.statusAriaLive)}`);
+  console.log(`  stable announcement       : before=${JSON.stringify(record.announcementBefore)} exposed=${record.announcementExposedAtIdle} afterQueue=${record.announcementTextAfterQueue} sameAfterQueue=${record.announcementSameAfterQueue} after=${JSON.stringify(record.afterAttempt && { text: record.afterAttempt.announcementText, role: record.afterAttempt.announcementRole, ariaLive: record.afterAttempt.announcementAriaLive, atomic: record.afterAttempt.announcementAtomic })} sameAfterFailure=${record.announcementSameNode} connected=${record.announcementConnected}`);
   console.log(`  audio element             : ${JSON.stringify(record.afterAttempt?.audio)}`);
   console.log(`  toggle label              : ${JSON.stringify(record.afterAttempt?.toggleLabel)}`);
   console.log(`  player identity           : ${JSON.stringify(record.afterAttempt?.identity)}`);
@@ -406,6 +687,11 @@ for (const locale of ["en", "zh-CN"]) {
   console.log(`  queue after attempt       : ${JSON.stringify(record.afterAttempt?.queueItems)} (${JSON.stringify(record.afterAttempt?.queueSummary)})`);
   console.log(`  downloaded original       : ${JSON.stringify(record.oracle)}`);
   console.log(`  supported control         : status=${JSON.stringify(record.supportedControl?.statusText)} audio=${JSON.stringify(record.supportedControl?.audio)} toggle=${JSON.stringify(record.supportedControl?.toggleLabel)}`);
+  console.log(`  pending native start      : ${JSON.stringify(record.nativeStartPending)}`);
+  console.log(`  released native start     : ${JSON.stringify(record.nativeStartReleased && { identity: record.nativeStartReleased.identity, statusText: record.nativeStartReleased.statusText, toggleLabel: record.nativeStartReleased.toggleLabel, audio: record.nativeStartReleased.audio })}`);
+  console.log(`  Stop late acknowledgment  : ${JSON.stringify(record.stopLateAck)}`);
+  console.log(`  replacement late ack      : ${JSON.stringify(record.replacementLateAck)}`);
+  console.log(`  queue repeat path         : ${JSON.stringify(record.repeatPath)}`);
 }
 
 // These three started life as diagnostics, because the player used to render the
@@ -415,9 +701,9 @@ for (const locale of ["en", "zh-CN"]) {
 // reader can miss. The exact localized sentence is expected here because the
 // fixture provokes exactly one outcome, `unsupported-format`.
 const presentationDefects = [];
-const missingLiveRegion = ["en", "zh-CN"].filter((locale) => Boolean(observed[locale]?.afterAttempt) && !observed[locale].afterAttempt.statusRole && !observed[locale].afterAttempt.statusAriaLive);
+const missingLiveRegion = ["en", "zh-CN"].filter((locale) => Boolean(observed[locale]?.afterAttempt) && (observed[locale].afterAttempt.announcementRole !== "status" || observed[locale].afterAttempt.announcementAriaLive !== "polite"));
 if (missingLiveRegion.length) {
-  presentationDefects.push(`the error status element carried no role="status"/aria-live in ${missingLiveRegion.join(", ")}, so the failure is not announced to assistive technology`);
+  presentationDefects.push(`the stable error announcement node carried no role="status"/aria-live in ${missingLiveRegion.join(", ")}, so the failure is not announced to assistive technology`);
 }
 const errorKeys = new Set(["unsupported-format", "identity-unavailable", "size-limit", "length-mismatch", "hash-mismatch", "empty-response", "playback-failed", "playback-permission", "workspace-mismatch", "track-unavailable"]);
 const keyLeaks = ["en", "zh-CN"].filter((locale) => {
@@ -441,5 +727,5 @@ if (failure) {
   if (daemonLog.trim()) console.error(`--- isolated daemon log (tail) ---\n${daemonLog.trim().split("\n").slice(-20).join("\n")}`);
   process.exitCode = 1;
 } else {
-  console.log(`PASS: a real renamed non-audio original reached the player as an explicit error in both locales; no audio element claimed to be playing, the attempted identity and queue occurrence were retained with no silent advance, the browser's own decoder rejected the exact downloaded bytes, and a real WAV still played through the same player.`);
+  console.log(`PASS: a real renamed non-audio original reached the player as an explicit error in both locales; the pre-mounted live node announced it while visible status stayed plain text, no silent queue advance occurred, browser decode rejected the exact original, and real WAV native-start pending/ack, Stop fencing, and replacement fencing were observed.`);
 }

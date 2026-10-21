@@ -34,8 +34,8 @@ go_version="$(go env GOVERSION)"
 # so the replaced binary can be told apart from the one it replaced without
 # trusting a filename.
 echo "building replacement binaries from $repo_root"
-( cd "$repo_root" && go build -tags purego -ldflags "-X main.buildVersion=$new_version" -o "$new_bin" ./server/cmd/cairnd )
-( cd "$repo_root" && go build -tags purego -ldflags "-X main.buildVersion=$new_version" -o "$new_cli" ./client/cmd/cairn )
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -ldflags "-X main.buildVersion=$new_version" -o "$new_bin" ./server/cmd/cairnd )
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -ldflags "-X main.buildVersion=$new_version" -o "$new_cli" ./client/cmd/cairn )
 
 built_version="$("$new_bin" --version 2>/dev/null | head -1 || true)"
 [[ "$built_version" == *"$new_version"* ]] || {

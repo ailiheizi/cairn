@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 )
+
+const reciprocalRankFusionK = 60
 
 // Component is one QueryProvider invocation inside host-owned result fusion.
 type Component struct {
@@ -22,6 +26,72 @@ type Component struct {
 	// answer state that one of its lanes is a bounded top-k set rather than a
 	// complete match set.
 	Page PageState
+}
+
+// RetainAuthorizedSubjects intersects the original union with the trusted
+// source-to-canonical map returned by the control plane's authorization pass.
+// Aliased source handles merge into their canonical subject before ranks are
+// compacted. A map entry for a source absent from the original union cannot
+// introduce a candidate.
+func (result FuseResult) RetainAuthorizedSubjects(canonicalBySource map[string]string) []FusedHit {
+	filtered := make([]FusedHit, 0, len(result.originalHits))
+	retained := make(map[string]struct{}, len(canonicalBySource))
+	indexByCanonical := make(map[string]int, len(canonicalBySource))
+	authorizedSource := make(map[string]string, len(canonicalBySource))
+	for _, hit := range result.originalHits {
+		canonical, ok := canonicalBySource[hit.SubjectID]
+		if !ok || canonical == "" {
+			continue
+		}
+		authorizedSource[hit.SubjectID] = canonical
+		candidate := hit
+		candidate.SubjectID = canonical
+		if at, exists := indexByCanonical[canonical]; exists {
+			for _, dimension := range candidate.Dimensions {
+				filtered[at].Dimensions = appendUnique(filtered[at].Dimensions, dimension)
+			}
+			mergeHitProvenance(&filtered[at].Hit, candidate.Hit)
+			continue
+		}
+		indexByCanonical[canonical] = len(filtered)
+		retained[canonical] = struct{}{}
+		filtered = append(filtered, candidate)
+	}
+	compacted := make(map[string]map[string]int, len(result.ranksByDimension))
+	for dimension, ranks := range result.ranksByDimension {
+		type subjectRank struct {
+			subject string
+			rank    int
+		}
+		ordered := make([]subjectRank, 0, len(ranks))
+		for source, rank := range ranks {
+			canonical, authorized := authorizedSource[source]
+			if _, ok := retained[canonical]; authorized && ok && rank > 0 {
+				ordered = append(ordered, subjectRank{subject: canonical, rank: rank})
+			}
+		}
+		bestRank := make(map[string]int, len(ordered))
+		for _, item := range ordered {
+			if prior, exists := bestRank[item.subject]; !exists || item.rank < prior {
+				bestRank[item.subject] = item.rank
+			}
+		}
+		ordered = ordered[:0]
+		for subject, rank := range bestRank {
+			ordered = append(ordered, subjectRank{subject: subject, rank: rank})
+		}
+		sort.Slice(ordered, func(i, j int) bool {
+			if ordered[i].rank != ordered[j].rank {
+				return ordered[i].rank < ordered[j].rank
+			}
+			return ordered[i].subject < ordered[j].subject
+		})
+		compacted[dimension] = make(map[string]int, len(ordered))
+		for i, item := range ordered {
+			compacted[dimension][item.subject] = i + 1
+		}
+	}
+	return rankFusedHits(filtered, compacted)
 }
 
 // FusedHit is a subject that one or more components returned.
@@ -61,7 +131,8 @@ func dimensionHasQueryMaterial(req QueryRequest, id string) bool {
 	}
 }
 
-// FuseResult unions typed component results without inventing a hybrid score.
+// FuseResult unions typed component results and keeps their score semantics
+// separate from the broker's host-owned rank-only ordering.
 type FuseResult struct {
 	Hits       []FusedHit
 	Components []Component
@@ -70,6 +141,12 @@ type FuseResult struct {
 	// lanes is pageable; the union as a whole never is, because the other lanes
 	// are bounded top-k sets with no seekable order.
 	Page PageState
+
+	// originalHits and ranksByDimension are process-local ranking inputs used
+	// only after the control plane applies its existing authorization
+	// projection. They never serialize and do not create a second authority.
+	originalHits     []FusedHit
+	ranksByDimension map[string]map[string]int
 }
 
 // DefaultFuseDimensions is the host-owned ordinary query surface. It is
@@ -85,8 +162,8 @@ func DefaultFuseDimensions(ready ProviderReadiness) []string {
 	return dimensions
 }
 
-// Fuse queries each named dimension separately and unions authorized
-// candidates by SubjectID. Score semantics stay per component.
+// Fuse queries each named dimension separately, unions authorized candidates
+// by SubjectID, and orders that union with the versioned host rank policy.
 //
 // The image dimension is included only through its own query provider: when it
 // is not ready it contributes no hits and is reported with its honest status
@@ -107,6 +184,7 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 	}
 	readiness := IndexerReadiness(idx)
 	seen := map[string]int{}
+	ranksByDimension := make(map[string]map[string]int, len(dims))
 	for _, id := range dims {
 		dimension, ok := LookupDimension(id, readiness)
 		component := Component{
@@ -176,6 +254,7 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 		component.Status = "SUCCEEDED"
 		component.Hits = len(hits)
 		result.Components = append(result.Components, component)
+		componentRanks := rankComponentSubjects(hits)
 		for _, hit := range hits {
 			if at, ok := seen[hit.SubjectID]; ok {
 				result.Hits[at].Dimensions = appendUnique(result.Hits[at].Dimensions, id)
@@ -185,8 +264,78 @@ func (idx *Indexer) Fuse(ctx context.Context, req QueryRequest) (FuseResult, err
 			seen[hit.SubjectID] = len(result.Hits)
 			result.Hits = append(result.Hits, FusedHit{Hit: hit, Dimensions: []string{id}})
 		}
+		ranksByDimension[id] = componentRanks
 	}
+	result.originalHits = append([]FusedHit(nil), result.Hits...)
+	result.ranksByDimension = ranksByDimension
+	result.Hits = rankFusedHits(result.originalHits, ranksByDimension)
 	return result, nil
+}
+
+func rankComponentSubjects(hits []Hit) map[string]int {
+	ranks := make(map[string]int, len(hits))
+	for _, hit := range hits {
+		if _, exists := ranks[hit.SubjectID]; exists {
+			continue
+		}
+		ranks[hit.SubjectID] = len(ranks) + 1
+	}
+	return ranks
+}
+
+// rankFusedHits applies the host-owned rank-only policy to the already
+// authorized union. Provider scores never cross dimension boundaries.
+func rankFusedHits(hits []FusedHit, ranksByDimension map[string]map[string]int) []FusedHit {
+	if len(hits) < 2 || len(ranksByDimension) == 0 {
+		return hits
+	}
+	dimensions := make([]string, 0, len(ranksByDimension))
+	for dimension := range ranksByDimension {
+		dimensions = append(dimensions, dimension)
+	}
+	sort.Strings(dimensions)
+	type rankedHit struct {
+		hit      FusedHit
+		score    float64
+		bestRank int
+		lexRank  int
+	}
+	ranked := make([]rankedHit, 0, len(hits))
+	for _, hit := range hits {
+		item := rankedHit{hit: hit, bestRank: math.MaxInt, lexRank: math.MaxInt}
+		for _, dimension := range dimensions {
+			rank := ranksByDimension[dimension][hit.SubjectID]
+			if rank < 1 {
+				continue
+			}
+			item.score += 1 / float64(reciprocalRankFusionK+rank)
+			if rank < item.bestRank {
+				item.bestRank = rank
+			}
+			if dimension == DimensionLexical {
+				item.lexRank = rank
+			}
+		}
+		ranked = append(ranked, item)
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		a, b := ranked[i], ranked[j]
+		if a.score != b.score {
+			return a.score > b.score
+		}
+		if a.bestRank != b.bestRank {
+			return a.bestRank < b.bestRank
+		}
+		if a.lexRank != b.lexRank {
+			return a.lexRank < b.lexRank
+		}
+		return a.hit.SubjectID < b.hit.SubjectID
+	})
+	ordered := make([]FusedHit, len(ranked))
+	for i := range ranked {
+		ordered[i] = ranked[i].hit
+	}
+	return ordered
 }
 
 // mergeHitProvenance keeps each component's source explanation when subjects
@@ -241,6 +390,9 @@ func QueryFailureReason(dimension string, err error) string {
 	}
 	if reason := SemanticEgressReasonOf(err); reason != "" {
 		return string(reason)
+	}
+	if errors.Is(err, ErrSemanticQueryInputTruncated) {
+		return SemanticQueryInputTruncatedReason
 	}
 	message := err.Error()
 	for _, reason := range []string{MultimodalSpaceMismatchReason, MultimodalIndexNotBuiltReason, MultimodalIndexUnavailableReason, QueryTextRequiredReason} {

@@ -25,10 +25,7 @@ func (d *Dispatcher) handleRecoveryImport(ctx context.Context, env command.Envel
 		return invalidInputResult(env, started, errString("artifact_path and trust_anchor_path are required"))
 	}
 	imported, err := d.exact.ImportRecoveryArtifact(ctx, input.ArtifactPath, input.TrustAnchorPath, input.PublicationDomain)
-	if err != nil {
-		return exactOperationErrorResult(env, started, err)
-	}
-	return succeeded(env, started, command.RecoveryImportData{
+	data := command.RecoveryImportData{
 		Schema:                imported.Schema,
 		SnapshotRef:           imported.SnapshotRef,
 		ManifestDigest:        imported.ManifestDigest,
@@ -40,7 +37,24 @@ func (d *Dispatcher) handleRecoveryImport(ctx context.Context, env command.Envel
 		Files:                 imported.Files,
 		Bytes:                 imported.Bytes,
 		CatalogCreated:        imported.CatalogCreated,
-	})
+	}
+	if err != nil {
+		if imported.CatalogCreated {
+			return degradedResult(env, started, data,
+				"catalog committed, but recovery import reconciliation is unavailable: "+err.Error())
+		}
+		return exactOperationErrorResult(env, started, err)
+	}
+	if imported.CatalogCreated && d.store != nil {
+		root, err := d.store.GetNamespaceRootBySnapshotRef(ctx, imported.SnapshotRef)
+		if err != nil {
+			return degradedResult(env, started, data, "catalog imported, but lexical refresh is unavailable because the reconstructed namespace could not be resolved: "+err.Error())
+		}
+		if err := d.rebuildSearch(ctx, root.WorkspaceID); err != nil {
+			return degradedResult(env, started, data, "catalog imported, but lexical refresh is unavailable: "+err.Error())
+		}
+	}
+	return succeeded(env, started, data)
 }
 
 // handleRecoveryTokenExport derives the deterministic proof envelope for one

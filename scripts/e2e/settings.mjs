@@ -143,6 +143,126 @@ export async function assertResponsiveLayout(ctx) {
   }
 }
 
+// Rebuild feedback keeps aggregate fields, lexical sources, and semantic
+// source/tokenizer coverage distinct. Every response is intercepted so this
+// check cannot reach a real rebuild operation.
+export async function assertSearchRebuildCoveragePresentation(ctx) {
+  const { page } = ctx;
+  const cases = [
+    {
+      status: "SUCCEEDED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true, source_coverage: { available: true, complete: true, expected: 1, indexed: 1 } },
+      },
+      expected: /semantic search is ready|语义搜索已就绪/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true, source_coverage: { available: true, complete: false, expected: 2, indexed: 1, missing: 1 } },
+      },
+      expected: /selected text sources|文字资料尚未进入关键词索引/,
+      forbidden: /keyword fields|关键词字段/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true, source_coverage: { available: false, complete: false, reason: "LEGACY_PROJECTION" } },
+      },
+      expected: /Selected text-source coverage is unavailable|已选文字资料的覆盖情况不可用/,
+      forbidden: /keyword fields|关键词字段/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "UNAVAILABLE", semantic_failure: "semantic unavailable",
+        lexical_coverage: { available: true, complete: true },
+      },
+      expected: /semantic search failed|语义搜索失败/,
+      forbidden: /source coverage|text sources|来源覆盖|文本来源/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true },
+        semantic_source_coverage: { available: true, complete: false, input_truncated: 1, input_unknown: 0 },
+      },
+      expected: /Some text was truncated during semantic indexing|部分文字在生成语义索引时被截断/,
+      forbidden: /keyword fields|关键词字段/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true },
+        semantic_source_coverage: { available: true, complete: false, input_truncated: 0, input_unknown: 1 },
+      },
+      expected: /Semantic processing coverage is not confirmed for some text|部分文字的语义处理范围尚未确认/,
+      forbidden: /keyword fields|关键词字段/,
+    },
+    {
+      status: "DEGRADED",
+      data: {
+        semantic_state: "AVAILABLE",
+        lexical_coverage: { available: true, complete: true },
+        semantic_source_coverage: { available: false, complete: false, reason: "LEGACY_RECEIPT_V1" },
+      },
+      expected: /Semantic source coverage is unavailable|语义来源覆盖情况不可用/,
+      forbidden: /keyword fields|关键词字段/,
+    },
+  ];
+  let responseIndex = 0;
+  const seen = [];
+  const routeCommand = async (route) => {
+    let payload;
+    try { payload = route.request().postDataJSON(); } catch {}
+    if (payload?.operation !== "search.rebuild") return route.continue();
+    const answer = cases[responseIndex++];
+    assert.ok(answer, "only the seven explicitly controlled search.rebuild requests may reach this helper");
+    seen.push(payload.operation);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: answer.status, data: answer.data }) });
+  };
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const settingsTrigger = page.getByRole("button", { name: /打开设置|Open settings/ });
+  if (await settingsTrigger.isVisible()) {
+    await settingsTrigger.click();
+  } else {
+    await page.locator("summary.topbar-menu-summary").click();
+    await page.getByRole("button", { name: /打开设置|Open settings/ }).click();
+  }
+  const settings = page.getByRole("dialog", { name: /设置|Settings/ });
+  await settings.waitFor({ state: "visible", timeout: 10000 });
+  await settings.getByRole("button", { name: /^(Search|搜索)$/ }).click();
+  const rebuild = settings.getByRole("button", { name: /重建搜索索引|Rebuild search indexes/ });
+  await rebuild.waitFor({ state: "visible", timeout: 10000 });
+  const message = rebuild.locator("xpath=ancestor::div[contains(@class,'model-card')]").locator(".model-action-message");
+  await page.route("**/api/v1/command", routeCommand);
+  try {
+    for (const [index, scenario] of cases.entries()) {
+      await rebuild.click();
+      await page.waitForFunction(({ expected }) => {
+        const card = [...document.querySelectorAll('.model-card')].find((element) => /Rebuild search indexes|重建搜索索引/.test(element.textContent ?? ''));
+        const message = card?.querySelector('.model-action-message');
+        return Boolean(message?.textContent && new RegExp(expected, 'i').test(message.textContent));
+      }, { expected: scenario.expected.source }, { timeout: 10000 });
+      const text = (await message.innerText()).trim();
+      assert.match(text, scenario.expected, `rebuild presentation scenario ${index + 1}: ${text}`);
+      if (scenario.forbidden) assert.doesNotMatch(text, scenario.forbidden, `rebuild presentation scenario ${index + 1}: ${text}`);
+      await ctx.captureSearchRebuildCase?.({ index, status: scenario.status, text });
+    }
+  } finally {
+    await page.unroute("**/api/v1/command", routeCommand);
+  }
+  assert.equal(responseIndex, cases.length, "the helper must intercept each expected search.rebuild response");
+  assert.equal(seen.length, cases.length, "no real search.rebuild request may pass through");
+  await settings.getByRole("button", { name: /关闭设置|Close settings/ }).click();
+}
+
 // The phone workspace panel: one topbar button opens the same rail (Library,
 // Sources, Duplicates, Tags, Activity) and the same trusted status disclosure
 // as a left slide-in panel, with the drawer dismiss contract. Above the

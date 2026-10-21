@@ -37,16 +37,17 @@ type semanticCoveragePairMethodProbe interface {
 }
 
 type SemanticCoverageStatement struct {
-	Dimension     string
-	GenerationID  string
-	ConfigDigest  string
-	ProfileDigest string
-	Available     bool
-	Complete      bool
-	Expected      int
-	Indexed       int
-	Missing       []string
-	Notes         string
+	Dimension      string
+	GenerationID   string
+	ConfigDigest   string
+	ProfileDigest  string
+	Available      bool
+	Complete       bool
+	Expected       int
+	Indexed        int
+	Missing        []string
+	Notes          string
+	SourceCoverage *SemanticSourceCoverageStatement `json:"source_coverage,omitempty"`
 }
 
 // semanticCoverageComparison is the host-owned comparison between the
@@ -68,20 +69,24 @@ type semanticCoverageComparison struct {
 // not consulted when reopening an old generation: descriptions and notes may
 // have advanced since that projection was built.
 type semanticGenerationReceiptFile struct {
-	Schema         string                 `json:"schema"`
-	GenerationID   string                 `json:"generation_id"`
-	WorkspaceID    string                 `json:"workspace_id"`
-	SnapshotRef    string                 `json:"snapshot_ref"`
-	NamespaceRoot  string                 `json:"namespace_root_id"`
-	ConfigDigest   string                 `json:"config_digest"`
-	ProfileDigest  string                 `json:"profile_digest"`
-	SemanticSpace  string                 `json:"semantic_space"`
-	LibraryDigest  string                 `json:"library_digest"`
-	IdentityDigest string                 `json:"identity_digest"`
-	Identities     []ZvecCoverageIdentity `json:"identities"`
+	Schema                string                   `json:"schema"`
+	GenerationID          string                   `json:"generation_id"`
+	WorkspaceID           string                   `json:"workspace_id"`
+	SnapshotRef           string                   `json:"snapshot_ref"`
+	NamespaceRoot         string                   `json:"namespace_root_id"`
+	ConfigDigest          string                   `json:"config_digest"`
+	ProfileDigest         string                   `json:"profile_digest"`
+	SemanticSpace         string                   `json:"semantic_space"`
+	LibraryDigest         string                   `json:"library_digest"`
+	IdentityDigest        string                   `json:"identity_digest"`
+	Identities            []ZvecCoverageIdentity   `json:"identities"`
+	SourceInventory       *semanticSourceInventory `json:"source_inventory,omitempty"`
+	SourceInventoryDigest string                   `json:"source_inventory_digest,omitempty"`
 }
 
 const semanticGenerationReceiptSchema = "cairn.semantic-generation-receipt.v1"
+const semanticGenerationReceiptSchemaV2 = "cairn.semantic-generation-receipt.v2"
+const semanticSourceReasonBackendLifecycleUnavailable = "BACKEND_LIFECYCLE_UNAVAILABLE"
 
 // Receipts are disposable search projection evidence, not an unbounded
 // metadata channel. Keep the limit high enough for a large real generation,
@@ -105,21 +110,39 @@ func semanticCoverageDigest(identities []ZvecCoverageIdentity) string {
 	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
-func writeSemanticGenerationReceipt(generation sqlite.IndexGeneration, libraryDigest string, identities []ZvecCoverageIdentity) error {
+func writeSemanticGenerationReceipt(generation sqlite.IndexGeneration, libraryDigest string, identities []ZvecCoverageIdentity, inventories ...semanticSourceInventory) error {
 	if strings.TrimSpace(generation.DBPath) == "" || strings.TrimSpace(generation.ID) == "" {
 		return errors.New("semantic generation receipt requires generation identity and path")
 	}
 	identities = append([]ZvecCoverageIdentity(nil), identities...)
+	inventory := semanticSourceInventory{}
+	if len(inventories) > 0 {
+		inventory = inventories[0]
+	}
+	schema := semanticGenerationReceiptSchema
+	if len(inventories) > 0 {
+		if !semanticSourceInventoryMatchesIdentities(inventory, identities) {
+			return errors.New("semantic generation source inventory is invalid")
+		}
+		schema = semanticGenerationReceiptSchemaV2
+	}
 	receipt := semanticGenerationReceiptFile{
-		Schema: semanticGenerationReceiptSchema, GenerationID: generation.ID,
+		Schema: schema, GenerationID: generation.ID,
 		WorkspaceID: generation.WorkspaceID, SnapshotRef: generation.SnapshotRef,
 		NamespaceRoot: generation.NamespaceRootID, ConfigDigest: generation.ConfigDigest,
 		ProfileDigest: generation.ProviderProfileDigest, SemanticSpace: generation.SemanticSpace,
 		LibraryDigest: libraryDigest, IdentityDigest: semanticCoverageDigest(identities), Identities: identities,
 	}
+	if schema == semanticGenerationReceiptSchemaV2 {
+		receipt.SourceInventory = &inventory
+		receipt.SourceInventoryDigest = semanticSourceInventoryDigest(inventory)
+	}
 	payload, err := json.Marshal(receipt)
 	if err != nil {
 		return err
+	}
+	if len(payload) == 0 || uint64(len(payload)) > semanticGenerationReceiptMaxBytes {
+		return errors.New("semantic generation receipt exceeds the bounded size limit")
 	}
 	// Generation IDs are unique. Refuse replacement so a stale or concurrent
 	// writer cannot silently reinterpret an existing generation.
@@ -253,7 +276,7 @@ func readSemanticGenerationReceipt(generation sqlite.IndexGeneration) ([]ZvecCov
 		if err := json.Unmarshal(payload, &receipt); err != nil {
 			return nil, "", "", fmt.Errorf("semantic generation receipt: %v", err)
 		}
-		if receipt.Schema != semanticGenerationReceiptSchema || receipt.GenerationID != generation.ID || receipt.WorkspaceID != generation.WorkspaceID ||
+		if (receipt.Schema != semanticGenerationReceiptSchema && receipt.Schema != semanticGenerationReceiptSchemaV2) || receipt.GenerationID != generation.ID || receipt.WorkspaceID != generation.WorkspaceID ||
 			receipt.SnapshotRef != generation.SnapshotRef || receipt.NamespaceRoot != generation.NamespaceRootID ||
 			receipt.ConfigDigest != generation.ConfigDigest || receipt.ProfileDigest != generation.ProviderProfileDigest || receipt.SemanticSpace != generation.SemanticSpace ||
 			receipt.IdentityDigest == "" || receipt.IdentityDigest != semanticCoverageDigest(receipt.Identities) {
@@ -264,6 +287,13 @@ func readSemanticGenerationReceipt(generation sqlite.IndexGeneration) ([]ZvecCov
 		}
 		if err := validateZvecCoverageIdentities(receipt.Identities); err != nil || len(receipt.Identities) == 0 {
 			return nil, "", "", errors.New("semantic generation receipt identities are invalid")
+		}
+		if receipt.Schema == semanticGenerationReceiptSchemaV2 && (receipt.SourceInventory == nil ||
+			receipt.SourceInventoryDigest == "" || receipt.SourceInventoryDigest != semanticSourceInventoryDigest(*receipt.SourceInventory)) {
+			return nil, "", "", errors.New("semantic generation source inventory is invalid")
+		}
+		if receipt.Schema == semanticGenerationReceiptSchemaV2 && !semanticSourceInventoryMatchesIdentities(*receipt.SourceInventory, receipt.Identities) {
+			return nil, "", "", errors.New("semantic generation source inventory row is invalid")
 		}
 		return append([]ZvecCoverageIdentity(nil), receipt.Identities...), receipt.IdentityDigest, receipt.LibraryDigest, nil
 	}
@@ -288,6 +318,34 @@ func readSemanticGenerationReceipt(generation sqlite.IndexGeneration) ([]ZvecCov
 		return nil, "", "", errors.New("semantic generation metadata identities are invalid")
 	}
 	return append([]ZvecCoverageIdentity(nil), metadata.Identities...), semanticCoverageDigest(metadata.Identities), metadata.LibraryDigest, nil
+}
+
+func readSemanticSourceInventory(generation sqlite.IndexGeneration) (*semanticSourceInventory, string, error) {
+	if strings.TrimSpace(generation.DBPath) == "" {
+		return nil, SemanticSourceReasonInventoryInvalid, errors.New("semantic generation path is empty")
+	}
+	payload, err := readBoundedSemanticGenerationReceipt(semanticGenerationReceiptPath(generation.DBPath))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, SemanticSourceReasonLegacyReceipt, nil
+		}
+		return nil, SemanticSourceReasonInventoryInvalid, err
+	}
+	var receipt semanticGenerationReceiptFile
+	if err := json.Unmarshal(payload, &receipt); err != nil {
+		return nil, SemanticSourceReasonInventoryInvalid, err
+	}
+	if receipt.Schema == semanticGenerationReceiptSchema {
+		return nil, SemanticSourceReasonLegacyReceipt, nil
+	}
+	if receipt.Schema != semanticGenerationReceiptSchemaV2 || receipt.GenerationID != generation.ID || receipt.WorkspaceID != generation.WorkspaceID ||
+		receipt.SnapshotRef != generation.SnapshotRef || receipt.NamespaceRoot != generation.NamespaceRootID ||
+		receipt.ConfigDigest != generation.ConfigDigest || receipt.ProfileDigest != generation.ProviderProfileDigest ||
+		receipt.SemanticSpace != generation.SemanticSpace || receipt.SourceInventory == nil ||
+		receipt.SourceInventoryDigest != semanticSourceInventoryDigest(*receipt.SourceInventory) || !semanticSourceInventoryValid(*receipt.SourceInventory) {
+		return nil, SemanticSourceReasonInventoryInvalid, errors.New("semantic source inventory binding or digest is invalid")
+	}
+	return receipt.SourceInventory, "", nil
 }
 
 func validateSemanticReceiptLibrary(idx *Indexer, libraryDigest string) error {
@@ -589,6 +647,7 @@ func (idx *Indexer) SemanticCoverage(ctx context.Context, workspaceID string) (S
 	}
 	expectedPairs, _, libraryDigest, receiptErr := readSemanticGenerationReceipt(generation)
 	if receiptErr != nil {
+		statement.SourceCoverage = unavailableSemanticSourceCoverage(generation, SemanticSourceReasonInventoryInvalid)
 		statement.Notes = "semantic generation expected identity receipt is unavailable"
 		return statement, nil
 	}
@@ -656,6 +715,13 @@ func (idx *Indexer) SemanticCoverage(ctx context.Context, workspaceID string) (S
 	statement.Available = true
 	statement.Missing = append(statement.Missing, comparison.Missing...)
 	statement.Complete = pairBound && comparison.Complete()
+	if inventory, reason, inventoryErr := readSemanticSourceInventory(generation); inventoryErr != nil {
+		statement.SourceCoverage = unavailableSemanticSourceCoverage(generation, SemanticSourceReasonInventoryInvalid)
+	} else if inventory == nil {
+		statement.SourceCoverage = unavailableSemanticSourceCoverage(generation, reason)
+	} else {
+		statement.SourceCoverage = ptrSemanticSourceCoverage(summarizeSemanticSourceCoverage(generation, *inventory, expectedPairs, pairs, pairBound, pairBound && comparison.Complete(), idx.SemanticManifest.PreprocessingDigest))
+	}
 	if statement.Complete {
 		// Coverage is allowed to report complete only after an explicit
 		// generation lifecycle check. CoveragePairs may be metadata-backed and
@@ -663,6 +729,11 @@ func (idx *Indexer) SemanticCoverage(ctx context.Context, workspaceID string) (S
 		if err := openCloseSemanticGeneration(ctx, idx.SemanticZvec, spec); err != nil {
 			statement.Complete = false
 			statement.Notes = "semantic generation lifecycle is unavailable"
+			if statement.SourceCoverage != nil {
+				statement.SourceCoverage.Available = false
+				statement.SourceCoverage.Complete = false
+				statement.SourceCoverage.Reason = semanticSourceReasonBackendLifecycleUnavailable
+			}
 			return statement, nil
 		}
 	}
@@ -683,6 +754,17 @@ func (idx *Indexer) SemanticCoverage(ctx context.Context, workspaceID string) (S
 		statement.Notes = "semantic generation covers every durable segment"
 	}
 	return statement, nil
+}
+
+func unavailableSemanticSourceCoverage(generation sqlite.IndexGeneration, reason string) *SemanticSourceCoverageStatement {
+	return &SemanticSourceCoverageStatement{Scope: semanticSourceCoverageScopeV1, GenerationID: generation.ID,
+		SnapshotRef: generation.SnapshotRef, NamespaceRootID: generation.NamespaceRootID,
+		ConfigDigest: generation.ConfigDigest, ProfileDigest: generation.ProviderProfileDigest,
+		Available: false, Complete: false, Reason: reason}
+}
+
+func ptrSemanticSourceCoverage(value SemanticSourceCoverageStatement) *SemanticSourceCoverageStatement {
+	return &value
 }
 
 // Coverage reports what the lexical generation actually feeds, honestly.
@@ -733,7 +815,13 @@ func (idx *Indexer) CoverageGeneration(ctx context.Context, workspaceID string, 
 	if err != nil {
 		return statement, err
 	}
-	return LexicalCoverage(true, perField), nil
+	statement = LexicalCoverage(true, perField)
+	sourceCoverage, err := measureSourceCoverage(ctx, generation, generation.DBPath)
+	if err != nil {
+		return CoverageStatement{}, err
+	}
+	statement.SourceCoverage = &sourceCoverage
+	return statement, nil
 }
 
 // measureFieldCoverage runs one aggregate query over the built documents

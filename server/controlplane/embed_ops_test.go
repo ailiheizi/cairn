@@ -183,7 +183,7 @@ func TestSemanticMultimodalFuse(t *testing.T) {
 	if err := json.Unmarshal(fused.Data, &fuseData); err != nil {
 		t.Fatalf("decode fuse: %v", err)
 	}
-	if fuseData.Provider != search.ProviderBrokerFuse || fuseData.ScoreSemantics != search.ScoreComponentUnion {
+	if fuseData.Provider != search.ProviderBrokerFuse || fuseData.ScoreSemantics != search.ScoreReciprocalRankFusion {
 		t.Fatalf("fuse provenance = %+v", fuseData)
 	}
 	if fuseData.Dimension != "" {

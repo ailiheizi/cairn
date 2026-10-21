@@ -1,4 +1,4 @@
-//go:build cgo && purego && arm64 && supervised_integration && (darwin || linux)
+//go:build cgo && (purego || cairn_zvec_dynamic) && arm64 && supervised_integration && (darwin || linux)
 
 package processor
 
@@ -120,7 +120,7 @@ func buildCairndForWorker(t *testing.T) string {
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "..", "..", ".."))
 	output := filepath.Join(t.TempDir(), "cairnd")
-	cmd := exec.Command("go", "build", "-tags", "purego", "-o", output, "./server/cmd/cairnd")
+	cmd := exec.Command("go", "build", "-tags", "cairn_zvec_dynamic", "-o", output, "./server/cmd/cairnd")
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build cairnd worker binary: %v\n%s", err, out)

@@ -351,6 +351,17 @@ func TestPartBoundPublicationFailsClosedAndStillRestores(t *testing.T) {
 	if err := reference.ValidateAgainstRepository(ctx, fixture.repo, *fixture.service.TrustAnchor); err != nil {
 		t.Fatalf("validate recovery reference against the repository: %v", err)
 	}
+	compactPayload, err := MarshalCompactRecoveryReference(compactReferenceFromV2ForTest(t, reference))
+	if err != nil {
+		t.Fatalf("marshal compact reference over existing part-bound fixture: %v", err)
+	}
+	compactReference, err := DecodeCompactRecoveryReference(compactPayload)
+	if err != nil {
+		t.Fatalf("decode compact reference over existing part-bound fixture: %v", err)
+	}
+	if err := compactReference.ValidateAgainstRepository(ctx, fixture.repo, *fixture.service.TrustAnchor); err != nil {
+		t.Fatalf("validate compact reference over prepared/fact parts: %v", err)
+	}
 	anchorPath := filepath.Join(t.TempDir(), "trust-anchor.json")
 	if _, err := fixture.service.ExportTrustAnchor(anchorPath); err != nil {
 		t.Fatalf("export trust anchor: %v", err)
@@ -379,6 +390,9 @@ func TestPartBoundPublicationFailsClosedAndStillRestores(t *testing.T) {
 	if _, err := reader.Restore(ctx, result.SnapshotRef, t.TempDir()); err == nil {
 		t.Fatal("restore accepted a truncated prepared part")
 	}
+	if err := compactReference.ValidateAgainstRepository(ctx, fixture.repo, *fixture.service.TrustAnchor); err == nil {
+		t.Fatal("compact recovery reference accepted a truncated prepared part")
+	}
 	if err := os.WriteFile(preparedPart, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -399,11 +413,17 @@ func TestPartBoundPublicationFailsClosedAndStillRestores(t *testing.T) {
 	if _, err := listPortableFactClosures(ctx, fixture.repo, fixture.repo, *fixture.service.TrustAnchor, fixture.service.PublicationDomain, commits[0]); err == nil {
 		t.Fatal("a missing fact part was accepted as a complete fact child")
 	}
+	if err := compactReference.ValidateAgainstRepository(ctx, fixture.repo, *fixture.service.TrustAnchor); err == nil {
+		t.Fatal("compact recovery reference accepted a missing fact part")
+	}
 	if err := os.WriteFile(factPart, factPayload, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := listPortableFactClosures(ctx, fixture.repo, fixture.repo, *fixture.service.TrustAnchor, fixture.service.PublicationDomain, commits[0]); err != nil {
 		t.Fatalf("restored fact part bytes were not accepted again: %v", err)
+	}
+	if err := compactReference.ValidateAgainstRepository(ctx, fixture.repo, *fixture.service.TrustAnchor); err != nil {
+		t.Fatalf("restored fact part bytes were rejected by the compact reference: %v", err)
 	}
 
 	// A missing prepared part cannot be mistaken for a complete publication.

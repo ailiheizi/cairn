@@ -168,36 +168,42 @@ func TestOCRCropRotatesVerticalRunsAndPadsRecognitionInput(t *testing.T) {
 func TestOCRCTCDecodeUsesGreedyBlankCollapse(t *testing.T) {
 	dictionary := []string{"", "A", "B", "C"}
 	const classes = 4
-	steps := 6
-	logits := make([]float32, steps*classes)
-	set := func(step, class int, value float32) { logits[step*classes+class] = value }
-	// blank, A, A, blank, C, blank
-	set(0, 0, 10)
-	set(1, 1, 10)
-	set(2, 1, 10)
-	set(3, 0, 10)
-	set(4, 3, 10)
-	set(5, 0, 10)
-	text, confidence := ocrCTCDecode(logits, steps, classes, dictionary)
+	// blank, A, A, blank, C, blank; each row is an explicit probability
+	// distribution from the recognizer's Softmax output.
+	probabilities := []float32{
+		0.95, 0.02, 0.02, 0.01,
+		0.03, 0.90, 0.04, 0.03,
+		0.02, 0.90, 0.04, 0.04,
+		0.95, 0.02, 0.02, 0.01,
+		0.05, 0.10, 0.15, 0.70,
+		0.95, 0.02, 0.02, 0.01,
+	}
+	text, confidence, err := ocrCTCDecode(probabilities, 6, classes, dictionary)
+	if err != nil {
+		t.Fatalf("decode probabilities: %v", err)
+	}
 	if text != "AC" {
 		t.Fatalf("decoded text = %q, want AC", text)
 	}
-	if confidence < 0.99 {
-		t.Fatalf("dominant confidence = %v, want ~1", confidence)
+	if math.Abs(confidence-0.8) > 1e-6 {
+		t.Fatalf("mean confidence = %v, want 0.8 from 0.9 and 0.7", confidence)
 	}
-	// A near-tie must produce a genuinely uncertain, low confidence instead of
-	// a confident-looking constant.
-	uncertain := make([]float32, 2*classes)
-	uncertain[1] = 5.0
-	uncertain[2] = 4.9
-	uncertain[classes+1] = 5.0
-	uncertain[classes+2] = 4.9
-	_, lowConfidence := ocrCTCDecode(uncertain, 2, classes, dictionary)
-	if lowConfidence >= 0.6 {
-		t.Fatalf("uncertain confidence = %v, want < 0.6", lowConfidence)
+	if text, confidence, err := ocrCTCDecode(nil, 0, 0, dictionary); err == nil || text != "" || confidence != 0 {
+		t.Fatalf("invalid empty matrix = (%q, %v, %v), want error", text, confidence, err)
 	}
-	if text, _ := ocrCTCDecode(nil, 0, 0, dictionary); text != "" {
-		t.Fatalf("empty logits decoded to %q", text)
+	for _, tc := range []struct {
+		name string
+		row  []float32
+	}{
+		{name: "nan", row: []float32{float32(math.NaN()), 0, 0, 0}},
+		{name: "out-of-range", row: []float32{0, 1.1, 0, 0}},
+		{name: "bad-sum", row: []float32{0.1, 0.1, 0.1, 0.1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if text, confidence, err := ocrCTCDecode(tc.row, 1, classes, dictionary); err == nil || text != "" || confidence != 0 {
+				t.Fatalf("invalid probabilities = (%q, %v, %v), want error", text, confidence, err)
+			}
+		})
 	}
 }
 

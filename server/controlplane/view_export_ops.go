@@ -39,12 +39,14 @@ func (d *Dispatcher) handleViewSave(ctx context.Context, env command.Envelope, s
 	if strings.TrimSpace(input.Name) == "" {
 		return invalidInputResult(env, started, errString("name is required"))
 	}
-	if strings.TrimSpace(input.Query) == "" {
-		return invalidInputResult(env, started, errString("query is required"))
-	}
 	fields := normalizeStringList(input.Fields)
 	if err := validateViewConditions(fields); err != nil {
 		return invalidInputResult(env, started, err)
+	}
+	if strings.TrimSpace(input.Query) == "" {
+		if err := validateFilterOnlyViewConditions(fields); err != nil {
+			return invalidInputResult(env, started, err)
+		}
 	}
 	record := sqlite.SavedView{
 		Name:        strings.TrimSpace(input.Name),
@@ -56,6 +58,9 @@ func (d *Dispatcher) handleViewSave(ctx context.Context, env command.Envelope, s
 		Required:    normalizeStringList(input.Required),
 		WhenMissing: strings.TrimSpace(input.WhenMissing),
 		Revision:    1,
+	}
+	if err := validateSupportedSavedViewPolicy(record); err != nil {
+		return invalidInputResult(env, started, err)
 	}
 	viewID, err := sqlite.NewStableID("view")
 	if err != nil {
@@ -171,7 +176,33 @@ func (d *Dispatcher) handleViewEvaluate(ctx context.Context, env command.Envelop
 		}
 		return catalogErrorResult(env, started, err)
 	}
-	evaluated, reason := d.evaluateViewNow(ctx, view, input.Limit)
+	if input.Page != nil {
+		if input.Limit != nil {
+			return invalidInputResult(env, started, errString("legacy limit cannot be combined with page"))
+		}
+		data, reason := d.evaluateViewPage(ctx, view, input.Scope, *input.Page)
+		if reason != nil {
+			if errors.Is(reason, search.ErrInvalidQuery) || errors.Is(reason, search.ErrInvalidContinuation) || errors.Is(reason, search.ErrStaleContinuation) ||
+				isUnsupportedViewCondition(reason) || isStableIDError(reason) {
+				return invalidInputResult(env, started, reason)
+			}
+			if errors.Is(reason, exact.ErrBlocked) || errors.Is(reason, search.ErrUnavailable) || strings.Contains(reason.Error(), "unavailable") {
+				return degradedResult(env, started, command.ViewEvaluateData{
+					ViewID: view.ViewID, Query: view.Query, Hits: []command.SearchHitData{}, Coverage: []string{search.DimensionLexical},
+				}, reason.Error())
+			}
+			if errSavedViewProjectionChanged == reason {
+				return failed(env, started, newReason(ReasonCodeCatalogError, reason.Error()))
+			}
+			return catalogErrorResult(env, started, reason)
+		}
+		return succeeded(env, started, data)
+	}
+	limit := 0
+	if input.Limit != nil {
+		limit = *input.Limit
+	}
+	evaluated, reason := d.evaluateViewNow(ctx, view, limit)
 	if reason != nil {
 		if errors.Is(reason, exact.ErrBlocked) || strings.Contains(reason.Error(), "unavailable") {
 			return degradedResult(env, started, command.ViewEvaluateData{
@@ -201,151 +232,6 @@ func (d *Dispatcher) handleViewEvaluate(ctx context.Context, env command.Envelop
 // Membership is intentionally dynamic: evaluating twice may differ. When the
 // exact lane or its index is unavailable it fails closed instead of
 // fabricating hits.
-func (d *Dispatcher) evaluateViewNow(ctx context.Context, view sqlite.SavedView, limit int) ([]command.SearchHitData, error) {
-	if d.search == nil {
-		return nil, errString("search index is unavailable")
-	}
-	dimension, ok := search.LookupDimension(search.DimensionLexical, search.IndexerReadiness(d.search))
-	if !ok || dimension.State != command.CapabilityAvailable {
-		return nil, errString("lexical search is unavailable")
-	}
-	filters, err := viewFiltersFromFields(view.Fields)
-	if err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(view.Query) == "" && !filters.Has() {
-		return nil, errString("view query is empty and carries no structured filters")
-	}
-	workspaceID := d.viewEvaluationWorkspace(ctx, view.Scope)
-	generation, hits, err := d.search.Query(ctx, search.QueryRequest{
-		WorkspaceID: workspaceID, Dimension: search.DimensionLexical,
-		Text: view.Query, Axes: nil, Filters: filters,
-	})
-	if err != nil {
-		return nil, err
-	}
-	authorized := d.authorizeHits(ctx, workspaceID, generation.WorkspaceID, hits, nil)
-	if limit > 0 && limit < len(authorized) {
-		authorized = authorized[:limit]
-	}
-	return authorized, nil
-}
-
-// viewEvaluationWorkspace resolves the workspace a dynamic view evaluates
-// against. Ingest creates the default workspace, so a view without an explicit
-// scope evaluates against it; an unavailable workspace fails closed instead of
-// fabricating membership.
-func (d *Dispatcher) viewEvaluationWorkspace(ctx context.Context, scope string) string {
-	if strings.TrimSpace(scope) != "" {
-		return strings.TrimSpace(scope)
-	}
-	workspace, err := d.store.GetWorkspaceByName(ctx, "default")
-	if err != nil {
-		return ""
-	}
-	return workspace.ID
-}
-
-// viewFiltersFromFields maps saved structured field constraints onto typed
-// search filters. Fields use the same snake_case keys as search.filters;
-// an empty field list means no structured constraint. A condition this build
-// cannot evaluate is refused with an unsupportedViewConditionError instead of
-// being dropped: silently skipping it would evaluate the saved view as a
-// wider, unfiltered result set that is not its membership.
-func viewFiltersFromFields(fields []string) (search.Filters, error) {
-	var filters search.Filters
-	for _, field := range fields {
-		key, value, ok := strings.Cut(field, "=")
-		if !ok {
-			return search.Filters{}, unsupportedViewConditionError(fmt.Sprintf(
-				"saved view condition %q is not a key=value condition", strings.TrimSpace(field)))
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		switch strings.ToLower(key) {
-		case "entry_type":
-			filters.EntryType = value
-		case "content_id":
-			filters.ContentID = value
-		case "duplicate_group":
-			filters.DuplicateGroup = value
-		case "protection_mode":
-			filters.ProtectionMode = value
-		case "suffix":
-			filters.Suffix = value
-		case "language":
-			filters.Language = value
-		case "size_min":
-			parsed, err := parseInt64Field(value)
-			if err != nil {
-				return search.Filters{}, err
-			}
-			filters.SizeMin = &parsed
-		case "size_max":
-			parsed, err := parseInt64Field(value)
-			if err != nil {
-				return search.Filters{}, err
-			}
-			filters.SizeMax = &parsed
-		case "mtime_after":
-			parsed, err := parseInt64Field(value)
-			if err != nil {
-				return search.Filters{}, err
-			}
-			filters.MtimeAfter = &parsed
-		case "mtime_before":
-			parsed, err := parseInt64Field(value)
-			if err != nil {
-				return search.Filters{}, err
-			}
-			filters.MtimeBefore = &parsed
-		default:
-			return search.Filters{}, unsupportedViewConditionError(fmt.Sprintf(
-				"saved view condition %q is not supported by view.evaluate", strings.TrimSpace(field)))
-		}
-	}
-	return search.NormalizeFilters(filters)
-}
-
-// unsupportedViewConditionError marks a saved-view condition this build cannot
-// evaluate: an unrecognized filter key or an entry that is not a key=value
-// condition. It is a caller-visible input problem, not a catalog failure, so
-// both view.evaluate and export.plan report it as invalid_input rather than
-// catalog_error; view.save refuses to persist one in the first place.
-type unsupportedViewConditionError string
-
-func (err unsupportedViewConditionError) Error() string { return string(err) }
-
-// isUnsupportedViewCondition reports whether err is a saved-view condition this
-// build cannot evaluate.
-func isUnsupportedViewCondition(err error) bool {
-	var unsupported unsupportedViewConditionError
-	return errors.As(err, &unsupported)
-}
-
-// validateViewConditions refuses to persist a condition this build cannot
-// evaluate, so a non-browser caller cannot create a saved retrieval that would
-// later fail or silently broaden. It reuses viewFiltersFromFields as the single
-// source of the recognized key set and only surfaces the unsupported/malformed
-// condition error: a value this build rejects at evaluation time (an unparsable
-// integer, a contradictory size range) keeps its existing outcome instead of
-// being reclassified at save time.
-func validateViewConditions(fields []string) error {
-	_, err := viewFiltersFromFields(fields)
-	if isUnsupportedViewCondition(err) {
-		return err
-	}
-	return nil
-}
-
-func parseInt64Field(value string) (int64, error) {
-	var parsed int64
-	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
-		return 0, fmt.Errorf("field value %q must be an integer", value)
-	}
-	return parsed, nil
-}
-
 type exportPlanInput struct {
 	ViewID         string   `json:"view_id,omitempty"`
 	Name           string   `json:"name,omitempty"`
@@ -467,7 +353,11 @@ func (d *Dispatcher) resolveExportSubjects(ctx context.Context, input exportPlan
 	if err != nil {
 		return nil, "", err
 	}
-	evaluated, err := d.evaluateViewNow(ctx, view, 0)
+	workspaceID := d.viewEvaluationWorkspace(ctx, view.Scope)
+	if workspaceID == "" {
+		return nil, "", errString("saved view workspace is unavailable")
+	}
+	evaluated, err := d.evaluateViewForExport(ctx, view)
 	if err != nil {
 		return nil, "", err
 	}
@@ -476,10 +366,10 @@ func (d *Dispatcher) resolveExportSubjects(ctx context.Context, input exportPlan
 	}
 	subjects := make([]sqlite.NamespaceEntry, 0, len(evaluated))
 	for _, hit := range evaluated {
-		entry, lookupErr := d.lookupSubjectAcrossWorkspaces(ctx, hit.SubjectRef)
+		entry, lookupErr := d.resolveSubject(ctx, workspaceID, hit.SubjectRef)
 		if lookupErr != nil {
 			if containsNotFound(lookupErr) {
-				continue
+				return nil, "", fmt.Errorf("evaluated view subject %s is no longer available in its workspace", hit.SubjectRef)
 			}
 			return nil, "", lookupErr
 		}

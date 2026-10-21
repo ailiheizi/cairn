@@ -10,10 +10,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/ailiheizi/cairn/client/command"
 )
@@ -157,23 +159,17 @@ func (s *UploadSession) Stage(fileName string, content io.Reader) command.Upload
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	original := fileName
-	if s.refusal != "" {
-		return command.UploadFileResult{OriginalName: original, SkippedReason: s.refusal, Message: "the upload request was refused and rolled back"}
-	}
-	s.parts++
-	if s.parts > s.limits.maxFiles {
-		s.refusal = command.UploadReasonTooMany
-		skipped := command.UploadFileResult{
-			OriginalName:  original,
-			SkippedReason: s.refusal,
-			Message:       fmt.Sprintf("upload request carries more than %d files", s.limits.maxFiles),
-		}
-		s.results = append(s.results, skipped)
-		return skipped
+	if skipped := s.beginPartLocked(original); skipped != nil {
+		return *skipped
 	}
 	display, rewritten, nameErr := sanitizeUploadName(fileName)
 	if nameErr != nil {
 		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonNameRejected, Message: nameErr.Error()}
+		s.results = append(s.results, skipped)
+		return skipped
+	}
+	if info, err := os.Lstat(filepath.Join(s.dir, display)); err == nil && (info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonNameRejected, Message: "filename conflicts with an existing staged folder path"}
 		s.results = append(s.results, skipped)
 		return skipped
 	}
@@ -189,6 +185,174 @@ func (s *UploadSession) Stage(fileName string, content io.Reader) command.Upload
 	skipped.OriginalName = original
 	s.results = append(s.results, *skipped)
 	return *skipped
+}
+
+// StageRelative streams a strictly validated folder-relative path without
+// rewriting components. Duplicate paths and file/directory collisions are
+// per-file refusals; no existing staged path is overwritten.
+func (s *UploadSession) StageRelative(relativePath string, content io.Reader) command.UploadFileResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	original := relativePath
+	if skipped := s.beginPartLocked(original); skipped != nil {
+		return *skipped
+	}
+	if err := validateRelativeUploadPath(relativePath); err != nil {
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonNameRejected, Message: err.Error()}
+		s.results = append(s.results, skipped)
+		return skipped
+	}
+	if s.seen[relativePath] > 0 {
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonNameRejected, Message: "the same folder-relative path was selected more than once"}
+		s.results = append(s.results, skipped)
+		return skipped
+	}
+	parentRoot, leaf, err := openRelativeUploadParent(s.dir, relativePath)
+	if err != nil {
+		message := "create safe folder path: " + err.Error()
+		reason := command.UploadReasonIOFailed
+		if errors.Is(err, errUploadPathConflict) {
+			reason = command.UploadReasonNameRejected
+			message = err.Error()
+		}
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: reason, Message: message}
+		s.results = append(s.results, skipped)
+		return skipped
+	}
+	defer parentRoot.Close()
+	if _, statErr := parentRoot.Lstat(leaf); statErr == nil {
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonNameRejected, Message: "folder-relative path conflicts with an already staged file or folder"}
+		s.results = append(s.results, skipped)
+		return skipped
+	} else if !errors.Is(statErr, fs.ErrNotExist) {
+		skipped := command.UploadFileResult{OriginalName: original, SkippedReason: command.UploadReasonIOFailed, Message: "inspect folder-relative path: " + statErr.Error()}
+		s.results = append(s.results, skipped)
+		return skipped
+	}
+	storedPath := filepath.Join(s.dir, filepath.FromSlash(relativePath))
+	receipt, skipped := s.writeRelativeFile(parentRoot, leaf, relativePath, storedPath, content)
+	if receipt != nil {
+		receipt.OriginalName = original
+		s.seen[relativePath] = 1
+		s.results = append(s.results, *receipt)
+		s.staged = append(s.staged, receipt.StoredPath)
+		return *receipt
+	}
+	skipped.OriginalName = original
+	s.results = append(s.results, *skipped)
+	return *skipped
+}
+
+// DrainRemainder consumes at most the daemon-owned per-file allowance plus
+// one sentinel byte. The staging write may already have consumed part data;
+// this independently bounds only the bytes discarded to reach the next part.
+func (s *UploadSession) DrainRemainder(content io.Reader) (string, error) {
+	limit := s.limits.maxFileBytes + 1
+	n, err := io.CopyN(io.Discard, content, limit)
+	if n == limit {
+		return command.UploadReasonTooLarge, nil
+	}
+	if errors.Is(err, io.EOF) {
+		return "", nil
+	}
+	if err != nil {
+		return command.UploadReasonIOFailed, err
+	}
+	return "", nil
+}
+
+func (s *UploadSession) beginPartLocked(original string) *command.UploadFileResult {
+	if s.refusal != "" {
+		return &command.UploadFileResult{OriginalName: original, SkippedReason: s.refusal, Message: "the upload request was refused and rolled back"}
+	}
+	s.parts++
+	if s.parts > s.limits.maxFiles {
+		s.refusal = command.UploadReasonTooMany
+		skipped := command.UploadFileResult{
+			OriginalName:  original,
+			SkippedReason: s.refusal,
+			Message:       fmt.Sprintf("upload request carries more than %d files", s.limits.maxFiles),
+		}
+		s.results = append(s.results, skipped)
+		return &skipped
+	}
+	return nil
+}
+
+var errUploadPathConflict = errors.New("folder-relative path conflicts with an existing file, directory, or symbolic link")
+
+func validateRelativeUploadPath(raw string) error {
+	if raw == "" || !utf8.ValidString(raw) {
+		return errors.New("folder-relative path must be non-empty valid UTF-8")
+	}
+	if len(raw) > 2048 {
+		return errors.New("folder-relative path exceeds 2048 UTF-8 bytes")
+	}
+	if strings.HasPrefix(raw, "/") || strings.ContainsAny(raw, "\\:") {
+		return errors.New("folder-relative path must use safe relative slash-separated components")
+	}
+	components := strings.Split(raw, "/")
+	if len(components) > 16 {
+		return errors.New("folder-relative path exceeds 16 components")
+	}
+	for _, component := range components {
+		if component == "" || component == "." || component == ".." {
+			return errors.New("folder-relative path contains an empty, dot, or dot-dot component")
+		}
+		if len(component) > uploadNameByteLimit {
+			return fmt.Errorf("folder-relative path component exceeds %d UTF-8 bytes", uploadNameByteLimit)
+		}
+		for _, r := range component {
+			if unicode.IsControl(r) {
+				return errors.New("folder-relative path contains a control character")
+			}
+		}
+		if strings.HasSuffix(component, ".") || strings.HasSuffix(component, " ") {
+			return errors.New("folder-relative path components may not end in a dot or space")
+		}
+		if windowsReservedName(component) {
+			return fmt.Errorf("folder-relative path component %q is a reserved device name", component)
+		}
+	}
+	return nil
+}
+
+// openRelativeUploadParent descends one component at a time from the session
+// root. Lstat refuses a symlink or non-directory before opening each child;
+// os.Root keeps every subsequent operation confined if the directory changes
+// concurrently.
+func openRelativeUploadParent(sessionDir, relativePath string) (*os.Root, string, error) {
+	components := strings.Split(relativePath, "/")
+	root, err := os.OpenRoot(sessionDir)
+	if err != nil {
+		return nil, "", err
+	}
+	for _, component := range components[:len(components)-1] {
+		info, statErr := root.Lstat(component)
+		if errors.Is(statErr, fs.ErrNotExist) {
+			if mkdirErr := root.Mkdir(component, 0o700); mkdirErr != nil && !errors.Is(mkdirErr, fs.ErrExist) {
+				_ = root.Close()
+				return nil, "", mkdirErr
+			}
+			info, statErr = root.Lstat(component)
+		}
+		if statErr != nil {
+			_ = root.Close()
+			return nil, "", statErr
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			_ = root.Close()
+			return nil, "", errUploadPathConflict
+		}
+		child, openErr := root.OpenRoot(component)
+		if openErr != nil {
+			_ = root.Close()
+			return nil, "", openErr
+		}
+		_ = root.Close()
+		root = child
+	}
+	return root, components[len(components)-1], nil
 }
 
 // Refusal reports a sticky request-level refusal. Once set, no further file
@@ -227,8 +391,24 @@ func (s *UploadSession) Finish() command.UploadResult {
 		}
 		return result
 	}
+	pruneEmptySessionDirs(s.dir)
 	result.StagingDir = s.dir
 	return result
+}
+
+func pruneEmptySessionDirs(root string) {
+	var directories []string
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || path == root || !entry.IsDir() {
+			return err
+		}
+		directories = append(directories, path)
+		return nil
+	})
+	sort.Slice(directories, func(i, j int) bool { return len(directories[i]) > len(directories[j]) })
+	for _, directory := range directories {
+		_ = os.Remove(directory) // Only empty directories are removed.
+	}
 }
 
 func (s *UploadSession) removeSessionDirLocked() {
@@ -275,6 +455,21 @@ func (s *UploadSession) writeFile(storedName string, content io.Reader) (*comman
 	if err != nil {
 		return nil, &command.UploadFileResult{SkippedReason: command.UploadReasonIOFailed, Message: "create staged file: " + err.Error()}
 	}
+	return s.writeFileContents(file, storedName, path, content, func() { _ = os.Remove(path) })
+}
+
+func (s *UploadSession) writeRelativeFile(root *os.Root, leaf, storedName, storedPath string, content io.Reader) (*command.UploadFileResult, *command.UploadFileResult) {
+	file, err := root.OpenFile(leaf, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return nil, &command.UploadFileResult{SkippedReason: command.UploadReasonNameRejected, Message: "folder-relative path conflicts with an already staged file or folder"}
+		}
+		return nil, &command.UploadFileResult{SkippedReason: command.UploadReasonIOFailed, Message: "create staged folder file: " + err.Error()}
+	}
+	return s.writeFileContents(file, storedName, storedPath, content, func() { _ = root.Remove(leaf) })
+}
+
+func (s *UploadSession) writeFileContents(file *os.File, storedName, storedPath string, content io.Reader, remove func()) (*command.UploadFileResult, *command.UploadFileResult) {
 	hasher := sha256.New()
 	var length int64
 	var reserved int64
@@ -286,7 +481,7 @@ func (s *UploadSession) writeFile(storedName string, content io.Reader) (*comman
 	}
 	fail := func(reason, message string) *command.UploadFileResult {
 		_ = file.Close()
-		_ = os.Remove(path)
+		remove()
 		release()
 		return &command.UploadFileResult{SkippedReason: reason, Message: message}
 	}
@@ -316,14 +511,14 @@ func (s *UploadSession) writeFile(storedName string, content io.Reader) (*comman
 		}
 	}
 	if err := file.Close(); err != nil {
-		_ = os.Remove(path)
+		remove()
 		release()
 		return nil, &command.UploadFileResult{SkippedReason: command.UploadReasonIOFailed, Message: "close staged file: " + err.Error()}
 	}
 	release()
 	return &command.UploadFileResult{
 		StoredName: storedName,
-		StoredPath: path,
+		StoredPath: storedPath,
 		SHA256:     hex.EncodeToString(hasher.Sum(nil)),
 		Length:     length,
 	}, nil

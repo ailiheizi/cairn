@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,12 +49,24 @@ const (
 	// id. Both are stable per published entry, so a page boundary cannot lose
 	// or repeat an entry.
 	OrderEntryPathID = "entry_path,entry_id"
+	// OrderDescriptionSubjectRevisionID is the total order of a description
+	// summary projection. Its key is internal to the authenticated cursor.
+	OrderDescriptionSubjectRevisionID = "subject_ref,revision,description_document_id"
+	// OrderSavedViewLexical is the total order of an authorized, filtered
+	// SavedView projection. Its cursor carries a projection ordinal rather than
+	// an index row key.
+	OrderSavedViewLexical = "saved-view-lexical"
 
 	// LaneContentList names the content-library projection lane. It is not an
 	// index dimension: it is the published namespace projection, whose order is
 	// total and whose position is a stable entry identity rather than an index
 	// coordinate.
 	LaneContentList = "content-list"
+	// LaneDescriptionList names the pageable catalog description projection.
+	LaneDescriptionList = "description-list"
+	// LaneSavedView names a pageable projection of existing dynamic view
+	// membership; it is not a new index dimension.
+	LaneSavedView = "saved-view"
 
 	// ContinuationTTL bounds how long an issued continuation stays valid. A
 	// longer-lived token would let a stale page chain cross a generation
@@ -87,9 +100,9 @@ type PagePosition struct {
 	// for a free-text lexical page, whose order is (rank, rowid).
 	Rank    float64
 	HasRank bool
-	// EntryID is the stable namespace entry id a content-list chain stopped
-	// at. It is used only for the content-list lane, whose position is an
-	// entry identity rather than an index coordinate.
+	// EntryID carries an authenticated catalog/projection position for
+	// content-list, description-list, or saved-view continuations. It is not an
+	// index coordinate.
 	EntryID string
 }
 
@@ -178,21 +191,23 @@ func (shape QueryShape) Digest() (string, error) {
 		return "", err
 	}
 	payload, err := json.Marshal(struct {
-		WorkspaceID     string   `json:"workspace_id"`
-		Dimension       string   `json:"dimension"`
-		Fuse            []string `json:"fuse"`
-		Text            string   `json:"text"`
-		Axes            []string `json:"construct_axes"`
-		Filters         Filters  `json:"filters"`
-		ImageSubjectRef string   `json:"image_subject_ref"`
+		LexicalQueryPolicy string   `json:"lexical_query_policy"`
+		WorkspaceID        string   `json:"workspace_id"`
+		Dimension          string   `json:"dimension"`
+		Fuse               []string `json:"fuse"`
+		Text               string   `json:"text"`
+		Axes               []string `json:"construct_axes"`
+		Filters            Filters  `json:"filters"`
+		ImageSubjectRef    string   `json:"image_subject_ref"`
 	}{
-		WorkspaceID:     normalized.WorkspaceID,
-		Dimension:       normalized.Dimension,
-		Fuse:            normalized.Fuse,
-		Text:            normalized.Text,
-		Axes:            normalized.Axes,
-		Filters:         normalized.Filters,
-		ImageSubjectRef: normalized.ImageSubjectRef,
+		LexicalQueryPolicy: lexicalCJKQueryPolicy,
+		WorkspaceID:        normalized.WorkspaceID,
+		Dimension:          normalized.Dimension,
+		Fuse:               normalized.Fuse,
+		Text:               normalized.Text,
+		Axes:               normalized.Axes,
+		Filters:            normalized.Filters,
+		ImageSubjectRef:    normalized.ImageSubjectRef,
 	})
 	if err != nil {
 		return "", err
@@ -383,7 +398,7 @@ func validateBinding(binding ContinuationBinding) error {
 		return fmt.Errorf("%w: lane is required", ErrInvalidContinuation)
 	}
 	switch binding.Order {
-	case OrderRankRowID, OrderRowID, OrderEntryPathID:
+	case OrderRankRowID, OrderRowID, OrderEntryPathID, OrderDescriptionSubjectRevisionID, OrderSavedViewLexical:
 	default:
 		return fmt.Errorf("%w: order %q is not a declared total order", ErrInvalidContinuation, binding.Order)
 	}
@@ -407,10 +422,30 @@ func validatePosition(position PagePosition, order string) error {
 			return fmt.Errorf("%w: content-list position is not in the content-list order", ErrInvalidContinuation)
 		}
 		return nil
+	case LaneDescriptionList:
+		if strings.TrimSpace(position.EntryID) == "" {
+			return fmt.Errorf("%w: description-list position carries no resume key", ErrInvalidContinuation)
+		}
+		if position.RowID != 0 || position.Rank != 0 || position.HasRank || order != OrderDescriptionSubjectRevisionID {
+			return fmt.Errorf("%w: description-list position does not match its declared order", ErrInvalidContinuation)
+		}
+		return nil
+	case LaneSavedView:
+		if position.EntryID == "" {
+			return fmt.Errorf("%w: saved-view position carries no projection ordinal", ErrInvalidContinuation)
+		}
+		if position.RowID != 0 || position.Rank != 0 || position.HasRank || order != OrderSavedViewLexical {
+			return fmt.Errorf("%w: saved-view position does not match its declared order", ErrInvalidContinuation)
+		}
+		ordinal, err := strconv.ParseUint(position.EntryID, 10, 63)
+		if err != nil || strconv.FormatUint(ordinal, 10) != position.EntryID {
+			return fmt.Errorf("%w: saved-view projection ordinal is invalid", ErrInvalidContinuation)
+		}
+		return nil
 	default:
 		return fmt.Errorf("%w: position lane %q is not pageable", ErrInvalidContinuation, position.Lane)
 	}
-	if position.Lane == LaneContentList || order == OrderEntryPathID {
+	if position.Lane == LaneContentList || position.Lane == LaneDescriptionList || position.Lane == LaneSavedView || order == OrderEntryPathID || order == OrderDescriptionSubjectRevisionID || order == OrderSavedViewLexical {
 		return fmt.Errorf("%w: position does not match its declared lane", ErrInvalidContinuation)
 	}
 	if position.RowID < 0 {

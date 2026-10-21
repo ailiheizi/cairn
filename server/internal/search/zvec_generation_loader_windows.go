@@ -1,4 +1,4 @@
-//go:build purego && windows
+//go:build (purego || cairn_zvec_dynamic) && windows
 
 package search
 

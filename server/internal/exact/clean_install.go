@@ -29,10 +29,10 @@ type RecoveryImportResult struct {
 	CatalogCreated        bool
 }
 
-// ImportRecoveryArtifact admits either the current typed v2 recovery
-// reference or the legacy signed v1 bundle. New public exports use v2; v1 is
-// retained as an explicit migration input so an existing independently stored
-// recovery artifact does not become unreadable after an upgrade.
+// ImportRecoveryArtifact admits typed v2/v3 recovery references or the legacy
+// signed v1 bundle. V1 remains an explicit migration input so an existing
+// independently stored recovery artifact does not become unreadable after an
+// upgrade.
 func (s *Service) ImportRecoveryArtifact(ctx context.Context, artifactPath, trustAnchorPath, publicationDomain string) (RecoveryImportResult, error) {
 	var result RecoveryImportResult
 	if err := s.requireRepository(); err != nil {
@@ -59,6 +59,12 @@ func (s *Service) ImportRecoveryArtifact(ctx context.Context, artifactPath, trus
 			return result, err
 		}
 		return s.importRecoveryReference(ctx, anchor, reference)
+	case RecoveryReferenceSchemaV3:
+		reference, err := DecodeCompactRecoveryReference(payload)
+		if err != nil {
+			return result, err
+		}
+		return s.importCompactRecoveryReference(ctx, anchor, reference)
 	case RecoveryExportBundleSchemaV1:
 		var bundle recoveryExportBundle
 		if err := decodeStrictRecord(payload, &bundle); err != nil {
@@ -70,11 +76,11 @@ func (s *Service) ImportRecoveryArtifact(ctx context.Context, artifactPath, trus
 	}
 }
 
-// MigrateRecoveryArtifact converts the legacy v1 recovery export into the
-// independently retainable v2 reference. Migration is a read/validate/write
-// operation: it never deletes or overwrites the source artifact and never
-// publishes a second snapshot. The repository's authenticated commit and
-// portable fact closure remain authoritative for the successor reference.
+// MigrateRecoveryArtifact converts supported recovery artifacts into a
+// bounded independently retainable reference. Migration is a
+// read/validate/write operation: it never deletes or overwrites the source
+// artifact and never publishes a second snapshot. The repository's
+// authenticated records remain authoritative for the reference.
 func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, trustAnchorPath, destination, publicationDomain string) (ExportResult, error) {
 	var result ExportResult
 	if strings.TrimSpace(destination) == "" {
@@ -94,7 +100,10 @@ func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, tru
 	if err := json.Unmarshal(payload, &header); err != nil {
 		return result, fmt.Errorf("decode recovery artifact header: %w", err)
 	}
-	var reference RecoveryReference
+	var encoded []byte
+	var schema, snapshotRef, manifestDigest string
+	var files int
+	var logicalBytes int64
 	switch header.Schema {
 	case RecoveryExportBundleSchemaV1:
 		var bundle recoveryExportBundle
@@ -104,10 +113,9 @@ func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, tru
 		if _, _, _, _, err := s.verifyImportBundle(ctx, anchor, bundle); err != nil {
 			return result, fmt.Errorf("validate legacy recovery bundle for migration: %w", err)
 		}
-		// BuildRecoveryReference reads the authenticated repository lineage and
-		// current complete-state child; it does not trust mutable v1 fields. Use
-		// a catalog-free reader with the independently loaded anchor rather than
-		// copying the caller's synchronization state.
+		// Build a bounded successor from the authenticated repository lineage,
+		// not from mutable fields in the legacy artifact. The builder selects
+		// v3 only when the existing v2 reader-size limit is reached.
 		reader := &Service{
 			Repo:                     s.Repo,
 			TrustAnchor:              &anchor,
@@ -117,53 +125,89 @@ func (s *Service) MigrateRecoveryArtifact(ctx context.Context, artifactPath, tru
 		if reader.PublicationDomain == "" {
 			reader.PublicationDomain = anchor.PublicationDomain
 		}
-		reference, err = reader.BuildRecoveryReference(ctx, bundle.SnapshotRef)
+		artifact, err := reader.buildRecoveryReferenceArtifact(ctx, bundle.SnapshotRef)
 		if err != nil {
-			return result, fmt.Errorf("build v2 recovery successor: %w", err)
+			return result, fmt.Errorf("build bounded recovery successor: %w", err)
 		}
-		if reference.PublicationCommitDigest != bundle.PublicationCommitDigest ||
-			reference.PreparedClosure.Manifest.ManifestDigest != bundle.PreparedClosure.Manifest.ManifestDigest {
+		commitDigest, err := artifactPublicationCommitDigest(artifact)
+		if err != nil {
+			return result, err
+		}
+		if commitDigest != bundle.PublicationCommitDigest ||
+			artifact.ManifestDigest != bundle.PreparedClosure.Manifest.ManifestDigest {
 			return result, errors.New("migration changed the authenticated publication identity")
 		}
+		encoded, schema, snapshotRef, manifestDigest = artifact.Payload, artifact.Schema, artifact.SnapshotRef, artifact.ManifestDigest
+		files, logicalBytes = artifact.Files, artifact.Bytes
 	case RecoveryReferenceSchemaV2:
-		reference, err = DecodeRecoveryReference(payload)
+		reference, err := DecodeRecoveryReference(payload)
 		if err != nil {
 			return result, err
 		}
 		if err := reference.ValidateAgainstRepository(ctx, s.Repo, anchor); err != nil {
 			return result, fmt.Errorf("validate v2 recovery reference for migration: %w", err)
 		}
+		driver, err := s.publicationRecordDriver()
+		if err != nil {
+			return result, err
+		}
+		manifest, err := reference.reassembledManifest(ctx, driver)
+		if err != nil {
+			return result, err
+		}
+		files, logicalBytes = manifestFileTotals(manifest)
+		encoded, err = MarshalRecoveryReference(reference)
+		if err != nil {
+			return result, err
+		}
+		schema, snapshotRef, manifestDigest = RecoveryReferenceSchemaV2, reference.SnapshotRef, manifest.ManifestDigest
+	case RecoveryReferenceSchemaV3:
+		reference, err := DecodeCompactRecoveryReference(payload)
+		if err != nil {
+			return result, err
+		}
+		manifest, _, err := reference.validateAgainstRepository(ctx, s.Repo, anchor)
+		if err != nil {
+			return result, fmt.Errorf("validate v3 recovery reference for migration: %w", err)
+		}
+		files, logicalBytes = manifestFileTotals(manifest)
+		encoded, err = MarshalCompactRecoveryReference(reference)
+		if err != nil {
+			return result, err
+		}
+		schema, snapshotRef, manifestDigest = RecoveryReferenceSchemaV3, reference.SnapshotRef, manifest.ManifestDigest
 	default:
 		return result, fmt.Errorf("unsupported recovery artifact schema %q", header.Schema)
-	}
-	// Revalidate the exact successor against the supplied repository and
-	// independent anchor before writing any bytes to the destination.
-	if err := reference.ValidateAgainstRepository(ctx, s.Repo, anchor); err != nil {
-		return result, fmt.Errorf("validate migrated recovery reference: %w", err)
-	}
-	encoded, err := MarshalRecoveryReference(reference)
-	if err != nil {
-		return result, err
 	}
 	path, err := writeNewRecoveryFile(destination, encoded)
 	if err != nil {
 		return result, err
 	}
-	driver, err := s.publicationRecordDriver()
-	if err != nil {
-		return result, err
-	}
-	manifest, err := reference.reassembledManifest(ctx, driver)
-	if err != nil {
-		return result, err
-	}
-	files, bytes := manifestFileTotals(manifest)
 	return ExportResult{
-		SnapshotRef: reference.SnapshotRef, Schema: RecoveryReferenceSchemaV2,
-		ManifestDigest: manifest.ManifestDigest,
-		ArtifactPath:   path, Length: int64(len(encoded)), Files: files, Bytes: bytes,
+		SnapshotRef: snapshotRef, Schema: schema,
+		ManifestDigest: manifestDigest,
+		ArtifactPath:   path, Length: int64(len(encoded)), Files: files, Bytes: logicalBytes,
 		IndependentlyStored: true,
 	}, nil
+}
+
+func artifactPublicationCommitDigest(artifact recoveryArtifactData) (string, error) {
+	switch artifact.Schema {
+	case RecoveryReferenceSchemaV2:
+		reference, err := DecodeRecoveryReference(artifact.Payload)
+		if err != nil {
+			return "", err
+		}
+		return reference.PublicationCommitDigest, nil
+	case RecoveryReferenceSchemaV3:
+		reference, err := DecodeCompactRecoveryReference(artifact.Payload)
+		if err != nil {
+			return "", err
+		}
+		return reference.PublicationCommitDigest, nil
+	default:
+		return "", fmt.Errorf("unsupported bounded recovery artifact schema %q", artifact.Schema)
+	}
 }
 
 // ImportRecoveryBundle admits a portable recovery export produced by
@@ -294,6 +338,21 @@ func (s *Service) importRecoveryReference(ctx context.Context, anchor TrustAncho
 		Bytes:                 bytes,
 	}
 	if s.Store != nil {
+		project, err := shouldProjectRecoveryCatalog(ctx, s.Store, reference.SnapshotRef, reference.FactHealth)
+		if err != nil {
+			return result, err
+		}
+		if project {
+			if len(reference.PortableFactClosures) == 0 {
+				return result, errors.New("complete recovery fact health has no selected portable fact head")
+			}
+			created, err := s.reconstructRecoveryCatalog(ctx, anchor, reference.PublicationDomain, reference.PublicationCommitDigest, reference.PortableFactClosures[len(reference.PortableFactClosures)-1].RecordDigest)
+			result.CatalogCreated = created
+			if err != nil {
+				return result, err
+			}
+			return result, nil
+		}
 		bundle := recoveryExportBundle{
 			Schema: RecoveryExportBundleSchemaV1, SnapshotRef: reference.SnapshotRef,
 			PublicationCommitDigest: reference.PublicationCommitDigest, PublicationCommit: reference.PublicationCommit,
@@ -301,6 +360,75 @@ func (s *Service) importRecoveryReference(ctx context.Context, anchor TrustAncho
 			RequiredTrustAnchorKeyID: anchor.KeyID, RequiredTrustAnchorDigest: anchorDigest,
 		}
 		created, err := s.reconcileImportedPublication(ctx, bundle)
+		if err != nil {
+			return result, err
+		}
+		result.CatalogCreated = created
+	}
+	return result, nil
+}
+
+func (s *Service) importCompactRecoveryReference(ctx context.Context, anchor TrustAnchor, reference RecoveryReferenceV3) (RecoveryImportResult, error) {
+	var result RecoveryImportResult
+	manifest, prepared, err := reference.validateAgainstRepository(ctx, s.Repo, anchor)
+	if err != nil {
+		return result, err
+	}
+	driver, err := s.publicationRecordDriver()
+	if err != nil {
+		return result, err
+	}
+	commits, err := listCommitMarkers(ctx, driver, anchor, reference.PublicationDomain)
+	if err != nil {
+		return result, err
+	}
+	if err := verifyImportLineage(reference.PublicationCommit, reference.PublicationCommitDigest, commits); err != nil {
+		return result, err
+	}
+	anchorDigest, err := DigestCanonicalJSON(anchor)
+	if err != nil {
+		return result, err
+	}
+	files, logicalBytes := manifestFileTotals(manifest)
+	result = RecoveryImportResult{
+		Schema:                RecoveryReferenceSchemaV3,
+		SnapshotRef:           reference.SnapshotRef,
+		ManifestDigest:        manifest.ManifestDigest,
+		CommitDigest:          reference.PublicationCommitDigest,
+		PreparedClosureDigest: reference.PreparedClosure.RecordDigest,
+		Generation:            reference.PublicationCommit.Generation,
+		TrustAnchorDigest:     anchorDigest,
+		FactHealth:            reference.FactHealth,
+		Files:                 files,
+		Bytes:                 logicalBytes,
+	}
+	if s.Store != nil {
+		project, err := shouldProjectRecoveryCatalog(ctx, s.Store, reference.SnapshotRef, reference.FactHealth)
+		if err != nil {
+			return result, err
+		}
+		if project {
+			if len(reference.PortableFactClosures) == 0 {
+				return result, errors.New("complete recovery fact health has no selected portable fact head")
+			}
+			created, err := s.reconstructRecoveryCatalog(ctx, anchor, reference.PublicationDomain, reference.PublicationCommitDigest, reference.PortableFactClosures[len(reference.PortableFactClosures)-1].RecordDigest)
+			result.CatalogCreated = created
+			if err != nil {
+				return result, err
+			}
+			return result, nil
+		}
+		projection := recoveryExportBundle{
+			Schema:                    RecoveryExportBundleSchemaV1,
+			SnapshotRef:               reference.SnapshotRef,
+			PublicationCommitDigest:   reference.PublicationCommitDigest,
+			PublicationCommit:         reference.PublicationCommit,
+			PreparedClosureDigest:     reference.PreparedClosure.RecordDigest,
+			PreparedClosure:           prepared,
+			RequiredTrustAnchorKeyID:  anchor.KeyID,
+			RequiredTrustAnchorDigest: anchorDigest,
+		}
+		created, err := s.reconcileImportedPublication(ctx, projection)
 		if err != nil {
 			return result, err
 		}

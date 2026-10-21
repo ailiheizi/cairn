@@ -16,7 +16,7 @@ import (
 func TestVersionFlagReportsInjectedBuildVersion(t *testing.T) {
 	workspaceRoot := testWorkspaceRoot(t)
 	target := filepath.Join(t.TempDir(), "cairnd")
-	cmd := exec.Command("go", "build", "-tags", "purego",
+	cmd := exec.Command("go", "build", "-tags", "cairn_zvec_dynamic",
 		"-ldflags", "-X main.buildVersion=9.9.9-version-flag-test",
 		"-o", target, "./server/cmd/cairnd")
 	cmd.Dir = workspaceRoot
@@ -54,7 +54,7 @@ func TestVersionFlagReportsInjectedBuildVersion(t *testing.T) {
 func TestVersionFlagWithoutInjectionStillReportsABuildIdentity(t *testing.T) {
 	workspaceRoot := testWorkspaceRoot(t)
 	target := filepath.Join(t.TempDir(), "cairnd")
-	cmd := exec.Command("go", "build", "-tags", "purego", "-o", target, "./server/cmd/cairnd")
+	cmd := exec.Command("go", "build", "-tags", "cairn_zvec_dynamic", "-o", target, "./server/cmd/cairnd")
 	cmd.Dir = workspaceRoot
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build unreplaced daemon: %v\n%s", err, output)

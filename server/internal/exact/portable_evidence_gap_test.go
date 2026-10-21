@@ -958,6 +958,88 @@ func TestPortableEvidenceRejectsDescriptionProfileBindingLoss(t *testing.T) {
 	}
 }
 
+func TestPortableEvidenceDescriptionConfigProvenanceBinding(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		remove    bool
+		wantError bool
+	}{
+		{name: "optional provenance field absent", remove: true},
+		{name: "duplicated config disagrees", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			evidence := newPortableEvidenceFixture(t)
+			replacePortableFactBundleForTest(t, evidence.fixture, func(bundle *portableFactBundle) {
+				index := findPortableRecord(t, *bundle, "DESCRIPTION_REVISION")
+				var provenance map[string]json.RawMessage
+				if err := decodeStrictRecord(bundle.Records[index].Provenance, &provenance); err != nil {
+					t.Fatal(err)
+				}
+				if test.remove {
+					delete(provenance, "config_digest")
+				} else {
+					foreign := DigestBytes([]byte("different but valid creation config"))
+					encoded, err := CanonicalJSON(foreign)
+					if err != nil {
+						t.Fatal(err)
+					}
+					provenance["config_digest"] = encoded
+				}
+				encoded, err := CanonicalJSON(provenance)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bundle.Records[index].Provenance = encoded
+			})
+			reader := &Service{Repo: evidence.fixture.repo, TrustAnchor: evidence.fixture.service.TrustAnchor, PublicationDomain: testPublicationDomain, RequireSignedPublication: true}
+			_, err := reader.ListPortableFactClosures(context.Background(), evidence.result.SnapshotRef)
+			if test.wantError && err == nil {
+				t.Fatal("portable description with inconsistent duplicated config provenance was accepted")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("portable description requiring no optional provenance field was rejected: %v", err)
+			}
+		})
+	}
+}
+
+func TestPortableEvidenceRejectsPortableClosureSignatureTamper(t *testing.T) {
+	fixture := newSignedPublicationFixture(t, "signature-tamper.txt", []byte("signed portable closure"))
+	result := fixture.ingest(t, "sha256:portable-signature-tamper-plan")
+	driver := repository.RecordDriver(fixture.repo)
+	digests, err := driver.ListRecordDigests(context.Background(), repository.RecordPortableFactClosure)
+	if err != nil || len(digests) != 1 {
+		t.Fatalf("portable fact digests = %v, err=%v", digests, err)
+	}
+	payload, err := readRecord(context.Background(), driver, repository.RecordPortableFactClosure, digests[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope PortableFactClosureEnvelope
+	if err := decodeStrictRecord(payload, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if len(envelope.Closure.Signature) == 0 {
+		t.Fatal("portable fact closure signature is empty before tampering")
+	}
+	envelope.Closure.Signature = append([]byte(nil), envelope.Closure.Signature...)
+	envelope.Closure.Signature[0] ^= 0xff
+	tampered, err := CanonicalJSON(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(recordRelocationPath(t, fixture.repo.Root(), repository.RecordPortableFactClosure, digests[0])); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := driver.PlaceRecord(context.Background(), repository.RecordPortableFactClosure, bytes.NewReader(tampered)); err != nil {
+		t.Fatal(err)
+	}
+	reader := &Service{Repo: fixture.repo, TrustAnchor: fixture.service.TrustAnchor, PublicationDomain: testPublicationDomain, RequireSignedPublication: true}
+	if _, err := reader.ListPortableFactClosures(context.Background(), result.SnapshotRef); err == nil {
+		t.Fatal("portable fact closure with a tampered signature was accepted")
+	}
+}
+
 func TestPortableEvidenceRejectsMissingPreparedCommitAndFactRoles(t *testing.T) {
 	tests := []struct {
 		name string

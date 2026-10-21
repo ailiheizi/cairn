@@ -44,10 +44,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command -v go >/dev/null 2>&1 || { echo "error: go is required" >&2; exit 1; }
 
 # The daemon must carry the in-process zvec backend; scripts/package-offline.sh
-# independently re-checks -tags=purego and the pinned zvec-go digest.
-echo "building daemon and CLI with -tags purego"
-( cd "$repo_root" && go build -tags purego -o "$out_dir/bin/cairnd" ./server/cmd/cairnd )
-( cd "$repo_root" && go build -tags purego -o "$out_dir/bin/cairn" ./client/cmd/cairn )
+# independently re-checks the custom loader tag and pinned zvec-go source digest.
+echo "building daemon and CLI with -tags cairn_zvec_dynamic"
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -o "$out_dir/bin/cairnd" ./server/cmd/cairnd )
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -o "$out_dir/bin/cairn" ./client/cmd/cairn )
 
 if [[ -z "$web_dist" ]]; then
   web_dist="$repo_root/web/dist"

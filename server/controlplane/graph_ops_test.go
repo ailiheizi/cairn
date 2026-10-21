@@ -85,9 +85,7 @@ func TestGraphRelationDimension(t *testing.T) {
 		"kind":         "TAG",
 		"body":         "reviewed",
 	}))
-	if tagged.Status != command.StatusSucceeded {
-		t.Fatalf("tag = %q: %+v", tagged.Status, tagged.Reasons)
-	}
+	assertUnsignedFixtureTAG(t, tagged, ingestData.WorkspaceID, "reviewed")
 
 	artist := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, map[string]any{
 		"workspace_id": ingestData.WorkspaceID,

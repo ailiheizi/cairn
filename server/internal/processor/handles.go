@@ -26,15 +26,21 @@ var (
 // SourceHandle is an opaque read of pinned exact bytes. It never exposes a
 // repository path or credential.
 type SourceHandle struct {
-	id      string
-	body    []byte
-	content string
-	closed  atomic.Bool
+	id        string
+	body      []byte
+	content   string
+	truncated bool
+	closed    atomic.Bool
 }
 
 func (h *SourceHandle) ID() string { return h.id }
 
 func (h *SourceHandle) ContentID() string { return h.content }
+
+// Truncated reports whether the host bounded this handle before EOF. Existing
+// consumers may keep using the bounded prefix; processors that require a
+// complete source must refuse it explicitly.
+func (h *SourceHandle) Truncated() bool { return h != nil && h.truncated }
 
 func (h *SourceHandle) ReadAll(ctx context.Context) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
@@ -168,14 +174,16 @@ func openSource(ctx context.Context, repo repository.Driver, contentID string, m
 	if err != nil {
 		return nil, err
 	}
+	truncated := maxBytes > 0 && int64(len(payload)) > maxBytes
 	if maxBytes > 0 && int64(len(payload)) > maxBytes {
 		payload = payload[:maxBytes]
 	}
 	sum := sha256.Sum256([]byte(contentID))
 	return &SourceHandle{
-		id:      "sch_" + hex.EncodeToString(sum[:8]),
-		body:    payload,
-		content: contentID,
+		id:        "sch_" + hex.EncodeToString(sum[:8]),
+		body:      payload,
+		content:   contentID,
+		truncated: truncated,
 	}, nil
 }
 
@@ -214,14 +222,16 @@ func SourceFromFile(ctx context.Context, file *os.File, maxBytes int64) (*Source
 	if err != nil {
 		return nil, err
 	}
+	truncated := int64(len(payload)) > maxBytes
 	if int64(len(payload)) > maxBytes {
 		payload = payload[:maxBytes]
 	}
 	sum := sha256.Sum256(payload)
 	return &SourceHandle{
-		id:      "sch_" + hex.EncodeToString(sum[:8]),
-		body:    payload,
-		content: "sha256:" + hex.EncodeToString(sum[:]),
+		id:        "sch_" + hex.EncodeToString(sum[:8]),
+		body:      payload,
+		content:   "sha256:" + hex.EncodeToString(sum[:]),
+		truncated: truncated,
 	}, nil
 }
 

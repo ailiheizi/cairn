@@ -211,3 +211,68 @@ func TestEngineQueryPageRefusesAnOutOfRangeBound(t *testing.T) {
 		t.Fatalf("legacy query hits = %d, want 3", len(hits))
 	}
 }
+
+// TestEngineQueryAllPageIsPrivateAndWalksEveryRow proves that the tag-only
+// SavedView enumeration can page the complete lexical generation without
+// relaxing ordinary empty-query validation. The page remains bounded and
+// uses the generation's stable rowid order.
+func TestEngineQueryAllPageIsPrivateAndWalksEveryRow(t *testing.T) {
+	ctx := context.Background()
+	const total = 25
+	const pageSize = 7
+	engine, path := buildPagingFixture(t, total)
+
+	if _, err := engine.QueryPage(ctx, path, "", nil, Filters{}, PageRequest{Limit: pageSize}); err == nil {
+		t.Fatal("ordinary empty search must remain refused")
+	}
+
+	seen := make(map[string]int, total)
+	var cursor *PagePosition
+	pageCount := 0
+	for {
+		page, err := engine.queryAllPage(ctx, path, PageRequest{Limit: pageSize, Position: cursor})
+		if err != nil {
+			t.Fatalf("all-lexical page %d: %v", pageCount, err)
+		}
+		pageCount++
+		if page.Order != OrderRowID {
+			t.Fatalf("all-lexical page order = %q, want %q", page.Order, OrderRowID)
+		}
+		if len(page.Hits) > pageSize {
+			t.Fatalf("page %d returned %d hits, above bound %d", pageCount, len(page.Hits), pageSize)
+		}
+		for _, hit := range page.Hits {
+			seen[hit.SubjectID]++
+		}
+		if !page.HasMore {
+			break
+		}
+		if len(page.Hits) != pageSize {
+			t.Fatalf("page %d returned %d hits with more available, want %d", pageCount, len(page.Hits), pageSize)
+		}
+		position := page.Next
+		if position.Lane != DimensionLexical || position.HasRank || position.RowID <= 0 {
+			t.Fatalf("page %d returned invalid rowid continuation: %+v", pageCount, position)
+		}
+		cursor = &position
+		if pageCount > total {
+			t.Fatal("all-lexical paging did not advance")
+		}
+	}
+	if len(seen) != total {
+		t.Fatalf("all-lexical paging returned %d distinct subjects, want %d", len(seen), total)
+	}
+	for subject, count := range seen {
+		if count != 1 {
+			t.Fatalf("subject %s appeared %d times, want exactly once", subject, count)
+		}
+	}
+	if _, err := engine.queryAllPage(ctx, path, PageRequest{Limit: MaxPageSize + 1}); err == nil {
+		t.Fatal("all-lexical page above the maximum must be refused")
+	}
+	if _, err := engine.queryAllPage(ctx, path, PageRequest{
+		Limit: pageSize, Position: &PagePosition{Lane: DimensionLexical, RowID: -1},
+	}); err == nil {
+		t.Fatal("all-lexical page with an invalid rowid continuation must be refused")
+	}
+}

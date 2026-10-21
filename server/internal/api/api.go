@@ -27,6 +27,8 @@ type Options struct {
 	Upload UploadStaging
 }
 
+const maxCommandBodyBytes = 4 << 20
+
 func Handler(dispatch DispatchFunc, options Options) http.Handler {
 	if dispatch == nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -63,9 +65,13 @@ func Handler(dispatch DispatchFunc, options Options) http.Handler {
 			return
 		}
 		defer r.Body.Close()
-		body, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxCommandBodyBytes+1))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "read request: "+err.Error())
+			return
+		}
+		if len(body) > maxCommandBodyBytes {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body exceeds the 4 MiB limit")
 			return
 		}
 		if len(body) == 0 || !json.Valid(body) {

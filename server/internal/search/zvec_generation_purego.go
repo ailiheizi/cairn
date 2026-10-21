@@ -1,4 +1,4 @@
-//go:build purego
+//go:build purego || cairn_zvec_dynamic
 
 package search
 
@@ -24,6 +24,8 @@ type puregoZvecGeneration struct {
 	mu         sync.Mutex
 	closed     bool
 }
+
+const zvecMaxWriteBatchSize = 1024
 
 var puregoZvecMu sync.Mutex
 var puregoZvecLoadedPath string
@@ -232,11 +234,19 @@ func (d *puregoZvecGenerationDriver) buildNative(spec ZvecGenerationSpec, segmen
 		}
 		docs = append(docs, doc)
 	}
-	result, err := collection.Insert(docs)
-	zvec.FreeDocs(docs)
-	if err != nil || result == nil || result.SuccessCount != uint64(len(segments)) {
-		return ZvecGenerationReceipt{}, fmt.Errorf("%w: insert result=%+v err=%v", ErrZvecUnavailable, result, err)
+	for start := 0; start < len(docs); start += zvecMaxWriteBatchSize {
+		end := start + zvecMaxWriteBatchSize
+		if end > len(docs) {
+			end = len(docs)
+		}
+		batch := docs[start:end]
+		result, insertErr := collection.Insert(batch)
+		if insertErr != nil || result == nil || result.SuccessCount != uint64(len(batch)) || result.ErrorCount != 0 {
+			zvec.FreeDocs(docs)
+			return ZvecGenerationReceipt{}, fmt.Errorf("%w: insert batch [%d:%d] result=%+v err=%v", ErrZvecUnavailable, start, end, result, insertErr)
+		}
 	}
+	zvec.FreeDocs(docs)
 	if err := collection.Flush(); err != nil {
 		return ZvecGenerationReceipt{}, fmt.Errorf("%w: flush: %v", ErrZvecUnavailable, err)
 	}

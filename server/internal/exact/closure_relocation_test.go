@@ -50,7 +50,7 @@ func relocateSizedRepository(t *testing.T, zstd bool) (service *Service, movedRo
 	service = &Service{
 		Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: testPublicationDomain, RequireSignedPublication: true,
-		ConfigDigest: "sha256:exact-test-config",
+		ConfigDigest: DigestBytes([]byte("exact-test-config")),
 	}
 	plan, err := service.InspectIngest(ctx, source, IngestOptions{})
 	if err != nil {

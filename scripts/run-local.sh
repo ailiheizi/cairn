@@ -51,12 +51,17 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 mkdir -p "$data_dir/bin"
 config_path=$data_dir/config.toml
 socket_path=$data_dir/cairnd.sock
+mkdir -p "$data_dir/web"
+web_root=$(mktemp -d "$data_dir/web/dist.XXXXXX")
+trap 'rm -rf "$web_root"' EXIT
 
 echo "Cairn: building daemon, CLI, and WebUI..."
-( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/cairnd" ./server/cmd/cairnd )
-( cd "$repo_root" && go build -tags purego -o "$data_dir/bin/cairn" ./client/cmd/cairn )
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -o "$data_dir/bin/cairnd" ./server/cmd/cairnd )
+( cd "$repo_root" && go build -tags cairn_zvec_dynamic -o "$data_dir/bin/cairn" ./client/cmd/cairn )
 [ -d "$repo_root/web/node_modules" ] || npm --prefix "$repo_root/web" ci >/dev/null
-npm --prefix "$repo_root/web" run build >/dev/null
+npm --prefix "$repo_root/web" run build -- --outDir "$web_root" --emptyOutDir >/dev/null
+[ -f "$web_root/index.html" ] || { echo "error: WebUI build did not produce $web_root/index.html" >&2; exit 1; }
+trap - EXIT
 
 # Config init is the only writer of a new profile. XDG_DATA_HOME makes every
 # generated default path deterministic below --data-dir; an existing profile
@@ -65,8 +70,6 @@ if [ ! -e "$config_path" ]; then
   ( cd "$repo_root" && XDG_DATA_HOME=$data_dir "$data_dir/bin/cairn" config init --path "$config_path" )
 fi
 
-web_root=$repo_root/web/dist
-[ -f "$web_root/index.html" ] || { echo "error: WebUI build did not produce $web_root/index.html" >&2; exit 1; }
 echo "Cairn: serving WebUI and API at http://$listen/"
 echo "Cairn: data root $data_dir"
 echo "Cairn: running in foreground; press Ctrl-C to stop"

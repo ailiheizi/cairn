@@ -182,7 +182,7 @@ func (s *Service) executeCapturedIngestWithExecutionKey(ctx context.Context, cap
 		}
 	}
 	if s.Indexer != nil {
-		if _, err := s.Indexer.Rebuild(ctx, result.WorkspaceID, result.SnapshotRef, result.RootID); err != nil {
+		if _, err := s.Indexer.RebuildLexical(ctx, result.WorkspaceID, result.SnapshotRef, result.RootID); err != nil {
 			result.Warnings = append(result.Warnings, "indexer: "+err.Error())
 		}
 	}

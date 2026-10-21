@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,10 +32,43 @@ func (integrationSemanticProvider) Embed(_ context.Context, req SemanticEmbeddin
 	return results, validateSemanticEmbeddingResults(req, results)
 }
 
+type truncatedQueryIntegrationSemanticProvider struct{}
+
+func (truncatedQueryIntegrationSemanticProvider) Embed(ctx context.Context, req SemanticEmbeddingRequest) ([]SemanticVector, error) {
+	if req.Purpose == SemanticEmbeddingQuery && len(strings.Fields(req.Inputs[0].Text)) > 512 {
+		return nil, ErrSemanticQueryInputTruncated
+	}
+	return (integrationSemanticProvider{}).Embed(ctx, req)
+}
+
 type failingSemanticProvider struct{}
 
 func (failingSemanticProvider) Embed(context.Context, SemanticEmbeddingRequest) ([]SemanticVector, error) {
 	return nil, errors.New("runtime probe failed")
+}
+
+type cancelOnceIntegrationSemanticProvider struct {
+	ready      atomic.Bool
+	cancelNext atomic.Bool
+	entered    chan struct{}
+}
+
+func (p *cancelOnceIntegrationSemanticProvider) SemanticReady() bool { return p.ready.Load() }
+
+func (p *cancelOnceIntegrationSemanticProvider) Embed(ctx context.Context, req SemanticEmbeddingRequest) ([]SemanticVector, error) {
+	if req.Purpose == SemanticEmbeddingQuery && p.cancelNext.CompareAndSwap(true, false) {
+		select {
+		case p.entered <- struct{}{}:
+		default:
+		}
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	results, err := (integrationSemanticProvider{}).Embed(ctx, req)
+	if err == nil {
+		p.ready.Store(true)
+	}
+	return results, err
 }
 
 type integrationSemanticGenerationDriver struct {
@@ -42,6 +76,7 @@ type integrationSemanticGenerationDriver struct {
 	byPath           map[string][]ZvecSegment
 	membershipByPath map[string]map[ZvecCoverageIdentity]struct{}
 	coverageCalls    int
+	queryCalls       int
 }
 
 func (d *integrationSemanticGenerationDriver) ZvecReady(string, string, EmbeddingGenerationManifest) bool {
@@ -78,7 +113,7 @@ func (d *integrationSemanticGenerationDriver) Open(_ context.Context, spec ZvecG
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	segments := append([]ZvecSegment(nil), d.byPath[spec.Path]...)
-	return integrationSemanticGeneration{segments: segments, dimension: spec.Manifest.Dimension}, nil
+	return integrationSemanticGeneration{segments: segments, dimension: spec.Manifest.Dimension, driver: d}, nil
 }
 
 func (d *integrationSemanticGenerationDriver) Coverage(_ context.Context, spec ZvecGenerationSpec) ([]string, error) {
@@ -110,6 +145,12 @@ func (d *integrationSemanticGenerationDriver) coverageProbeCalls() int {
 	return d.coverageCalls
 }
 
+func (d *integrationSemanticGenerationDriver) semanticQueryCalls() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.queryCalls
+}
+
 func (d *integrationSemanticGenerationDriver) VerifyMembership(_ context.Context, spec ZvecGenerationSpec, candidates []ZvecCoverageIdentity) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -138,9 +179,15 @@ func (d *integrationSemanticGenerationDriver) remove(path, segmentID string) {
 type integrationSemanticGeneration struct {
 	segments  []ZvecSegment
 	dimension int
+	driver    *integrationSemanticGenerationDriver
 }
 
 func (g integrationSemanticGeneration) Query(_ context.Context, vector []float32, topK int) ([]ZvecHit, error) {
+	if g.driver != nil {
+		g.driver.mu.Lock()
+		g.driver.queryCalls++
+		g.driver.mu.Unlock()
+	}
 	if len(vector) != g.dimension {
 		return nil, ErrInvalidZvecGeneration
 	}
@@ -834,6 +881,109 @@ func TestIndexerSemanticRebuildQueryFuseAndProvenance(t *testing.T) {
 	coverage, err = indexer.SemanticCoverage(ctx, seed.WorkspaceID)
 	if err != nil || coverage.Available || coverage.Complete {
 		t.Fatalf("degraded semantic coverage = %+v, err=%v", coverage, err)
+	}
+}
+
+func TestIndexerReadinessAllowsFreshSemanticQueryAfterRequestCancellation(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	manifest := testZvecManifest()
+	provider := &cancelOnceIntegrationSemanticProvider{entered: make(chan struct{}, 1)}
+	indexer := &Indexer{
+		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4), SemanticManifest: manifest,
+		SemanticProvider: provider, SemanticZvec: &integrationSemanticGenerationDriver{},
+		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:semantic-cancel", seed.RootID); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if !IndexerReadiness(indexer).SemanticReal {
+		t.Fatal("semantic provider was not ready before query cancellation")
+	}
+	provider.cancelNext.Store(true)
+	queryCtx, cancel := context.WithCancel(context.Background())
+	queryDone := make(chan error, 1)
+	go func() {
+		_, _, err := indexer.Query(queryCtx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "archive recovery"})
+		queryDone <- err
+	}()
+	select {
+	case <-provider.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceled query did not reach the semantic provider")
+	}
+	cancel()
+	select {
+	case err := <-queryDone:
+		if !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("canceled query error = %v, want unavailable", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceled query did not return")
+	}
+	if !IndexerReadiness(indexer).SemanticReal {
+		t.Fatal("soft query cancellation permanently disabled the admitted semantic provider")
+	}
+	_, hits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "archive recovery"})
+	if err != nil || !containsSemanticSubject(hits, seed.FileEntryID) {
+		t.Fatalf("fresh semantic query after canceled request = %+v, err=%v", hits, err)
+	}
+}
+
+func TestIndexerLongSemanticQueryDegradesOnlyThatLaneAndKeepsReadiness(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	seed := testutil.SeedNamespace(t, store)
+	manifest := testZvecManifest()
+	driver := &integrationSemanticGenerationDriver{}
+	indexer := &Indexer{
+		Store: store, Engine: &Engine{Dir: t.TempDir()}, ConfigDigest: manifest.ConfigDigest,
+		LexicalProfileDigest: ProfileDigest(DimensionLexical, LexicalProfileV4), SemanticManifest: manifest,
+		SemanticProvider: truncatedQueryIntegrationSemanticProvider{}, SemanticZvec: driver,
+		SemanticLibraryPath: "/private/explicit/libzvec_c_api.dylib", SemanticLibraryDigest: "sha256:" + strings.Repeat("0", 64),
+	}
+	if _, err := indexer.Rebuild(ctx, seed.WorkspaceID, "snapshot:semantic-long-query", seed.RootID); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if !IndexerReadiness(indexer).SemanticReal {
+		t.Fatal("semantic generation was not ready before long query")
+	}
+	// The fake provider uses 513 whitespace-delimited terms only as a caller-
+	// refusal propagation fixture. This is not evidence of BGE's tokenizer limit.
+	longText := strings.Repeat("archive ", 513)
+	fused, err := indexer.Fuse(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Text: longText, Fuse: []string{DimensionLexical, DimensionSemantic}})
+	if err != nil {
+		t.Fatalf("fused long query: %v", err)
+	}
+	var lexical, semantic *Component
+	for i := range fused.Components {
+		switch fused.Components[i].Dimension {
+		case DimensionLexical:
+			lexical = &fused.Components[i]
+		case DimensionSemantic:
+			semantic = &fused.Components[i]
+		}
+	}
+	if lexical == nil || lexical.Status != "SUCCEEDED" {
+		t.Fatalf("lexical component = %+v, want independent success", lexical)
+	}
+	if semantic == nil || semantic.Status != "DEGRADED" || semantic.Reason != SemanticQueryInputTruncatedReason {
+		t.Fatalf("semantic component = %+v, want degraded %s", semantic, SemanticQueryInputTruncatedReason)
+	}
+	if !IndexerReadiness(indexer).SemanticReal {
+		t.Fatal("query-specific truncation revoked semantic generation readiness")
+	}
+	if calls := driver.semanticQueryCalls(); calls != 0 {
+		t.Fatalf("zvec Query calls after refused long input = %d, want 0", calls)
+	}
+	_, hits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "archive recovery"})
+	if err != nil || !containsSemanticSubject(hits, seed.FileEntryID) {
+		t.Fatalf("short semantic query after rejected long query = %+v, err=%v", hits, err)
+	}
+	if calls := driver.semanticQueryCalls(); calls != 1 {
+		t.Fatalf("zvec Query calls after ordinary short query = %d, want exactly 1", calls)
 	}
 }
 

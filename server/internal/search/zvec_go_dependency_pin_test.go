@@ -1,4 +1,4 @@
-//go:build purego
+//go:build purego || cairn_zvec_dynamic
 
 package search
 
@@ -20,7 +20,7 @@ import (
 var zvecDependencyProbe = zvec.GetVersion
 
 // TestZvecGoBuildDependencyMatchesBundlePin proves that the zvec-go package
-// linked into this purego test binary is the immutable pseudo-version used by
+// linked into this test binary is the immutable pseudo-version used by
 // the semantic bundle descriptor.  A mutable release tag or an unpinned
 // replacement must not satisfy this check.
 func TestZvecGoBuildDependencyMatchesBundlePin(t *testing.T) {
@@ -35,19 +35,19 @@ func TestZvecGoBuildDependencyMatchesBundlePin(t *testing.T) {
 	dependency := findBuildDependency(info, modulePath)
 	if dependency == nil {
 		// Go test binaries do not retain their module dependency list in
-		// ReadBuildInfo. Build the actual daemon (the purego consumer) and
+		// ReadBuildInfo. Build the actual daemon (the custom-tag consumer) and
 		// inspect its executable BuildInfo instead; this still avoids running
 		// the daemon and therefore cannot initialize native zvec.
 		moduleRoot := moduleRootForDependencyTest(t)
 		binary := filepath.Join(t.TempDir(), "cairnd")
-		build := exec.Command("go", "build", "-tags=purego", "-o", binary, "./server/cmd/cairnd")
+		build := exec.Command("go", "build", "-tags="+semanticInstallerZvecGoBuildTag, "-o", binary, "./server/cmd/cairnd")
 		build.Dir = moduleRoot
 		if output, err := build.CombinedOutput(); err != nil {
-			t.Fatalf("build purego daemon for dependency provenance: %v\n%s", err, output)
+			t.Fatalf("build custom-tag daemon for dependency provenance: %v\n%s", err, output)
 		}
 		binaryInfo, err := buildinfo.ReadFile(binary)
 		if err != nil {
-			t.Fatalf("read purego daemon BuildInfo: %v", err)
+			t.Fatalf("read custom-tag daemon BuildInfo: %v", err)
 		}
 		dependency = findBuildDependency(binaryInfo, modulePath)
 	}
@@ -57,8 +57,15 @@ func TestZvecGoBuildDependencyMatchesBundlePin(t *testing.T) {
 	if dependency.Version != semanticInstallerZvecGoModuleVersion {
 		t.Fatalf("linked zvec-go version = %q, want immutable pin %q", dependency.Version, semanticInstallerZvecGoModuleVersion)
 	}
-	if dependency.Replace != nil {
-		t.Fatalf("linked zvec-go dependency is replaced by %q; the immutable module pin must be built directly", dependency.Replace.Path)
+	if dependency.Replace == nil || dependency.Replace.Path != semanticInstallerZvecGoReplacePath {
+		got := "<none>"
+		if dependency.Replace != nil {
+			got = dependency.Replace.Path
+		}
+		t.Fatalf("linked zvec-go replacement = %q, want pinned in-repository source %q", got, semanticInstallerZvecGoReplacePath)
+	}
+	if dependency.Sum != "" {
+		t.Fatalf("locally replaced zvec-go unexpectedly reports module sum %q; go.sum remains the upstream source pin", dependency.Sum)
 	}
 
 	// Go pseudo-versions retain the first 12 hexadecimal characters of the

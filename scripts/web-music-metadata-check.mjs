@@ -63,6 +63,15 @@ assert.deepEqual(displayedSet.map((item) => item.entryID), ["entry-a", "entry-b"
 assert.equal(artistRows.length - displayedSet.length, 1, "the displayed-set skipped count includes unsupported known-size tracks");
 const allSupported = loaded.map((item) => playableMusicTrack(item, "workspace-one")).filter(Boolean);
 assert.deepEqual(allSupported.map((item) => item.entryID), ["entry-a", "entry-b", "entry-c", "entry-none"], "known supported originals remain playable without metadata");
+const renamedAlias = hit("alias", { name: "renamed-source.mp3" });
+const aliasTrack = playableMusicTrack(renamedAlias, "workspace-one", { subjectRef: "alias", name: "tagged-source.mp3", title: "Slow Morning", artist: "RestoreWeave QA Artist", artifactID: "fact-alias" });
+assert.equal(aliasTrack.name, "renamed-source.mp3", "the selected hit filename remains the original download/MIME name");
+assert.equal(aliasTrack.displayTitle, "Slow Morning", "subject-bound labels survive a differing recorded source filename");
+assert.equal(aliasTrack.displayArtist, "RestoreWeave QA Artist");
+assert.equal(playableMusicTrack(renamedAlias, "workspace-one", { subjectRef: "different-subject", title: "Foreign title", artist: "Foreign artist", artifactID: "foreign-fact" })?.displayTitle, undefined, "facts from another subject cannot relabel this playback");
+const unlabeledTrack = playableMusicTrack(renamedAlias, "workspace-one");
+assert.equal(unlabeledTrack?.name, "renamed-source.mp3", "missing facts preserve immediate filename playback");
+assert.equal(unlabeledTrack?.displayTitle, undefined);
 assert.equal(playableMusicTrack(loaded[0], undefined), undefined);
 assert.equal(playableMusicTrack(hit("bad", { content_id: "bare-digest" }), "workspace-one"), undefined);
 assert.equal(playableMusicTrack(hit("unknown-size", { logical_size: undefined }), "workspace-one"), undefined);

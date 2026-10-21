@@ -49,8 +49,8 @@ func (s *Store) InsertSavedView(ctx context.Context, view SavedView) (SavedView,
 	if strings.TrimSpace(view.Name) == "" {
 		return view, errors.New("view name is required")
 	}
-	if strings.TrimSpace(view.Query) == "" {
-		return view, errors.New("view query is required")
+	if !savedViewHasQueryOrFields(view) {
+		return view, errors.New("view query or fields are required")
 	}
 	if view.Revision < 1 {
 		view.Revision = 1
@@ -98,8 +98,8 @@ func (s *Store) UpdateSavedView(ctx context.Context, view SavedView) (SavedView,
 	if strings.TrimSpace(view.Name) == "" {
 		return view, errors.New("view name is required")
 	}
-	if strings.TrimSpace(view.Query) == "" {
-		return view, errors.New("view query is required")
+	if !savedViewHasQueryOrFields(view) {
+		return view, errors.New("view query or fields are required")
 	}
 	fieldsJSON, err := json.Marshal(view.Fields)
 	if err != nil {
@@ -136,6 +136,18 @@ WHERE name = ?`,
 		return nil
 	})
 	return view, err
+}
+
+func savedViewHasQueryOrFields(view SavedView) bool {
+	if strings.TrimSpace(view.Query) != "" {
+		return true
+	}
+	for _, field := range view.Fields {
+		if strings.TrimSpace(field) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // GetSavedViewByName reads the current revision of a named view.

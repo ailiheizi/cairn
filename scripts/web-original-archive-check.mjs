@@ -10,7 +10,7 @@ globalThis.crypto ??= webcrypto;
 const source = await readFile(new URL("../web/src/lib/originalArchive.ts", import.meta.url), "utf8");
 const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
 const moduleURL = `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`;
-const { buildStoredZip, captureArchiveSelection, materializeVerifiedArchive, readBoundedOriginalResponse, releaseDownloadLease, resolveArchiveSelectionSizes, sha256ContentID, validateFrozenArchiveItems, ORIGINAL_ARCHIVE_LIMITS } = await import(moduleURL);
+const { buildStoredZip, captureArchiveSelection, preflightArchiveSelection, materializeVerifiedArchive, readBoundedOriginalResponse, releaseDownloadLease, resolveArchiveSelectionSizes, sha256ContentID, validateFrozenArchiveItems, ORIGINAL_ARCHIVE_LIMITS } = await import(moduleURL);
 const id = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const emptyHash = id(Buffer.alloc(0));
 const alpha = Buffer.from("hello original\n");
@@ -27,7 +27,29 @@ assert.equal(enriched[0].name, unknownSizeHit.name);
 assert.equal(enriched[0].entry_id, unknownSizeHit.entry_id);
 assert.deepEqual(resolveArchiveSelectionSizes([unknownSizeHit], [{ ...matchingLoadedHit, entry_id: "other-entry" }]), [unknownSizeHit]);
 assert.deepEqual(resolveArchiveSelectionSizes([unknownSizeHit], [{ ...matchingLoadedHit, content_id: emptyHash }]), [unknownSizeHit]);
+const malformedIdentity = "sha256:ABCDEF";
+const malformedHit = { ...unknownSizeHit, content_id: malformedIdentity };
+const malformedLoaded = { ...matchingLoadedHit, content_id: malformedIdentity };
+assert.deepEqual(resolveArchiveSelectionSizes([malformedHit], [malformedLoaded]), [malformedHit], "the same noncanonical tuple cannot supply a loaded size");
+assert.deepEqual(resolveArchiveSelectionSizes([unknownSizeHit], [matchingLoadedHit, { ...matchingLoadedHit, logical_size: alpha.length + 1 }]), [unknownSizeHit], "conflicting sizes for the same authorized tuple remain unknown");
 assert.deepEqual(resolveArchiveSelectionSizes([unknownSizeHit], []), [unknownSizeHit]);
+const unknownSizePreflight = preflightArchiveSelection([unknownSizeHit]);
+assert.equal(unknownSizePreflight.ok, false);
+assert.equal(unknownSizePreflight.refusal, "budget");
+assert.deepEqual(unknownSizePreflight.fallbackSubjects?.map(({ subject_ref, entry_id, content_id, name }) => ({ subject_ref, entry_id, content_id, name })), [{ subject_ref: "subject-x", entry_id: "entry-x", content_id: id(alpha), name: "chosen.txt" }]);
+assert.equal(Object.isFrozen(unknownSizePreflight.fallbackSubjects), true, "budget continuation freezes the original selected subjects");
+const oversizedPreflight = preflightArchiveSelection([{ ...matchingLoadedHit, logical_size: ORIGINAL_ARCHIVE_LIMITS.perFileBytes + 1 }]);
+assert.equal(oversizedPreflight.refusal, "budget");
+assert.equal(oversizedPreflight.fallbackSubjects?.[0]?.entry_id, matchingLoadedHit.entry_id);
+const invalidIdentityPreflight = preflightArchiveSelection([{ ...unknownSizeHit, content_id: malformedIdentity }]);
+assert.equal(invalidIdentityPreflight.refusal, "invalid");
+assert.equal(invalidIdentityPreflight.fallbackSubjects, undefined, "invalid identity cannot expose a fallback");
+const duplicatePreflight = preflightArchiveSelection([matchingLoadedHit, { ...matchingLoadedHit, entry_id: "entry-y" }]);
+assert.equal(duplicatePreflight.refusal, "invalid");
+assert.equal(duplicatePreflight.fallbackSubjects, undefined, "duplicate subject identity cannot expose a fallback");
+const tooManyPreflight = preflightArchiveSelection(Array.from({ length: ORIGINAL_ARCHIVE_LIMITS.files + 1 }, (_, index) => ({ ...matchingLoadedHit, subject_ref: `subject-${index}`, entry_id: `entry-${index}` })));
+assert.equal(tooManyPreflight.refusal, "budget");
+assert.equal(tooManyPreflight.fallbackSubjects?.length, ORIGINAL_ARCHIVE_LIMITS.files + 1, "server-directory fallback retains the complete selection without truncation");
 const frozen = validateFrozenArchiveItems([
   JSON.stringify({ subject_ref: "entry_a", output_name: "same.txt", content_id: id(alpha), logical_size: alpha.length, exact: true }),
   JSON.stringify({ subject_ref: "entry_b", output_name: "empty.txt", content_id: emptyHash, exact: true }),
@@ -89,4 +111,4 @@ try {
   await rm(dir, { recursive: true, force: true });
 }
 
-console.log("PASS bounded selection, manifest binding, stale/malformed/collision/byte-limit refusal, zero-byte identity, ZIP extraction, failure and cancellation boundaries");
+console.log("PASS bounded selection, retained identity-bound budget fallback, malformed/duplicate refusal, complete over-count retention, manifest binding, stale/malformed/collision/byte-limit refusal, zero-byte identity, ZIP extraction, failure and cancellation boundaries");

@@ -67,6 +67,14 @@ func TestDeclaredDimensionsStayHonest(t *testing.T) {
 	if ready[2].ID != DimensionSemantic || ready[2].State != "AVAILABLE" {
 		t.Fatalf("semantic ready = %+v", ready[2])
 	}
+	if ready[2].Provider != ProviderSemanticFix || ready[2].ScoreSemantics != ScoreSemanticExact || ready[2].Reason != "" {
+		t.Fatalf("explicit fixture semantic dimension = %+v, want fixture provider/exact score", ready[2])
+	}
+	if unready[2].ID != DimensionSemantic || unready[2].State != "UNAVAILABLE" ||
+		unready[2].Provider != ProviderSemanticONNX || unready[2].ScoreSemantics != ScoreSemanticCosine ||
+		unready[2].Reason != SemanticIndexUnavailableReason || !strings.Contains(unready[2].Notes, SemanticIndexUnavailableReason) {
+		t.Fatalf("default semantic dimension = %+v, want unavailable local ONNX/cosine declaration with reason", unready[2])
+	}
 	if ready[3].ID != DimensionMultimodal || ready[3].State != "AVAILABLE" {
 		t.Fatalf("multimodal ready = %+v", ready[3])
 	}
@@ -95,7 +103,8 @@ func TestIndexerReadinessDoesNotAdvertiseFixtureDimensionsByDefault(t *testing.T
 		t.Fatalf("fixture readiness = %+v, want unavailable without explicit opt-in", ready)
 	}
 	semantic, ok := LookupDimension(DimensionSemantic, ready)
-	if !ok || semantic.State != "UNAVAILABLE" || !strings.Contains(semantic.Notes, SemanticIndexUnavailableReason) {
+	if !ok || semantic.State != "UNAVAILABLE" || semantic.Provider != ProviderSemanticONNX || semantic.ScoreSemantics != ScoreSemanticCosine ||
+		semantic.Reason != SemanticIndexUnavailableReason || !strings.Contains(semantic.Notes, SemanticIndexUnavailableReason) {
 		t.Fatalf("semantic capability = %+v ok=%v", semantic, ok)
 	}
 }

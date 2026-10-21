@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fillNoteDraft, assertFocusReturned, assertNoHorizontalOverflow } from "./support.mjs";
+import { assertSelectionFollowsSearchPresentations } from "./search.mjs";
 
 // A tile is a picture and a name. Text tiles must render no preview text and
 // must not read content at all: the reader opens the file instead. The tiny
@@ -639,5 +640,240 @@ export async function assertLibraryMediaViews(ctx) {
     assert.equal(operations.some((operation) => operation === "content.list" || operation === "search.query"), false, "returning to All types must remain a local view switch");
   } finally {
     page.off("request", onRequest);
+  }
+}
+
+// Selection follows the host's loaded result scope while first-party pages
+// change only their presentation. This focused real-daemon journey also checks
+// that an actual host facet replacement prunes subjects outside that scope.
+export async function assertLoadedScopeSelectionContinuity(ctx, { evidenceDir } = {}) {
+  const { browser, url } = ctx;
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const requests = [];
+  const responseTasks = [];
+  const assets = [];
+  const byRequest = new Map();
+  const states = [];
+  const requestListener = (request) => {
+    if (request.method() !== "POST" || !request.url().endsWith("/api/v1/command")) return;
+    let payload;
+    try { payload = request.postDataJSON(); } catch { return; }
+    const record = { method: request.method(), url: request.url(), payload, httpStatus: undefined, commandStatus: undefined, orderedSubjects: undefined };
+    requests.push(record);
+    byRequest.set(request, record);
+  };
+  const responseListener = (response) => {
+    if (/\/assets\/.*\.(?:js|css)(?:\?|$)/.test(response.url())) {
+      const assetTask = (async () => {
+        try {
+          const bytes = await response.body();
+          assets.push({ url: response.url(), status: response.status(), sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length });
+        } catch (error) {
+          assets.push({ url: response.url(), status: response.status(), body_error: error instanceof Error ? error.message : String(error) });
+        }
+      })();
+      responseTasks.push(assetTask);
+    }
+    const record = byRequest.get(response.request());
+    if (!record) return;
+    const task = (async () => {
+      record.httpStatus = response.status();
+      try {
+        const body = await response.json();
+        record.commandStatus = body?.status;
+        if (record.payload.operation === "content.list") {
+          record.orderedSubjects = (body?.data?.items ?? []).map(({ subject_ref, entry_id, content_id, logical_size, name, entry_type }) => ({ subject_ref, entry_id, content_id, logical_size, name, entry_type }));
+        }
+      } catch (error) {
+        record.responseBodyError = error instanceof Error ? error.message : String(error);
+      }
+    })();
+    responseTasks.push(task);
+  };
+  const snapshot = async (label) => page.evaluate((stateLabel) => {
+    const list = document.querySelector(".result-list, .music-track-list");
+    const selectedLabels = [...document.querySelectorAll('[role="checkbox"][aria-checked="true"], input[type="checkbox"]:checked, .overview-select[aria-pressed="true"]')]
+      .map((element) => element.getAttribute("aria-label") ?? "");
+    const overviewVisibleRows = [...document.querySelectorAll(".overview-photo, .overview-audio-row")].map((row) => ({
+      name: row.querySelector("strong")?.textContent?.trim() ?? "",
+      selected: row.querySelector('.overview-select[aria-pressed="true"]')?.getAttribute("aria-label") ?? null,
+    }));
+    return {
+      label: stateLabel,
+      hash: location.hash,
+      query: document.querySelector('input[aria-label="Search content library"], input[aria-label="搜索内容库"]')?.value ?? "",
+      selectionCount: list?.getAttribute("data-selection-count") ?? document.querySelector(".selection-count")?.textContent?.match(/\d+/)?.[0] ?? "0",
+      selectedLabels,
+      overviewVisibleRows,
+      hiddenSelectionDisclosure: [...document.querySelectorAll(".music-action-notes, .library-selection-scope")].map((node) => node.textContent?.trim()).filter(Boolean),
+      photoCards: document.querySelectorAll(".photo-library .photo-card").length,
+      musicTracks: document.querySelectorAll(".music-track-list .music-track").length,
+      resultRows: document.querySelectorAll(".result-list .result-row").length,
+      overview: document.querySelectorAll(".overview-experience").length,
+      detailHeading: document.querySelector(".detail-column h2, .detail-column h3")?.textContent?.trim() ?? "",
+      noteDraft: document.querySelector('textarea[aria-label="New note"], textarea[aria-label="新备注"]')?.value ?? null,
+    };
+  }, label);
+  const record = async (label) => { states.push(await snapshot(label)); };
+  const waitCount = async (expected) => page.waitForFunction((value) => {
+    const list = document.querySelector(".result-list, .music-track-list");
+    const count = list?.getAttribute("data-selection-count") ?? document.querySelector(".selection-count")?.textContent?.match(/\d+/)?.[0] ?? "0";
+    return count === value;
+  }, expected, { timeout: 10000 });
+  const regexEscape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const label = (selected, name) => new RegExp(`^(?:${selected ? "Deselect\\s+|取消选择\\s*" : "Select\\s+|选择\\s*"})${regexEscape(name)}$`);
+  const navigateOverview = async () => {
+    const options = page.locator("details.library-view-options");
+    if (!(await options.evaluate((element) => element.open))) await options.locator("summary").click();
+    await page.locator('.library-presentation-navigation__presentation[data-layout*="overview" i]').click();
+    await page.locator(".overview-experience").waitFor({ state: "visible", timeout: 15000 });
+  };
+  let resolvedEvidenceDir;
+  let photo;
+  let track;
+  let guardMessage = "";
+  let completed = false;
+  page.on("request", requestListener);
+  page.on("response", responseListener);
+  try {
+    if (evidenceDir) {
+      resolvedEvidenceDir = evidenceDir;
+      mkdirSync(resolvedEvidenceDir, { recursive: true });
+    }
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.locator(".result-list .result-row").first().waitFor({ state: "visible", timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector(".result-list")?.getAttribute("data-selection-count") !== null, undefined, { timeout: 10000 });
+    const initialList = () => requests.filter((request) => request.payload.operation === "content.list");
+    const listDeadline = Date.now() + 20000;
+    while ((!initialList().length || initialList().some((request) => !Array.isArray(request.orderedSubjects))) && Date.now() < listDeadline) await page.waitForTimeout(50);
+    assert.ok(initialList().length >= 1, "the initial library is backed by its real content.list request");
+    await Promise.all(responseTasks);
+    const items = initialList().flatMap((request) => request.orderedSubjects ?? []);
+    photo = items.find((item) => item.name === "Cairn-Frame-Small.png");
+    track = items.find((item) => item.name === "Tone-Alpha.wav");
+    assert.ok(photo?.subject_ref && photo.entry_id && photo.content_id && Number.isFinite(photo.logical_size), "content.list supplies the selected photo's full identity and logical length");
+    assert.ok(track?.subject_ref && track.entry_id && track.content_id && Number.isFinite(track.logical_size), "content.list supplies the selected track's full identity and logical length");
+    assert.equal(initialList()[0].httpStatus, 200, "the initial content.list receives a successful HTTP response");
+    assert.equal(initialList()[0].commandStatus, "SUCCEEDED", "the initial content.list receives a successful daemon result");
+    assert.equal(initialList().length, 1, "the loaded journey uses one initial content.list page");
+    assert.equal(requests.filter((request) => request.payload.operation === "search.query").length, 0, "the loaded journey does not submit a search query");
+
+    await page.locator('.library-presentation-navigation__domain[data-domain="cairn:photos"]').click();
+    const photoCheckbox = page.getByRole("checkbox", { name: label(false, photo.name) });
+    await photoCheckbox.waitFor({ state: "visible", timeout: 20000 });
+    await photoCheckbox.click();
+    await waitCount("1");
+    await record("photos-one-selected");
+
+    await page.locator('.library-presentation-navigation__domain[data-domain="cairn:music"]').click();
+    await page.locator(".music-track-list").waitFor({ state: "visible", timeout: 20000 });
+    await page.getByRole("checkbox", { name: label(false, track.name) }).waitFor({ state: "visible", timeout: 20000 });
+    await record("music-one-hidden-selection");
+    assert.equal(states.at(-1).selectionCount, "1", "Music retains the photo selection from the shared loaded scope");
+    assert.match(states.at(-1).hiddenSelectionDisclosure.join(" "), /outside the displayed tracks|当前显示曲目之外/, "Music truthfully discloses the retained photo outside displayed tracks");
+    await page.getByRole("checkbox", { name: label(false, track.name) }).click();
+    await waitCount("2");
+    await record("music-two-selected");
+
+    await page.locator(".library-presentation-navigation__domain--library").click();
+    await waitCount("2");
+    await record("all-types-two-selected");
+    await navigateOverview();
+    await waitCount("2");
+    await record("overview-two-selected");
+    const overviewSelectedNames = states.at(-1).overviewVisibleRows.filter((row) => row.selected).map((row) => row.selected.replace(/^(?:Deselect|Select|取消选择|选择)\s*/, ""));
+    assert.equal(new Set(overviewSelectedNames).size, overviewSelectedNames.length, "Overview does not duplicate a selected subject within its bounded visible rows");
+    assert.ok(overviewSelectedNames.every((name) => [photo.name, track.name].includes(name)), `Overview's bounded selected rows belong to the shared selection: ${overviewSelectedNames.join(", ")}`);
+    assert.equal(states.at(-1).selectionCount, "2", "Overview retains the global two-item selection, including subjects beyond its bounded mounted rows");
+
+    await page.locator(".library-presentation-navigation__domain--library").click();
+    await waitCount("2");
+    await record("all-types-two-selected-after-overview");
+    assert.deepEqual(new Set(states.at(-1).selectedLabels.map((value) => value.replace(/^(?:Deselect|Select|取消选择|选择)\s*/, ""))), new Set([photo.name, track.name]), "returning from Overview exposes both exact selected subjects in All Types");
+    const filters = page.locator("details.library-filters-disclosure");
+    if (!(await filters.evaluate((element) => element.open))) await filters.locator(":scope > summary").click();
+    const systemFacets = page.locator("details.system-facets-disclosure");
+    if (!(await systemFacets.evaluate((element) => element.open))) await systemFacets.locator("summary").click();
+    const formatGroup = page.locator(".system-facet-group").filter({ hasText: /^(?:Format|格式)/ });
+    await formatGroup.getByRole("button", { name: /PNG/i }).click();
+    await waitCount("1");
+    await record("host-format-png-pruned-track");
+    assert.deepEqual(states.at(-1).selectedLabels.map((value) => value.replace(/^(?:Deselect|Select|取消选择|选择)\s*/, "")), [photo.name], "the host PNG scope prunes the out-of-scope track and keeps its photo");
+    await page.locator(".filter-summary-clear").click();
+    await waitCount("1");
+
+    await page.locator(".result-list .result-row").filter({ has: page.locator(".result-open-copy", { hasText: photo.name }) }).locator(".result-open-copy").click();
+    await page.getByRole("heading", { name: photo.name, exact: true }).waitFor({ state: "visible", timeout: 10000 });
+    const composer = page.getByRole("textbox", { name: /New note|新备注/ });
+    const addNote = page.getByRole("button", { name: /Add note|添加备注/ });
+    await fillNoteDraft({ page }, composer, addNote);
+    const draftValue = "unsaved browser note draft";
+    assert.equal(await composer.inputValue(), draftValue, "the unsaved note exists only as a visible UI draft");
+    for (const [view, stateName] of [["photos", "draft-photos"], ["music", "draft-music"], ["all", "draft-all-types"], ["overview", "draft-overview"]]) {
+      if (view === "photos") await page.locator('.library-presentation-navigation__domain[data-domain="cairn:photos"]').click();
+      if (view === "music") await page.locator('.library-presentation-navigation__domain[data-domain="cairn:music"]').click();
+      if (view === "all") await page.locator(".library-presentation-navigation__domain--library").click();
+      if (view === "overview") await navigateOverview();
+      assert.equal(await composer.inputValue(), draftValue, `same-scope ${view} navigation retains the visible note draft`);
+      await record(stateName);
+    }
+    const navigationMenu = page.locator("details.topbar-menu");
+    if (!(await navigationMenu.evaluate((element) => element.open))) await navigationMenu.locator('summary[aria-label="Navigation and status"], summary[aria-label="导航与状态"]').click();
+    const allContentRail = page.locator(".workspace-nav-item:visible").filter({ hasText: /All content|全部内容/ });
+    await allContentRail.waitFor({ state: "visible", timeout: 10000 });
+    await allContentRail.click();
+    assert.equal(await composer.inputValue(), draftValue, "returning to Library through the ordinary navigation rail retains the visible note draft");
+    await record("draft-library-rail-return");
+    const sourceButton = page.locator(".workspace-nav-item:visible").filter({ hasText: /Sources|来源/ });
+    if (!(await sourceButton.isVisible())) {
+      const menu = page.locator("details.topbar-menu");
+      if (!(await menu.evaluate((element) => element.open))) await menu.locator('summary[aria-label="Navigation and status"], summary[aria-label="导航与状态"]').click();
+    }
+    page.once("dialog", async (dialog) => { guardMessage = dialog.message(); await dialog.dismiss(); });
+    await sourceButton.click();
+    assert.match(guardMessage, /Discard unsaved note changes|放弃未保存的备注更改/i, "leaving the true source context still presents its unsaved-note guard");
+    assert.equal(await composer.inputValue(), draftValue, "dismissing the true-context guard retains the draft");
+    await record("sources-departure-cancelled");
+
+    const durableWritePattern = /^(annotation\.(upsert|delete|tag_apply|tag_plan)|description\.(create|generate)|config\.update|view\.save|plan\.apply|source\.staging_clean|image\.bundle|semantic\.bundle|export\.(plan|apply))/;
+    const writes = requests.filter((request) => durableWritePattern.test(request.payload.operation));
+    assert.deepEqual(writes, [], "the browser journey performs no annotation, export, settings, or workspace writes");
+    assert.equal(requests.filter((request) => request.payload.operation === "search.query").length, 0, "loaded navigation and scope changes issue no semantic or lexical search");
+    assert.equal(initialList().length, 1, "same-scope navigation does not reload content.list");
+    if (resolvedEvidenceDir) await page.screenshot({ path: join(resolvedEvidenceDir, "overview-retained-selection.png"), animations: "disabled" }).catch(() => {});
+    completed = true;
+  } finally {
+    page.off("request", requestListener);
+    page.off("response", responseListener);
+    await Promise.allSettled(responseTasks);
+    if (resolvedEvidenceDir) {
+      if (!completed) await page.screenshot({ path: join(resolvedEvidenceDir, "failure-state.png"), animations: "disabled" }).catch(() => {});
+      const receipt = {
+        completed,
+        optional_photo_preference_fallback: "NOT RUN",
+        assets,
+        requests: requests.map(({ method, url: requestURL, payload, httpStatus, commandStatus, orderedSubjects, responseBodyError }) => ({ method, url: requestURL, payload, http_status: httpStatus, command_status: commandStatus, ordered_subjects: orderedSubjects, response_body_error: responseBodyError })),
+        states,
+        selected_identity_tuples: [photo, track].filter(Boolean),
+        guard_message: guardMessage,
+      };
+      writeFileSync(join(resolvedEvidenceDir, completed ? "loaded-scope-selection.json" : "loaded-scope-selection-last-attempt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+    }
+    await page.close();
+  }
+
+  // The earlier admitted query-scope regression must continue to pass against
+  // the new host scope input, in a separate fresh browser context.
+  const searchPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await searchPage.goto(url, { waitUntil: "domcontentloaded" });
+    await assertSelectionFollowsSearchPresentations({ page: searchPage, url }, {
+      query: "a",
+      photoName: "Cairn-Frame-Overpixel.png",
+      musicName: "Tone-Alpha.wav",
+      evidenceDir: evidenceDir ? join(evidenceDir, "search-scope") : undefined,
+    });
+  } finally {
+    await searchPage.close();
   }
 }

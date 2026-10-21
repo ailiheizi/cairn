@@ -1,4 +1,4 @@
-//go:build cgo && purego && arm64 && supervised_integration && (darwin || linux)
+//go:build cgo && (purego || cairn_zvec_dynamic) && arm64 && supervised_integration && (darwin || linux)
 
 package main
 
@@ -42,8 +42,8 @@ func TestRealDaemonSemanticEndToEnd(t *testing.T) {
 	}
 	workspaceRoot := testWorkspaceRoot(t)
 	binDir := t.TempDir()
-	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "purego")
-	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "purego")
+	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "cairn_zvec_dynamic")
+	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "cairn_zvec_dynamic")
 
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "xdg-data")
@@ -467,7 +467,10 @@ func writeRealSemanticBundle(t *testing.T, root, runtimeSource, modelSource, tok
 		"zvec-go and native zvec libraries: Apache-2.0. github.com/zvec-ai/zvec-go\n"))
 	notice := writeAsset("notice", "NOTICE", []byte("This bundle uses the MIT BAAI/bge-small-zh-v1.5@7999e1d3359715c523056ef9478215996d62a620 model via the pinned Xenova/bge-small-zh-v1.5@75c43b069aac4d136ba6bc1122f995fedcfd2781 ONNX conversion; it is not a BAAI-published ONNX artifact.\n"+
 		"Runtime: ONNX Runtime 1.29.0. Vector index: zvec 0.6.0. See LICENSE and SBOM for provenance.\n"))
-	zvecGoPayload := []byte("zvec-go 0.6.0\nmodule github.com/zvec-ai/zvec-go version v0.6.1-0.20260721023313-9199195b29da\n9199195b29dac4bf369bb16954464ddf2d73e932\n")
+	zvecGoPayload := []byte("zvec-go 0.6.0\nmodule github.com/zvec-ai/zvec-go version v0.6.1-0.20260721023313-9199195b29da\n" +
+		"commit 9199195b29dac4bf369bb16954464ddf2d73e932\n" +
+		"source_sha256 sha256:15f6c7c021f4e5be1232c072e381c1c7c109e5b9d428857899bcb1f91fb338be\n" +
+		"replacement ./third_party/zvec-go\nloader_build_tag cairn_zvec_dynamic\n")
 	zvecGo := writeAsset("zvec_go", "zvec-go.txt", zvecGoPayload)
 	runtimeAsset := asset("runtime")
 	zvecAsset := asset("zvec")

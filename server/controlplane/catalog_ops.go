@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -217,10 +218,14 @@ func (d *Dispatcher) handleAnnotationUpsert(ctx context.Context, env command.Env
 	if err != nil {
 		return annotationWriteResult(env, started, err)
 	}
+	var searchErr, publicationErr error
 	if kind != sqlite.AnnotationProgress {
-		if rebuildErr := d.rebuildSearch(ctx, input.WorkspaceID); rebuildErr != nil {
-			return degradedResult(env, started, command.AnnotationUpsertData{Annotation: projectAnnotation(record)}, "annotation saved, but search index is unavailable: "+rebuildErr.Error())
-		}
+		searchErr = d.rebuildSearch(ctx, input.WorkspaceID)
+	}
+	publicationErr = d.publishAnnotationFact(ctx, record)
+	if searchErr != nil || publicationErr != nil {
+		data := command.AnnotationUpsertData{Annotation: projectAnnotation(record)}
+		return annotationPostCommitDegradedResult(env, started, data, searchErr, publicationErr)
 	}
 	return succeeded(env, started, command.AnnotationUpsertData{Annotation: projectAnnotation(record)})
 }
@@ -249,15 +254,30 @@ func (d *Dispatcher) handleAnnotationDelete(ctx context.Context, env command.Env
 	if existing.Tombstoned {
 		return notFoundResult(env, started, "annotation not found")
 	}
-	if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, input.AnnotationID, input.ExpectedRevision, existing.Body, true, time.Time{}); err != nil {
+	if existing.Revision != input.ExpectedRevision {
+		return annotationWriteResult(env, started, sqlite.ErrConflict)
+	}
+	tombstoneTime := time.Now().UTC()
+	if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, input.AnnotationID, input.ExpectedRevision, existing.Body, true, tombstoneTime); err != nil {
 		return annotationWriteResult(env, started, err)
 	}
-	updated, err := d.store.GetAnnotation(ctx, input.WorkspaceID, input.AnnotationID)
-	if err != nil {
-		return annotationWriteResult(env, started, err)
+	updated := sqlite.Annotation{
+		ID:                  existing.ID,
+		WorkspaceID:         existing.WorkspaceID,
+		SubjectRef:          existing.SubjectRef,
+		Kind:                existing.Kind,
+		Body:                existing.Body,
+		BodyDigest:          annotationBodyDigest(existing.Body),
+		Revision:            input.ExpectedRevision + 1,
+		PredecessorRevision: input.ExpectedRevision,
+		Tombstoned:          true,
+		CreatedAt:           existing.CreatedAt,
+		UpdatedAt:           tombstoneTime,
 	}
-	if rebuildErr := d.rebuildSearch(ctx, input.WorkspaceID); rebuildErr != nil {
-		return degradedResult(env, started, command.AnnotationUpsertData{Annotation: projectAnnotation(updated)}, "annotation deleted, but search index is unavailable: "+rebuildErr.Error())
+	searchErr := d.rebuildSearch(ctx, input.WorkspaceID)
+	publicationErr := d.publishAnnotationFact(ctx, updated)
+	if searchErr != nil || publicationErr != nil {
+		return annotationPostCommitDegradedResult(env, started, command.AnnotationUpsertData{Annotation: projectAnnotation(updated)}, searchErr, publicationErr)
 	}
 	return succeeded(env, started, command.AnnotationUpsertData{Annotation: projectAnnotation(updated)})
 }
@@ -363,7 +383,8 @@ func (d *Dispatcher) handleAnnotationImport(ctx context.Context, env command.Env
 		}
 	}
 	imported := make([]command.AnnotationData, 0, len(bundle.Annotations))
-	workspaces := map[string]struct{}{}
+	changedWorkspaces := map[string]struct{}{}
+	committedByWorkspace := map[string][]sqlite.Annotation{}
 	err = d.store.Update(ctx, func(tx *sqlite.Tx) error {
 		for _, item := range bundle.Annotations {
 			existing, getErr := tx.GetAnnotation(ctx, item.WorkspaceID, item.ID)
@@ -371,11 +392,13 @@ func (d *Dispatcher) handleAnnotationImport(ctx context.Context, env command.Env
 				same := existing.Revision == item.Revision && existing.PredecessorRevision == item.PredecessorRevision && existing.Body == item.Body && existing.Tombstoned == item.Tombstoned
 				if same {
 					imported = append(imported, projectAnnotation(existing))
+					committedByWorkspace[item.WorkspaceID] = append(committedByWorkspace[item.WorkspaceID], existing)
 					continue
 				}
 				switch policy {
 				case command.AnnotationConflictKeepLocal:
 					imported = append(imported, projectAnnotation(existing))
+					committedByWorkspace[item.WorkspaceID] = append(committedByWorkspace[item.WorkspaceID], existing)
 					continue
 				case command.AnnotationConflictKeepImported:
 					if existing.Tombstoned {
@@ -389,7 +412,8 @@ func (d *Dispatcher) handleAnnotationImport(ctx context.Context, env command.Env
 						return err
 					}
 					imported = append(imported, projectAnnotation(updated))
-					workspaces[item.WorkspaceID] = struct{}{}
+					committedByWorkspace[item.WorkspaceID] = append(committedByWorkspace[item.WorkspaceID], updated)
+					changedWorkspaces[item.WorkspaceID] = struct{}{}
 					continue
 				default:
 					return fmt.Errorf("%w: annotation %s already exists with a different revision", sqlite.ErrConflict, item.ID)
@@ -416,25 +440,59 @@ func (d *Dispatcher) handleAnnotationImport(ctx context.Context, env command.Env
 				return err
 			}
 			imported = append(imported, projectAnnotation(created))
-			workspaces[item.WorkspaceID] = struct{}{}
+			committedByWorkspace[item.WorkspaceID] = append(committedByWorkspace[item.WorkspaceID], created)
+			changedWorkspaces[item.WorkspaceID] = struct{}{}
 		}
 		return nil
 	})
 	if err != nil {
 		return annotationWriteResult(env, started, err)
 	}
-	for workspaceID := range workspaces {
+	searchErrors := make([]error, 0, len(changedWorkspaces))
+	searchWorkspaces := sortedWorkspaceIDs(changedWorkspaces)
+	for _, workspaceID := range searchWorkspaces {
 		if rebuildErr := d.rebuildSearch(ctx, workspaceID); rebuildErr != nil {
-			return degradedResult(env, started, command.AnnotationExportData{
-				Schema: command.AnnotationBundleSchema, Annotations: imported, Conflict: policy,
-			}, "annotations imported, but search index is unavailable: "+rebuildErr.Error())
+			searchErrors = append(searchErrors, fmt.Errorf("workspace %s: %w", workspaceID, rebuildErr))
 		}
 	}
-	return succeeded(env, started, command.AnnotationExportData{
-		Schema:      command.AnnotationBundleSchema,
-		Annotations: imported,
-		Conflict:    policy,
-	})
+	publicationErrors := make([]error, 0, len(committedByWorkspace))
+	for _, workspaceID := range sortedAnnotationWorkspaceIDs(committedByWorkspace) {
+		if publishErr := d.publishAnnotationFacts(ctx, workspaceID, committedByWorkspace[workspaceID]); publishErr != nil {
+			publicationErrors = append(publicationErrors, fmt.Errorf("workspace %s: %w", workspaceID, publishErr))
+		}
+	}
+	var searchErr, publicationErr error
+	if len(searchErrors) > 0 {
+		searchErr = errors.Join(searchErrors...)
+	}
+	if len(publicationErrors) > 0 {
+		publicationErr = errors.Join(publicationErrors...)
+	}
+	data := command.AnnotationExportData{
+		Schema: command.AnnotationBundleSchema, Annotations: imported, Conflict: policy,
+	}
+	if searchErr != nil || publicationErr != nil {
+		return metadataPostCommitDegradedResult(env, started, data, "annotation import", searchErr, publicationErr)
+	}
+	return succeeded(env, started, data)
+}
+
+func sortedWorkspaceIDs(workspaces map[string]struct{}) []string {
+	ids := make([]string, 0, len(workspaces))
+	for id := range workspaces {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedAnnotationWorkspaceIDs(records map[string][]sqlite.Annotation) []string {
+	ids := make([]string, 0, len(records))
+	for id := range records {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func normalizeAnnotationConflict(policy string) (string, error) {
@@ -586,7 +644,8 @@ func (d *Dispatcher) handleSearchQuery(ctx context.Context, env command.Envelope
 		ConstructAxes:  axes,
 		Hits:           []command.SearchHitData{},
 	}
-	if dimension.State != command.CapabilityAvailable {
+	pinnedStaleSemantic := dimension.ID == search.DimensionSemantic && input.GenerationID != "" && d.search.PinnedSemanticHistoryEligible()
+	if dimension.State != command.CapabilityAvailable && !pinnedStaleSemantic {
 		empty.ConstructAxes = nil
 		empty.Page = boundedSearchPageData(page.Mode, page.Limit, dimension.ID, string(dimension.State), 0, 0)
 		return degradedResult(env, started, empty,
@@ -754,13 +813,16 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 		hits = append(hits, hit.Hit)
 		dimBySubject[hit.SubjectID] = hit.Dimensions
 	}
+	authorizedHits, canonicalBySource := d.authorizeHitsWithCanonicalSubjects(ctx, authorizedWorkspaceID, "", hits, dimBySubject)
+	retained := fused.RetainAuthorizedSubjects(canonicalBySource)
+	orderedAuthorizedHits := projectAuthorizedFusedOrder(authorizedHits, retained)
 	data := command.SearchQueryData{
 		Provider:        search.ProviderBrokerFuse,
-		ScoreSemantics:  search.ScoreComponentUnion,
+		ScoreSemantics:  search.ScoreReciprocalRankFusion,
 		FusedDimensions: dims,
 		ConstructAxes:   axes,
 		Components:      components,
-		Hits:            d.authorizeHits(ctx, authorizedWorkspaceID, "", hits, dimBySubject),
+		Hits:            orderedAuthorizedHits,
 	}
 	// The fused answer states its own partiality: a union that mixes the
 	// complete lexical match set with bounded top-k lanes is not a complete
@@ -774,6 +836,12 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 	if defaultBroker {
 		for _, component := range fused.Components {
 			if component.Status != string(command.StatusSucceeded) {
+				// A ready semantic lane has no query to run for filter-only
+				// requests. Only this explicitly non-failure skip is successful;
+				// other skipped or unavailable states remain degraded.
+				if component.Status == search.ComponentSkipped && component.Reason == search.QueryTextRequiredReason {
+					continue
+				}
 				return degradedResult(env, started, data, fusedDegradedMessage(fused.Components,
 					"one or more default search components are unavailable; available component results are still returned"))
 			}
@@ -782,10 +850,9 @@ func (d *Dispatcher) handleFusedSearch(ctx context.Context, env command.Envelope
 	return succeeded(env, started, data)
 }
 
-// fusedDegradedMessage names the stable egress reason of any failed fused
-// component. A remote-provider authorization problem is reported as
-// EGRESS_CONFIRMATION_REQUIRED (or its sibling), never as generic
-// unavailability, and never as a silent fallback to another provider.
+// fusedDegradedMessage preserves egress reasons and the one actionable
+// semantic query input refusal while leaving other failures on the fallback.
+// Egress authorization keeps priority over a query-specific message.
 func fusedDegradedMessage(components []search.Component, fallback string) string {
 	for _, component := range components {
 		if component.Status == string(command.StatusSucceeded) {
@@ -793,6 +860,12 @@ func fusedDegradedMessage(components []search.Component, fallback string) string
 		}
 		if search.IsSemanticEgressReason(component.Reason) {
 			return component.Dimension + " requires an egress authorization (" + component.Reason + "); " + fallback
+		}
+	}
+	for _, component := range components {
+		if component.Status != string(command.StatusSucceeded) && component.Dimension == search.DimensionSemantic &&
+			component.Reason == search.SemanticQueryInputTruncatedReason {
+			return "This query is too long for semantic search. Shorten it to use semantic search; available keyword and filter results are still shown."
 		}
 	}
 	return fallback
@@ -829,6 +902,26 @@ func (d *Dispatcher) resolveFusedWorkspace(ctx context.Context, requested string
 }
 
 func (d *Dispatcher) authorizeHits(ctx context.Context, workspaceID, fallbackWorkspace string, hits []search.Hit, dimensions map[string][]string) []command.SearchHitData {
+	rows, _ := d.authorizeHitsWithCanonicalSubjects(ctx, workspaceID, fallbackWorkspace, hits, dimensions)
+	return rows
+}
+
+// authorizeHitsWithCanonicalSubjects keeps the existing authorization
+// projection and records the canonical SubjectRef for each successfully
+// resolved original hit in that same pass. The mapping is only an input to
+// fused-result filtering; it is not an alternate authorization path.
+func (d *Dispatcher) authorizeHitsWithCanonicalSubjects(ctx context.Context, workspaceID, fallbackWorkspace string, hits []search.Hit, dimensions map[string][]string) ([]command.SearchHitData, map[string]string) {
+	return d.authorizeHitsWithCanonicalSubjectsAndLength(ctx, workspaceID, fallbackWorkspace, hits, dimensions, false)
+}
+
+// authorizePagedHitsWithCanonicalSubjects adds the already-authorized
+// namespace entry's known length for paged SavedView use. Legacy callers keep
+// the historical response shape through authorizeHitsWithCanonicalSubjects.
+func (d *Dispatcher) authorizePagedHitsWithCanonicalSubjects(ctx context.Context, workspaceID, fallbackWorkspace string, hits []search.Hit, dimensions map[string][]string) ([]command.SearchHitData, map[string]string) {
+	return d.authorizeHitsWithCanonicalSubjectsAndLength(ctx, workspaceID, fallbackWorkspace, hits, dimensions, true)
+}
+
+func (d *Dispatcher) authorizeHitsWithCanonicalSubjectsAndLength(ctx context.Context, workspaceID, fallbackWorkspace string, hits []search.Hit, dimensions map[string][]string, includeKnownRegularFileLength bool) ([]command.SearchHitData, map[string]string) {
 	if workspaceID == "" {
 		workspaceID = fallbackWorkspace
 	}
@@ -842,10 +935,14 @@ func (d *Dispatcher) authorizeHits(ctx context.Context, workspaceID, fallbackWor
 		displayPath string
 	}
 	resolved := make([]resolvedHit, 0, len(hits))
+	canonicalBySource := make(map[string]string, len(hits))
 	for _, hit := range hits {
 		entry, err := d.resolveSubject(ctx, workspaceID, hit.SubjectID)
 		if err != nil {
 			continue
+		}
+		if entry.SubjectRef != "" {
+			canonicalBySource[hit.SubjectID] = entry.SubjectRef
 		}
 		displayPath := strings.TrimSpace(hit.Path)
 		if displayPath == "" {
@@ -866,7 +963,7 @@ func (d *Dispatcher) authorizeHits(ctx context.Context, workspaceID, fallbackWor
 	}
 	authorized := make([]command.SearchHitData, 0, len(resolved))
 	for _, item := range resolved {
-		authorized = append(authorized, command.SearchHitData{
+		row := command.SearchHitData{
 			SubjectRef:    item.entry.SubjectRef,
 			EntryID:       item.entry.ID,
 			Path:          item.displayPath,
@@ -877,9 +974,36 @@ func (d *Dispatcher) authorizeHits(ctx context.Context, workspaceID, fallbackWor
 			Dimensions:    dimensions[item.hit.SubjectID],
 			Segments:      projectSearchSegments(item.hit.Segments),
 			IndexStatus:   statuses[item.entry.SubjectRef],
-		})
+		}
+		if includeKnownRegularFileLength && item.entry.EntryType == sqlite.EntryFile && item.entry.LogicalSize != nil && *item.entry.LogicalSize >= 0 {
+			size := *item.entry.LogicalSize
+			row.LogicalSize = &size
+		}
+		authorized = append(authorized, row)
 	}
-	return authorized
+	return authorized, canonicalBySource
+}
+
+func projectAuthorizedFusedOrder(authorized []command.SearchHitData, retained []search.FusedHit) []command.SearchHitData {
+	firstBySubject := make(map[string]command.SearchHitData, len(authorized))
+	for _, row := range authorized {
+		if _, exists := firstBySubject[row.SubjectRef]; !exists {
+			firstBySubject[row.SubjectRef] = row
+		}
+	}
+	ordered := make([]command.SearchHitData, 0, len(retained))
+	for _, hit := range retained {
+		row, ok := firstBySubject[hit.SubjectID]
+		if !ok {
+			continue
+		}
+		row.SubjectRef = hit.SubjectID
+		row.ConstructAxes = hit.ConstructAxes
+		row.Dimensions = hit.Dimensions
+		row.Segments = projectSearchSegments(hit.Segments)
+		ordered = append(ordered, row)
+	}
+	return ordered
 }
 
 func (d *Dispatcher) namespaceDisplayPath(ctx context.Context, workspaceID string, entry sqlite.NamespaceEntry) string {
@@ -925,9 +1049,24 @@ func projectSearchSegments(segments []search.SegmentRef) []command.SearchSegment
 			Language:              segment.Language,
 			MatchedExcerpt:        matchedExcerpt(segment.MatchedText, segment.MatchSpans),
 			MatchSpans:            projectMatchSpans(segment.MatchSpans),
+			TextSourceProvenance:  projectTextSourceProvenance(segment.TextSourceProvenance),
 		})
 	}
 	return projected
+}
+
+func projectTextSourceProvenance(provenance *search.TextSourceProvenance) *command.SearchTextSourceProvenanceData {
+	if provenance == nil {
+		return nil
+	}
+	return &command.SearchTextSourceProvenanceData{
+		SourceRevision:            provenance.SourceRevision,
+		BodyDigest:                provenance.BodyDigest,
+		SegmentationProfileDigest: provenance.SegmentationProfileDigest,
+		SourceStartByte:           provenance.SourceStartByte,
+		SourceEndByte:             provenance.SourceEndByte,
+		TextDigest:                provenance.TextDigest,
+	}
 }
 
 func projectMatchSpans(spans []search.MatchSpan) []command.SearchMatchSpanData {
@@ -1006,7 +1145,7 @@ func (d *Dispatcher) upsertTag(ctx context.Context, input annotationUpsertInput)
 	if err := d.store.CreateAnnotation(ctx, record); err != nil {
 		return sqlite.Annotation{}, err
 	}
-	return d.store.GetAnnotation(ctx, input.WorkspaceID, id)
+	return *record, nil
 }
 
 func (d *Dispatcher) upsertNote(ctx context.Context, input annotationUpsertInput) (sqlite.Annotation, error) {
@@ -1029,7 +1168,7 @@ func (d *Dispatcher) upsertNote(ctx context.Context, input annotationUpsertInput
 		if err := d.store.CreateAnnotation(ctx, record); err != nil {
 			return sqlite.Annotation{}, err
 		}
-		return d.store.GetAnnotation(ctx, input.WorkspaceID, id)
+		return *record, nil
 	}
 	if err := requireStableID("annotation_id", input.AnnotationID); err != nil {
 		return sqlite.Annotation{}, err
@@ -1041,10 +1180,17 @@ func (d *Dispatcher) upsertNote(ctx context.Context, input annotationUpsertInput
 	if existing.Kind != sqlite.AnnotationNote || existing.Tombstoned {
 		return sqlite.Annotation{}, sqlite.ErrNotFound
 	}
-	if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, input.AnnotationID, input.ExpectedRevision, input.Body, false, time.Time{}); err != nil {
+	updatedAt := time.Now().UTC()
+	if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, input.AnnotationID, input.ExpectedRevision, input.Body, false, updatedAt); err != nil {
 		return sqlite.Annotation{}, err
 	}
-	return d.store.GetAnnotation(ctx, input.WorkspaceID, input.AnnotationID)
+	return sqlite.Annotation{
+		ID: input.AnnotationID, WorkspaceID: input.WorkspaceID,
+		SubjectRef: existing.SubjectRef, Kind: sqlite.AnnotationNote,
+		Body: input.Body, BodyDigest: annotationBodyDigest(input.Body),
+		Revision: input.ExpectedRevision + 1, PredecessorRevision: input.ExpectedRevision,
+		CreatedAt: existing.CreatedAt, UpdatedAt: updatedAt,
+	}, nil
 }
 
 func (d *Dispatcher) upsertProgress(ctx context.Context, input annotationUpsertInput) (sqlite.Annotation, error) {
@@ -1054,10 +1200,17 @@ func (d *Dispatcher) upsertProgress(ctx context.Context, input annotationUpsertI
 		if expected == 0 {
 			expected = existing.Revision
 		}
-		if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, existing.ID, expected, input.Body, false, time.Time{}); err != nil {
+		updatedAt := time.Now().UTC()
+		if err := d.store.ReviseAnnotation(ctx, input.WorkspaceID, existing.ID, expected, input.Body, false, updatedAt); err != nil {
 			return sqlite.Annotation{}, err
 		}
-		return d.store.GetAnnotation(ctx, input.WorkspaceID, existing.ID)
+		return sqlite.Annotation{
+			ID: existing.ID, WorkspaceID: existing.WorkspaceID,
+			SubjectRef: existing.SubjectRef, Kind: sqlite.AnnotationProgress,
+			Body: input.Body, BodyDigest: annotationBodyDigest(input.Body),
+			Revision: expected + 1, PredecessorRevision: expected,
+			CreatedAt: existing.CreatedAt, UpdatedAt: updatedAt,
+		}, nil
 	}
 	if !containsNotFound(err) {
 		return sqlite.Annotation{}, err
@@ -1085,14 +1238,14 @@ func (d *Dispatcher) upsertProgress(ctx context.Context, input annotationUpsertI
 	if err := d.store.CreateAnnotation(ctx, record); err != nil {
 		return sqlite.Annotation{}, err
 	}
-	return d.store.GetAnnotation(ctx, input.WorkspaceID, id)
+	return *record, nil
 }
 
 func (d *Dispatcher) rebuildSearch(ctx context.Context, workspaceID string) error {
 	if d.search == nil {
 		return nil
 	}
-	_, err := d.search.RebuildLatest(ctx, workspaceID)
+	_, err := d.search.RebuildLatestLexical(ctx, workspaceID)
 	return err
 }
 
@@ -1128,11 +1281,6 @@ func projectAnnotation(record sqlite.Annotation) command.AnnotationData {
 		CreatedAt:           record.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:           record.UpdatedAt.UTC().Format(time.RFC3339),
 	}
-}
-
-func parseQueryText(raw json.RawMessage) string {
-	text, _, _, _, _ := parseSearchQueryObject(raw)
-	return text
 }
 
 func parseSearchRequest(input searchQueryInput) (text, dimension string, axes, fuse []string, filters search.Filters) {

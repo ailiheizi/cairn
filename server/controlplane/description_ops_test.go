@@ -30,14 +30,7 @@ func TestDescriptionCreateReviseListGetAndSegmentSpans(t *testing.T) {
 		"coverage":         0.75,
 		"accepted":         true,
 	}))
-	if created.Status != command.StatusSucceeded {
-		t.Fatalf("create status = %q: %+v", created.Status, created.Reasons)
-	}
-	var createData command.DescriptionCreateData
-	if err := json.Unmarshal(created.Data, &createData); err != nil {
-		t.Fatalf("decode create: %v", err)
-	}
-	document := createData.Document
+	document := assertUnsignedDescriptionDegraded(t, created, body, 1)
 	if document.ID == "" || document.Revision != 1 || document.PredecessorID != "" {
 		t.Fatalf("created document = %+v", document)
 	}
@@ -57,15 +50,9 @@ func TestDescriptionCreateReviseListGetAndSegmentSpans(t *testing.T) {
 		"body":           revisedBody,
 		"predecessor_id": document.ID,
 	}))
-	if revised.Status != command.StatusSucceeded {
-		t.Fatalf("revise status = %q: %+v", revised.Status, revised.Reasons)
-	}
-	var reviseData command.DescriptionCreateData
-	if err := json.Unmarshal(revised.Data, &reviseData); err != nil {
-		t.Fatalf("decode revise: %v", err)
-	}
-	if reviseData.Document.Revision != 2 || reviseData.Document.PredecessorID != document.ID {
-		t.Fatalf("revised document = %+v", reviseData.Document)
+	revisedDocument := assertUnsignedDescriptionDegraded(t, revised, revisedBody, 2)
+	if revisedDocument.Revision != 2 || revisedDocument.PredecessorID != document.ID {
+		t.Fatalf("revised document = %+v", revisedDocument)
 	}
 	branch := dispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionCreate, map[string]any{
 		"workspace_id":   seed.WorkspaceID,
@@ -114,7 +101,7 @@ func TestDescriptionCreateReviseListGetAndSegmentSpans(t *testing.T) {
 
 	got := dispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionGet, map[string]any{
 		"workspace_id":            seed.WorkspaceID,
-		"description_document_id": reviseData.Document.ID,
+		"description_document_id": revisedDocument.ID,
 	}))
 	if got.Status != command.StatusSucceeded {
 		t.Fatalf("get status = %q: %+v", got.Status, got.Reasons)
@@ -123,7 +110,7 @@ func TestDescriptionCreateReviseListGetAndSegmentSpans(t *testing.T) {
 	if err := json.Unmarshal(got.Data, &getData); err != nil {
 		t.Fatalf("decode get: %v", err)
 	}
-	if getData.Document.Body != revisedBody || len(getData.Document.Segments) != len(reviseData.Document.Segments) {
+	if getData.Document.Body != revisedBody || len(getData.Document.Segments) != len(revisedDocument.Segments) {
 		t.Fatalf("got document = %+v", getData.Document)
 	}
 }
@@ -208,24 +195,18 @@ func TestDescriptionCreateBindsConfigAndProfileIdentities(t *testing.T) {
 		"body":             "bound description",
 		"producer_profile": "operator-v1",
 	}))
-	if result.Status != command.StatusSucceeded {
-		t.Fatalf("description.create status = %q: %+v", result.Status, result.Reasons)
+	document := assertUnsignedDescriptionDegraded(t, result, "bound description", 1)
+	if document.ConfigDigest != configDigest || document.ProducerProfileDigest == "" {
+		t.Fatalf("description binding = %+v", document)
 	}
-	var data command.DescriptionCreateData
-	if err := json.Unmarshal(result.Data, &data); err != nil {
-		t.Fatal(err)
+	if len(document.Segments) != 1 || document.Segments[0].DocumentRevision != document.Revision || document.Segments[0].SegmentationProfileDigest != sqlite.DescriptionSegmentationProfileDigestV1 {
+		t.Fatalf("segment binding = %+v", document.Segments)
 	}
-	if data.Document.ConfigDigest != configDigest || data.Document.ProducerProfileDigest == "" {
-		t.Fatalf("description binding = %+v", data.Document)
-	}
-	if len(data.Document.Segments) != 1 || data.Document.Segments[0].DocumentRevision != data.Document.Revision || data.Document.Segments[0].SegmentationProfileDigest != sqlite.DescriptionSegmentationProfileDigestV1 {
-		t.Fatalf("segment binding = %+v", data.Document.Segments)
-	}
-	got, err := store.GetDescriptionDocument(context.Background(), seed.WorkspaceID, data.Document.ID)
+	got, err := store.GetDescriptionDocument(context.Background(), seed.WorkspaceID, document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ConfigDigest != configDigest || got.ProducerProfileDigest != data.Document.ProducerProfileDigest {
+	if got.ConfigDigest != configDigest || got.ProducerProfileDigest != document.ProducerProfileDigest {
 		t.Fatalf("stored description binding = %+v", got)
 	}
 }
@@ -239,31 +220,19 @@ func TestDescriptionConfigSwitchCreatesBoundSuccessor(t *testing.T) {
 		"workspace_id": seed.WorkspaceID, "subject_ref": seed.FileEntryID,
 		"kind": "USER", "body": "first revision", "producer_profile": "operator-v1",
 	}))
-	if first.Status != command.StatusSucceeded {
-		t.Fatalf("first description.create status = %q: %+v", first.Status, first.Reasons)
-	}
-	var firstData command.DescriptionCreateData
-	if err := json.Unmarshal(first.Data, &firstData); err != nil {
-		t.Fatal(err)
-	}
+	firstDocument := assertUnsignedDescriptionDegraded(t, first, "first revision", 1)
 	secondDispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn-b.sock", WithConfigDigest("sha256:description-config-b"))
 	second := secondDispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionCreate, map[string]any{
 		"workspace_id": seed.WorkspaceID, "subject_ref": seed.FileEntryID,
 		"kind": "USER", "body": "second revision", "producer_profile": "operator-v1",
-		"predecessor_id": firstData.Document.ID,
+		"predecessor_id": firstDocument.ID,
 	}))
-	if second.Status != command.StatusSucceeded {
-		t.Fatalf("second description.create status = %q: %+v", second.Status, second.Reasons)
+	secondDocument := assertUnsignedDescriptionDegraded(t, second, "second revision", 2)
+	if firstDocument.ConfigDigest == secondDocument.ConfigDigest || firstDocument.Revision != 1 || secondDocument.Revision != 2 {
+		t.Fatalf("config switch did not create distinct bound revisions: first=%+v second=%+v", firstDocument, secondDocument)
 	}
-	var secondData command.DescriptionCreateData
-	if err := json.Unmarshal(second.Data, &secondData); err != nil {
-		t.Fatal(err)
-	}
-	if firstData.Document.ConfigDigest == secondData.Document.ConfigDigest || firstData.Document.Revision != 1 || secondData.Document.Revision != 2 {
-		t.Fatalf("config switch did not create distinct bound revisions: first=%+v second=%+v", firstData.Document, secondData.Document)
-	}
-	if firstData.Document.Segments[0].SegmentationProfileDigest != secondData.Document.Segments[0].SegmentationProfileDigest {
-		t.Fatalf("segmentation profile unexpectedly changed: first=%+v second=%+v", firstData.Document.Segments, secondData.Document.Segments)
+	if firstDocument.Segments[0].SegmentationProfileDigest != secondDocument.Segments[0].SegmentationProfileDigest {
+		t.Fatalf("segmentation profile unexpectedly changed: first=%+v second=%+v", firstDocument.Segments, secondDocument.Segments)
 	}
 }
 

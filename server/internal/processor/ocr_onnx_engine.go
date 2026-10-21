@@ -316,7 +316,10 @@ func (e *ocrOnnxEngine) recognize(ctx context.Context, bitmap OCRBitmap) (string
 	if len(data) < steps*classes {
 		return "", 0, fmt.Errorf("OCR recognition output has %d values for %d steps and %d classes", len(data), steps, classes)
 	}
-	text, confidence := ocrCTCDecode(data, steps, classes, e.dictionary)
+	text, confidence, err := ocrCTCDecode(data, steps, classes, e.dictionary)
+	if err != nil {
+		return "", 0, fmt.Errorf("decode OCR recognition probabilities: %w", err)
+	}
 	return strings.TrimSpace(text), confidence, nil
 }
 

@@ -83,7 +83,13 @@ func (d *Dispatcher) handleSearchRebuild(ctx context.Context, env command.Envelo
 	} else if !coverage.Complete {
 		degradedReasons = append(degradedReasons, "lexical field coverage is incomplete after rebuild")
 	}
+	if coverage.SourceCoverage == nil || !coverage.SourceCoverage.Available {
+		degradedReasons = append(degradedReasons, "lexical source coverage is unavailable after rebuild")
+	} else if !coverage.SourceCoverage.Complete {
+		degradedReasons = append(degradedReasons, "lexical source coverage is incomplete after rebuild")
+	}
 	semantic := findDimension(search.DeclaredDimensions(search.IndexerReadiness(d.search)), search.DimensionSemantic)
+	var semanticGenerationForCoverage *sqlite.IndexGeneration
 	if semantic.State == command.CapabilityAvailable {
 		semanticGeneration, semanticErr := d.store.LatestIndexGeneration(ctx, input.WorkspaceID, search.DimensionSemantic)
 		if semanticErr == nil && semanticGeneration.WorkspaceID == generation.WorkspaceID &&
@@ -91,6 +97,7 @@ func (d *Dispatcher) handleSearchRebuild(ctx context.Context, env command.Envelo
 			semanticGeneration.NamespaceRootID == generation.NamespaceRootID {
 			data.SemanticGenerationRef = semanticGeneration.ID
 			data.SemanticState = command.CapabilityAvailable
+			semanticGenerationForCoverage = &semanticGeneration
 		} else if semanticErr == nil {
 			data.SemanticFailure = "semantic generation does not match rebuilt lexical snapshot"
 		} else if !errors.Is(semanticErr, sqlite.ErrNotFound) {
@@ -105,6 +112,71 @@ func (d *Dispatcher) handleSearchRebuild(ctx context.Context, env command.Envelo
 			}
 		}
 		degradedReasons = append(degradedReasons, "semantic search unavailable; lexical search generation was rebuilt")
+	} else {
+		// Pair-only SemanticCoverage retains its historical meaning. Project
+		// source lineage only when it is bound to this exact semantic generation
+		// and the rebuilt lexical snapshot/root; an absent or stale source proof
+		// degrades the report without revoking otherwise usable vectors.
+		semanticCoverage, semanticCoverageErr := d.search.SemanticCoverage(ctx, input.WorkspaceID)
+		semanticVerificationFailure := ""
+		semanticVerificationValid := false
+		sourceCoverage := semanticCoverage.SourceCoverage
+		switch {
+		case semanticCoverageErr != nil:
+			semanticVerificationFailure = semanticCoverageErr.Error()
+			data.SemanticSourceCoverage = unavailableSemanticSourceCoverage(semanticGenerationForCoverage, "SOURCE_REPORT_UNAVAILABLE")
+			degradedReasons = append(degradedReasons, "semantic source coverage is unavailable after rebuild")
+		case semanticGenerationForCoverage == nil || semanticCoverage.GenerationID != data.SemanticGenerationRef ||
+			semanticCoverage.ConfigDigest != semanticGenerationForCoverage.ConfigDigest || semanticCoverage.ProfileDigest != semanticGenerationForCoverage.ProviderProfileDigest:
+			semanticVerificationFailure = "semantic generation coverage does not match rebuilt generation"
+			data.SemanticSourceCoverage = unavailableSemanticSourceCoverage(semanticGenerationForCoverage, "GENERATION_BINDING_MISMATCH")
+			degradedReasons = append(degradedReasons, "semantic source coverage does not match rebuilt generation")
+		case sourceCoverage == nil:
+			semanticVerificationValid = semanticCoverage.Available && semanticCoverage.Complete
+			if !semanticVerificationValid {
+				semanticVerificationFailure = strings.TrimSpace(semanticCoverage.Notes)
+			}
+			data.SemanticSourceCoverage = unavailableSemanticSourceCoverage(semanticGenerationForCoverage, "SOURCE_REPORT_UNAVAILABLE")
+			degradedReasons = append(degradedReasons, "semantic source coverage is unavailable after rebuild")
+		case sourceCoverage.GenerationID != data.SemanticGenerationRef || sourceCoverage.SnapshotRef != data.SnapshotRef ||
+			sourceCoverage.NamespaceRootID != data.NamespaceRootID || sourceCoverage.ConfigDigest != semanticGenerationForCoverage.ConfigDigest ||
+			sourceCoverage.ProfileDigest != semanticGenerationForCoverage.ProviderProfileDigest:
+			semanticVerificationFailure = "semantic generation coverage does not match rebuilt scope"
+			data.SemanticSourceCoverage = unavailableSemanticSourceCoverage(semanticGenerationForCoverage, "GENERATION_BINDING_MISMATCH")
+			degradedReasons = append(degradedReasons, "semantic source coverage does not match rebuilt scope")
+		default:
+			semanticVerificationValid = semanticCoverage.Available && semanticCoverage.Complete
+			if !semanticVerificationValid {
+				semanticVerificationFailure = strings.TrimSpace(semanticCoverage.Notes)
+			}
+			data.SemanticSourceCoverage = projectSemanticSourceCoverage(sourceCoverage)
+			if !sourceCoverage.Available {
+				degradedReasons = append(degradedReasons, "semantic source coverage is unavailable after rebuild")
+			} else if !sourceCoverage.Complete {
+				degradedReasons = append(degradedReasons, "semantic source coverage is incomplete after rebuild")
+			}
+		}
+		// Coverage validation itself reopens and probes the semantic backend.
+		// A lifecycle/pair verification failure must not leave the earlier
+		// readiness snapshot advertising vectors as usable. Source-only
+		// incompleteness (for example a TRUNCATED input) does not affect this
+		// pair/runtime decision and keeps SemanticState AVAILABLE.
+		semanticAfterCoverage := findDimension(search.DeclaredDimensions(search.IndexerReadiness(d.search)), search.DimensionSemantic)
+		if !semanticVerificationValid || semanticAfterCoverage.State != command.CapabilityAvailable {
+			data.SemanticState = command.CapabilityUnavailable
+			failure := strings.TrimSpace(semanticVerificationFailure)
+			if failure == "" {
+				failure = strings.TrimSpace(d.search.SemanticFailure())
+			}
+			if failure == "" {
+				failure = strings.TrimSpace(semanticAfterCoverage.Reason)
+			}
+			if failure == "" {
+				failure = search.SemanticIndexUnavailableReason
+			}
+			data.SemanticFailure = failure
+			degradedReasons = append(degradedReasons, "semantic search is unavailable after generation coverage validation; lexical search generation was rebuilt")
+		}
 	}
 	// A remote-provider refusal keeps its stable egress reason in the degraded
 	// outcome: the operator must see EGRESS_CONFIRMATION_REQUIRED (or its
@@ -141,12 +213,72 @@ func projectSearchCoverage(statement search.CoverageStatement) command.SearchCov
 		fields[field] = present
 	}
 	return command.SearchCoverageData{
-		Dimension: statement.Dimension,
-		Available: statement.Available,
-		Complete:  statement.Complete,
-		Fields:    fields,
-		Missing:   append([]string(nil), statement.Missing...),
-		Notes:     statement.Notes,
+		Dimension:      statement.Dimension,
+		Available:      statement.Available,
+		Complete:       statement.Complete,
+		Fields:         fields,
+		Missing:        append([]string(nil), statement.Missing...),
+		Notes:          statement.Notes,
+		SourceCoverage: projectSearchSourceCoverage(statement.SourceCoverage),
+	}
+}
+
+func projectSearchSourceCoverage(statement *search.SourceCoverageStatement) *command.SearchSourceCoverageData {
+	if statement == nil {
+		return nil
+	}
+	rows := make([]command.SearchSourceCoverageRowData, 0, len(statement.Rows))
+	for _, row := range statement.Rows {
+		rows = append(rows, command.SearchSourceCoverageRowData{
+			SourceKind: row.SourceKind, SourceSubtype: row.SourceSubtype, Field: row.Field,
+			SourceRef: row.SourceRef, Revision: row.Revision, SourceDigest: row.SourceDigest,
+			Disposition: command.SearchSourceCoverageDisposition(row.Disposition), Reason: row.Reason,
+		})
+	}
+	return &command.SearchSourceCoverageData{
+		Scope: statement.Scope, GenerationID: statement.GenerationID, SnapshotRef: statement.SnapshotRef,
+		NamespaceRootID: statement.NamespaceRootID, ConfigDigest: statement.ConfigDigest,
+		ProfileDigest: statement.ProfileDigest, Available: statement.Available, Complete: statement.Complete,
+		Expected: statement.Expected, Indexed: statement.Indexed, Excluded: statement.Excluded,
+		Missing: statement.Missing, Unavailable: statement.Unavailable, Truncated: statement.Truncated,
+		Rows: rows, Reason: statement.Reason, Notes: statement.Notes,
+	}
+}
+
+func projectSemanticSourceCoverage(statement *search.SemanticSourceCoverageStatement) *command.SearchSemanticSourceCoverageData {
+	if statement == nil {
+		return nil
+	}
+	rows := make([]command.SearchSemanticSourceCoverageRowData, 0, len(statement.Rows))
+	for _, row := range statement.Rows {
+		rows = append(rows, command.SearchSemanticSourceCoverageRowData{
+			SubjectID: row.SubjectID, SourceKind: row.SourceKind, SourceSubtype: row.SourceSubtype,
+			SourceRef: row.SourceRef, Revision: row.Revision, BodyDigest: row.BodyDigest,
+			Disposition: command.SearchSemanticSourceCoverageDisposition(row.Disposition), Reason: row.Reason,
+			SegmentCount: row.SegmentCount, SegmentIndexed: row.SegmentIndexed, SegmentMissing: row.SegmentMissing,
+			InputFull: row.InputFull, InputTruncated: row.InputTruncated, InputUnknown: row.InputUnknown,
+		})
+	}
+	return &command.SearchSemanticSourceCoverageData{
+		Scope: statement.Scope, GenerationID: statement.GenerationID, SnapshotRef: statement.SnapshotRef,
+		NamespaceRootID: statement.NamespaceRootID, ConfigDigest: statement.ConfigDigest,
+		ProfileDigest: statement.ProfileDigest, Available: statement.Available, Complete: statement.Complete,
+		Expected: statement.Expected, Indexed: statement.Indexed, Excluded: statement.Excluded,
+		Missing: statement.Missing, Unavailable: statement.Unavailable,
+		InputFull: statement.InputFull, InputTruncated: statement.InputTruncated, InputUnknown: statement.InputUnknown,
+		Truncated: statement.Truncated, Rows: rows, Reason: statement.Reason, Notes: statement.Notes,
+	}
+}
+
+func unavailableSemanticSourceCoverage(generation *sqlite.IndexGeneration, reason string) *command.SearchSemanticSourceCoverageData {
+	if generation == nil {
+		return nil
+	}
+	return &command.SearchSemanticSourceCoverageData{
+		Scope: "SEMANTIC_SELECTED_TEXT_V1", GenerationID: generation.ID,
+		SnapshotRef: generation.SnapshotRef, NamespaceRootID: generation.NamespaceRootID,
+		ConfigDigest: generation.ConfigDigest, ProfileDigest: generation.ProviderProfileDigest,
+		Available: false, Complete: false, Reason: reason,
 	}
 }
 

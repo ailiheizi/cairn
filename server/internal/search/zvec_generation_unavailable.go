@@ -1,4 +1,4 @@
-//go:build !purego
+//go:build !purego && !cairn_zvec_dynamic
 
 package search
 

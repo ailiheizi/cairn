@@ -522,3 +522,16 @@ func TestEgressReasonsSurviveIndexerWrapping(t *testing.T) {
 		t.Fatalf("unrelated stored failure classified as %q", got)
 	}
 }
+
+func TestQueryFailureReasonPreservesSemanticQueryTruncation(t *testing.T) {
+	err := ErrSemanticQueryInputTruncated
+	if !errors.Is(err, ErrInvalidQuery) {
+		t.Fatalf("semantic truncation sentinel must remain an invalid caller query: %v", err)
+	}
+	if got := QueryFailureReason(DimensionSemantic, err); got != SemanticQueryInputTruncatedReason {
+		t.Fatalf("semantic truncation reason = %q, want %s", got, SemanticQueryInputTruncatedReason)
+	}
+	if got := QueryFailureReason(DimensionSemantic, ErrInvalidQuery); got != "QUERY_FAILED" {
+		t.Fatalf("ordinary invalid query reason = %q, want existing generic reason", got)
+	}
+}

@@ -17,6 +17,26 @@ import (
 	"github.com/ailiheizi/cairn/server/testutil"
 )
 
+const unsignedTagRenamePublicationWarning = "authenticated recovery publication incomplete: resolve authenticated recovery parents: subject-fact publication requires signed publication to be enabled"
+const unsignedTagRenamePublicationReason = "tag rename/merge committed with post-commit warning: " + unsignedTagRenamePublicationWarning
+
+func assertUnsignedTagRenamePublicationDegraded(t *testing.T, result command.Result, report command.AnnotationTagApplyData) {
+	t.Helper()
+	if result.Status != command.StatusDegraded || len(result.Reasons) != 1 ||
+		result.Reasons[0].Code != ReasonCodeUnavailable || result.Reasons[0].Message != unsignedTagRenamePublicationReason {
+		t.Fatalf("unsigned tag rename publication = %q: %+v", result.Status, result.Reasons)
+	}
+	foundWarning := false
+	for _, warning := range report.Warnings {
+		if warning == unsignedTagRenamePublicationWarning {
+			foundWarning = true
+		}
+	}
+	if !foundWarning {
+		t.Fatalf("tag rename result omitted exact publication warning: %+v", report.Warnings)
+	}
+}
+
 // tagFixture publishes one workspace with two distinct file subjects so the
 // rename/merge pair is exercised against real subjects, not synthetic refs.
 type tagFixture struct {
@@ -76,12 +96,21 @@ func (f tagFixture) putTag(t *testing.T, subjectRef, body string) command.Annota
 	result := f.dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationUpsert, map[string]any{
 		"workspace_id": f.workspaceID, "subject_ref": subjectRef, "kind": "TAG", "body": body,
 	}))
-	if result.Status != command.StatusSucceeded {
-		t.Fatalf("annotation.upsert %s on %s = %q: %+v", body, subjectRef, result.Status, result.Reasons)
+	unsignedFixtureWarning := "annotation committed with post-commit warning: authenticated recovery publication incomplete: resolve authenticated recovery parents: subject-fact publication requires signed publication to be enabled"
+	if result.Status != command.StatusDegraded || len(result.Reasons) != 1 ||
+		result.Reasons[0].Code != ReasonCodeUnavailable || result.Reasons[0].Message != unsignedFixtureWarning {
+		t.Fatalf("unsigned fixture annotation.upsert %s on %s = %q: %+v", body, subjectRef, result.Status, result.Reasons)
 	}
 	var data command.AnnotationUpsertData
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("decode annotation.upsert: %v", err)
+	}
+	if data.Annotation.ID == "" || data.Annotation.WorkspaceID != f.workspaceID ||
+		data.Annotation.SubjectRef != subjectRef || data.Annotation.Kind != "TAG" ||
+		data.Annotation.Revision != 1 || data.Annotation.PredecessorRevision != 0 ||
+		data.Annotation.Tombstoned || data.Annotation.Body != body ||
+		data.Annotation.BodyDigest != annotationBodyDigest(body) {
+		t.Fatalf("unsigned fixture warning lost exact saved TAG identity: %+v", data.Annotation)
 	}
 	return data.Annotation
 }
@@ -270,10 +299,8 @@ func TestAnnotationTagPlanIsReadOnlyAndApplyIsDigestBound(t *testing.T) {
 
 	// A confirmed apply reports every subject's own outcome.
 	applied := fixture.apply(t, from, to, plan.PlanDigest)
-	if applied.Status != command.StatusSucceeded {
-		t.Fatalf("apply = %q: %+v", applied.Status, applied.Reasons)
-	}
 	report := decodeTagApply(t, applied)
+	assertUnsignedTagRenamePublicationDegraded(t, applied, report)
 	if report.Schema != command.AnnotationTagApplySchema || report.PlanDigest != plan.PlanDigest {
 		t.Fatalf("apply schema/digest = %+v", report)
 	}
@@ -331,10 +358,8 @@ func TestAnnotationTagPlanIsReadOnlyAndApplyIsDigestBound(t *testing.T) {
 		t.Fatalf("reverse plan = %+v", reverse)
 	}
 	reversed := fixture.apply(t, to, from, reverse.PlanDigest)
-	if reversed.Status != command.StatusSucceeded {
-		t.Fatalf("reverse apply = %q: %+v", reversed.Status, reversed.Reasons)
-	}
 	reverseReport := decodeTagApply(t, reversed)
+	assertUnsignedTagRenamePublicationDegraded(t, reversed, reverseReport)
 	if reverseReport.Changed != 2 || !reverseReport.Applied {
 		t.Fatalf("reverse report = %+v", reverseReport)
 	}
@@ -385,13 +410,17 @@ func TestAnnotationTagApplyInterruptionLeavesBothNames(t *testing.T) {
 	if result.Status != command.StatusDegraded {
 		t.Fatalf("partial apply = %q: %+v, want DEGRADED", result.Status, result.Reasons)
 	}
-	if !hasReasonCode(result, ReasonCodeUnavailable) || !strings.Contains(result.Reasons[0].Message, "not a clean rename") {
+	if !hasReasonCode(result, ReasonCodeUnavailable) || result.Reasons[0].Message != unsignedTagRenamePublicationReason {
 		t.Fatalf("partial apply reasons = %+v", result.Reasons)
 	}
 	report := decodeTagApply(t, result)
+	assertUnsignedTagRenamePublicationDegraded(t, result, report)
 	if report.Partial != true || report.Applied != false || report.Failed != 2 ||
 		report.Changed != 0 || report.Unchanged != 1 || report.SourceRemains != 1 {
 		t.Fatalf("partial apply counts = %+v", report)
+	}
+	if !strings.Contains(strings.Join(report.Warnings, ";"), "2 of 2 subjects did not complete") {
+		t.Fatalf("partial rename lost its subject-count warning: %+v", report.Warnings)
 	}
 	alphaOutcome := tagApplySubject(t, report, alpha)
 	if alphaOutcome.Outcome != command.AnnotationTagOutcomeUnchanged ||
@@ -433,11 +462,10 @@ func TestAnnotationTagApplyInterruptionLeavesBothNames(t *testing.T) {
 		t.Fatal("the re-planned digest must differ after the interrupted apply wrote records")
 	}
 	completed := fixture.apply(t, from, to, remaining.PlanDigest)
-	if completed.Status != command.StatusSucceeded {
-		t.Fatalf("reconciled apply = %q: %+v", completed.Status, completed.Reasons)
-	}
-	if report := decodeTagApply(t, completed); report.Changed != 2 || report.Unchanged != 0 || report.SourceRemains != 0 || !report.Applied {
-		t.Fatalf("reconciled apply report = %+v", report)
+	completedReport := decodeTagApply(t, completed)
+	assertUnsignedTagRenamePublicationDegraded(t, completed, completedReport)
+	if completedReport.Changed != 2 || completedReport.Unchanged != 0 || completedReport.SourceRemains != 0 || !completedReport.Applied {
+		t.Fatalf("reconciled apply report = %+v", completedReport)
 	}
 	assertBodies(t, fixture.liveBodies(t, alpha), to)
 	assertBodies(t, fixture.liveBodies(t, beta), to)

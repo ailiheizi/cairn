@@ -575,7 +575,11 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 		searchData.Components[0].Dimension != search.DimensionLexical ||
 		searchData.Components[0].Status != string(command.StatusSucceeded) ||
 		searchData.Components[1].Dimension != search.DimensionSemantic ||
-		searchData.Components[1].Status != string(command.StatusDegraded) {
+		searchData.Components[1].Provider != search.ProviderSemanticONNX ||
+		searchData.Components[1].ScoreSemantics != search.ScoreSemanticCosine ||
+		searchData.Components[1].Status != "UNAVAILABLE" ||
+		searchData.Components[1].Reason != search.SemanticIndexUnavailableReason ||
+		searchData.Components[1].Hits != 0 {
 		t.Fatalf("real CLI default broker search = %+v", searchData)
 	}
 	if len(searchData.Hits) != 1 || searchData.Hits[0].SubjectRef != resolvedData.Entry.SubjectRef || len(searchData.Hits[0].Segments) == 0 {
@@ -730,7 +734,7 @@ func TestRealDaemonAndCLIEndToEndConfiguredIngestAndCleanRecovery(t *testing.T) 
 	if closeErr != nil {
 		t.Fatalf("close configured catalog: %v", closeErr)
 	}
-	wantLexicalProfile := search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV4)
+	wantLexicalProfile := search.ProfileDigest(search.DimensionLexical, search.CurrentLexicalProfile)
 	if generation.ConfigDigest != effective.Digest || generation.ProviderProfileDigest != wantLexicalProfile {
 		t.Fatalf("real daemon lexical generation binding = %+v, want config=%s profile=%s",
 			generation, effective.Digest, wantLexicalProfile)

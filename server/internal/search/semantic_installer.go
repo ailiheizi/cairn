@@ -45,11 +45,11 @@ const (
 	semanticInstallerTokenizerDigest     = "48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26"
 	semanticInstallerTokenizerSize       = uint64(439125)
 	semanticInstallerHeaderSize          = uint64(398209)
-	// This receipt is generated from the immutable zvec-go module identity
-	// above. Keep both facts pinned: a self-consistent descriptor cannot make a
-	// replaced provenance receipt admissible.
-	semanticInstallerZvecGoReceiptDigest = "c4844b64f066fc24daf39d274bf380fe08cfcf37facb08509a74d724cafb2092"
-	semanticInstallerZvecGoReceiptSize   = uint64(134)
+	// The receipt binds the immutable upstream module to Cairn's exact patched
+	// source tree and loader-selection tag. The receipt asset enters the bundle
+	// profile digest; it is provenance, not runtime code loading from source.
+	semanticInstallerZvecGoReceiptDigest = "11de8e8441114dc74b0b30e21319ab683f6fee73b482b088274c099c4a0c79d2"
+	semanticInstallerZvecGoReceiptSize   = uint64(297)
 
 	semanticInstallerORTVersion          = "1.29.0"
 	semanticInstallerZvecVersion         = "0.6.0"
@@ -403,12 +403,14 @@ func installDefaultSemanticBundleForPlatformWithSpecsPolicy(ctx context.Context,
 			return semanticBundleInstallResult{}, err
 		}
 	}
-	// Keep the Go binding's module identity in the generated SBOM rather than
-	// relying on the descriptor's abbreviated version/commit fields.  The
-	// detached zvec-go.txt receipt is itself packaged and hashed, so a clean
-	// install can audit exactly which immutable dependency was used.
+	// Keep the Go binding's module identity and exact in-repo patch digest in
+	// the generated SBOM. The detached receipt is packaged and hashed into the
+	// profile digest; installed code never reads the source tree at runtime.
 	zvecGoPath := filepath.Join(stage, "zvec-go.txt")
-	if err := writeSemanticInstallerAsset(zvecGoPath, []byte("zvec-go 0.6.0\nmodule "+semanticInstallerZvecGoModule+" version "+semanticInstallerZvecGoModuleVersion+"\n"+semanticInstallerZvecCommit+"\n")); err != nil {
+	zvecGoReceipt := "zvec-go 0.6.0\nmodule " + semanticInstallerZvecGoModule + " version " + semanticInstallerZvecGoModuleVersion + "\n" +
+		"commit " + semanticInstallerZvecCommit + "\nsource_sha256 " + semanticInstallerZvecGoSourceDigest + "\nreplacement " + semanticInstallerZvecGoReplacePath +
+		"\nloader_build_tag " + semanticInstallerZvecGoBuildTag + "\n"
+	if err := writeSemanticInstallerAsset(zvecGoPath, []byte(zvecGoReceipt)); err != nil {
 		return semanticBundleInstallResult{}, err
 	}
 	zvecGoDigest, zvecGoSize, err := semanticFileDigest(zvecGoPath)

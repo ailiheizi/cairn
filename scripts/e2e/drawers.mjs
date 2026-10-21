@@ -12,6 +12,14 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assertStickyBarInView } from "./support.mjs";
 
+async function openExportDisclosure(drawer, selector) {
+  const disclosure = drawer.locator(selector);
+  await disclosure.waitFor({ state: "visible", timeout: 10000 });
+  if (!await disclosure.evaluate((element) => element.open)) await disclosure.locator("summary").click();
+  assert.equal(await disclosure.evaluate((element) => element.open), true, `${selector} must be expanded before its content is used`);
+  return disclosure;
+}
+
 // The restore drawer uses the same sticky action bar as the add-source drawer:
 // one next step, always in the same pinned position. It starts as the preview
 // action, disabled until a destination exists, and it never lets a confirm
@@ -143,6 +151,19 @@ export async function assertSelectedExport(ctx) {
   const selectedExportDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await selectedExportDrawer.waitFor({ state: "visible", timeout: 10000 });
   await selectedExportDrawer.getByRole("button", { name: /选中的结果 alpha\.txt|Selected result alpha\.txt/ }).waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForLoadState("networkidle");
+  for (const selector of [".export-other-sources", ".export-options", ".export-history"]) {
+    assert.equal(await selectedExportDrawer.locator(selector).evaluate((element) => element.open), false, `${selector} must start collapsed for a selected-result export`);
+  }
+  const disclosureCommands = [];
+  const captureDisclosureCommand = (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/api/v1/command")) disclosureCommands.push(request.url());
+  };
+  page.on("request", captureDisclosureCommand);
+  await openExportDisclosure(selectedExportDrawer, ".export-other-sources");
+  page.off("request", captureDisclosureCommand);
+  assert.deepEqual(disclosureCommands, [], "opening alternative sources must not issue a daemon command");
+  assert.match(await selectedExportDrawer.getByRole("button", { name: /选中的结果 alpha\.txt|Selected result alpha\.txt/ }).getAttribute("class"), /active/, "opening alternatives must retain selected-result source intent");
   await selectedExportDrawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).fill(`${ctx.exportDestination}-selected`);
   await selectedExportDrawer.getByRole("button", { name: /预览冻结导出|Preview frozen export/ }).click();
   await selectedExportDrawer.getByText(/导出清单已冻结|Export manifest frozen/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
@@ -164,6 +185,7 @@ export async function assertViewExportWithVerifyRetry(ctx) {
   await button(/^(导出|Export)$/).click();
   let exportDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await exportDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(exportDrawer, ".export-other-sources");
   await page.route("**/api/v1/command", async (route) => {
     if (route.request().method() === "POST") {
       let payload;
@@ -201,6 +223,12 @@ export async function assertViewExportWithVerifyRetry(ctx) {
   await exportDrawer.getByRole("textbox", { name: /保存查询名称|Saved query name/ }).fill("browser-note-view");
   await exportDrawer.getByRole("button", { name: /^(保存查询|Save query)$/ }).click();
   await exportDrawer.getByText(/查询已保存。冻结|Query saved\. The view remains/, { exact: false }).waitFor({ state: "visible", timeout: 10000 });
+  const sourceDisclosure = exportDrawer.locator(".export-other-sources");
+  const sourceSummary = sourceDisclosure.locator("summary");
+  assert.match(await sourceSummary.innerText(), /browser-note-view/, "a collapsed active-view disclosure must retain its selected source label");
+  await sourceSummary.click();
+  assert.equal(await sourceDisclosure.evaluate((element) => element.open), false, "the active saved-view source must remain identifiable while alternatives are collapsed");
+  await sourceSummary.click();
   // The saved view is a durable daemon record: the drawer must list it back
   // immediately after the query is saved, with its stored revision.
   const savedViewRows = exportDrawer.locator(".export-view-row");
@@ -240,6 +268,71 @@ export async function assertViewExportWithVerifyRetry(ctx) {
   await page.unroute("**/api/v1/command");
 }
 
+// Isolate the bounded client outcome using the real durable view created by
+// the drawer flow. The route is installed only for this explicit recall and is
+// always removed before ordinary export-history assertions continue.
+export async function assertBoundedSavedViewRecall(ctx, { viewName = "browser-note-view" } = {}) {
+  const { page, button } = ctx;
+  const boundedEvaluationRoute = async (route) => {
+    let payload;
+    try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
+    if (payload?.operation === "view.evaluate") {
+      const hits = Array.from({ length: 200 }, (_, index) => ({
+        subject_ref: `fixture:bounded-view-${String(index + 1).padStart(3, "0")}`,
+        name: `bounded-view-${String(index + 1).padStart(3, "0")}.txt`,
+        entry_type: "REGULAR_FILE",
+      }));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        status: "SUCCEEDED",
+        data: { view_id: payload.input.view_id, query: "browser-note", hits, coverage: ["LEXICAL"] },
+      }) });
+      return;
+    }
+    await route.continue();
+  };
+  await page.route("**/api/v1/command", boundedEvaluationRoute);
+  try {
+    await button(/^(已保存的检索|Saved retrieval)$/).click();
+    const retrievalPanel = page.locator("#saved-retrieval-panel");
+    const savedRow = retrievalPanel.locator(".saved-retrieval-rows li").filter({ hasText: viewName });
+    await savedRow.waitFor({ state: "visible", timeout: 10000 });
+    await savedRow.getByRole("button", { name: /在内容库中打开|Open in library/ }).click();
+    const recallCaption = page.locator(".recall-caption");
+    await recallCaption.waitFor({ state: "visible", timeout: 10000 });
+    // The shared result wall intentionally mounts only its visible window.
+    // Assert the loaded sequence, not 200 simultaneous DOM rows.
+    await page.waitForFunction(() => document.querySelector(".result-list")?.getAttribute("data-listing-count") === "200");
+    await page.locator(".result-list .result-row").first().waitFor({ state: "visible", timeout: 10000 });
+    const recalledHits = Number(await page.locator(".result-list").getAttribute("data-listing-count"));
+    assert.equal(recalledHits, 200, `the bounded evaluation fixture must retain its returned matches: ${recalledHits}`);
+    await recallCaption.getByText(/200 loaded matches|已加载 200 个匹配项/).waitFor({ state: "visible", timeout: 10000 });
+    await recallCaption.getByText(/This view may have more matches|匹配项可能多于当前已加载结果/).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(".result-count").getByText(/200 loaded matches|已加载 200 个匹配项/).waitFor({ state: "visible", timeout: 10000 });
+    await retrievalPanel.getByText(/200 loaded matches|已加载 200 个匹配项/).waitFor({ state: "visible", timeout: 10000 });
+    await retrievalPanel.getByText(/This view may have more matches|匹配项可能多于当前已加载结果/).waitFor({ state: "visible", timeout: 10000 });
+    const firstRecalledRow = page.locator(".result-list .result-row").first();
+    await firstRecalledRow.hover();
+    await firstRecalledRow.getByRole("checkbox", { name: /Select bounded-view-001\.txt|选择 bounded-view-001\.txt/i }).click();
+    const recalledSelection = page.locator(".selection-bar");
+    await recalledSelection.getByText(/更多操作|More actions/).click();
+    await recalledSelection.getByRole("button", { name: /导出所选|Export selected/ }).click();
+    const boundedExportDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
+    await boundedExportDrawer.waitFor({ state: "visible", timeout: 10000 });
+    const selectedSource = boundedExportDrawer.getByRole("button", { name: /选中的结果 bounded-view-001\.txt|Selected result bounded-view-001\.txt/i });
+    await selectedSource.waitFor({ state: "visible", timeout: 10000 });
+    await boundedExportDrawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+    await firstRecalledRow.getByRole("checkbox", { name: /Deselect bounded-view-001\.txt|取消选择 bounded-view-001\.txt/i }).click();
+    await button(/^(导出|Export)$/).click();
+    const viewSourceDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
+    await viewSourceDrawer.waitFor({ state: "visible", timeout: 10000 });
+    assert.equal(await viewSourceDrawer.locator(".export-other-sources").evaluate((element) => element.open), true, "a search with no selected file must initially expose the active view source");
+    assert.match(await viewSourceDrawer.locator(".export-other-sources > summary").innerText(), /browser-note/, "the initially expanded view source must be named");
+    await viewSourceDrawer.getByRole("button", { name: /关闭导出|Close export/ }).click();
+  } finally {
+    await page.unroute("**/api/v1/command", boundedEvaluationRoute);
+  }
+}
+
 // Saved views and frozen manifests are durable daemon records: a full page
 // reload must still list them, and neither may be rebuilt from client state.
 // Recalling a saved view evaluates it now and renders the hits in the ordinary
@@ -256,6 +349,7 @@ export async function assertDurableSavedViewsAfterReload(ctx) {
   await button(/^(导出|Export)$/).click();
   const reloadedDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await reloadedDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(reloadedDrawer, ".export-other-sources");
   const reloadedRows = reloadedDrawer.locator(".export-view-row");
   await reloadedRows.first().waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await reloadedRows.count(), 1, "the saved view must still be listed after a page reload");
@@ -263,20 +357,27 @@ export async function assertDurableSavedViewsAfterReload(ctx) {
   assert.match(reloadedRowText, /browser-note-view/, `reloaded saved view name missing: ${reloadedRowText}`);
   assert.match(reloadedRowText, /(?:版本|revision)\s*[1-9][0-9]*/i, `reloaded saved view revision missing: ${reloadedRowText}`);
 
+  // Preserve real backend evaluation coverage before the bounded display case.
   await reloadedRows.first().getByRole("button", { name: /回到内容库|Recall in library/ }).click();
   await page.getByRole("main").getByRole("heading", { name: /搜索结果|Results for "/i }).waitFor({ state: "visible", timeout: 15000 });
   const recallCaption = page.locator(".recall-caption");
   await recallCaption.waitFor({ state: "visible", timeout: 10000 });
   await recallCaption.getByText(/实时求值|live evaluation/i).waitFor({ state: "visible", timeout: 10000 });
   await recallCaption.getByText(/成员是动态的|Membership is dynamic/).waitFor({ state: "visible", timeout: 10000 });
-  const recalledResult = page.locator(".result-list .result-row").first();
-  await recalledResult.waitFor({ state: "visible", timeout: 10000 });
-  const recalledHits = await page.locator(".result-list .result-row").count();
-  assert.ok(recalledHits > 0, `recalling the saved view must render its dynamic hits: ${recalledHits}`);
+  await page.locator(".result-list .result-row").first().waitFor({ state: "visible", timeout: 10000 });
+  const recalledHits = Number(await page.locator(".result-list").getAttribute("data-listing-count"));
+  assert.ok(recalledHits > 0, `real backend recall must render its dynamic hits: ${recalledHits}`);
+  await recallCaption.getByText(new RegExp(`${recalledHits} loaded matches|已加载 ${recalledHits} 个匹配项`)).waitFor({ state: "visible", timeout: 10000 });
+  if (recalledHits < 200) {
+    assert.doesNotMatch(await recallCaption.innerText(), /This view may have more matches|匹配项可能多于当前已加载结果/, "under-cap real recall must not imply a bounded result");
+  }
+
+  await assertBoundedSavedViewRecall(ctx);
 
   await button(/^(导出|Export)$/).click();
   const historyDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await historyDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(historyDrawer, ".export-history");
   const historyRows = historyDrawer.locator(".export-history-row");
   await historyRows.first().waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await historyRows.first().getAttribute("title"), ctx.state.lastFrozenManifest.manifest_id, "export history must list the newest frozen manifest first");
@@ -311,6 +412,7 @@ export async function assertExportSidecarPolicy(ctx) {
   await button(/^(导出|Export)$/).click();
   const drawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await drawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(drawer, ".export-options");
   const selector = drawer.getByLabel(/随附文件策略|Sidecar policy/);
   await selector.waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await selector.inputValue(), "", "the default sidecar policy must be the empty (none) value");
@@ -326,6 +428,7 @@ export async function assertExportSidecarPolicy(ctx) {
   await button(/^(导出|Export)$/).click();
   const second = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await second.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(second, ".export-options");
   await second.getByLabel(/随附文件策略|Sidecar policy/).selectOption("handoff-v1:manifest-json");
   await second.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).fill(`${ctx.exportDestination}-sidecar-handoff`);
   await second.getByRole("button", { name: /预览冻结导出|Preview frozen export/ }).click();
@@ -357,6 +460,7 @@ export async function assertExportBrowserPreset(ctx) {
   await button(/^(导出|Export)$/).click();
   const drawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await drawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(drawer, ".export-options");
   const destination = drawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ });
   const selector = drawer.getByLabel(/随附文件策略|Sidecar policy/);
   await destination.waitFor({ state: "visible", timeout: 10000 });
@@ -373,6 +477,7 @@ export async function assertExportBrowserPreset(ctx) {
   await button(/^(导出|Export)$/).click();
   const clearedDrawer = page.getByRole("dialog", { name: /导出内容|Export content/ });
   await clearedDrawer.waitFor({ state: "visible", timeout: 10000 });
+  await openExportDisclosure(clearedDrawer, ".export-options");
   assert.equal(await clearedDrawer.getByRole("textbox", { name: /服务器输出目录|Server output directory/ }).inputValue(), "", "a cleared preset must leave the destination empty");
   assert.equal(await clearedDrawer.getByLabel(/随附文件策略|Sidecar policy/).inputValue(), "", "a cleared preset must leave the sidecar choice empty");
   assert.equal(await clearedDrawer.locator(".export-preset-note").count(), 0, "an empty preset must not be labelled");

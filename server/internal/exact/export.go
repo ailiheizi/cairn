@@ -37,12 +37,33 @@ type ExportResult struct {
 	IndependentlyStored bool
 }
 
-// ExportRecoveryArtifact selects the current authenticated v2 reference for a
-// signed publication and retains the legacy snapshot export only for an
+// ExportRecoveryArtifact selects the bounded authenticated recovery artifact
+// for a signed publication and retains the legacy snapshot export only for an
 // explicitly unsigned development service.
 func (s *Service) ExportRecoveryArtifact(ctx context.Context, snapshotRef, destination string) (ExportResult, error) {
 	if s.signedPublicationEnabled() {
-		return s.ExportRecoveryReference(ctx, snapshotRef, destination)
+		var result ExportResult
+		if strings.TrimSpace(destination) == "" {
+			return result, errors.New("export destination is required")
+		}
+		artifact, err := s.buildRecoveryReferenceArtifact(ctx, snapshotRef)
+		if err != nil {
+			return result, err
+		}
+		path, err := writeNewRecoveryFile(destination, artifact.Payload)
+		if err != nil {
+			return result, err
+		}
+		return ExportResult{
+			SnapshotRef:         artifact.SnapshotRef,
+			Schema:              artifact.Schema,
+			ManifestDigest:      artifact.ManifestDigest,
+			ArtifactPath:        path,
+			Length:              int64(len(artifact.Payload)),
+			Files:               artifact.Files,
+			Bytes:               artifact.Bytes,
+			IndependentlyStored: true,
+		}, nil
 	}
 	return s.ExportRecovery(ctx, snapshotRef, destination)
 }

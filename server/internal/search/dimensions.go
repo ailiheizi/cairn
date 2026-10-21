@@ -47,18 +47,19 @@ const (
 	// ProviderMultimodalONNX is the real local image-space query provider. Its
 	// text queries go through the image model's own text tower; they are never
 	// served by the text embedding provider.
-	ProviderMultimodalONNX = "query.multimodal.onnx-clip-zvec.v1"
-	ProviderBrokerFuse     = "query.broker.fuse.v1"
-	ProviderGraphCatalog   = "query.graph.catalog.v1"
-	ScoreLexicalRank       = "fts5-rank"
-	ScoreGraphExact        = "relation-exact"
-	ScoreAcousticExact     = "fixture-exact"
-	ScoreSemanticExact     = "fixture-exact"
-	ScoreSemanticCosine    = "cosine-similarity"
-	ScoreMultimodalExact   = "fixture-exact"
-	ScoreMultimodalCosine  = "cosine-similarity"
-	ScoreComponentUnion    = "component-union"
-	CapabilityKindBroker   = "query-broker"
+	ProviderMultimodalONNX    = "query.multimodal.onnx-clip-zvec.v1"
+	ProviderBrokerFuse        = "query.broker.fuse.v2"
+	ProviderGraphCatalog      = "query.graph.catalog.v1"
+	ScoreLexicalRank          = "fts5-rank"
+	ScoreGraphExact           = "relation-exact"
+	ScoreAcousticExact        = "fixture-exact"
+	ScoreSemanticExact        = "fixture-exact"
+	ScoreSemanticCosine       = "cosine-similarity"
+	ScoreMultimodalExact      = "fixture-exact"
+	ScoreMultimodalCosine     = "cosine-similarity"
+	ScoreComponentUnion       = "component-union"
+	ScoreReciprocalRankFusion = "reciprocal-rank-fusion-k60-v1"
+	CapabilityKindBroker      = "query-broker"
 
 	AxisPath            = "path"
 	AxisName            = "name"
@@ -250,7 +251,7 @@ func FixtureIndexBinding(configDigest string) IndexBinding {
 	multimodalManifest.ProviderDigest = ProfileDigest(DimensionMultimodal, MultimodalFixtureProfileV1)
 	return IndexBinding{
 		ConfigDigest:            strings.TrimSpace(configDigest),
-		LexicalProfileDigest:    ProfileDigest(DimensionLexical, LexicalProfileV4),
+		LexicalProfileDigest:    ProfileDigest(DimensionLexical, CurrentLexicalProfile),
 		SemanticProfileDigest:   semanticManifest.CanonicalDigest(),
 		MultimodalProfileDigest: multimodalManifest.CanonicalDigest(),
 		AcousticProfileDigest:   ProfileDigest(DimensionAcoustic, AcousticFixtureProfileV1),
@@ -272,7 +273,7 @@ func ProfileDigest(dimension, profile string) string {
 }
 
 const (
-	// LexicalProfileV4 is the lexical feed shape that adds the derived CJK
+	// LexicalProfileV4 is the historical lexical feed shape that adds the derived CJK
 	// adjacency tokens — every adjacent character bigram plus every single
 	// character of each CJK run, and the adjacent pinyin syllable pairs — on
 	// top of the V3 pinyin token enrichment (name/path/notes/descriptions/
@@ -285,7 +286,11 @@ const (
 	// field. It supersedes the "fts5-metadata-v3" profile: a generation built
 	// under an older profile records a different ProviderProfileDigest and is
 	// refused, never reinterpreted, by the current wiring.
-	LexicalProfileV4           = "fts5-metadata-v4"
+	LexicalProfileV4 = "fts5-metadata-v4"
+	// LexicalProfileV5 changes only the mtime facet source to captured source
+	// metadata. Its text axes and token enrichment are identical to V4.
+	LexicalProfileV5           = "fts5-metadata-v5"
+	CurrentLexicalProfile      = LexicalProfileV5
 	GraphProfileV1             = "graph-catalog-v1"
 	AcousticFixtureProfileV1   = "acoustic-fixture-v1"
 	SemanticFixtureProfileV1   = "semantic-fixture-v1"
@@ -408,10 +413,10 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 		acousticNotes = "disposable fixture-fingerprint generation over admitted FINGERPRINT artifacts; not Chromaprint, not SHA-256, not recovery authority"
 	}
 	semanticState := "UNAVAILABLE"
-	semanticProvider := ProviderSemanticFix
-	semanticScore := ScoreSemanticExact
-	semanticReason := ""
-	semanticNotes := "real embedding model and vector IndexProvider are not wired (" + SemanticIndexUnavailableReason + "); fixture embeddings require explicit opt-in"
+	semanticProvider := ProviderSemanticONNX
+	semanticScore := ScoreSemanticCosine
+	semanticReason := SemanticIndexUnavailableReason
+	semanticNotes := "the default local ONNX/BGE embedding provider and vector IndexProvider are unavailable (" + SemanticIndexUnavailableReason + "); fixture embeddings require explicit opt-in"
 	if ready.SemanticInstalled && !ready.Semantic {
 		// A real provider and vector binding exist. What is missing is a
 		// verified generation for this workspace, so the dimension reports
@@ -439,6 +444,8 @@ func DeclaredDimensions(ready ProviderReadiness) []Dimension {
 		semanticState = "AVAILABLE"
 		semanticReason = ""
 		semanticNotes = "explicitly enabled fixture-embedding generation over admitted ENRICH artifacts; not a model runtime, not SHA-256, not recovery authority"
+		semanticProvider = ProviderSemanticFix
+		semanticScore = ScoreSemanticExact
 		if ready.SemanticReal {
 			semanticProvider = ProviderSemanticONNX
 			semanticScore = ScoreSemanticCosine
@@ -569,12 +576,13 @@ type FieldCoverage map[string]bool
 // and non-empty for at least one subject. It is never asserted from the index
 // schema alone; it requires an actual built generation.
 type CoverageStatement struct {
-	Dimension string
-	Available bool
-	Complete  bool
-	Fields    FieldCoverage
-	Missing   []string
-	Notes     string
+	Dimension      string
+	Available      bool
+	Complete       bool
+	Fields         FieldCoverage
+	Missing        []string
+	Notes          string
+	SourceCoverage *SourceCoverageStatement `json:"source_coverage,omitempty"`
 }
 
 // LexicalCoverage reports what one built generation actually feeds. When the

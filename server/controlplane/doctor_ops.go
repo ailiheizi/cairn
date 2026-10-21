@@ -13,8 +13,9 @@ import (
 )
 
 type doctorInput struct {
-	Source     string `json:"source"`
-	Repository string `json:"repository"`
+	Source        string `json:"source"`
+	Repository    string `json:"repository"`
+	StorageReport bool   `json:"storage_report"`
 }
 
 func (d *Dispatcher) handleDoctorCheck(ctx context.Context, env command.Envelope, started time.Time) command.Result {
@@ -99,6 +100,9 @@ func (d *Dispatcher) handleDoctorCheck(ctx context.Context, env command.Envelope
 		}
 	}
 	data := command.DoctorData{OK: ok, Checks: checks}
+	if input.StorageReport {
+		data.StorageReport = d.buildStorageReport(ctx)
+	}
 	if !ok {
 		return degradedResult(env, started, data, "one or more core doctor checks failed")
 	}

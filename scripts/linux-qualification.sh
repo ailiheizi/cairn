@@ -134,8 +134,8 @@ cd "$REPO_ROOT"
 go version | tee "$ARTIFACTS/go-version.txt"
 go test ./... -run '^$' | tee "$ARTIFACTS/compile.log"
 go test ./... -count=1 | tee "$ARTIFACTS/full-test.log"
-go build -tags=purego -o "$BIN_DIR/cairn" ./client/cmd/cairn
-go build -tags=purego -o "$BIN_DIR/cairnd" ./server/cmd/cairnd
+go build -tags=cairn_zvec_dynamic -o "$BIN_DIR/cairn" ./client/cmd/cairn
+go build -tags=cairn_zvec_dynamic -o "$BIN_DIR/cairnd" ./server/cmd/cairnd
 "$BIN_DIR/cairn" config init --path "$CONFIG_PATH" | tee "$ARTIFACTS/config-init.log"
 
 "$BIN_DIR/cairnd" --config "$CONFIG_PATH" --socket "$SOCKET_PATH" \
@@ -198,7 +198,7 @@ done
 
 run_required_test() {
     local package="$1" test_name="$2" output="$3"
-    go test -json -tags='purego supervised_integration' "$package" \
+    go test -json -tags='cairn_zvec_dynamic supervised_integration' "$package" \
         -run "^${test_name}$" -count=1 | tee "$output"
     if jq -e --arg test "$test_name" 'select(.Test == $test and .Action == "skip")' "$output" >/dev/null; then
         echo "error: required real qualification test skipped: $test_name" >&2

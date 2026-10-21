@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ailiheizi/cairn/server/internal/repository"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
@@ -29,13 +30,18 @@ type projectionFixture struct {
 
 func newProjectionFixture(t *testing.T, files int) projectionFixture {
 	t.Helper()
-	return newProjectionFixtureWith(t, files, nil)
+	return newProjectionFixtureWithOptions(t, files, nil, IngestOptions{}, false)
 }
 
 // newProjectionFixtureWith builds the fixture and lets a test decorate each
 // created file (for example with a large extended attribute) before the
 // capture that the projection measures.
 func newProjectionFixtureWith(t *testing.T, files int, decorate func(t *testing.T, path string)) projectionFixture {
+	t.Helper()
+	return newProjectionFixtureWithOptions(t, files, decorate, IngestOptions{}, false)
+}
+
+func newProjectionFixtureWithOptions(t *testing.T, files int, decorate func(t *testing.T, path string), options IngestOptions, includeEmpty bool) projectionFixture {
 	t.Helper()
 	ctx := context.Background()
 	source := t.TempDir()
@@ -56,7 +62,15 @@ func newProjectionFixtureWith(t *testing.T, files int, decorate func(t *testing.
 	if err := os.WriteFile(filepath.Join(source, "nested", "leaf.txt"), []byte("nested leaf"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	store, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "catalog.sqlite"), sqlite.Options{})
+	if includeEmpty {
+		if err := os.WriteFile(filepath.Join(source, "empty.txt"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fixtureTime := time.Date(2026, time.October, 16, 12, 34, 56, 123456789, time.UTC)
+	store, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "catalog.sqlite"), sqlite.Options{
+		Now: func() time.Time { return fixtureTime },
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,9 +89,10 @@ func newProjectionFixtureWith(t *testing.T, files int, decorate func(t *testing.
 	service := &Service{
 		Store: store, Repo: repo, SigningIdentity: &identity, TrustAnchor: &anchor,
 		PublicationDomain: testPublicationDomain, RequireSignedPublication: true,
-		ConfigDigest: "sha256:projection-test-config",
+		ConfigDigest: DigestBytes([]byte("projection-test-config")), Now: func() time.Time { return fixtureTime },
+		AllowLinkOnly: true, LinkOnlyRequiresConfirmation: true,
 	}
-	policy, err := service.resolveIngestOptions(IngestOptions{})
+	policy, err := service.resolveIngestOptions(options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +188,38 @@ func TestProjectedPublicationRecordsMatchThePlacedRecords(t *testing.T) {
 		} else {
 			t.Logf("%s projected=%d placed=%d slack=%d", record.role, record.projected, record.placed, slack)
 		}
+	}
+
+	// The witness builder must also project the production LINK_ONLY profile,
+	// including an empty FileVersion. Empty files carry no logical extent, while
+	// their authenticated representation relation still belongs in the record.
+	linkOptions := IngestOptions{
+		FileProtection:   map[string]sqlite.ProtectionMode{"empty.txt": sqlite.ProtectionLinkOnly},
+		ConfirmLinkOnly:  true,
+		ExternalLocators: []IngestLocator{{Path: "empty.txt", Locator: "https://downloads.example.test/empty.txt"}},
+	}
+	linkFixture := newProjectionFixtureWithOptions(t, 1, nil, linkOptions, true)
+	linkPlan, err := linkFixture.service.InspectIngest(ctx, linkFixture.source, linkOptions)
+	if err != nil {
+		t.Fatalf("inspect LINK_ONLY/empty-file ingest: %v", err)
+	}
+	if _, err := linkFixture.service.ApplyIngestPlanWithExecutionKey(ctx, linkPlan, "sha256:projection-link-only-empty-plan"); err != nil {
+		t.Fatalf("apply LINK_ONLY/empty-file ingest: %v", err)
+	}
+	linkPreparedBytes := placedFactClosureBytes(t, ctx, linkFixture.repo, repository.RecordPreparedClosure)
+	linkFactBytes := placedFactClosureBytes(t, ctx, linkFixture.repo, repository.RecordPortableFactClosure)
+	for _, record := range []struct {
+		role      repository.RecordRole
+		projected int64
+		placed    int64
+	}{
+		{repository.RecordPreparedClosure, linkFixture.projection.PreparedClosureBytes, linkPreparedBytes},
+		{repository.RecordPortableFactClosure, linkFixture.projection.PortableFactClosureBytes, linkFactBytes},
+	} {
+		if record.projected < record.placed || record.projected-record.placed > 512 {
+			t.Fatalf("LINK_ONLY/empty %s projection=%d placed=%d; want conservative projection within the 512-byte placeholder width", record.role, record.projected, record.placed)
+		}
+		t.Logf("LINK_ONLY/empty %s projected=%d placed=%d slack=%d", record.role, record.projected, record.placed, record.projected-record.placed)
 	}
 }
 

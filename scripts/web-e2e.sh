@@ -60,12 +60,12 @@ cleanup_build() { rm -rf "$build_root"; }
 trap cleanup_build EXIT INT TERM
 if ! command -v "$daemon_bin" >/dev/null 2>&1; then
   command -v go >/dev/null 2>&1 || { echo "FAIL: cairnd is unavailable and go is not installed" >&2; exit 1; }
-  go build -tags purego -o "$build_root/cairnd" ./server/cmd/cairnd || { echo "FAIL: could not build cairnd" >&2; exit 1; }
+  go build -tags cairn_zvec_dynamic -o "$build_root/cairnd" ./server/cmd/cairnd || { echo "FAIL: could not build cairnd" >&2; exit 1; }
   daemon_bin=$build_root/cairnd
 fi
 if ! command -v "$cairn_bin" >/dev/null 2>&1; then
   command -v go >/dev/null 2>&1 || { echo "FAIL: cairn is unavailable and go is not installed" >&2; exit 1; }
-  go build -tags purego -o "$build_root/cairn" ./client/cmd/cairn || { echo "FAIL: could not build cairn" >&2; exit 1; }
+  go build -tags cairn_zvec_dynamic -o "$build_root/cairn" ./client/cmd/cairn || { echo "FAIL: could not build cairn" >&2; exit 1; }
   cairn_bin=$build_root/cairn
 fi
 

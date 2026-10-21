@@ -88,8 +88,9 @@ const (
 	ImageBundleMaxAssetBytes    = uint64(4 << 30)
 	ImageBundleMaxManifestBytes = uint64(1 << 20)
 	// ImageBundleDefaultProfileID is the shortlist default model identity from
-	// the local model research: Chinese-CLIP ViT-B/16 (MIT, 512 dimensions,
-	// Chinese-native text tower).
+	// the local model research: Chinese-CLIP ViT-B/16 (512 dimensions,
+	// Chinese-native text tower). Actual model/export licenses and provenance
+	// are bound in each installed descriptor; a code license is not a weight license.
 	ImageBundleDefaultProfileID = "chinese-clip-vit-base-patch16"
 	ImageBundleDefaultModelID   = "OFA-Sys/chinese-clip-vit-base-patch16"
 	// ImageBundleONNXRuntimeCAPI matches the pinned text bundle's C API table.

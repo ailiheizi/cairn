@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
@@ -43,8 +44,27 @@ func LexicalSubjectCoverage(ctx context.Context, generation sqlite.IndexGenerati
 	return out, rows.Err()
 }
 
+// LexicalSubjectCoverageForWorkspace returns coverage only for the latest
+// lexical generation that is bound to this Indexer's current config and
+// lexical profile. The raw generation reader above remains available for
+// historical projection inspection; runtime readiness must use this bound
+// form, matching the query path's generation authority.
+func (idx *Indexer) LexicalSubjectCoverageForWorkspace(ctx context.Context, workspaceID string) (map[string]struct{}, error) {
+	if idx == nil || idx.Store == nil || idx.Engine == nil || strings.TrimSpace(workspaceID) == "" {
+		return nil, ErrUnavailable
+	}
+	generation, err := idx.Store.LatestIndexGeneration(ctx, workspaceID, DimensionLexical)
+	if err != nil {
+		return nil, err
+	}
+	if generation.WorkspaceID != workspaceID || !generationBindingMatches(idx, generation, DimensionLexical) {
+		return nil, ErrUnavailable
+	}
+	return LexicalSubjectCoverage(ctx, generation)
+}
+
 // SemanticSubjectCoverage validates the admitted semantic generation and
-// returns only subject IDs proven by its signed receipt/backend coverage.
+// returns only subject IDs proven by its generation-local receipt/backend coverage.
 func (idx *Indexer) SemanticSubjectCoverage(ctx context.Context, workspaceID string) (map[string]struct{}, error) {
 	if idx == nil || idx.Store == nil || idx.SemanticProvider == nil || idx.SemanticZvec == nil || idx.SemanticManifest == (EmbeddingGenerationManifest{}) {
 		return nil, ErrUnavailable
@@ -52,6 +72,11 @@ func (idx *Indexer) SemanticSubjectCoverage(ctx context.Context, workspaceID str
 	generation, err := idx.Store.LatestIndexGeneration(ctx, workspaceID, DimensionSemantic)
 	if err != nil {
 		return nil, err
+	}
+	if semanticRequiresCurrentFeed(idx) {
+		if err := idx.semanticGenerationMatchesLatestFeed(ctx, generation); err != nil {
+			return nil, err
+		}
 	}
 	if err := idx.ensureSemanticGenerationVerified(ctx, generation); err != nil {
 		return nil, err

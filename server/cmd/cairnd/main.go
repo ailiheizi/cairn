@@ -92,7 +92,7 @@ func run() error {
 		recoveryReader = flag.Bool("recovery-reader", false,
 			"serve a catalog-free read-only recovery reader")
 		recoveryReference = flag.String("recovery-reference", "",
-			"v2 portable recovery reference for --recovery-reader")
+			"v2 or v3 portable recovery reference for --recovery-reader")
 		trustAnchorPath = flag.String("trust-anchor", "",
 			"independently retained public trust anchor for --recovery-reader")
 		configPath = flag.String("config", "",
@@ -629,7 +629,7 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	}
 	indexBinding := search.IndexBinding{
 		ConfigDigest:         resolved.Digest,
-		LexicalProfileDigest: search.ProfileDigest(search.DimensionLexical, search.LexicalProfileV4),
+		LexicalProfileDigest: search.ProfileDigest(search.DimensionLexical, search.CurrentLexicalProfile),
 		GraphProfileDigest:   search.ProfileDigest(search.DimensionGraph, search.GraphProfileV1),
 	}
 	dispatcherOptions := []controlplane.DispatcherOption{
@@ -874,22 +874,18 @@ func runRecoveryReader(ctx context.Context, options daemonOptions) error {
 	if err != nil {
 		return fmt.Errorf("load recovery trust anchor: %w", err)
 	}
-	reference, err := exact.LoadRecoveryReference(options.recoveryReference)
-	if err != nil {
-		return fmt.Errorf("load recovery reference: %w", err)
-	}
 	service := &exact.Service{
 		Repo:                     repo,
 		TrustAnchor:              &anchor,
-		PublicationDomain:        reference.PublicationDomain,
+		PublicationDomain:        anchor.PublicationDomain,
 		RequireSignedPublication: true,
 	}
-	imported, err := service.ImportRecoveryArtifact(ctx, options.recoveryReference, options.trustAnchorPath, reference.PublicationDomain)
+	imported, err := service.ImportRecoveryArtifact(ctx, options.recoveryReference, options.trustAnchorPath, anchor.PublicationDomain)
 	if err != nil {
 		return fmt.Errorf("admit recovery reference: %w", err)
 	}
-	if imported.Schema != exact.RecoveryReferenceSchemaV2 {
-		return fmt.Errorf("recovery reader requires %s, got %s", exact.RecoveryReferenceSchemaV2, imported.Schema)
+	if imported.Schema != exact.RecoveryReferenceSchemaV2 && imported.Schema != exact.RecoveryReferenceSchemaV3 {
+		return fmt.Errorf("recovery reader requires %s or %s, got %s", exact.RecoveryReferenceSchemaV2, exact.RecoveryReferenceSchemaV3, imported.Schema)
 	}
 	dispatcher, err := controlplane.NewRecoveryDispatcher(options.socketPath, service)
 	if err != nil {

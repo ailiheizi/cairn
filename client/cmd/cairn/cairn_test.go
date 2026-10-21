@@ -114,8 +114,9 @@ func TestCLIDescriptionCreateListAndGet(t *testing.T) {
 	code, stdout, stderr := runCLI(t, "--socket", socketPath, "description", "create", seed.FileEntryID,
 		"--workspace", seed.WorkspaceID, "--kind", "USER", "--language", "zh", "--title", "剧情与感想",
 		"--body-file", bodyPath, "--accepted")
-	if code != 0 {
-		t.Fatalf("description create code=%d stderr=%s", code, stderr)
+	wantCreateStderr := "unavailable: description committed with post-commit warning: authenticated recovery publication incomplete: exact service is unavailable for authenticated recovery publication\noperation description.create completed with degraded capabilities\n"
+	if code != 5 || stderr != wantCreateStderr {
+		t.Fatalf("description create code=%d stderr=%s, want degraded post-commit warning %q", code, stderr, wantCreateStderr)
 	}
 	var documentID string
 	for _, line := range strings.Split(stdout, "\n") {

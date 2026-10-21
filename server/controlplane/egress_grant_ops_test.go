@@ -93,6 +93,14 @@ func newOnlineProviderDispatcher(t *testing.T, modelsRoot string) (*Dispatcher, 
 	return dispatcher, store
 }
 
+type listOnlyDescribeProvider struct{ profile search.OnlineDescribeProfile }
+
+func (p listOnlyDescribeProvider) Describe(context.Context, search.DescribeRequest) (search.DescribeResult, error) {
+	return search.DescribeResult{}, nil
+}
+func (p listOnlyDescribeProvider) CheckDescribeReadiness(context.Context) error { return nil }
+func (p listOnlyDescribeProvider) Profile() search.OnlineDescribeProfile        { return p.profile }
+
 func TestSemanticProviderInstallAndListThroughTheDispatcher(t *testing.T) {
 	modelsRoot := filepath.Join(t.TempDir(), "models")
 	dispatcher, _ := newOnlineProviderDispatcher(t, modelsRoot)
@@ -179,6 +187,108 @@ func TestSemanticProviderInstallAndListThroughTheDispatcher(t *testing.T) {
 	}
 	if listed.Profiles[0].ProfileDigest != profile.ProviderProfileDigest() || listed.Profiles[0].Expired {
 		t.Fatalf("listed profile = %+v", listed.Profiles[0])
+	}
+}
+
+func TestSemanticProviderListOptInProjectsDescribeProfilesWithoutChangingLegacyShape(t *testing.T) {
+	modelsRoot := filepath.Join(t.TempDir(), "models")
+	dispatcher, _ := newOnlineProviderDispatcher(t, modelsRoot)
+	embedding := controlPlaneOnlineProfile(t)
+	embeddingSource := writeControlPlaneProfileDocument(t, t.TempDir(), embedding)
+	installed := dispatcher.Handle(context.Background(), command.Envelope{
+		Operation: command.OpSemanticProviderInstall,
+		Input:     mustEncodeJSON(t, command.SemanticProviderInstallInput{Path: embeddingSource, ProfileDigest: embedding.ProviderProfileDigest()}),
+	})
+	if installed.Status != command.StatusSucceeded {
+		t.Fatalf("install embedding profile = %s, reasons=%+v", installed.Status, installed.Reasons)
+	}
+	describe := installDescribeProfile(t, modelsRoot, "http://127.0.0.1:43127")
+	dispatcher.describeModelsRoot = modelsRoot
+	dispatcher.describeProvider = listOnlyDescribeProvider{profile: describe}
+
+	legacy := dispatcher.Handle(context.Background(), command.Envelope{
+		Operation: command.OpSemanticProviderList, Input: []byte(`{}`),
+	})
+	if legacy.Status != command.StatusSucceeded {
+		t.Fatalf("legacy list = %s, reasons=%+v", legacy.Status, legacy.Reasons)
+	}
+	var legacyJSON map[string]json.RawMessage
+	if err := json.Unmarshal(legacy.Data, &legacyJSON); err != nil {
+		t.Fatal(err)
+	}
+	var legacyData command.SemanticProviderListData
+	if err := json.Unmarshal(legacy.Data, &legacyData); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := legacyJSON["describe"]; present || len(legacyData.Profiles) != 1 || legacyData.Profiles[0].ProfileID != embedding.ProfileID {
+		t.Fatalf("legacy list changed: raw=%s data=%+v", legacy.Data, legacyData)
+	}
+
+	listed := dispatcher.Handle(context.Background(), command.Envelope{
+		Operation: command.OpSemanticProviderList,
+		Input:     []byte(`{"include_describe":true}`),
+	})
+	if listed.Status != command.StatusSucceeded {
+		t.Fatalf("opt-in list = %s, reasons=%+v", listed.Status, listed.Reasons)
+	}
+	var data command.SemanticProviderListData
+	if err := json.Unmarshal(listed.Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Profiles) != 1 || data.Profiles[0].ProfileID != embedding.ProfileID || data.Describe == nil ||
+		data.Describe.State != "AVAILABLE" || data.Describe.Reason != "" || len(data.Describe.Profiles) != 1 {
+		t.Fatalf("opt-in list = %+v describe=%+v raw=%s", data, data.Describe, listed.Data)
+	}
+	row := data.Describe.Profiles[0]
+	if row.ProfileID != describe.ProfileID || row.ProfileDigest != describe.ProviderProfileDigest() ||
+		row.Provider != describe.Provider || row.APIStyle != describe.APIStyle || row.EndpointHost != "127.0.0.1:43127" ||
+		row.ModelID != describe.ModelID || row.ModelRevision != describe.ModelRevision ||
+		row.OutputSchema != search.OnlineDescribeOutputSchema || row.Destination != filepath.Join(modelsRoot, search.OnlineDescribeProfileDirName, describe.ProfileID, search.OnlineDescribeProfileFileName) ||
+		row.Expiry != describe.Egress.Expiry || row.MaxRequests != describe.Egress.Budgets.MaxRequests ||
+		row.MaxBytes != describe.Egress.Budgets.MaxBytes || row.MaxSeconds != describe.Egress.Budgets.MaxSeconds ||
+		!row.AuditRequired || row.Expired {
+		t.Fatalf("describe profile projection = %+v", row)
+	}
+	var listedJSON map[string]any
+	if err := json.Unmarshal(listed.Data, &listedJSON); err != nil {
+		t.Fatal(err)
+	}
+	describeJSON := listedJSON["describe"].(map[string]any)
+	profileJSON := describeJSON["profiles"].([]any)[0].(map[string]any)
+	for _, secretOrPrivateField := range []string{"credential_ref", "system_instruction", "max_output_tokens", "max_output_bytes"} {
+		if _, present := profileJSON[secretOrPrivateField]; present {
+			t.Fatalf("describe profile projection leaked %q: %s", secretOrPrivateField, listed.Data)
+		}
+	}
+	for _, rawInput := range []string{`{"include_describe":"true"}`, `{"include_describe":null}`, `{"include_describe":true,"extra":1}`} {
+		invalid := dispatcher.Handle(context.Background(), command.Envelope{Operation: command.OpSemanticProviderList, Input: []byte(rawInput)})
+		if invalid.Status != command.StatusFailed || !hasReasonCode(invalid, ReasonCodeInvalidInput) {
+			t.Fatalf("input %s = %s reasons=%+v; want strict invalid-input rejection", rawInput, invalid.Status, invalid.Reasons)
+		}
+	}
+
+	// A malformed describe profile makes only the opted-in describe projection
+	// unavailable; the established embedding profile response remains usable.
+	malformedDir := filepath.Join(modelsRoot, search.OnlineDescribeProfileDirName, "broken-describe")
+	if err := os.MkdirAll(malformedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(malformedDir, search.OnlineDescribeProfileFileName), []byte(`{"schema":"unknown"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withMalformed := dispatcher.Handle(context.Background(), command.Envelope{
+		Operation: command.OpSemanticProviderList, Input: []byte(`{"include_describe":true}`),
+	})
+	if withMalformed.Status != command.StatusSucceeded {
+		t.Fatalf("malformed describe listing = %s, reasons=%+v", withMalformed.Status, withMalformed.Reasons)
+	}
+	var unavailable command.SemanticProviderListData
+	if err := json.Unmarshal(withMalformed.Data, &unavailable); err != nil {
+		t.Fatal(err)
+	}
+	if len(unavailable.Profiles) != 1 || unavailable.Describe == nil || unavailable.Describe.State != "UNAVAILABLE" ||
+		strings.TrimSpace(unavailable.Describe.Reason) == "" || len(unavailable.Describe.Profiles) != 0 {
+		t.Fatalf("malformed describe result = %+v", unavailable)
 	}
 }
 
@@ -469,6 +579,28 @@ func TestFusedDegradedMessageNamesEgressReasons(t *testing.T) {
 	}, "fallback text")
 	if plain != "fallback text" {
 		t.Fatalf("unrelated component reason changed the message: %q", plain)
+	}
+}
+
+func TestFusedDegradedMessageExplainsLongSemanticQuery(t *testing.T) {
+	message := "This query is too long for semantic search. Shorten it to use semantic search; available keyword and filter results are still shown."
+	degraded := fusedDegradedMessage([]search.Component{
+		{Dimension: search.DimensionSemantic, Status: "DEGRADED", Reason: search.SemanticQueryInputTruncatedReason},
+	}, "fallback text")
+	if degraded != message {
+		t.Fatalf("long semantic query message = %q, want %q", degraded, message)
+	}
+	// An egress restriction keeps precedence even if another failed lane has
+	// the query-specific truncation reason.
+	withEgress := fusedDegradedMessage([]search.Component{
+		{Dimension: search.DimensionSemantic, Status: "DEGRADED", Reason: search.SemanticQueryInputTruncatedReason},
+		{Dimension: search.DimensionSemantic, Status: "DEGRADED", Reason: string(search.EgressReasonConfirmationRequired)},
+	}, "fallback text")
+	if !strings.Contains(withEgress, string(search.EgressReasonConfirmationRequired)) {
+		t.Fatalf("egress restriction lost priority: %q", withEgress)
+	}
+	if plain := fusedDegradedMessage([]search.Component{{Dimension: search.DimensionLexical, Status: "DEGRADED", Reason: "OTHER_REASON"}}, "fallback text"); plain != "fallback text" {
+		t.Fatalf("unrelated degraded reason = %q, want fallback", plain)
 	}
 }
 

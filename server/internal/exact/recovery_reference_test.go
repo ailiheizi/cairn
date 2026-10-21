@@ -597,8 +597,15 @@ func downgradePortableBundleToV1ForTest(t *testing.T, source portableFactBundle)
 	}
 	result := source
 	result.Schema = PortableFactBundleSchemaV1
-	result.Records = make([]portableFactRecord, len(source.Records))
-	for index, sourceRecord := range source.Records {
+	result.Records = make([]portableFactRecord, 0, len(source.Records))
+	for _, sourceRecord := range source.Records {
+		// Catalog relation witnesses were introduced by the v2 publisher and
+		// are reserved to that schema. A genuine historical v1 bundle cannot
+		// contain one; retaining it while downgrading only the envelope would
+		// turn this compatibility fixture into a malformed hybrid.
+		if isCatalogRelationWitnessRecord(sourceRecord) {
+			continue
+		}
 		record := sourceRecord
 		record.Schema = PortableFactRecordSchemaV1
 		entryID, ok := stableToEntry[record.StableSubjectRef]
@@ -632,7 +639,7 @@ func downgradePortableBundleToV1ForTest(t *testing.T, source portableFactBundle)
 		}
 		record.PayloadDigest = DigestBytes(record.Payload)
 		record.PayloadLength = int64(len(record.Payload))
-		result.Records[index] = record
+		result.Records = append(result.Records, record)
 	}
 	return result
 }

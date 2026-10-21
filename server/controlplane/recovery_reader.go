@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -174,11 +173,4 @@ func recoveryPlanApplyData(entry *recoveryReaderPlan, result exact.RestoreResult
 		SnapshotRef: result.SnapshotRef, State: "SUCCEEDED",
 		Destination: result.Destination, Files: result.Files, Bytes: result.Bytes,
 	}
-}
-
-func (d *Dispatcher) recoveryReaderSummary() string {
-	if d == nil || d.recoveryReader == nil {
-		return ""
-	}
-	return fmt.Sprintf("catalog-free recovery reader (%s)", d.recoveryReader.workspaceID)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +16,7 @@ import (
 	"github.com/ailiheizi/cairn/client/command"
 	"github.com/ailiheizi/cairn/server/internal/exact"
 	"github.com/ailiheizi/cairn/server/internal/repository"
+	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 	"github.com/ailiheizi/cairn/server/testutil"
 )
@@ -102,7 +104,7 @@ type viewExportHarness struct {
 // openViewExportHarness ingests root and returns the harness plus the published
 // direct children of the ingest root. The single-subject wrapper below requires
 // exactly one child; multi-file tests walk the children themselves.
-func openViewExportHarness(t *testing.T, root string) (viewExportHarness, []command.NamespaceEntryData) {
+func openViewExportHarness(t *testing.T, root string, requireSignedPublication ...bool) (viewExportHarness, []command.NamespaceEntryData) {
 	t.Helper()
 	catalogPath := filepath.Join(t.TempDir(), "catalog.sqlite")
 	repoDir := filepath.Join(t.TempDir(), "repository")
@@ -111,10 +113,18 @@ func openViewExportHarness(t *testing.T, root string) (viewExportHarness, []comm
 	if err != nil {
 		t.Fatalf("open repository: %v", err)
 	}
-	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(&exact.Service{
-		Store: store,
-		Repo:  repo,
-	}))
+	service := &exact.Service{Store: store, Repo: repo}
+	if len(requireSignedPublication) > 0 && requireSignedPublication[0] {
+		identity, anchor, err := exact.OpenSigningMaterial(t.TempDir(), "workspace:default", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		service.SigningIdentity = &identity
+		service.TrustAnchor = &anchor
+		service.PublicationDomain = "workspace:default"
+		service.RequireSignedPublication = true
+	}
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithExact(service))
 	ctx := context.Background()
 	ingest := mustAppliedIngest(t, ctx, dispatcher, map[string]any{"root": root})
 	return viewExportHarness{
@@ -343,6 +353,700 @@ func TestViewEvaluateReturnsHitsAfterIngest(t *testing.T) {
 	}
 	if data.ViewID != view.ViewID || data.Query != "annual" {
 		t.Fatalf("evaluate data = %+v", data)
+	}
+}
+
+func TestSavedViewUnsupportedPoliciesRefuseWritesAndPreserveLegacyRecords(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "payload.txt"), []byte("ordinary payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := newViewExportHarness(t, root)
+	policies := []struct {
+		name, field string
+		input       map[string]any
+		stored      sqlite.SavedView
+	}{
+		{name: "sort", field: "sort", input: map[string]any{"sort": "name-ascending-v1"}, stored: sqlite.SavedView{Sort: "name-ascending-v1"}},
+		{name: "output_names", field: "output_names", input: map[string]any{"output_names": "relative-path-v1"}, stored: sqlite.SavedView{OutputNames: "relative-path-v1"}},
+		{name: "required_capabilities", field: "required_capabilities", input: map[string]any{"required_capabilities": []string{"semantic"}}, stored: sqlite.SavedView{Required: []string{"semantic"}}},
+		{name: "when_missing", field: "when_missing", input: map[string]any{"when_missing": "skip"}, stored: sqlite.SavedView{WhenMissing: "skip"}},
+	}
+
+	// New requests must not persist policy values that this evaluator does not
+	// implement, and the error must name the ignored option.
+	for _, policy := range policies {
+		t.Run("new save rejects "+policy.name, func(t *testing.T) {
+			input := map[string]any{"name": "new-" + policy.name, "query": "payload", "scope": h.ingest.WorkspaceID}
+			for key, value := range policy.input {
+				input[key] = value
+			}
+			refused := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, input))
+			if refused.Status != command.StatusFailed || !hasReasonCode(refused, ReasonCodeInvalidInput) ||
+				len(refused.Reasons) == 0 || !strings.Contains(refused.Reasons[0].Message, policy.field) {
+				t.Fatalf("view.save with %s = %q: %+v", policy.field, refused.Status, refused.Reasons)
+			}
+			missing := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"name": "new-" + policy.name}))
+			if missing.Status != command.StatusFailed || !hasReasonCode(missing, ReasonCodeNotFound) {
+				t.Fatalf("rejected %s view was persisted: %q %+v", policy.field, missing.Status, missing.Reasons)
+			}
+		})
+	}
+	combined := map[string]any{
+		"name": "new-combined-policy", "query": "payload", "scope": h.ingest.WorkspaceID,
+		"sort": "name-ascending-v1", "output_names": "relative-path-v1",
+		"required_capabilities": []string{"semantic"}, "when_missing": "skip",
+	}
+	combinedRefusal := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, combined))
+	if combinedRefusal.Status != command.StatusFailed || !hasReasonCode(combinedRefusal, ReasonCodeInvalidInput) {
+		t.Fatalf("view.save with combined policies = %q: %+v", combinedRefusal.Status, combinedRefusal.Reasons)
+	}
+	base := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "revision-stays", "query": "payload", "scope": h.ingest.WorkspaceID,
+	}))
+	if base.Status != command.StatusSucceeded {
+		t.Fatalf("save policy update fixture = %q: %+v", base.Status, base.Reasons)
+	}
+	update := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "revision-stays", "query": "payload", "sort": "name-ascending-v1",
+	}))
+	if update.Status != command.StatusFailed || !hasReasonCode(update, ReasonCodeInvalidInput) {
+		t.Fatalf("view.save unsupported update = %q: %+v", update.Status, update.Reasons)
+	}
+	baseView := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"name": "revision-stays"}))
+	var retainedBase command.ViewData
+	if baseView.Status != command.StatusSucceeded || json.Unmarshal(baseView.Data, &retainedBase) != nil || retainedBase.Revision != 1 || retainedBase.Sort != "" {
+		t.Fatalf("rejected unsupported update changed existing view: %q %+v %+v", baseView.Status, baseView.Reasons, retainedBase)
+	}
+
+	// Seed legacy records directly as an older build could have persisted them.
+	// get/list preserve each literal value, while evaluate/export refuse rather
+	// than silently returning broader or differently named output.
+	type legacyPolicyView struct {
+		view   sqlite.SavedView
+		fields []string
+	}
+	legacyViews := make([]legacyPolicyView, 0, len(policies)+1)
+	for _, policy := range policies {
+		id, err := sqlite.NewStableID("view")
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := policy.stored
+		view.ViewID, view.Name, view.Query, view.Scope = id, "legacy-"+policy.name, "payload", h.ingest.WorkspaceID
+		view.Revision = 3
+		stored, err := h.dispatcher.store.InsertSavedView(context.Background(), view)
+		if err != nil {
+			t.Fatalf("seed legacy %s view: %v", policy.field, err)
+		}
+		legacyViews = append(legacyViews, legacyPolicyView{view: stored, fields: []string{policy.field}})
+	}
+	combinedID, err := sqlite.NewStableID("view")
+	if err != nil {
+		t.Fatal(err)
+	}
+	combinedLegacy, err := h.dispatcher.store.InsertSavedView(context.Background(), sqlite.SavedView{
+		ViewID: combinedID, Name: "legacy-combined", Query: "payload", Scope: h.ingest.WorkspaceID,
+		Sort: "name-ascending-v1", OutputNames: "relative-path-v1", Required: []string{"semantic"}, WhenMissing: "skip", Revision: 4,
+	})
+	if err != nil {
+		t.Fatalf("seed legacy combined view: %v", err)
+	}
+	legacyViews = append(legacyViews, legacyPolicyView{view: combinedLegacy, fields: []string{"sort", "output_names", "required_capabilities", "when_missing"}})
+
+	for _, legacy := range legacyViews {
+		view := legacy.view
+		got := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"view_id": view.ViewID}))
+		if got.Status != command.StatusSucceeded {
+			t.Fatalf("get legacy %q = %q: %+v", view.Name, got.Status, got.Reasons)
+		}
+		var projected command.ViewData
+		if err := json.Unmarshal(got.Data, &projected); err != nil {
+			t.Fatal(err)
+		}
+		if projected.Sort != view.Sort || projected.OutputNames != view.OutputNames ||
+			!reflect.DeepEqual(projected.Required, view.Required) || projected.WhenMissing != view.WhenMissing {
+			t.Fatalf("legacy policy changed on get: got=%+v want=%+v", projected, view)
+		}
+		for _, operation := range []string{command.OpViewEvaluate, command.OpExportPlan} {
+			refused := handleViewExport(h.dispatcher, mustEnvelope(t, operation, map[string]any{"view_id": view.ViewID}))
+			if refused.Status != command.StatusFailed || !hasReasonCode(refused, ReasonCodeInvalidInput) {
+				t.Fatalf("%s legacy %q = %q: %+v", operation, view.Name, refused.Status, refused.Reasons)
+			}
+			if len(refused.Reasons) == 0 || !strings.Contains(refused.Reasons[0].Message, legacy.fields[0]) {
+				t.Fatalf("%s did not identify unsupported policy for %q: %+v", operation, view.Name, refused.Reasons)
+			}
+		}
+	}
+	listed := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewList, nil))
+	if listed.Status != command.StatusSucceeded {
+		t.Fatalf("view.list legacy policies = %q: %+v", listed.Status, listed.Reasons)
+	}
+	var listedViews []command.ViewData
+	if err := json.Unmarshal(listed.Data, &listedViews); err != nil {
+		t.Fatal(err)
+	}
+	if len(listedViews) != len(legacyViews)+1 {
+		t.Fatalf("view.list has %d views, want %d legacy policies plus the unchanged update fixture", len(listedViews), len(legacyViews)+1)
+	}
+	listedByName := make(map[string]command.ViewData, len(listedViews))
+	for _, view := range listedViews {
+		listedByName[view.Name] = view
+	}
+	for _, legacy := range legacyViews {
+		view, found := listedByName[legacy.view.Name]
+		if !found || view.Sort != legacy.view.Sort || view.OutputNames != legacy.view.OutputNames ||
+			!reflect.DeepEqual(view.Required, legacy.view.Required) || view.WhenMissing != legacy.view.WhenMissing {
+			t.Fatalf("legacy policy changed on list for %q: got=%+v want=%+v found=%v", legacy.view.Name, view, legacy.view, found)
+		}
+	}
+	listedBase, found := listedByName["revision-stays"]
+	if !found || listedBase.Revision != retainedBase.Revision || listedBase.Sort != retainedBase.Sort ||
+		listedBase.OutputNames != retainedBase.OutputNames || !reflect.DeepEqual(listedBase.Required, retainedBase.Required) ||
+		listedBase.WhenMissing != retainedBase.WhenMissing {
+		t.Fatalf("view.list changed the rejected-update fixture: got=%+v want=%+v found=%v", listedBase, retainedBase, found)
+	}
+	manifests := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportList, nil))
+	if manifests.Status != command.StatusSucceeded {
+		t.Fatalf("export.list after policy refusals = %q: %+v", manifests.Status, manifests.Reasons)
+	}
+	var frozen []command.ExportManifestData
+	if err := json.Unmarshal(manifests.Data, &frozen); err != nil {
+		t.Fatal(err)
+	}
+	if len(frozen) != 0 {
+		t.Fatalf("refused policy exports left %d frozen manifests", len(frozen))
+	}
+
+	// Empty policy values keep ordinary legacy views and explicit selection
+	// exports available.
+	plain := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "plain", "query": "payload", "scope": h.ingest.WorkspaceID,
+		"sort": "  ", "output_names": "  ", "required_capabilities": []string{"", "  "}, "when_missing": "  ",
+	}))
+	if plain.Status != command.StatusSucceeded {
+		t.Fatalf("plain save with normalized blank policy = %q: %+v", plain.Status, plain.Reasons)
+	}
+	plainPlanned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"name": "plain"}))
+	if plainPlanned.Status != command.StatusSucceeded {
+		t.Fatalf("plain view export.plan = %q: %+v", plainPlanned.Status, plainPlanned.Reasons)
+	}
+	explicitPlanned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"subjects": []string{h.subjectRef}}))
+	if explicitPlanned.Status != command.StatusSucceeded {
+		t.Fatalf("explicit selection export.plan = %q: %+v", explicitPlanned.Status, explicitPlanned.Reasons)
+	}
+}
+
+func TestViewSaveFilterOnlyQueryRoundTripsAndRejectsEmptyConditions(t *testing.T) {
+	root := t.TempDir()
+	for name, body := range map[string]string{
+		"filter-alpha.wav": "alpha bytes",
+		"filter-bravo.wav": "bravo bytes",
+		"filter-notes.txt": "notes bytes",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	h, _ := openViewExportHarness(t, root)
+	saved := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "wav originals", "query": "  ", "scope": h.ingest.WorkspaceID, "fields": []string{"suffix=wav"},
+	}))
+	if saved.Status != command.StatusSucceeded {
+		t.Fatalf("filter-only view.save = %q: %+v", saved.Status, saved.Reasons)
+	}
+	var view command.ViewData
+	if err := json.Unmarshal(saved.Data, &view); err != nil {
+		t.Fatalf("decode filter-only view.save: %v", err)
+	}
+	if view.Query != "" || len(view.Fields) != 1 || view.Fields[0] != "suffix=wav" {
+		t.Fatalf("filter-only saved view = %+v; want empty query and retained suffix filter", view)
+	}
+
+	got := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"name": view.Name}))
+	if got.Status != command.StatusSucceeded {
+		t.Fatalf("filter-only view.get = %q: %+v", got.Status, got.Reasons)
+	}
+	var fetched command.ViewData
+	if err := json.Unmarshal(got.Data, &fetched); err != nil {
+		t.Fatalf("decode filter-only view.get: %v", err)
+	}
+	if fetched.ViewID != view.ViewID || fetched.Query != "" || len(fetched.Fields) != 1 || fetched.Fields[0] != "suffix=wav" {
+		t.Fatalf("filter-only view.get = %+v", fetched)
+	}
+
+	listed := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewList, map[string]any{}))
+	if listed.Status != command.StatusSucceeded {
+		t.Fatalf("view.list = %q: %+v", listed.Status, listed.Reasons)
+	}
+	var views []command.ViewData
+	if err := json.Unmarshal(listed.Data, &views); err != nil {
+		t.Fatalf("decode view.list: %v", err)
+	}
+	if len(views) != 1 || views[0].ViewID != view.ViewID || views[0].Query != "" || len(views[0].Fields) != 1 || views[0].Fields[0] != "suffix=wav" {
+		t.Fatalf("view.list = %+v; want the filter-only view with its condition retained", views)
+	}
+
+	evaluated := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewEvaluate, map[string]any{"view_id": view.ViewID}))
+	if evaluated.Status != command.StatusSucceeded {
+		t.Fatalf("filter-only view.evaluate = %q: %+v", evaluated.Status, evaluated.Reasons)
+	}
+	var result command.ViewEvaluateData
+	if err := json.Unmarshal(evaluated.Data, &result); err != nil {
+		t.Fatalf("decode filter-only view.evaluate: %v", err)
+	}
+	if result.Query != "" || len(result.Hits) != 2 {
+		t.Fatalf("filter-only evaluate query=%q hits=%d, want empty query and 2 WAV hits", result.Query, len(result.Hits))
+	}
+	for _, hit := range result.Hits {
+		if !strings.HasSuffix(strings.ToLower(hit.Name), ".wav") {
+			t.Fatalf("filter-only result included non-WAV %q", hit.Name)
+		}
+	}
+
+	planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"view_id": view.ViewID}))
+	if planned.Status != command.StatusSucceeded {
+		t.Fatalf("filter-only export.plan = %q: %+v", planned.Status, planned.Reasons)
+	}
+	var manifest command.ExportManifestData
+	if err := json.Unmarshal(planned.Data, &manifest); err != nil {
+		t.Fatalf("decode filter-only export.plan: %v", err)
+	}
+	if manifest.ViewID != view.ViewID || manifest.SubjectCount != 2 {
+		t.Fatalf("filter-only export manifest = %+v; want same view and 2 frozen subjects", manifest)
+	}
+
+	for index, fields := range [][]string{
+		nil,
+		{"suffix="},
+		{"suffix=wav", "language="},
+		{"type=audio"},
+		{"size_min=not-a-number"},
+		{"size_min=-1"},
+		{"size_min=10", "size_max=1"},
+	} {
+		name := fmt.Sprintf("invalid filter-only %d", index)
+		refused := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+			"name": name, "query": "", "scope": h.ingest.WorkspaceID, "fields": fields,
+		}))
+		if refused.Status != command.StatusFailed || !hasReasonCode(refused, ReasonCodeInvalidInput) {
+			t.Fatalf("empty-query view.save fields=%v = %q: %+v, want failed invalid_input", fields, refused.Status, refused.Reasons)
+		}
+		missing := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewGet, map[string]any{"name": name}))
+		if missing.Status != command.StatusFailed || !hasReasonCode(missing, ReasonCodeNotFound) {
+			t.Fatalf("refused view %q was persisted: %q %+v", name, missing.Status, missing.Reasons)
+		}
+	}
+}
+
+func TestSavedViewExactTagsFilterAuthorizedSubjectsAndFreezeExport(t *testing.T) {
+	root := t.TempDir()
+	for name, body := range map[string]string{
+		"alpha.txt":   "needle alpha payload",
+		"bravo.txt":   "needle bravo payload",
+		"charlie.txt": "other charlie payload",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	h, entries := openViewExportHarness(t, root, true)
+	byName := make(map[string]command.NamespaceEntryData, len(entries))
+	for _, entry := range entries {
+		byName[entry.DisplayName] = entry
+	}
+	alpha := byName["alpha.txt"]
+	bravo := byName["bravo.txt"]
+	charlie := byName["charlie.txt"]
+	if alpha.SubjectRef == "" || bravo.SubjectRef == "" || charlie.SubjectRef == "" {
+		t.Fatalf("fixture subjects missing: %+v", entries)
+	}
+
+	// Full tag values are JSON string literals; spaces, Unicode, punctuation,
+	// quotes, and equals signs are data, not field syntax or FTS prefixes.
+	tagOne := "  出门 = \"先\"  "
+	tagTwo := "旅行/完成"
+	upsertTag := func(subject, body string) command.AnnotationUpsertData {
+		t.Helper()
+		created := h.dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationUpsert, map[string]any{
+			"workspace_id": h.ingest.WorkspaceID, "subject_ref": subject, "kind": "TAG", "body": body,
+		}))
+		if created.Status != command.StatusSucceeded {
+			t.Fatalf("upsert TAG %q = %q: %+v", body, created.Status, created.Reasons)
+		}
+		var data command.AnnotationUpsertData
+		if err := json.Unmarshal(created.Data, &data); err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	upsertTag(alpha.SubjectRef, tagOne)
+	upsertTag(alpha.SubjectRef, tagTwo)
+	upsertTag(bravo.SubjectRef, tagOne)
+	upsertTag(bravo.SubjectRef, tagTwo)
+	upsertTag(charlie.SubjectRef, tagOne+" suffix")
+	upsertTag(charlie.SubjectRef, tagTwo)
+	// A tombstoned second tag must not satisfy an AND condition.
+	annotationsBeforeDelete, err := h.dispatcher.store.ListAnnotations(context.Background(), h.ingest.WorkspaceID, bravo.SubjectRef, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tombstoned sqlite.Annotation
+	for _, annotation := range annotationsBeforeDelete {
+		if annotation.Kind == sqlite.AnnotationTag && annotation.Body == tagTwo && !annotation.Tombstoned {
+			tombstoned = annotation
+			break
+		}
+	}
+	if tombstoned.ID == "" {
+		t.Fatal("bravo tagTwo record not found for tombstone test")
+	}
+	deleted := h.dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationDelete, map[string]any{
+		"workspace_id": h.ingest.WorkspaceID, "annotation_id": tombstoned.ID, "expected_revision": tombstoned.Revision,
+	}))
+	if deleted.Status != command.StatusSucceeded {
+		t.Fatalf("delete TAG = %q: %+v", deleted.Status, deleted.Reasons)
+	}
+
+	quoteTag := func(value string) string {
+		t.Helper()
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(encoded)
+	}
+	fields := []string{"tag=" + quoteTag(tagOne), "tag=" + quoteTag(tagTwo), "tag=" + quoteTag(tagOne)}
+	saved := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "exact tag intersection", "query": "", "scope": h.ingest.WorkspaceID, "fields": fields,
+	}))
+	if saved.Status != command.StatusSucceeded {
+		t.Fatalf("tag-only view.save = %q: %+v", saved.Status, saved.Reasons)
+	}
+	var view command.ViewData
+	if err := json.Unmarshal(saved.Data, &view); err != nil {
+		t.Fatal(err)
+	}
+	evaluate := func(input map[string]any) command.ViewEvaluateData {
+		t.Helper()
+		result := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewEvaluate, input))
+		if result.Status != command.StatusSucceeded {
+			t.Fatalf("view.evaluate = %q: %+v", result.Status, result.Reasons)
+		}
+		var data command.ViewEvaluateData
+		if err := json.Unmarshal(result.Data, &data); err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	got := evaluate(map[string]any{"view_id": view.ViewID})
+	if len(got.Hits) != 1 || got.Hits[0].SubjectRef != alpha.SubjectRef {
+		t.Fatalf("tag-only AND evaluation = %+v; want only alpha", got.Hits)
+	}
+
+	// Existing lexical and structured predicates remain conjunctive with TAGs.
+	mixed := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "mixed exact tag", "query": "needle", "scope": h.ingest.WorkspaceID,
+		"fields": []string{"entry_type=REGULAR_FILE", "tag=" + quoteTag(tagOne)},
+	}))
+	if mixed.Status != command.StatusSucceeded {
+		t.Fatalf("mixed view.save = %q: %+v", mixed.Status, mixed.Reasons)
+	}
+	var mixedView command.ViewData
+	if err := json.Unmarshal(mixed.Data, &mixedView); err != nil {
+		t.Fatal(err)
+	}
+	mixedResult := evaluate(map[string]any{"view_id": mixedView.ViewID})
+	if len(mixedResult.Hits) != 2 || mixedResult.Hits[0].SubjectRef == charlie.SubjectRef || mixedResult.Hits[1].SubjectRef == charlie.SubjectRef {
+		t.Fatalf("mixed query/filter/TAG evaluation = %+v; want alpha and bravo only", mixedResult.Hits)
+	}
+
+	planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"view_id": view.ViewID}))
+	if planned.Status != command.StatusSucceeded {
+		t.Fatalf("tag view export.plan = %q: %+v", planned.Status, planned.Reasons)
+	}
+	var frozen command.ExportManifestData
+	if err := json.Unmarshal(planned.Data, &frozen); err != nil {
+		t.Fatal(err)
+	}
+	annotations, err := h.dispatcher.store.ListAnnotations(context.Background(), h.ingest.WorkspaceID, alpha.SubjectRef, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, annotation := range annotations {
+		if annotation.Kind == sqlite.AnnotationTag && annotation.Body == tagTwo && !annotation.Tombstoned {
+			result := h.dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationDelete, map[string]any{
+				"workspace_id": h.ingest.WorkspaceID, "annotation_id": annotation.ID, "expected_revision": annotation.Revision,
+			}))
+			if result.Status != command.StatusSucceeded {
+				t.Fatalf("delete frozen-match TAG = %q: %+v", result.Status, result.Reasons)
+			}
+		}
+	}
+	afterTagViewChange := evaluate(map[string]any{"view_id": view.ViewID})
+	if len(afterTagViewChange.Hits) != 0 {
+		t.Fatalf("tag-only evaluation after removing required TAG = %+v; want no hits", afterTagViewChange.Hits)
+	}
+	afterTagChange := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportList, map[string]any{}))
+	if afterTagChange.Status != command.StatusSucceeded {
+		t.Fatalf("export.list after TAG change = %q: %+v", afterTagChange.Status, afterTagChange.Reasons)
+	}
+	var manifests []command.ExportManifestData
+	if err := json.Unmarshal(afterTagChange.Data, &manifests); err != nil {
+		t.Fatal(err)
+	}
+	if len(manifests) != 1 || manifests[0].ManifestID != frozen.ManifestID || manifests[0].ManifestDigest != frozen.ManifestDigest || manifests[0].SubjectCount != 1 ||
+		len(manifests[0].Items) != len(frozen.Items) || manifests[0].Items[0] != frozen.Items[0] {
+		t.Fatalf("frozen export changed after live TAG mutation: before=%+v after=%+v", frozen, manifests)
+	}
+
+	for _, malformed := range []string{"tag=bare", `tag=""`, `tag="unterminated`} {
+		refused := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+			"name": "bad " + malformed, "query": "needle", "scope": h.ingest.WorkspaceID, "fields": []string{malformed},
+		}))
+		if refused.Status != command.StatusFailed || !hasReasonCode(refused, ReasonCodeInvalidInput) {
+			t.Fatalf("malformed TAG field %q = %q: %+v", malformed, refused.Status, refused.Reasons)
+		}
+	}
+	malformedTagAfterNumeric := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "bad numeric before malformed tag", "query": "needle", "scope": h.ingest.WorkspaceID,
+		"fields": []string{"size_min=not-a-number", `tag="unterminated`},
+	}))
+	if malformedTagAfterNumeric.Status != command.StatusFailed || !hasReasonCode(malformedTagAfterNumeric, ReasonCodeInvalidInput) {
+		t.Fatalf("malformed TAG after invalid numeric condition = %q: %+v", malformedTagAfterNumeric.Status, malformedTagAfterNumeric.Reasons)
+	}
+}
+
+func TestSavedViewTagScanFindsMatchPastFirstThousandCandidates(t *testing.T) {
+	root := t.TempDir()
+	for index := 0; index < 1001; index++ {
+		name := fmt.Sprintf("candidate-%04d.txt", index)
+		body := fmt.Sprintf("ordinary candidate payload %04d", index)
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "zz-target.txt"), []byte("late unique target payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h, entries := openViewExportHarness(t, root, true)
+	var target command.NamespaceEntryData
+	for _, entry := range entries {
+		if entry.DisplayName == "zz-target.txt" {
+			target = entry
+			break
+		}
+	}
+	if target.SubjectRef == "" {
+		t.Fatal("late target subject was not ingested")
+	}
+	tag := `tag="late exact match"`
+	created := h.dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationUpsert, map[string]any{
+		"workspace_id": h.ingest.WorkspaceID, "subject_ref": target.SubjectRef, "kind": "TAG", "body": "late exact match",
+	}))
+	if created.Status != command.StatusSucceeded {
+		t.Fatalf("upsert late TAG = %q: %+v", created.Status, created.Reasons)
+	}
+	// Establish from the current pinned lexical candidate stream that the
+	// target is beyond the first legacy-result ceiling, rather than inferring
+	// candidate order from the fixture filename.
+	var generationID string
+	var position *search.PagePosition
+	var firstThousand []command.SearchHitData
+	for len(firstThousand) < search.LegacyResultLimit {
+		page, err := h.dispatcher.search.QueryLexicalAllPage(context.Background(), h.ingest.WorkspaceID, generationID, search.PageRequest{
+			Limit: search.DefaultPageSize, Position: position,
+		})
+		if err != nil {
+			t.Fatalf("read lexical candidate page: %v", err)
+		}
+		generationID = page.Generation.ID
+		firstThousand = append(firstThousand, h.dispatcher.authorizeHits(context.Background(), h.ingest.WorkspaceID, page.Generation.WorkspaceID, page.Hits, nil)...)
+		if len(firstThousand) >= search.LegacyResultLimit {
+			firstThousand = firstThousand[:search.LegacyResultLimit]
+			break
+		}
+		if !page.Page.HasMore || page.Page.Next == nil {
+			t.Fatalf("lexical candidate stream exhausted after %d hits before the legacy ceiling", len(firstThousand))
+		}
+		position = page.Page.Next
+	}
+	for _, hit := range firstThousand {
+		if hit.SubjectRef == target.SubjectRef {
+			t.Fatal("target appeared in actual first 1,000 lexical candidates; fixture does not prove late-match scanning")
+		}
+	}
+	saved := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+		"name": "late exact tag", "query": "", "scope": h.ingest.WorkspaceID, "fields": []string{tag},
+	}))
+	if saved.Status != command.StatusSucceeded {
+		t.Fatalf("late tag view.save = %q: %+v", saved.Status, saved.Reasons)
+	}
+	var view command.ViewData
+	if err := json.Unmarshal(saved.Data, &view); err != nil {
+		t.Fatal(err)
+	}
+	evaluated := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewEvaluate, map[string]any{"view_id": view.ViewID}))
+	if evaluated.Status != command.StatusSucceeded {
+		t.Fatalf("late tag view.evaluate = %q: %+v", evaluated.Status, evaluated.Reasons)
+	}
+	var result command.ViewEvaluateData
+	if err := json.Unmarshal(evaluated.Data, &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Hits) != 1 || result.Hits[0].SubjectRef != target.SubjectRef {
+		t.Fatalf("late tag evaluation = %d hits; want target beyond first 1000 candidates", len(result.Hits))
+	}
+}
+
+func TestViewBackedExportPlanExhaustsUntaggedAndTaggedMembership(t *testing.T) {
+	const count = search.LegacyResultLimit + 1
+	root := t.TempDir()
+	for index := 0; index < count; index++ {
+		name := fmt.Sprintf("export-candidate-%04d.txt", index)
+		if err := os.WriteFile(filepath.Join(root, name), []byte("shared export candidate"), 0o600); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+	h, entries := openViewExportHarness(t, root)
+	if len(entries) != count {
+		t.Fatalf("ingested %d entries, want %d", len(entries), count)
+	}
+	ctx := context.Background()
+	if err := h.dispatcher.store.Update(ctx, func(tx *sqlite.Tx) error {
+		for _, entry := range entries {
+			annotationID, err := sqlite.NewStableID("ann")
+			if err != nil {
+				return err
+			}
+			annotation := sqlite.Annotation{
+				ID: annotationID, WorkspaceID: h.ingest.WorkspaceID, SubjectRef: entry.SubjectRef,
+				Kind: sqlite.AnnotationTag, Body: "all export candidates", Revision: 1,
+			}
+			if err := tx.InsertAnnotation(ctx, &annotation); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed TAG facts: %v", err)
+	}
+
+	for _, test := range []struct {
+		name   string
+		query  string
+		fields []string
+	}{
+		{name: "untagged", query: "candidate"},
+		{name: "tagged", fields: []string{`tag="all export candidates"`}},
+	} {
+		saved := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+			"name": test.name, "query": test.query, "scope": h.ingest.WorkspaceID, "fields": test.fields,
+		}))
+		if saved.Status != command.StatusSucceeded {
+			t.Fatalf("save %s view = %q: %+v", test.name, saved.Status, saved.Reasons)
+		}
+		var view command.ViewData
+		if err := json.Unmarshal(saved.Data, &view); err != nil {
+			t.Fatalf("decode %s view: %v", test.name, err)
+		}
+		bounded := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewEvaluate, map[string]any{
+			"view_id": view.ViewID, "limit": 200,
+		}))
+		if bounded.Status != command.StatusSucceeded {
+			t.Fatalf("evaluate bounded %s view = %q: %+v", test.name, bounded.Status, bounded.Reasons)
+		}
+		var boundedResult command.ViewEvaluateData
+		if err := json.Unmarshal(bounded.Data, &boundedResult); err != nil {
+			t.Fatalf("decode bounded %s evaluation: %v", test.name, err)
+		}
+		if len(boundedResult.Hits) != 200 {
+			t.Fatalf("bounded %s evaluation returned %d hits, want 200", test.name, len(boundedResult.Hits))
+		}
+		planned := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportPlan, map[string]any{"view_id": view.ViewID}))
+		if planned.Status != command.StatusSucceeded {
+			t.Fatalf("plan %s view = %q: %+v", test.name, planned.Status, planned.Reasons)
+		}
+		var manifest command.ExportManifestData
+		if err := json.Unmarshal(planned.Data, &manifest); err != nil {
+			t.Fatalf("decode %s manifest: %v", test.name, err)
+		}
+		if manifest.SubjectCount != count || len(manifest.Items) != count {
+			t.Fatalf("%s manifest froze %d items (items=%d), want all %d", test.name, manifest.SubjectCount, len(manifest.Items), count)
+		}
+		wantEntries := make(map[string]command.NamespaceEntryData, count)
+		for _, entry := range entries {
+			wantEntries[entry.ID] = entry
+		}
+		for _, encoded := range manifest.Items {
+			var item exact.ExportItem
+			if err := json.Unmarshal([]byte(encoded), &item); err != nil {
+				t.Fatalf("decode %s frozen item: %v", test.name, err)
+			}
+			entry, expected := wantEntries[item.SubjectRef]
+			if !expected {
+				t.Fatalf("%s manifest contains unexpected subject %q", test.name, item.SubjectRef)
+			}
+			if item.OutputName != outputNameFor(entry.DisplayName, entry.ID) || item.ContentID != entry.ContentID || item.LogicalSize != sizeOrZero(entry.LogicalSize) {
+				t.Fatalf("%s frozen item does not match source entry %q: item=%+v entry=%+v", test.name, item.SubjectRef, item, entry)
+			}
+			delete(wantEntries, item.SubjectRef)
+		}
+		if len(wantEntries) != 0 {
+			t.Fatalf("%s manifest omitted %d matching entries", test.name, len(wantEntries))
+		}
+	}
+}
+
+func TestViewBackedExportPlanRefusesEmptyOrUnavailableGeneration(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "candidate.txt"), []byte("one export candidate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := newViewExportHarness(t, root)
+	for _, test := range []struct {
+		name      string
+		query     string
+		scope     string
+		cancelled bool
+	}{
+		{name: "empty", query: "no_matching_token", scope: h.ingest.WorkspaceID},
+		{name: "missing-generation", query: "candidate", scope: "wsp_missing_generation"},
+		{name: "cancelled", query: "candidate", scope: h.ingest.WorkspaceID, cancelled: true},
+	} {
+		saved := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpViewSave, map[string]any{
+			"name": test.name, "query": test.query, "scope": test.scope,
+		}))
+		if saved.Status != command.StatusSucceeded {
+			t.Fatalf("save %s view = %q: %+v", test.name, saved.Status, saved.Reasons)
+		}
+		var view command.ViewData
+		if err := json.Unmarshal(saved.Data, &view); err != nil {
+			t.Fatal(err)
+		}
+		env := mustEnvelope(t, command.OpExportPlan, map[string]any{"view_id": view.ViewID})
+		planned := command.Result{}
+		if test.cancelled {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			planned = h.dispatcher.handleExportPlan(ctx, env, time.Now().UTC())
+		} else {
+			planned = handleViewExport(h.dispatcher, env)
+		}
+		if planned.Status == command.StatusSucceeded {
+			t.Fatalf("plan %s view unexpectedly succeeded: %s", test.name, planned.Data)
+		}
+		listed := handleViewExport(h.dispatcher, mustEnvelope(t, command.OpExportList, nil))
+		if listed.Status != command.StatusSucceeded {
+			t.Fatalf("export.list after %s refusal = %q: %+v", test.name, listed.Status, listed.Reasons)
+		}
+		var manifests []command.ExportManifestData
+		if err := json.Unmarshal(listed.Data, &manifests); err != nil {
+			t.Fatal(err)
+		}
+		if len(manifests) != 0 {
+			t.Fatalf("%s refusal persisted %d partial manifests", test.name, len(manifests))
+		}
 	}
 }
 

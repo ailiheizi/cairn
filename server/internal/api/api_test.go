@@ -55,3 +55,23 @@ func TestCommandAdapterRejectsMissingTokenAndUnknownRoute(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandAdapterRejectsOversizedValidBodyBeforeDispatch(t *testing.T) {
+	dispatchCalls := 0
+	h := Handler(func(_ context.Context, env command.Envelope) command.Result {
+		dispatchCalls++
+		return command.NewResult(env, command.StatusSucceeded, commandTime, commandTime, nil)
+	}, Options{})
+	body := `{"operation":"status.get","input":{}}`
+	body += strings.Repeat(" ", maxCommandBodyBytes+1-len(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/command", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	h.ServeHTTP(resp, req)
+	if resp.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized command status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if dispatchCalls != 0 {
+		t.Fatalf("dispatcher called %d times for a body beyond the 4 MiB cap", dispatchCalls)
+	}
+}

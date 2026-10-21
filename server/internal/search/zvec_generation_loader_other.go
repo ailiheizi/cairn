@@ -1,4 +1,4 @@
-//go:build purego && !darwin && !dragonfly && !freebsd && !linux && !netbsd && !openbsd && !windows
+//go:build (purego || cairn_zvec_dynamic) && !darwin && !dragonfly && !freebsd && !linux && !netbsd && !openbsd && !windows
 
 package search
 

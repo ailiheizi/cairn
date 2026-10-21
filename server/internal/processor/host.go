@@ -173,14 +173,30 @@ func NewHost(store *sqlite.Store, repo repository.Driver, opts Options) *Host {
 	if detect == nil {
 		detect = identify.NewDetector(0)
 	}
-	return &Host{
+	host := &Host{
 		Store:  store,
 		Repo:   repo,
 		opts:   opts,
-		pool:   newPool(opts.MaxConcurrent, opts.StageTimeout),
 		byCap:  byCap,
 		detect: detect,
 	}
+	// The host holds one bounded slot for the whole subject route. Give that
+	// slot enough time for the admitted document parser, while custom hosts that
+	// do not register document processors retain their configured timeout.
+	poolTimeout := opts.StageTimeout
+	for _, capability := range []string{CapabilityPDFTextExtract, CapabilityDOCXTextExtract} {
+		if _, ok := byCap[capability]; !ok {
+			continue
+		}
+		if budget := host.budgetFor(capability); budget.StageTimeout+opts.StageTimeout > poolTimeout {
+			// The route-level timeout also covers identification and opening the
+			// pinned source. Keep those bounded steps outside the parser's own
+			// declared stage window.
+			poolTimeout = budget.StageTimeout + opts.StageTimeout
+		}
+	}
+	host.pool = newPool(opts.MaxConcurrent, poolTimeout)
+	return host
 }
 
 // ProcessPublication runs optional processing after exact publication.
@@ -278,6 +294,12 @@ func (h *Host) RetryPublication(ctx context.Context, workspaceID, snapshotRef, r
 			source.Close()
 			return errors.New("processor retry route changed from authenticated predecessor")
 		}
+		readCeiling := routeReadCeiling(h.routeBudgets(route), h.opts.MaxSourceBytes)
+		source.Close()
+		source, err = openSource(ctx, h.Repo, entry.ContentID, readCeiling)
+		if err != nil {
+			return err
+		}
 		var node *RouteNode
 		for index := range route.Nodes {
 			candidate := &route.Nodes[index]
@@ -296,13 +318,31 @@ func (h *Host) RetryPublication(ctx context.Context, workspaceID, snapshotRef, r
 			return errors.New("processor retry capability is unavailable")
 		}
 		retryBudget := h.budgetFor(node.CapabilityID)
-		status, runErr := h.admitNode(ctx, workspaceID, snapshotRef, entry, source, classification, route, *node, proc, attemptContext{
-			fenceToken: invocation.FenceToken, retryJobID: invocation.JobID,
-			retryOwner:   invocation.Owner,
-			retryAttempt: invocation.Attempt, retryIdempotencyKey: invocation.IdempotencyKey,
-			retryLeaseToken: invocation.LeaseToken, predecessorAttemptID: previous.ID,
-		}, retryBudget)
-		source.Close()
+		type retryOutcome struct {
+			status ResultStatus
+			err    error
+		}
+		outcomes := make(chan retryOutcome, 1)
+		poolErr := h.pool.runWithTimeout(ctx, retryBudget.StageTimeout, func(runCtx context.Context) error {
+			defer source.Close()
+			status, runErr := h.admitNode(runCtx, workspaceID, snapshotRef, entry, source, classification, route, *node, proc, attemptContext{
+				fenceToken: invocation.FenceToken, retryJobID: invocation.JobID,
+				retryOwner:   invocation.Owner,
+				retryAttempt: invocation.Attempt, retryIdempotencyKey: invocation.IdempotencyKey,
+				retryLeaseToken: invocation.LeaseToken, predecessorAttemptID: previous.ID,
+			}, retryBudget)
+			outcomes <- retryOutcome{status: status, err: runErr}
+			return nil
+		})
+		var status ResultStatus
+		var runErr error
+		if poolErr != nil {
+			status = StatusFailed
+			runErr = poolErr
+		} else {
+			outcome := <-outcomes
+			status, runErr = outcome.status, outcome.err
+		}
 		if status == StatusFailed || status == StatusCancelled || runErr != nil {
 			message := "processor retry did not produce an admitted artifact"
 			if runErr != nil {
@@ -344,6 +384,11 @@ func (h *Host) budgetFor(capability string) CapabilityBudget {
 		if override.StageTimeout > 0 {
 			budget.StageTimeout = override.StageTimeout
 		}
+		if override.MaxOutputBytes > 0 {
+			budget.MaxOutputBytes = override.MaxOutputBytes
+		} else {
+			budget.MaxOutputBytes = budget.MaxSourceBytes
+		}
 		return budget
 	}
 	if proc, ok := h.byCap[capability]; ok {
@@ -355,7 +400,15 @@ func (h *Host) budgetFor(capability string) CapabilityBudget {
 			if declared.StageTimeout > 0 {
 				budget.StageTimeout = declared.StageTimeout
 			}
+			if declared.MaxOutputBytes > 0 {
+				budget.MaxOutputBytes = declared.MaxOutputBytes
+			} else {
+				budget.MaxOutputBytes = budget.MaxSourceBytes
+			}
 		}
+	}
+	if budget.MaxOutputBytes <= 0 {
+		budget.MaxOutputBytes = budget.MaxSourceBytes
 	}
 	return budget
 }
@@ -677,7 +730,10 @@ func (h *Host) admitNode(ctx context.Context, workspaceID, snapshotRef string, e
 	if stagingDir == "" {
 		stagingDir = filepath.Join(h.Repo.Root(), "staging")
 	}
-	stagingCeiling := budget.MaxSourceBytes
+	stagingCeiling := budget.MaxOutputBytes
+	if stagingCeiling <= 0 {
+		stagingCeiling = budget.MaxSourceBytes
+	}
 	if stagingCeiling <= 0 {
 		stagingCeiling = h.opts.MaxSourceBytes
 	}
@@ -899,6 +955,12 @@ func buildProcessingRoute(classification ClassificationRecord) Route {
 			},
 		}
 	}
+	if hasPDFEvidence(classification) {
+		return Route{Kind: RouteProcessing, Nodes: []RouteNode{{Stage: StageExtract, CapabilityID: CapabilityPDFTextExtract}}}
+	}
+	if hasDOCXEvidence(classification) {
+		return Route{Kind: RouteProcessing, Nodes: []RouteNode{{Stage: StageExtract, CapabilityID: CapabilityDOCXTextExtract}}}
+	}
 	if hasBookEvidence(classification) {
 		return Route{
 			Kind: RouteProcessing,
@@ -939,6 +1001,24 @@ func buildProcessingRoute(classification ClassificationRecord) Route {
 		}
 	}
 	return Route{Kind: RouteProcessing}
+}
+
+func hasPDFEvidence(classification ClassificationRecord) bool {
+	for _, item := range classification.Evidence {
+		if strings.EqualFold(item.Candidate.MIME, "application/pdf") || item.Candidate.FormatID == "pdf" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDOCXEvidence(classification ClassificationRecord) bool {
+	for _, item := range classification.Evidence {
+		if strings.EqualFold(item.Candidate.MIME, "application/vnd.openxmlformats-officedocument.wordprocessingml.document") || item.Candidate.FormatID == "ooxml-document" {
+			return true
+		}
+	}
+	return false
 }
 
 func hasImageEvidence(classification ClassificationRecord) bool {

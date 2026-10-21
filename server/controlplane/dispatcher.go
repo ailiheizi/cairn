@@ -1213,17 +1213,11 @@ func (d *Dispatcher) handleContentList(ctx context.Context, env command.Envelope
 // entry's captured metadata. It is a captured fact, not a live stat: a row
 // with no recorded time carries no field.
 func entryModifiedAt(entry sqlite.NamespaceEntry) string {
-	var snapshot struct {
-		ModTime string `json:"mod_time"`
-	}
-	if len(entry.Metadata) == 0 || json.Unmarshal(entry.Metadata, &snapshot) != nil {
+	parsed, ok := sqlite.CapturedModificationTime(entry.Metadata)
+	if !ok {
 		return ""
 	}
-	parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(snapshot.ModTime))
-	if err != nil || parsed.IsZero() || parsed.Unix() <= 0 {
-		return ""
-	}
-	return parsed.UTC().Format(time.RFC3339)
+	return parsed.Format(time.RFC3339Nano)
 }
 
 // indexDimensionStates computes the lexical and semantic discovery state for
@@ -1248,13 +1242,17 @@ func (d *Dispatcher) indexDimensionStates(ctx context.Context, workspaceID strin
 	}
 	if d.search != nil && d.search.LexicalUnavailableForWorkspace(workspaceID) {
 		states.lexicalState = "UNAVAILABLE"
-	} else if generation, generationErr := d.store.LatestIndexGeneration(ctx, workspaceID, search.DimensionLexical); generationErr == nil {
-		if covered, err := search.LexicalSubjectCoverage(ctx, generation); err == nil {
+	} else if d.search != nil {
+		if covered, err := d.search.LexicalSubjectCoverageForWorkspace(ctx, workspaceID); err == nil {
 			states.lexicalBySubject, states.lexicalState = covered, "READY"
-		} else {
+		} else if !errors.Is(err, sqlite.ErrNotFound) {
 			states.lexicalState = "UNAVAILABLE"
 		}
-	} else if !errors.Is(generationErr, sqlite.ErrNotFound) {
+	} else if _, err := d.store.LatestIndexGeneration(ctx, workspaceID, search.DimensionLexical); err == nil {
+		// A readable old index cannot be called ready without the configured
+		// Indexer binding that current queries use to validate its profile.
+		states.lexicalState = "UNAVAILABLE"
+	} else if !errors.Is(err, sqlite.ErrNotFound) {
 		states.lexicalState = "UNAVAILABLE"
 	}
 	if d.search != nil {

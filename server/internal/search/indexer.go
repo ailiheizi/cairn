@@ -2,11 +2,13 @@ package search
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,6 +64,9 @@ type Indexer struct {
 	// generation looking healthy or silently serve it with an unhealthy
 	// provider. A later successful rebuild clears the latch.
 	semanticUnavailable atomic.Bool
+	// semanticFeedStale distinguishes a verified current-feed mismatch from
+	// provider/backend failures. It is process-local and never recovery authority.
+	semanticFeedStale atomic.Bool
 	// lexicalUnavailable is a process-local health latch for the latest
 	// rebuild attempt. An older FTS generation may remain readable, but it must
 	// not be advertised as current after a failed rebuild. The per-workspace
@@ -221,7 +226,7 @@ func (idx *Indexer) profileDigest(dimension string) string {
 	case DimensionLexical:
 		digest = idx.LexicalProfileDigest
 		if digest == "" && idx.ConfigDigest != "" {
-			digest = ProfileDigest(dimension, LexicalProfileV4)
+			digest = ProfileDigest(dimension, CurrentLexicalProfile)
 		}
 	case DimensionGraph:
 		digest = idx.GraphProfileDigest
@@ -313,6 +318,32 @@ func generationBindingMatches(idx *Indexer, generation sqlite.IndexGeneration, d
 // Rebuild writes one new FTS5 database for the given namespace root and
 // records its path in the operational catalog.
 func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, namespaceRootID string) (generation sqlite.IndexGeneration, rebuildErr error) {
+	return idx.rebuild(ctx, workspaceID, snapshotRef, namespaceRootID, true)
+}
+
+// RebuildLexical refreshes the required lexical projection without running the
+// disposable semantic embedding lane. Explicit search.rebuild continues to use
+// Rebuild and therefore retains its full semantic behavior.
+func (idx *Indexer) RebuildLexical(ctx context.Context, workspaceID, snapshotRef, namespaceRootID string) (generation sqlite.IndexGeneration, rebuildErr error) {
+	generation, rebuildErr = idx.rebuild(ctx, workspaceID, snapshotRef, namespaceRootID, false)
+	if idx != nil && semanticRequiresCurrentFeed(idx) {
+		if rebuildErr != nil {
+			idx.markSemanticUnavailable("latest lexical rebuild failed")
+		} else if latest, err := idx.Store.LatestIndexGeneration(ctx, workspaceID, DimensionSemantic); err == nil {
+			if err := idx.semanticGenerationMatchesLatestFeed(ctx, latest); err == nil {
+				idx.clearSemanticFeedStale()
+			}
+		} else if errors.Is(err, sqlite.ErrNotFound) {
+			idx.semanticIndexReady.Store(false)
+			idx.clearSemanticFeedStale()
+		} else {
+			idx.markSemanticUnavailable("latest semantic generation cannot be read")
+		}
+	}
+	return generation, rebuildErr
+}
+
+func (idx *Indexer) rebuild(ctx context.Context, workspaceID, snapshotRef, namespaceRootID string, buildSemantic bool) (generation sqlite.IndexGeneration, rebuildErr error) {
 	// Keep the old generation in the catalog for recovery/debugging, while
 	// making the failed current rebuild visible to capability/status callers.
 	defer func() {
@@ -488,11 +519,28 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 	descriptionsBySubject := map[string][]string{}
 	descriptionFieldBytesBySubject := map[string]int{}
 	descriptionFieldPartsBySubject := map[string]int{}
+	sourceCoverageBySubject := map[string][]sourceCoverageCandidate{}
+	sourceCoverageOffsets := map[string]map[string]int{}
+	sourceCoveragePartCounts := map[string]map[string]int{}
+	coverageStart := func(subject, field, body string) int {
+		if sourceCoverageOffsets[subject] == nil {
+			sourceCoverageOffsets[subject] = map[string]int{}
+			sourceCoveragePartCounts[subject] = map[string]int{}
+		}
+		start := sourceCoverageOffsets[subject][field]
+		if sourceCoveragePartCounts[subject][field] > 0 {
+			start++ // strings.Join separator
+		}
+		sourceCoverageOffsets[subject][field] = start + len(body)
+		sourceCoveragePartCounts[subject][field]++
+		return start
+	}
 	// segmentsBySubject is the lexical provenance projection and intentionally
 	// retains every durable description revision. Semantic segments are a
 	// narrower active-leaf projection built in parallel below.
 	segmentsBySubject := map[string][]SegmentRef{}
 	semanticSegmentsBySubject := map[string][]SegmentRef{}
+	semanticSourceInventory := semanticSourceInventory{Rows: make([]semanticSourceInventoryRow, 0)}
 	locatorsBySubject := map[string][]string{}
 	recoveryBySubject := map[string][]string{}
 	duplicateGroupBySubject := map[string]string{}
@@ -504,15 +552,51 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		switch record.Kind {
 		case sqlite.AnnotationTag:
 			tagsBySubject[subjectRef] = append(tagsBySubject[subjectRef], record.Body)
+			appendSourceCoverageCandidate(sourceCoverageBySubject, subjectRef, "TAG", "", "tags", record.ID, fmt.Sprint(record.Revision), record.Body, record.BodyDigest, coverageStart(subjectRef, "tags", record.Body))
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, semanticSourceInventoryRow{SubjectID: subjectRef,
+				SourceKind: "TAG", SourceRef: record.ID, Revision: fmt.Sprint(record.Revision), BodyDigest: record.BodyDigest,
+				BodyLength:  int64(len(record.Body)),
+				Disposition: SemanticSourceExcluded, Reason: SemanticSourceReasonTag})
 		case sqlite.AnnotationNote:
 			notesBySubject[subjectRef] = append(notesBySubject[subjectRef], record.Body)
+			appendSourceCoverageCandidate(sourceCoverageBySubject, subjectRef, "NOTE", "", "notes", record.ID, fmt.Sprint(record.Revision), record.Body, record.BodyDigest, coverageStart(subjectRef, "notes", record.Body))
 			segment := SegmentRef{
 				SourceType: "ANNOTATION", SourceID: record.ID,
 				SegmentID: record.ID, MatchedText: record.Body,
 				Kind: string(sqlite.AnnotationNote), Producer: "USER", Accepted: true, Language: "und",
 			}
 			segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], segment)
-			semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], segment)
+			row := semanticSourceInventoryRow{SubjectID: subjectRef, SourceKind: "NOTE", SourceRef: record.ID,
+				Revision: fmt.Sprint(record.Revision), BodyDigest: record.BodyDigest, BodyLength: int64(len(record.Body)), Disposition: SemanticSourceIndexed}
+			semanticSegments := []SegmentRef{segment}
+			if !utf8.ValidString(record.Body) {
+				semanticSegments = nil
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+			} else if len(record.Body) > semanticTextSourceSegmentTargetBytes {
+				row.SegmentationProfileDigest = semanticTextSourceSegmentationProfileDigest
+				var valid bool
+				semanticSegments, valid = deriveSemanticTextSourceSegments("NOTE", subjectRef, record.ID, row.Revision, record.Body, record.BodyDigest, "USER")
+				if !valid {
+					semanticSegments = nil
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+				}
+			}
+			for _, semanticSegment := range semanticSegments {
+				semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], semanticSegment)
+				proof := semanticSourceInputFromSegment(semanticSegment, record.ID, row.Revision)
+				if semanticSegment.TextSourceProvenance != nil {
+					proof.SourceSpanStart, proof.SourceSpanEnd = semanticSegment.TextSourceProvenance.SourceStartByte, semanticSegment.TextSourceProvenance.SourceEndByte
+					proof.HasSourceSpan = true
+				}
+				row.Inputs = append(row.Inputs, proof)
+			}
+			if !validSHA256Text(record.BodyDigest) {
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceDigestMissing
+			} else if row.Disposition == SemanticSourceIndexed && len(row.Inputs) == 1 && row.Inputs[0].Disposition == SemanticSourceExcluded {
+				row.Disposition, row.Reason = SemanticSourceExcluded, SemanticSourceReasonEmptyText
+				row.Inputs = nil
+			}
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
 		}
 	}
 	for _, artifact := range artifacts {
@@ -523,9 +607,14 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		if _, ok := semanticArtifactEntryInRoots(artifact, subjectRef, byID, rootsByID); !ok {
 			continue
 		}
-		if artifact.Stage == "EXTRACT" && strings.TrimSpace(artifact.Body) != "" {
+		if artifact.Stage == "EXTRACT" {
+			if artifact.State != sqlite.ArtifactAdmitted {
+				continue
+			}
 			extractedBySubject[subjectRef] = append(extractedBySubject[subjectRef], artifact.Body)
-			if artifact.State == sqlite.ArtifactAdmitted && utf8.ValidString(artifact.Body) {
+			appendSourceCoverageCandidate(sourceCoverageBySubject, subjectRef, "EXTRACT", "", "extracted", artifact.ID, artifact.ID, artifact.Body, artifact.Digest, coverageStart(subjectRef, "extracted", artifact.Body))
+			disposition, reason := semanticExtractSourceDisposition(artifact.Body)
+			if disposition == SemanticSourceIndexed && artifact.State == sqlite.ArtifactAdmitted {
 				segment := SegmentRef{
 					SourceType: "ARTIFACT", SourceID: artifact.ID,
 					SegmentID: artifact.ID, MatchedText: artifact.Body,
@@ -533,7 +622,35 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 					Accepted: true, Language: "und",
 				}
 				segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], segment)
-				semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], segment)
+				row := semanticSourceInventoryRow{SubjectID: subjectRef, SourceKind: "EXTRACT", SourceRef: artifact.ID,
+					Revision: artifact.ID, BodyDigest: artifact.Digest, BodyLength: int64(len(artifact.Body)), Disposition: SemanticSourceIndexed}
+				semanticSegments := []SegmentRef{segment}
+				if len(artifact.Body) > semanticTextSourceSegmentTargetBytes {
+					row.SegmentationProfileDigest = semanticTextSourceSegmentationProfileDigest
+					var valid bool
+					semanticSegments, valid = deriveSemanticTextSourceSegments("EXTRACT", subjectRef, artifact.ID, artifact.ID, artifact.Body, artifact.Digest, artifact.ProducerDigest)
+					if !valid {
+						semanticSegments = nil
+						row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+					}
+				}
+				for _, semanticSegment := range semanticSegments {
+					semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], semanticSegment)
+					proof := semanticSourceInputFromSegment(semanticSegment, artifact.ID, artifact.ID)
+					if semanticSegment.TextSourceProvenance != nil {
+						proof.SourceSpanStart, proof.SourceSpanEnd = semanticSegment.TextSourceProvenance.SourceStartByte, semanticSegment.TextSourceProvenance.SourceEndByte
+						proof.HasSourceSpan = true
+					}
+					row.Inputs = append(row.Inputs, proof)
+				}
+				if !validSHA256Text(artifact.Digest) {
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceDigestMissing
+				}
+				semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+			} else {
+				semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, semanticSourceInventoryRow{SubjectID: subjectRef,
+					SourceKind: "EXTRACT", SourceRef: artifact.ID, Revision: artifact.ID, BodyDigest: artifact.Digest, BodyLength: int64(len(artifact.Body)),
+					Disposition: disposition, Reason: reason})
 			}
 		}
 	}
@@ -587,14 +704,16 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			descriptionFieldPartsBySubject[subjectRef]++
 		}
 		descriptionsBySubject[subjectRef] = append(descriptionsBySubject[subjectRef], parts...)
-		if description.ID == "" {
-			continue
-		}
+		appendSourceCoverageCandidate(sourceCoverageBySubject, subjectRef, "DESCRIPTION", string(description.Kind), "descriptions", description.ID, fmt.Sprint(description.Revision), description.Body, description.BodyDigest, bodyFieldStart)
 		segments, listErr := idx.Store.ListSemanticSegments(ctx, workspaceID, description.ID)
 		if listErr != nil {
 			return generation, listErr
 		}
 		sourceProvenance := verifiedDescriptionSourceProvenance(description, subjectRef, bodyFieldStart, segments)
+		if sourceProvenance == nil {
+			sourceProvenance = legacyDescriptionSourceProvenance(description, subjectRef, bodyFieldStart, segments)
+		}
+		lexicalRefs := make([]SegmentRef, 0, len(segments))
 		for segmentIndex, segment := range segments {
 			ref := SegmentRef{
 				DescriptionDocumentID: description.ID,
@@ -611,12 +730,58 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			if segmentIndex < len(sourceProvenance) {
 				ref.DescriptionSource = sourceProvenance[segmentIndex]
 			}
+			lexicalRefs = append(lexicalRefs, ref)
 			segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], ref)
-			// Durable segments from rejected/superseded revisions remain lexical
-			// provenance. Only accepted leaves enter a new semantic generation.
-			if _, ok := activeDescriptions[description.ID]; ok {
-				semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], ref)
+		}
+		row := semanticSourceInventoryRow{SubjectID: subjectRef, SourceKind: "DESCRIPTION", SourceSubtype: string(description.Kind),
+			SourceRef: description.ID, Revision: fmt.Sprint(description.Revision), BodyDigest: description.BodyDigest, BodyLength: int64(len(description.Body))}
+		if !description.Accepted {
+			row.Disposition, row.Reason = SemanticSourceExcluded, SemanticSourceReasonDescriptionRejected
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+		} else if _, active := activeDescriptions[description.ID]; !active {
+			row.Disposition, row.Reason = SemanticSourceExcluded, SemanticSourceReasonDescriptionSuperseded
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+		} else if !validSHA256Text(description.BodyDigest) {
+			row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceDigestMissing
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+		} else if sha256Text(description.Body) != description.BodyDigest {
+			row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceChanged
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+		} else {
+			if description.ID == "" {
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+				semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+				continue
 			}
+			if len(segments) == 0 || sourceProvenance == nil {
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+			}
+			for _, ref := range lexicalRefs {
+				// Durable segments from rejected/superseded revisions remain lexical
+				// provenance. Only accepted leaves enter a new semantic generation.
+				if description.Accepted {
+					semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], ref)
+					if ref.DescriptionSource == nil {
+						row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+					}
+					row.Inputs = append(row.Inputs, semanticSourceInputFromSegment(ref, description.ID, row.Revision))
+				}
+			}
+			if row.Disposition == "" {
+				indexedInputs := 0
+				for _, input := range row.Inputs {
+					if input.Disposition == SemanticSourceIndexed {
+						indexedInputs++
+					}
+				}
+				if indexedInputs == 0 {
+					row.Disposition, row.Reason = SemanticSourceExcluded, SemanticSourceReasonEmptyText
+					row.Inputs = nil
+				} else {
+					row.Disposition = SemanticSourceIndexed
+				}
+			}
+			semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
 		}
 	}
 	for _, binding := range bindings {
@@ -643,6 +808,17 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 	// EntryID as both source and segment identity. The stable SubjectRef is
 	// carried separately in the semantic vector row.
 	for _, entry := range byID {
+		filenameRow := semanticSourceInventoryRow{SubjectID: entry.SubjectRef, SourceKind: "FILENAME", SourceRef: entry.ID,
+			Revision: entry.ID, BodyDigest: sha256Text(entry.DisplayName), BodyLength: int64(len(entry.DisplayName))}
+		if strings.TrimSpace(entry.DisplayName) == "" {
+			filenameRow.Disposition, filenameRow.Reason = SemanticSourceExcluded, SemanticSourceReasonEmptyText
+		} else {
+			segment := SegmentRef{SourceType: "FILENAME", SourceID: entry.ID, SegmentID: entry.ID,
+				MatchedText: entry.DisplayName, Kind: "FILENAME", Producer: "CATALOG", Accepted: true, Language: "und"}
+			filenameRow.Disposition = SemanticSourceIndexed
+			filenameRow.Inputs = []semanticSourceInputProof{semanticSourceInputFromSegment(segment, entry.ID, entry.ID)}
+		}
+		semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, filenameRow)
 		if strings.TrimSpace(entry.DisplayName) == "" {
 			continue
 		}
@@ -676,7 +852,13 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 				string(representation.OwnershipMode), representation.RecordDigest)
 		}
 	}
+	generationID, err := sqlite.NewStableID(sqlite.IDPrefixIndexGeneration)
+	if err != nil {
+		return generation, err
+	}
 	docs := make([]Document, 0, len(nodes))
+	documentRefs := make([]string, 0, len(nodes))
+	generationSourceRows := make([]sourceCoverageRecord, 0)
 	for _, node := range nodes {
 		entry := node.Entry
 		metadata := append([]string{string(entry.Metadata)}, metadataBySubject[entry.SubjectRef]...)
@@ -689,12 +871,28 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			segments = nil
 		}
 		entryPath := displayPath(byID, entry)
+		candidates := append([]sourceCoverageCandidate(nil), sourceCoverageBySubject[entry.SubjectRef]...)
+		candidates = append(candidates, sourceCoverageCandidate{SourceKind: "FILENAME", Field: "name", SourceRef: entry.ID,
+			Revision: entry.ID, SourceBytes: entry.DisplayName, DocumentRef: entry.ID, FieldStart: 0, FieldEnd: len(entry.DisplayName)})
 		notes := strings.Join(notesBySubject[entry.SubjectRef], " ")
 		descriptions := strings.Join(descriptionsBySubject[entry.SubjectRef], " ")
+		sourceFields := map[string]string{"name": entry.DisplayName, "tags": strings.Join(tagsBySubject[entry.SubjectRef], " "),
+			"notes": notes, "descriptions": descriptions, "extracted": strings.Join(extractedBySubject[entry.SubjectRef], " ")}
+		generationSourceRows = append(generationSourceRows, makeSourceCoverageRecords(entry.SubjectRef, candidates, sourceFields)...)
 		segmentsJSON, marshalErr := marshalLexicalSegmentProjection(segments, descriptions)
 		if marshalErr != nil {
 			return generation, marshalErr
 		}
+		var projection lexicalSegmentProjection
+		if err := json.Unmarshal([]byte(segmentsJSON), &projection); err != nil {
+			return generation, err
+		}
+		projection.DocumentRef = entry.ID
+		segmentsBytes, err := json.Marshal(projection)
+		if err != nil {
+			return generation, err
+		}
+		segmentsJSON = string(segmentsBytes)
 		extracted := strings.Join(extractedBySubject[entry.SubjectRef], " ")
 		doc := Document{
 			SubjectID: entry.SubjectRef,
@@ -737,16 +935,50 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			size := *entry.LogicalSize
 			doc.LogicalSize = &size
 		}
-		if observation, ok := observationMtimeMillis(ctx, idx.Store, workspaceID, entry.ObservationID); ok {
-			doc.MtimeMillis = &observation
+		if captured, ok := sqlite.CapturedModificationTime(entry.Metadata); ok {
+			millis := captured.UnixMilli()
+			doc.MtimeMillis = &millis
 		}
 		docs = append(docs, doc)
+		documentRefs = append(documentRefs, entry.ID)
+	}
+	if len(generationSourceRows) > 0 {
+		generationSourceRows = deduplicateSourceCoverageRows(generationSourceRows)
+		proof := sourceCoverageProof{SourceCoverageVersion: sourceCoverageProjectionVersion,
+			Scope: SourceCoverageScopeLexicalSelectedTextV1, GenerationID: generationID,
+			WorkspaceID: workspaceID, SnapshotRef: generationSnapshotRef, NamespaceRootID: namespaceRootID,
+			ConfigDigest: idx.ConfigDigest, ProfileDigest: idx.profileDigest(DimensionLexical), Rows: generationSourceRows}
+		proof.InventoryDigest = sourceCoverageDigest(proof)
+		anchor := 0
+		for index := 1; index < len(documentRefs); index++ {
+			if documentRefs[index] < documentRefs[anchor] {
+				anchor = index
+			}
+		}
+		for index := range docs {
+			var projection lexicalSegmentProjection
+			if err := json.Unmarshal([]byte(docs[index].Segments), &projection); err != nil {
+				return generation, err
+			}
+			marker := lexicalSourceCoverageProjection{Version: sourceCoverageProjectionVersion,
+				GenerationID: generationID, WorkspaceID: workspaceID, InventoryDigest: proof.InventoryDigest}
+			if index == anchor {
+				marker.Role, marker.Inventory = "ANCHOR", &proof
+			} else {
+				marker.Role = "FRAGMENT"
+			}
+			projection.SourceCoverage, err = json.Marshal(marker)
+			if err != nil {
+				return generation, err
+			}
+			payload, err := json.Marshal(projection)
+			if err != nil {
+				return generation, err
+			}
+			docs[index].Segments = string(payload)
+		}
 	}
 
-	generationID, err := sqlite.NewStableID(sqlite.IDPrefixIndexGeneration)
-	if err != nil {
-		return generation, err
-	}
 	dbPath, err := idx.Engine.Build(ctx, generationID, docs)
 	if err != nil {
 		return generation, err
@@ -770,14 +1002,16 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 		_, _ = idx.rebuildTokens(ctx, workspaceID, snapshotRef, namespaceRootID, byID, artifacts, DimensionSemantic, "ENRICH", "embed.text.fixture.v1")
 		_, _ = idx.rebuildTokens(ctx, workspaceID, snapshotRef, namespaceRootID, byID, artifacts, DimensionMultimodal, "ENRICH", "embed.clip.fixture.v1")
 	}
-	if idx.SemanticProvider != nil && idx.SemanticZvec != nil && idx.SemanticManifest != (EmbeddingGenerationManifest{}) {
-		if _, semanticErr := idx.rebuildSemantic(ctx, workspaceID, snapshotRef, namespaceRootID, rootIDs, semanticSegmentsBySubject); semanticErr != nil {
+	if buildSemantic && idx.SemanticProvider != nil && idx.SemanticZvec != nil && idx.SemanticManifest != (EmbeddingGenerationManifest{}) {
+		if _, semanticErr := idx.rebuildSemantic(ctx, workspaceID, snapshotRef, namespaceRootID, rootIDs, semanticSegmentsBySubject, semanticSourceInventory); semanticErr != nil {
 			// Semantic indexing is disposable derived work. Preserve the lexical
 			// generation and let capability/status report the unavailable branch.
 			idx.semanticUnavailable.Store(true)
+			idx.semanticFeedStale.Store(false)
 			idx.semanticFailure.Store(semanticErr.Error())
 		} else {
 			idx.semanticUnavailable.Store(false)
+			idx.semanticFeedStale.Store(false)
 			idx.semanticFailure.Store("")
 		}
 	}
@@ -798,6 +1032,23 @@ func (idx *Indexer) Rebuild(ctx context.Context, workspaceID, snapshotRef, names
 	}
 	_, _ = idx.rebuildGraph(ctx, workspaceID, snapshotRef, namespaceRootID, byID, annotations, artifacts)
 	return generation, nil
+}
+
+func semanticExtractSourceDisposition(body string) (SemanticSourceCoverageDisposition, string) {
+	if strings.TrimSpace(body) == "" {
+		return SemanticSourceExcluded, SemanticSourceReasonEmptyText
+	}
+	if !utf8.ValidString(body) {
+		return SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+	}
+	return SemanticSourceIndexed, ""
+}
+
+func legacyDescriptionSourceProvenance(document sqlite.DescriptionDocument, subjectID string, bodyFieldStart int, segments []sqlite.SemanticSegment) []*descriptionSourceProvenance {
+	if len(segments) != 1 || strings.TrimSpace(string(segments[0].SourceSpan)) != "" {
+		return nil
+	}
+	return wholeBodyLegacyDescriptionProvenance(document, subjectID, bodyFieldStart, segments)
 }
 
 // fixtureDimensionsActive gates the deterministic fixture projections. Fixture
@@ -932,6 +1183,48 @@ func (idx *Indexer) SemanticFailure() string {
 	return failure
 }
 
+// PinnedSemanticHistoryEligible permits dispatcher routing only when the
+// latest feed is stale and provider/backend health still passes. Query then
+// validates the explicit generation and its immutable coverage evidence.
+func (idx *Indexer) PinnedSemanticHistoryEligible() bool {
+	if idx == nil || !idx.semanticUnavailable.Load() || !idx.semanticFeedStale.Load() || !idx.semanticBindingActive() {
+		return false
+	}
+	if health, ok := idx.SemanticProvider.(interface{ SemanticReady() bool }); ok && !health.SemanticReady() {
+		return false
+	}
+	health, ok := idx.SemanticZvec.(ZvecGenerationReadiness)
+	return ok && health.ZvecReady(idx.SemanticLibraryPath, idx.SemanticLibraryDigest, idx.SemanticManifest)
+}
+
+func (idx *Indexer) markSemanticFeedStale(reason string) {
+	if idx == nil {
+		return
+	}
+	idx.semanticFeedStale.Store(true)
+	idx.semanticUnavailable.Store(true)
+	idx.semanticIndexReady.Store(false)
+	idx.semanticFailure.Store(semanticGenerationStaleReason + ": " + reason)
+}
+
+func (idx *Indexer) markSemanticUnavailable(reason string) {
+	if idx == nil {
+		return
+	}
+	idx.semanticFeedStale.Store(false)
+	idx.semanticUnavailable.Store(true)
+	idx.semanticIndexReady.Store(false)
+	idx.semanticFailure.Store(strings.TrimSpace(reason))
+}
+
+func (idx *Indexer) clearSemanticFeedStale() {
+	if idx == nil || !idx.semanticFeedStale.Swap(false) {
+		return
+	}
+	idx.semanticUnavailable.Store(false)
+	idx.semanticFailure.Store("")
+}
+
 // SemanticFailureReason returns the stable egress reason of the latest
 // semantic failure, if any. It is empty when the failure is not an egress
 // refusal; a stored diagnostic is classified, never guessed.
@@ -959,12 +1252,22 @@ func (idx *Indexer) semanticGenerationMatchesLatestFeed(ctx context.Context, gen
 	}
 	lexical, err := idx.Store.LatestIndexGeneration(ctx, generation.WorkspaceID, DimensionLexical)
 	if err != nil {
-		return fmt.Errorf("latest lexical generation: %w", err)
+		idx.markSemanticUnavailable("latest lexical generation cannot be read")
+		return fmt.Errorf("%w: latest lexical generation: %v", ErrUnavailable, err)
 	}
-	if lexical.WorkspaceID != generation.WorkspaceID || lexical.SnapshotRef != generation.SnapshotRef || lexical.NamespaceRootID != generation.NamespaceRootID || !generationBindingMatches(idx, lexical, DimensionLexical) {
-		return errors.New("semantic generation does not match latest lexical feed")
+	if lexical.WorkspaceID != generation.WorkspaceID {
+		idx.markSemanticUnavailable("semantic and lexical generation scopes differ")
+		return ErrUnavailable
 	}
-	return nil
+	if !generationBindingMatches(idx, lexical, DimensionLexical) {
+		idx.markSemanticUnavailable("latest lexical generation binding is incompatible")
+		return ErrUnavailable
+	}
+	if lexical.SnapshotRef != generation.SnapshotRef || lexical.NamespaceRootID != generation.NamespaceRootID {
+		idx.markSemanticFeedStale("semantic generation namespace or snapshot differs from latest lexical feed")
+		return fmt.Errorf("%w: %s: semantic generation namespace or snapshot differs from latest lexical feed", ErrUnavailable, semanticGenerationStaleReason)
+	}
+	return idx.semanticGenerationMatchesCurrentFeed(ctx, generation, lexical)
 }
 
 func semanticRequiresCurrentFeed(idx *Indexer) bool {
@@ -999,6 +1302,7 @@ func (idx *Indexer) WarmSemanticGeneration(ctx context.Context, workspaceID stri
 		return err
 	}
 	idx.semanticUnavailable.Store(false)
+	idx.semanticFeedStale.Store(false)
 	idx.semanticFailure.Store("")
 	idx.semanticIndexReady.Store(true)
 	return nil
@@ -1240,7 +1544,7 @@ func (idx *Indexer) rebuildAcoustic(ctx context.Context, workspaceID, snapshotRe
 	return generation, nil
 }
 
-func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRef, namespaceRootID string, rootIDs []string, segmentsBySubject map[string][]SegmentRef) (sqlite.IndexGeneration, error) {
+func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRef, namespaceRootID string, rootIDs []string, segmentsBySubject map[string][]SegmentRef, inventory semanticSourceInventory) (sqlite.IndexGeneration, error) {
 	var generation sqlite.IndexGeneration
 	idx.semanticIndexReady.Store(false)
 	if idx.SemanticProvider == nil || idx.SemanticZvec == nil {
@@ -1259,17 +1563,55 @@ func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRe
 	if !filepath.IsAbs(idx.Engine.Dir) || filepath.Clean(idx.Engine.Dir) != idx.Engine.Dir {
 		return generation, fmt.Errorf("%w: semantic index directory must be absolute and canonical", ErrUnavailable)
 	}
+	inputProofs := make(map[string]*semanticSourceInputProof)
+	rowByInput := make(map[string]*semanticSourceInventoryRow)
+	for rowIndex := range inventory.Rows {
+		row := &inventory.Rows[rowIndex]
+		for inputIndex := range row.Inputs {
+			proof := &row.Inputs[inputIndex]
+			if proof.Disposition != SemanticSourceIndexed {
+				continue
+			}
+			key := row.SubjectID + "\x00" + proof.SegmentID
+			if _, duplicate := inputProofs[key]; duplicate {
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonInputIdentityMismatch
+				continue
+			}
+			inputProofs[key], rowByInput[key] = proof, row
+		}
+	}
 	inputs := make([]SemanticTextInput, 0)
+	planned := make(map[string]struct{})
 	for subjectID, segments := range segmentsBySubject {
 		for _, segment := range segments {
 			if strings.TrimSpace(segment.SegmentID) == "" || strings.TrimSpace(segment.MatchedText) == "" {
 				continue
 			}
-			inputs = append(inputs, SemanticTextInput{
+			input := SemanticTextInput{
 				SubjectID: subjectID, SegmentID: segment.SegmentID,
 				DescriptionDocumentID: semanticSourceRevision(segment), Ordinal: segment.Ordinal,
 				Language: segment.Language, Text: segment.MatchedText,
-			})
+			}
+			key := input.SubjectID + "\x00" + input.SegmentID
+			proof := inputProofs[key]
+			if proof == nil || proof.InputDigest != sha256Text(input.Text) || proof.SourceRef != input.DescriptionDocumentID || proof.Ordinal != input.Ordinal {
+				if row := rowByInput[key]; row != nil {
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonInputIdentityMismatch
+				}
+			} else {
+				planned[key] = struct{}{}
+			}
+			inputs = append(inputs, input)
+		}
+	}
+	for key, proof := range inputProofs {
+		if _, found := planned[key]; !found {
+			if row := rowByInput[key]; row != nil {
+				row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonInputIdentityMismatch
+			}
+		}
+		if row := rowByInput[key]; row != nil && (row.SourceKind == "NOTE" || row.SourceKind == "EXTRACT" || row.SourceKind == "FILENAME") && row.SegmentationProfileDigest == "" && row.BodyDigest != proof.InputDigest {
+			row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceChanged
 		}
 	}
 	sort.Slice(inputs, func(i, j int) bool {
@@ -1292,8 +1634,16 @@ func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRe
 		return generation, fmt.Errorf("%w: provider: %w", ErrUnavailable, err)
 	}
 	zvecSegments := make([]ZvecSegment, 0, len(results))
+	resultByInput := make(map[string]SemanticVector, len(results))
 	for _, result := range results {
 		zvecSegments = append(zvecSegments, ZvecSegment{SubjectID: result.SubjectID, SegmentID: result.SegmentID, Vector: result.Vector})
+		resultByInput[result.SubjectID+"\x00"+result.SegmentID] = result
+	}
+	for key, proof := range inputProofs {
+		if result, ok := resultByInput[key]; ok && result.InputEvidence != nil {
+			evidence := *result.InputEvidence
+			proof.InputEvidence = &evidence
+		}
 	}
 	zvecPath := filepath.Join(idx.Engine.Dir, generationID+".zvec")
 	spec := ZvecGenerationSpec{
@@ -1309,9 +1659,9 @@ func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRe
 		idx.semanticIndexReady.Store(false)
 		return generation, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
-	candidates := make([]ZvecCoverageIdentity, 0, len(zvecSegments))
-	for _, segment := range zvecSegments {
-		candidates = append(candidates, ZvecCoverageIdentity{SubjectID: segment.SubjectID, SegmentID: segment.SegmentID})
+	candidates := make([]ZvecCoverageIdentity, 0, len(inputs))
+	for _, input := range inputs {
+		candidates = append(candidates, ZvecCoverageIdentity{SubjectID: input.SubjectID, SegmentID: input.SegmentID})
 	}
 	actualCoverage, err := idx.verifySemanticGenerationCoverage(ctx, spec, candidates)
 	if err != nil {
@@ -1337,7 +1687,7 @@ func (idx *Indexer) rebuildSemantic(ctx context.Context, workspaceID, snapshotRe
 	if strings.TrimSpace(generation.DBPath) == "" {
 		generation.DBPath = spec.Path
 	}
-	if err := writeSemanticGenerationReceipt(generation, idx.SemanticLibraryDigest, actualCoverage); err != nil {
+	if err := writeSemanticGenerationReceipt(generation, idx.SemanticLibraryDigest, actualCoverage, inventory); err != nil {
 		idx.semanticIndexReady.Store(false)
 		return generation, fmt.Errorf("%w: write generation receipt: %v", ErrUnavailable, err)
 	}
@@ -1428,10 +1778,233 @@ func semanticSourceRevision(segment SegmentRef) string {
 	return segment.SourceID
 }
 
+type semanticSourceProjectionRecord struct {
+	row   *semanticSourceInventoryRow
+	proof *semanticSourceInputProof
+}
+
+func semanticSourceProjectionIndex(inventory *semanticSourceInventory) map[string]semanticSourceProjectionRecord {
+	result := map[string]semanticSourceProjectionRecord{}
+	if inventory == nil {
+		return result
+	}
+	for rowIndex := range inventory.Rows {
+		row := &inventory.Rows[rowIndex]
+		for inputIndex := range row.Inputs {
+			proof := &row.Inputs[inputIndex]
+			key := row.SubjectID + "\x00" + proof.SegmentID
+			if _, exists := result[key]; exists {
+				result[key] = semanticSourceProjectionRecord{}
+				continue
+			}
+			result[key] = semanticSourceProjectionRecord{row: row, proof: proof}
+		}
+	}
+	return result
+}
+
+func semanticTextProofMatchesSegments(row semanticSourceInventoryRow, segments []SegmentRef, proof semanticSourceInputProof) bool {
+	if row.SegmentationProfileDigest != semanticTextSourceSegmentationProfileDigest || len(segments) != len(row.Inputs) {
+		return false
+	}
+	var selected *SegmentRef
+	for i := range segments {
+		if segments[i].SegmentID == proof.SegmentID {
+			selected = &segments[i]
+			break
+		}
+	}
+	if selected == nil || selected.Ordinal != proof.Ordinal || selected.TextSourceProvenance == nil ||
+		selected.MatchedText == "" || sha256Text(selected.MatchedText) != proof.InputDigest {
+		return false
+	}
+	provenance := selected.TextSourceProvenance
+	if provenance.SourceRevision != row.Revision || provenance.BodyDigest != row.BodyDigest ||
+		provenance.SegmentationProfileDigest != row.SegmentationProfileDigest ||
+		provenance.SourceStartByte != proof.SourceSpanStart || provenance.SourceEndByte != proof.SourceSpanEnd ||
+		provenance.TextDigest != proof.InputDigest {
+		return false
+	}
+	proofs := make(map[string]semanticSourceInputProof, len(row.Inputs))
+	for _, input := range row.Inputs {
+		proofs[input.SegmentID] = input
+	}
+	for _, segment := range segments {
+		input, ok := proofs[segment.SegmentID]
+		if !ok || segment.TextSourceProvenance == nil || segment.Ordinal != input.Ordinal ||
+			input.SegmentDigest != input.InputDigest ||
+			segment.TextSourceProvenance.SourceStartByte != input.SourceSpanStart ||
+			segment.TextSourceProvenance.SourceEndByte != input.SourceSpanEnd ||
+			sha256Text(segment.MatchedText) != input.InputDigest {
+			return false
+		}
+	}
+	return true
+}
+
+func (idx *Indexer) semanticSourceProjection(ctx context.Context, generation sqlite.IndexGeneration, entries map[string]sqlite.NamespaceEntry, index map[string]semanticSourceProjectionRecord, hit ZvecHit) (SegmentRef, error) {
+	record, exists := index[hit.SubjectID+"\x00"+hit.SegmentID]
+	row, proof := record.row, record.proof
+	if !exists || row == nil || proof == nil ||
+		(row.Disposition != SemanticSourceIndexed && !(row.Disposition == SemanticSourceUnavailable && row.Reason == SemanticSourceReasonSegmentSetInvalid)) ||
+		proof.Disposition != SemanticSourceIndexed {
+		return SegmentRef{}, errors.New("source input identity is duplicated or excluded")
+	}
+	if row == nil || proof == nil || !semanticSourceProofValid(*row) || proof.InputDigest != proof.SegmentDigest || !validSHA256Text(proof.InputDigest) {
+		return SegmentRef{}, errors.New("generation has no valid source proof for semantic hit")
+	}
+	var projected SegmentRef
+	switch row.SourceKind {
+	case "NOTE":
+		revision, err := strconv.ParseInt(row.Revision, 10, 64)
+		if err != nil || strconv.FormatInt(revision, 10) != row.Revision {
+			return projected, errors.New("Note source revision is invalid")
+		}
+		current, err := idx.Store.GetAnnotation(ctx, generation.WorkspaceID, row.SourceRef)
+		if err != nil || current.WorkspaceID != generation.WorkspaceID || current.Kind != sqlite.AnnotationNote || current.Tombstoned ||
+			semanticCanonicalSubjectForStore(ctx, idx.Store, entries, generation.WorkspaceID, current.SubjectRef) != hit.SubjectID {
+			return projected, errors.New("current Note lifecycle refuses semantic hit")
+		}
+		revisions, err := idx.Store.ListAnnotationRevisions(ctx, generation.WorkspaceID, current.SubjectRef)
+		if err != nil {
+			return projected, err
+		}
+		var found *sqlite.AnnotationRevision
+		for index := range revisions {
+			if revisions[index].AnnotationID == row.SourceRef && revisions[index].Revision == revision {
+				found = &revisions[index]
+				break
+			}
+		}
+		if found == nil || found.Kind != sqlite.AnnotationNote || found.Tombstoned || found.BodyDigest != row.BodyDigest ||
+			sha256Text(found.Body) != row.BodyDigest || found.SubjectRef != current.SubjectRef {
+			return projected, errors.New("generation-pinned Note revision is unavailable or mismatched")
+		}
+		if row.SegmentationProfileDigest == "" {
+			if sha256Text(found.Body) != proof.InputDigest || hit.SegmentID != row.SourceRef {
+				return projected, errors.New("legacy generation-pinned Note input is mismatched")
+			}
+			projected = SegmentRef{SourceType: "ANNOTATION", SourceID: row.SourceRef, SegmentID: proof.SegmentID,
+				MatchedText: found.Body, Kind: string(found.Kind), Producer: "USER", Accepted: true, Language: "und"}
+		} else {
+			if int64(len(found.Body)) != row.BodyLength {
+				return projected, errors.New("generation-pinned Note body length changed")
+			}
+			segments, valid := deriveSemanticTextSourceSegments("NOTE", hit.SubjectID, row.SourceRef, row.Revision, found.Body, row.BodyDigest, "USER")
+			if !valid || !semanticTextProofMatchesSegments(*row, segments, *proof) {
+				return projected, errors.New("generation-pinned Note segment set is unavailable or mismatched")
+			}
+			for _, segment := range segments {
+				if segment.SegmentID == proof.SegmentID {
+					projected = segment
+					break
+				}
+			}
+		}
+	case "FILENAME":
+		entry, ok, err := semanticFilenameEntry(ctx, idx.Store, generation, entries, row.SourceRef, hit.SubjectID)
+		if err != nil || !ok || sha256Text(entry.DisplayName) != row.BodyDigest || sha256Text(entry.DisplayName) != proof.InputDigest || hit.SegmentID != row.SourceRef {
+			return projected, errors.New("generation-pinned filename source is unavailable or mismatched")
+		}
+		projected = SegmentRef{SourceType: "FILENAME", SourceID: row.SourceRef, SegmentID: proof.SegmentID,
+			MatchedText: entry.DisplayName, Kind: "FILENAME", Producer: "CATALOG", Accepted: true, Language: "und"}
+	case "EXTRACT":
+		artifact, err := idx.Store.GetProcessorArtifact(ctx, generation.WorkspaceID, row.SourceRef)
+		if err != nil || artifact.State != sqlite.ArtifactAdmitted || artifact.Stage != "EXTRACT" || artifact.Digest != row.BodyDigest ||
+			sha256Text(artifact.Body) != row.BodyDigest || artifact.SubjectRef == "" {
+			return projected, errors.New("generation-pinned extracted source is unavailable or mismatched")
+		}
+		artifactSubject := semanticCanonicalSubjectForStore(ctx, idx.Store, entries, generation.WorkspaceID, artifact.SubjectRef)
+		entry, ok, err := semanticArtifactEntry(ctx, idx.Store, artifact, generation, entries, artifactSubject, hit.SubjectID)
+		if err != nil || !ok || artifactSubject != hit.SubjectID || semanticEntrySubject(entry) != hit.SubjectID {
+			return projected, errors.New("generation-pinned extracted source root binding is unavailable")
+		}
+		if row.SegmentationProfileDigest == "" {
+			if sha256Text(artifact.Body) != proof.InputDigest || hit.SegmentID != row.SourceRef {
+				return projected, errors.New("legacy generation-pinned extract input is mismatched")
+			}
+			projected = SegmentRef{SourceType: "ARTIFACT", SourceID: row.SourceRef, SegmentID: proof.SegmentID,
+				MatchedText: artifact.Body, Kind: artifact.Stage, Producer: artifact.ProducerDigest, Accepted: true, Language: "und"}
+		} else {
+			if int64(len(artifact.Body)) != row.BodyLength {
+				return projected, errors.New("generation-pinned extract body length changed")
+			}
+			segments, valid := deriveSemanticTextSourceSegments("EXTRACT", hit.SubjectID, row.SourceRef, row.Revision, artifact.Body, row.BodyDigest, artifact.ProducerDigest)
+			if !valid || !semanticTextProofMatchesSegments(*row, segments, *proof) {
+				return projected, errors.New("generation-pinned extract segment set is unavailable or mismatched")
+			}
+			for _, segment := range segments {
+				if segment.SegmentID == proof.SegmentID {
+					projected = segment
+					break
+				}
+			}
+		}
+	case "DESCRIPTION":
+		revision, err := strconv.ParseInt(row.Revision, 10, 64)
+		if err != nil || strconv.FormatInt(revision, 10) != row.Revision {
+			return projected, errors.New("description source revision is invalid")
+		}
+		segment, err := idx.Store.GetSemanticSegment(ctx, generation.WorkspaceID, proof.SegmentID)
+		if err != nil {
+			return projected, err
+		}
+		document, err := idx.Store.GetDescriptionDocument(ctx, generation.WorkspaceID, row.SourceRef)
+		if err != nil {
+			return projected, err
+		}
+		if document.Revision != revision || document.BodyDigest != row.BodyDigest || sha256Text(document.Body) != row.BodyDigest ||
+			semanticCanonicalSubjectForStore(ctx, idx.Store, entries, generation.WorkspaceID, document.SubjectRef) != hit.SubjectID ||
+			segment.DocumentID != document.ID || segment.DocumentRevision != revision || segment.SubjectRef != document.SubjectRef ||
+			segment.TextDigest != proof.SegmentDigest || sha256Text(segment.Text) != proof.InputDigest ||
+			segment.Ordinal != proof.Ordinal || (!proof.HasSourceSpan && (row.Disposition != SemanticSourceUnavailable || row.Reason != SemanticSourceReasonSegmentSetInvalid)) {
+			return projected, errors.New("generation-pinned description segment is unavailable or mismatched")
+		}
+		if proof.HasSourceSpan {
+			if strings.TrimSpace(string(segment.SourceSpan)) == "" {
+				// A v2 rebuild may derive this exact full-body span for one
+				// legacy segment whose catalog span is absent. Reopen the full
+				// document segment set before accepting that narrow case; never
+				// infer that a partial or multi-segment set covers the body.
+				segments, listErr := idx.Store.ListSemanticSegments(ctx, generation.WorkspaceID, document.ID)
+				derived := legacyDescriptionSourceProvenance(document, hit.SubjectID, 0, segments)
+				if listErr != nil || len(derived) != 1 || segments[0].ID != segment.ID || segments[0].Text != document.Body ||
+					derived[0].SourceStartByte != proof.SourceSpanStart || derived[0].SourceEndByte != proof.SourceSpanEnd {
+					return projected, errors.New("generation-pinned description source span is invalid")
+				}
+			} else {
+				span, err := decodeDescriptionSourceSpan(segment.SourceSpan)
+				if err != nil || span.StartByte != proof.SourceSpanStart || span.EndByte != proof.SourceSpanEnd || span.EndByte > len(document.Body) ||
+					document.Body[span.StartByte:span.EndByte] != segment.Text {
+					return projected, errors.New("generation-pinned description source span is invalid")
+				}
+			}
+		}
+		projected = SegmentRef{DescriptionDocumentID: document.ID, SourceType: "DESCRIPTION", SourceID: document.ID,
+			SegmentID: segment.ID, Ordinal: segment.Ordinal, MatchedText: segment.Text, Kind: string(document.Kind),
+			Producer: document.ProducerProfile, Accepted: document.Accepted, Language: document.Language}
+	default:
+		return projected, errors.New("semantic source kind is unsupported")
+	}
+	if projected.SegmentID != proof.SegmentID || sha256Text(projected.MatchedText) != proof.InputDigest {
+		return SegmentRef{}, errors.New("generation-pinned semantic input digest changed")
+	}
+	if proof.InputEvidence != nil {
+		input := SemanticTextInput{SubjectID: hit.SubjectID, SegmentID: proof.SegmentID, DescriptionDocumentID: proof.SourceRef,
+			Ordinal: proof.Ordinal, Language: projected.Language, Text: projected.MatchedText}
+		request := SemanticEmbeddingRequest{Purpose: SemanticEmbeddingDocument, GenerationID: generation.ID, Manifest: idx.SemanticManifest, Inputs: []SemanticTextInput{input}}
+		if err := validateSemanticInputEvidence(request, input, *proof.InputEvidence); err != nil {
+			return SegmentRef{}, err
+		}
+	}
+	return projected, nil
+}
+
 func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGeneration, text string) (result []Hit, err error) {
 	// Querying does not revoke other verified generations. A failed query only
 	// drops this generation's receipt through the deferred failure path.
 	querySucceeded := false
+	callerCanceledEmbedding := false
 	var opened ZvecGeneration
 	defer func() {
 		if opened != nil {
@@ -1439,9 +2012,10 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 				result = nil
 				err = fmt.Errorf("%w: close generation: %v", ErrUnavailable, closeErr)
 				querySucceeded = false
+				callerCanceledEmbedding = false
 			}
 		}
-		if !querySucceeded && !errors.Is(err, ErrInvalidQuery) {
+		if !querySucceeded && !callerCanceledEmbedding && !errors.Is(err, ErrInvalidQuery) {
 			idx.revokeSemanticGeneration(generation.ID)
 		}
 	}()
@@ -1469,6 +2043,13 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 	}
 	results, err := idx.SemanticProvider.Embed(ctx, request)
 	if err != nil {
+		callerCanceledEmbedding = callerCanceledSemanticRequest(ctx, err, idx.SemanticProvider)
+		// A query-specific input refusal does not make the verified generation
+		// unhealthy. Preserve the caller error so Fuse can report a degraded
+		// semantic lane while lexical and structured lanes continue normally.
+		if errors.Is(err, ErrInvalidQuery) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("%w: provider: %w", ErrUnavailable, err)
 	}
 	if err := validateSemanticEmbeddingResults(request, results); err != nil {
@@ -1499,6 +2080,11 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 		idx.semanticIndexReady.Store(false)
 		return nil, fmt.Errorf("%w: semantic namespace provenance: %v", ErrUnavailable, err)
 	}
+	sourceInventory, sourceInventoryReason, sourceInventoryErr := readSemanticSourceInventory(generation)
+	if sourceInventoryErr != nil {
+		return nil, fmt.Errorf("%w: semantic source inventory: %v", ErrUnavailable, sourceInventoryErr)
+	}
+	sourceProjectionIndex := semanticSourceProjectionIndex(sourceInventory)
 	candidates := make([]ZvecCoverageIdentity, 0, len(hits))
 	for _, hit := range hits {
 		if strings.TrimSpace(hit.SubjectID) == "" || strings.TrimSpace(hit.SegmentID) == "" {
@@ -1512,6 +2098,22 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 	result = make([]Hit, 0, len(hits))
 	bySubject := make(map[string]int, len(hits))
 	for _, hit := range hits {
+		if sourceInventory != nil {
+			projectedSegment, sourceErr := idx.semanticSourceProjection(ctx, generation, entries, sourceProjectionIndex, hit)
+			if sourceErr != nil {
+				return nil, fmt.Errorf("%w: semantic source provenance: %v", ErrUnavailable, sourceErr)
+			}
+			if at, ok := bySubject[hit.SubjectID]; ok {
+				result[at].Segments = appendUniqueSegment(result[at].Segments, projectedSegment)
+				continue
+			}
+			bySubject[hit.SubjectID] = len(result)
+			result = append(result, Hit{SubjectID: hit.SubjectID, Segments: []SegmentRef{projectedSegment}})
+			continue
+		}
+		if strings.HasPrefix(hit.SegmentID, sqlite.IDPrefixAnnotation+"_") && sourceInventoryReason == SemanticSourceReasonLegacyReceipt {
+			return nil, fmt.Errorf("%w: legacy semantic Note has no generation-pinned revision; rebuild required", ErrUnavailable)
+		}
 		if strings.HasPrefix(hit.SegmentID, sqlite.IDPrefixAnnotation+"_") {
 			annotationID := hit.SegmentID
 			annotation, annotationErr := idx.Store.GetAnnotation(ctx, generation.WorkspaceID, annotationID)
@@ -1603,6 +2205,24 @@ func (idx *Indexer) querySemantic(ctx context.Context, generation sqlite.IndexGe
 	}
 	querySucceeded = true
 	return result, nil
+}
+
+// callerCanceledSemanticRequest distinguishes a canceled embedding request
+// from evidence that a verified generation is corrupt. It is intentionally
+// scoped to the provider call: cancellation during zvec access, provenance,
+// receipt validation, or close still revokes the generation as before.
+func callerCanceledSemanticRequest(ctx context.Context, err error, provider SemanticEmbeddingProvider) bool {
+	if ctx == nil || err == nil {
+		return false
+	}
+	ctxErr := ctx.Err()
+	if (ctxErr != context.Canceled && ctxErr != context.DeadlineExceeded) || !errors.Is(err, ctxErr) {
+		return false
+	}
+	if health, ok := provider.(interface{ SemanticReady() bool }); ok && !health.SemanticReady() {
+		return false
+	}
+	return true
 }
 
 func semanticEntrySubject(entry sqlite.NamespaceEntry) string {
@@ -1832,6 +2452,24 @@ func (idx *Indexer) RebuildLatest(ctx context.Context, workspaceID string) (sqli
 	return idx.Rebuild(ctx, publication.WorkspaceID, publication.SnapshotRef, publication.NamespaceRootID)
 }
 
+// RebuildLatestLexical refreshes the newest lexical projection without
+// executing the semantic embedding lane. A later explicit RebuildLatest can
+// restore the default semantic generation from the same current source feed.
+func (idx *Indexer) RebuildLatestLexical(ctx context.Context, workspaceID string) (sqlite.IndexGeneration, error) {
+	var generation sqlite.IndexGeneration
+	if idx == nil || idx.Store == nil {
+		return generation, errors.New("search indexer requires a catalog")
+	}
+	publication, err := idx.Store.LatestPublication(ctx, workspaceID)
+	if err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			return generation, nil
+		}
+		return generation, err
+	}
+	return idx.RebuildLexical(ctx, publication.WorkspaceID, publication.SnapshotRef, publication.NamespaceRootID)
+}
+
 // QueryPageResult is one bounded provider answer. Hits and Page always
 // describe the same answer: Page never reports a bound the hits did not
 // respect.
@@ -1904,9 +2542,10 @@ func (idx *Indexer) QueryPage(ctx context.Context, req QueryRequest) (QueryPageR
 	case DimensionAcoustic:
 		hits, err = idx.Engine.QueryAcoustic(ctx, generation.DBPath, req.Text)
 	case DimensionSemantic:
-		if idx.semanticUnavailable.Load() && idx.SemanticManifest != (EmbeddingGenerationManifest{}) {
+		pinnedStale := strings.TrimSpace(req.GenerationID) != "" && idx.PinnedSemanticHistoryEligible()
+		if idx.semanticUnavailable.Load() && !pinnedStale && idx.SemanticManifest != (EmbeddingGenerationManifest{}) {
 			err = ErrUnavailable
-		} else if !idx.semanticUnavailable.Load() && idx.SemanticProvider != nil && idx.SemanticZvec != nil &&
+		} else if (!idx.semanticUnavailable.Load() || pinnedStale) && idx.SemanticProvider != nil && idx.SemanticZvec != nil &&
 			idx.SemanticManifest != (EmbeddingGenerationManifest{}) &&
 			generation.ProviderProfileDigest == idx.SemanticManifest.CanonicalDigest() {
 			hits, err = idx.querySemantic(ctx, generation, req.Text)
@@ -1966,6 +2605,38 @@ func (idx *Indexer) QueryPage(ctx context.Context, req QueryRequest) (QueryPageR
 	}
 	result.Hits = hits
 	result.Page = boundedLanePageState(dimension, len(hits))
+	return result, nil
+}
+
+// QueryLexicalAllPage supplies the host's existing SavedView evaluator with a
+// bounded candidate page when its only predicates are exact live TAG facts.
+// This is a bundled implementation helper, not a public search operation or
+// provider ABI. The caller must apply those predicates and ordinary subject
+// authorization before returning membership. Later pages pin Generation.ID.
+func (idx *Indexer) QueryLexicalAllPage(ctx context.Context, workspaceID, generationID string, pageRequest PageRequest) (QueryPageResult, error) {
+	var result QueryPageResult
+	if pageRequest.Position != nil && strings.TrimSpace(generationID) == "" {
+		return result, fmt.Errorf("%w: lexical enumeration continuation requires a pinned generation", ErrInvalidQuery)
+	}
+	if idx == nil || idx.Store == nil || idx.Engine == nil || strings.TrimSpace(workspaceID) == "" {
+		return result, fmt.Errorf("%w: lexical enumeration requires a workspace, catalog and engine", ErrUnavailable)
+	}
+	generation, _, err := idx.queryGeneration(ctx, QueryRequest{
+		WorkspaceID: workspaceID, GenerationID: generationID, Dimension: DimensionLexical,
+	})
+	result.Generation = generation
+	if err != nil {
+		return result, err
+	}
+	page, err := idx.Engine.queryAllPage(ctx, generation.DBPath, pageRequest)
+	if err != nil {
+		return result, err
+	}
+	result.Hits = page.Hits
+	result.Page = PageState{
+		Returned: len(page.Hits), HasMore: page.HasMore, Complete: !page.HasMore,
+		Order: page.Order, Lane: DimensionLexical, Next: nextPosition(page),
+	}
 	return result, nil
 }
 
@@ -2132,22 +2803,4 @@ func subjectLanguage(descriptions []string) string {
 		}
 	}
 	return ""
-}
-
-// observationMtimeMillis returns the observation observed-at timestamp in
-// milliseconds since the Unix epoch. The catalog observation timestamp is the
-// closest honest mtime facet available for a namespace entry; when the entry
-// has no observation, the facet is absent.
-func observationMtimeMillis(ctx context.Context, store *sqlite.Store, workspaceID, observationID string) (int64, bool) {
-	if observationID == "" {
-		return 0, false
-	}
-	observation, err := store.GetObservation(ctx, workspaceID, observationID)
-	if err != nil {
-		return 0, false
-	}
-	if observation.ObservedAt.IsZero() {
-		return 0, false
-	}
-	return observation.ObservedAt.UnixMilli(), true
 }

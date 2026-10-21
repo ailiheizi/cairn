@@ -197,7 +197,14 @@ func MarshalRecoveryReference(reference RecoveryReference) ([]byte, error) {
 		return nil, err
 	}
 	reference.SelfDigest = digest
-	return CanonicalJSON(reference)
+	payload, err := CanonicalJSON(reference)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(payload)) > portableRecordReadLimit {
+		return nil, &RecoveryReferenceSizeError{SerializedBytes: int64(len(payload)), LimitBytes: portableRecordReadLimit}
+	}
+	return payload, nil
 }
 
 // DecodeRecoveryReference parses exactly one bounded v2 reference. Optional
@@ -447,10 +454,6 @@ func (s *Service) ExportRecoveryReference(ctx context.Context, snapshotRef, dest
 	if err != nil {
 		return result, err
 	}
-	path, err := writeNewRecoveryFile(destination, payload)
-	if err != nil {
-		return result, err
-	}
 	driver, err := s.publicationRecordDriver()
 	if err != nil {
 		return result, err
@@ -460,6 +463,10 @@ func (s *Service) ExportRecoveryReference(ctx context.Context, snapshotRef, dest
 		return result, err
 	}
 	files, bytes := manifestFileTotals(manifest)
+	path, err := writeNewRecoveryFile(destination, payload)
+	if err != nil {
+		return result, err
+	}
 	return ExportResult{SnapshotRef: snapshotRef, Schema: RecoveryReferenceSchemaV2, ManifestDigest: manifest.ManifestDigest, ArtifactPath: path, Length: int64(len(payload)), Files: files, Bytes: bytes, IndependentlyStored: true}, nil
 }
 

@@ -12,6 +12,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ailiheizi/cairn/server/internal/capture"
 	"github.com/ailiheizi/cairn/server/internal/repository"
@@ -541,7 +542,8 @@ func (s *Service) projectPublicationRecords(
 			}
 		}
 		recordBytes, recordCount, recordMax, err := projectedPortableFactRecordBytes(
-			workspaceID, snapshotRef, rootID, sourceID, entry.Name, parentSubject, manifestEntry)
+			workspaceID, snapshotRef, rootID, sourceID, entry.Name, parentSubject, manifestEntry,
+			item.entry, item.protectionMode, item.fileVersionID, item.representation)
 		if err != nil {
 			return projection, err
 		}
@@ -735,6 +737,9 @@ func projectedPreparedItem(
 func projectedPortableFactRecordBytes(
 	workspaceID, snapshotRef, rootID, sourceID, displayName, parentSubject string,
 	entry ManifestEntry,
+	captured scanner.EntryRecord,
+	protectionMode sqlite.ProtectionMode,
+	fileVersionID, representationID string,
 ) (int64, int, int64, error) {
 	recordSchema, err := portableFactRecordSchema(PortableFactBundleSchemaV2)
 	if err != nil {
@@ -748,8 +753,7 @@ func projectedPortableFactRecordBytes(
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	fileVersionID := ""
-	if entry.ContentID != "" {
+	if entry.ContentID != "" && fileVersionID == "" {
 		if fileVersionID, err = sqlite.NewStableID(sqlite.IDPrefixFileVersion); err != nil {
 			return 0, 0, 0, err
 		}
@@ -808,18 +812,101 @@ func projectedPortableFactRecordBytes(
 	}); err != nil {
 		return 0, 0, 0, err
 	}
-	if entry.Facts == nil {
-		return total, count, largest, nil
+	if entry.Facts != nil {
+		for _, fact := range entry.Facts.Facts {
+			if err := appendRecord("METADATA_FACT", entryID+":capture:"+fact.Name, fact, map[string]any{
+				"source_profile": fact.SourceProfile, "authority": fact.Authority,
+				"capture_time": fact.CapturedAt, "provenance_digest": fact.ProvenanceDigest,
+			}); err != nil {
+				return 0, 0, 0, err
+			}
+		}
 	}
-	for _, fact := range entry.Facts.Facts {
-		if err := appendRecord("METADATA_FACT", entryID+":capture:"+fact.Name, fact, map[string]any{
-			"source_profile": fact.SourceProfile, "authority": fact.Authority,
-			"capture_time": fact.CapturedAt, "provenance_digest": fact.ProvenanceDigest,
+	if fileVersionID != "" {
+		witness, err := projectedCatalogRelationWitness(
+			workspaceID, snapshotRef, rootID, subjectRef, fileVersionID, representationID,
+			entry, captured, protectionMode)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		fact, err := catalogRelationWitnessFact(workspaceID, snapshotRef, rootID, subjectRef, witness)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		if err := appendRecord("METADATA_FACT", fact.ID, fact, map[string]any{
+			"namespace": catalogRelationWitnessNamespace, "profile_digest": catalogRelationWitnessProfileDigest(),
+			"snapshot_ref": snapshotRef, "namespace_root_id": rootID, "file_version_id": fileVersionID,
 		}); err != nil {
 			return 0, 0, 0, err
 		}
 	}
 	return total, count, largest, nil
+}
+
+// projectedCatalogRelationWitness constructs the same immutable relation rows
+// that ingest adopts, with same-width IDs and a maximum-width database time.
+// The payload then passes through catalogRelationWitnessPayload, the builder
+// used by the post-publication catalog reader, so this projection accounts for
+// the actual authenticated witness rather than a per-file allowance.
+func projectedCatalogRelationWitness(
+	workspaceID, snapshotRef, rootID, subjectRef, fileVersionID, representationID string,
+	manifestEntry ManifestEntry,
+	captured scanner.EntryRecord,
+	protectionMode sqlite.ProtectionMode,
+) (catalogRelationWitness, error) {
+	if captured.Content == nil || representationID == "" || manifestEntry.ContentID != captured.Content.ContentID {
+		return catalogRelationWitness{}, errors.New("cannot project catalog relation witness without the captured exact identity")
+	}
+	const widestCanonicalTime = "2099-12-31T23:59:59.999999999Z"
+	createdAt, err := time.Parse(time.RFC3339Nano, widestCanonicalTime)
+	if err != nil {
+		return catalogRelationWitness{}, err
+	}
+	size := captured.Content.BytesRead
+	contentID := captured.Content.ContentID
+	profile := representationProfile(protectionMode)
+	fileVersion := sqlite.FileVersion{
+		ID: fileVersionID, WorkspaceID: workspaceID, AssetID: "asset:" + captured.PathID,
+		ContentID: contentID, LogicalSize: size, HashingProfile: scanner.HashVersion,
+		AuthoritativeRepresentationID: representationID, ExtentSetDigest: contentID,
+		HardlinkGroupID: captured.HardLink.GroupID, SparseEvidence: json.RawMessage(`{}`),
+		VerificationRef: fileVersionVerificationRef(prepared{entry: captured, protectionMode: protectionMode}),
+		RecordDigest:    contentID, CreatedAt: createdAt,
+	}
+	representations := []sqlite.Representation{{
+		ID: representationID, WorkspaceID: workspaceID, ContentID: contentID, DecodedLength: size,
+		OwnershipMode: profile.ownership, CodecProfileRef: profile.codec, AccessMode: profile.access,
+		WholeReadRequiredToVerify: profile.wholeRead, RecordDigest: contentID,
+		Metadata: profile.metadata, CreatedAt: createdAt,
+	}}
+	extents := make([]sqlite.ContentExtent, 0, 1)
+	if size > 0 {
+		extentID, err := sqlite.NewStableID(sqlite.IDPrefixContentExtent)
+		if err != nil {
+			return catalogRelationWitness{}, err
+		}
+		extents = append(extents, sqlite.ContentExtent{
+			ID: extentID, WorkspaceID: workspaceID, FileVersionID: fileVersionID,
+			Ordinal: 0, LogicalOffset: 0, LogicalLength: size, Kind: sqlite.ExtentData,
+			RepresentationID: representationID, RepresentationOffset: 0, ExtentDigest: contentID,
+			Metadata: json.RawMessage(`{}`), CreatedAt: createdAt,
+		})
+	}
+	selected := make(map[string]struct{})
+	if manifestEntry.Protection.LocalRepresentationID != "" {
+		selected[manifestEntry.Protection.LocalRepresentationID] = struct{}{}
+	}
+	for _, reference := range manifestEntry.Protection.RecoveryReferences {
+		if reference.RepresentationID != "" {
+			selected[reference.RepresentationID] = struct{}{}
+		}
+	}
+	selectedRefs := make([]string, 0, len(selected))
+	for id := range selected {
+		selectedRefs = append(selectedRefs, id)
+	}
+	sort.Strings(selectedRefs)
+	return catalogRelationWitnessPayload(fileVersion, representations, extents, snapshotRef, rootID, subjectRef, selectedRefs)
 }
 
 func (s *Service) publishRecoveryClosure(ctx context.Context, adopted adopted, manifest Manifest, placed placedSet, planDigest, captureDigest, policyDigest string) (result PublicationClosureResult, retErr error) {

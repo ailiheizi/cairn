@@ -1,4 +1,4 @@
-//go:build purego && darwin
+//go:build (purego || cairn_zvec_dynamic) && darwin
 
 package search
 

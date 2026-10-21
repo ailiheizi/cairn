@@ -26,6 +26,10 @@ var (
 	ErrInvalidQuery = errors.New("search query is invalid")
 )
 
+const SemanticQueryInputTruncatedReason = "QUERY_INPUT_TRUNCATED"
+
+var ErrSemanticQueryInputTruncated = fmt.Errorf("%w: semantic query tokenizer truncated the input", ErrInvalidQuery)
+
 type Document struct {
 	SubjectID string
 	Path      string
@@ -63,7 +67,7 @@ type Document struct {
 	Segments           string
 }
 
-// SegmentRef is provenance for one durable text span inside a hit.
+// SegmentRef is provenance for one durable or deterministically derived text span inside a hit.
 type SegmentRef struct {
 	DescriptionDocumentID string
 	SourceType            string
@@ -78,7 +82,8 @@ type SegmentRef struct {
 	// DescriptionSource is a verified, disposable lexical projection. It is
 	// absent in older generations and for segments whose durable spans fail
 	// validation; it never changes semantic inputs or source authority.
-	DescriptionSource *descriptionSourceProvenance `json:"description_source_provenance,omitempty"`
+	DescriptionSource    *descriptionSourceProvenance `json:"description_source_provenance,omitempty"`
+	TextSourceProvenance *TextSourceProvenance        `json:"text_source_provenance,omitempty"`
 	// MatchSpans are query-derived byte ranges within MatchedText. They are
 	// absent when the match came only from derived text or cannot be mapped
 	// exactly to this source segment.
@@ -219,12 +224,23 @@ func (engine *Engine) QueryPage(ctx context.Context, dbPath, text string, axes [
 }
 
 func (engine *Engine) queryPage(ctx context.Context, dbPath, text string, axes []string, filters Filters, page PageRequest) (result HitPage, err error) {
+	return engine.queryPageMode(ctx, dbPath, text, axes, filters, page, false)
+}
+
+// queryAllPage enumerates one bounded lexical page for a host-owned predicate
+// that is evaluated outside FTS (currently exact live TAG membership). It does
+// not relax the ordinary query entry points or authorize any returned subject.
+func (engine *Engine) queryAllPage(ctx context.Context, dbPath string, page PageRequest) (HitPage, error) {
+	return engine.queryPageMode(ctx, dbPath, "", nil, Filters{}, page, true)
+}
+
+func (engine *Engine) queryPageMode(ctx context.Context, dbPath, text string, axes []string, filters Filters, page PageRequest, allowAll bool) (result HitPage, err error) {
 	normalizedFilters, err := NormalizeFilters(filters)
 	if err != nil {
 		return result, fmt.Errorf("%w: %v", ErrInvalidQuery, err)
 	}
 	filters = normalizedFilters
-	if strings.TrimSpace(text) == "" && !filters.Has() {
+	if strings.TrimSpace(text) == "" && !filters.Has() && !allowAll {
 		return result, errors.New("search query text is required")
 	}
 	limit, err := ResolvePageSize(page.Limit)
@@ -342,6 +358,24 @@ FROM documents ` + where
 			}
 			if !matchesFilters(hit, filters, sizeFacet, mtimeFacet, duplicateGroup, suffix, protection, language) {
 				continue
+			}
+			if containsHanPhrase(tokens) {
+				fields := map[string]string{
+					AxisPath: hit.Path, AxisName: hit.Name, AxisSuffix: suffix, AxisType: hit.EntryType,
+					AxisChecksum: hit.ContentID, AxisMetadata: metadata, AxisDuplicates: duplicates,
+					AxisProtection: protection, AxisLocators: locators, AxisTags: tags,
+					AxisNotes: notes, AxisDescriptions: descriptions, AxisExtracted: extracted,
+					AxisDetection: detection, AxisProcessing: processing, AxisRepresentations: representations,
+					AxisLanguage: language, AxisDuplicateGroup: duplicateGroup,
+				}
+				cjkProof, proofErr := cjkCandidateProof(ctx, matcher, tokens, axes, fields)
+				if proofErr != nil {
+					_ = rows.Close()
+					return result, fmt.Errorf("prove contiguous CJK source phrase: %w", proofErr)
+				}
+				if !cjkProof {
+					continue
+				}
 			}
 			if len(hits) == limit {
 				// The (limit+1)-th match proves the generation holds more
@@ -521,25 +555,85 @@ func ftsQuery(text string, axes []string) string {
 	if !restrictToAxes(axes) {
 		parts := make([]string, len(tokens))
 		for i, token := range tokens {
-			parts[i] = `"` + token + `"*`
+			parts[i] = ftsTokenGroup(token, nil)
 		}
 		return strings.Join(parts, " AND ")
 	}
 	groups := make([]string, 0, len(tokens))
 	for _, token := range tokens {
-		alts := make([]string, 0, len(axes))
-		for _, axis := range axes {
-			for _, column := range ftsColumnsForAxis(axis) {
-				alts = append(alts, column+`:"`+token+`"*`)
-			}
-		}
-		if len(alts) == 1 {
-			groups = append(groups, alts[0])
-			continue
-		}
-		groups = append(groups, "("+strings.Join(alts, " OR ")+")")
+		groups = append(groups, ftsTokenGroup(token, axes))
 	}
 	return strings.Join(groups, " AND ")
+}
+
+func ftsTokenGroup(token string, axes []string) string {
+	columns := make([]string, 0, len(axes)*2)
+	if len(axes) == 0 || !restrictToAxes(axes) {
+		columns = append(columns, "")
+	} else {
+		for _, axis := range axes {
+			columns = append(columns, ftsColumnsForAxis(axis)...)
+		}
+	}
+	term := func(column, value string) string {
+		if column == "" {
+			return `"` + value + `"*`
+		}
+		return column + `:"` + value + `"*`
+	}
+	orTerms := func(value string) string {
+		alts := make([]string, 0, len(columns))
+		for _, column := range columns {
+			alts = append(alts, term(column, value))
+		}
+		if len(alts) == 1 {
+			return alts[0]
+		}
+		return "(" + strings.Join(alts, " OR ") + ")"
+	}
+	branches := []string{orTerms(token)}
+	if hanPhraseToken(token) {
+		bigramColumns := cjkEnrichedColumns(axes)
+		bigramTerms := make([]string, 0, maxCJKQueryBigrams)
+		for _, bigram := range cjkQueryBigrams(token) {
+			alts := make([]string, 0, len(bigramColumns))
+			for _, column := range bigramColumns {
+				alts = append(alts, term(column, bigram))
+			}
+			if len(alts) == 1 {
+				bigramTerms = append(bigramTerms, alts[0])
+			} else if len(alts) > 1 {
+				bigramTerms = append(bigramTerms, "("+strings.Join(alts, " OR ")+")")
+			}
+		}
+		if len(bigramTerms) > 0 {
+			branches = append(branches, "("+strings.Join(bigramTerms, " AND ")+")")
+		}
+	}
+	if len(branches) == 1 {
+		return branches[0]
+	}
+	return "(" + strings.Join(branches, " OR ") + ")"
+}
+
+func cjkEnrichedColumns(axes []string) []string {
+	axisColumns := map[string]string{
+		AxisName: "name_pinyin", AxisPath: "path_pinyin", AxisNotes: "notes_pinyin",
+		AxisDescriptions: "descriptions_pinyin", AxisExtracted: "extracted_pinyin",
+	}
+	var columns []string
+	if !restrictToAxes(axes) {
+		for _, axis := range []string{AxisName, AxisPath, AxisNotes, AxisDescriptions, AxisExtracted} {
+			columns = append(columns, axisColumns[axis])
+		}
+		return columns
+	}
+	for _, axis := range axes {
+		if column := axisColumns[axis]; column != "" {
+			columns = append(columns, column)
+		}
+	}
+	return columns
 }
 
 // ftsColumnsForAxis maps one lexical construct axis to the FTS5 columns that
@@ -665,6 +759,10 @@ func matchedConstructAxes(ctx context.Context, matcher *provenanceMatcher, hit H
 			return nil, err
 		}
 		if rawMatch {
+			matched = append(matched, field.axis)
+			continue
+		}
+		if cjkAxisProof(field.axis, field.text, tokens) {
 			matched = append(matched, field.axis)
 			continue
 		}
@@ -919,6 +1017,7 @@ func matchedDescriptionSegments(ctx context.Context, matcher *provenanceMatcher,
 	var extractedCursor int
 	extractedBound := len(boundForPinyinEnrichment(extracted))
 	var derivedDescriptionSources []sourceByteRange
+	var cjkDescriptionSources []sourceByteRange
 	if versionedProjection && len(derivedOrigins) > 0 && axisAllowed(AxisDescriptions, axes) {
 		derivedSpans, _, err := matcher.matches(ctx, descriptionsPinyin, tokens, false)
 		if err != nil {
@@ -926,6 +1025,17 @@ func matchedDescriptionSegments(ctx context.Context, matcher *provenanceMatcher,
 		}
 		derivedDescriptionSources = matchedDescriptionSourceRanges(derivedSpans, derivedOrigins)
 	}
+	if versionedProjection && axisAllowed(AxisDescriptions, axes) {
+		for _, token := range tokens {
+			if hanPhraseToken(token) {
+				phraseRanges := verifiedDescriptionPhraseRanges(descriptions, segmentsJSON, subjectID, token)
+				cjkDescriptionSources = append(cjkDescriptionSources, phraseRanges...)
+				derivedDescriptionSources = append(derivedDescriptionSources, phraseRanges...)
+			}
+		}
+	}
+	cjkDescriptionSources = mergeSourceByteRanges(cjkDescriptionSources)
+	derivedDescriptionSources = mergeSourceByteRanges(derivedDescriptionSources)
 	for _, segment := range segments {
 		axis := ""
 		switch segment.SourceType {
@@ -1003,8 +1113,27 @@ func matchedDescriptionSegments(ctx context.Context, matcher *provenanceMatcher,
 				return nil, derivedErr
 			}
 		}
-		if rawMatch || derivedMatch {
-			segment.MatchSpans = rawSpans
+		phraseText := text
+		if axis == AxisExtracted || axis == AxisDescriptions {
+			// New interior matching has exactly the appendix's indexed budget.
+			// Unverified legacy multi-segment descriptions omit the new proof.
+			// Genuine raw-prefix matches retain their original spans below.
+			phraseText = derivedText
+		}
+		phraseSpans := cjkPhraseSpans(phraseText, tokens)
+		if axis == AxisDescriptions && versionedProjection && sourceRangeOverlapsAny(verifiedRanges[segment.SegmentID], cjkDescriptionSources) {
+			segmentRange := verifiedRanges[segment.SegmentID]
+			for _, phrase := range cjkDescriptionSources {
+				start := maxInt(phrase.start, segmentRange.start)
+				end := minInt(phrase.end, segmentRange.end)
+				if start < end {
+					phraseSpans = append(phraseSpans, MatchSpan{StartByte: start - segmentRange.start, EndByte: end - segmentRange.start})
+				}
+			}
+		}
+		rawSpans = removeOverlappingSpans(rawSpans, phraseSpans)
+		if rawMatch || derivedMatch || len(phraseSpans) > 0 {
+			segment.MatchSpans = mergeMatchSpans(append(rawSpans, phraseSpans...))
 			refs = append(refs, segment)
 		}
 	}

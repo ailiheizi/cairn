@@ -143,7 +143,20 @@ func (p *ONNXSemanticEmbeddingProvider) Embed(ctx context.Context, req search.Se
 		if result.Status != EmbedTextAccepted {
 			return nil, fmt.Errorf("%w: segment %q returned %s", search.ErrSemanticProviderUnavailable, result.SegmentID, result.Status)
 		}
-		results = append(results, search.SemanticVector{SubjectID: result.SubjectRef, SegmentID: result.SegmentID, Vector: append([]float32(nil), result.Vector...)})
+		if req.Purpose == search.SemanticEmbeddingQuery && result.Coverage == EmbedTextCoverageTruncated {
+			return nil, search.ErrSemanticQueryInputTruncated
+		}
+		vector := search.SemanticVector{SubjectID: result.SubjectRef, SegmentID: result.SegmentID, Vector: append([]float32(nil), result.Vector...)}
+		if req.Purpose == search.SemanticEmbeddingDocument {
+			coverage := search.SemanticInputCoverage(result.Coverage)
+			vector.InputEvidence = &search.SemanticInputEvidence{
+				TextDigest: result.TextDigest, SourceRef: result.DescriptionDocumentID, Ordinal: int64(result.Ordinal),
+				PreprocessingDigest:        req.Manifest.PreprocessingDigest,
+				AppliedPreprocessingDigest: result.PreprocessingDigest,
+				Coverage:                   coverage, InputTokens: result.InputTokens, EmbeddedTokens: result.EmbeddedTokens,
+			}
+		}
+		results = append(results, vector)
 	}
 	return results, nil
 }

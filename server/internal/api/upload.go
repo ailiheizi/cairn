@@ -21,18 +21,28 @@ type UploadStaging interface {
 // UploadSession is one request-scoped staging session. Stage streams one file
 // part into the inbox; Refusal reports a sticky request-level refusal after
 // which the caller must Rollback; Finish reports every per-file outcome.
+// DrainRemainder bounds discarded payload before the next part. A nonempty
+// reason or error requires rollback without advancing the multipart reader.
 type UploadSession interface {
 	Stage(fileName string, content io.Reader) command.UploadFileResult
+	DrainRemainder(content io.Reader) (reason string, err error)
 	Refusal() string
 	Rollback()
 	Finish() command.UploadResult
 }
 
+// RelativeUploadSession is an optional extension for sessions that can stage
+// safe, hierarchy-preserving paths. Callers must refuse the request rather
+// than flattening relative_files when a session does not implement it.
+type RelativeUploadSession interface {
+	StageRelative(relativePath string, content io.Reader) command.UploadFileResult
+}
+
 // serveUpload streams a multipart/form-data upload into the daemon's staging
 // session. The adapter never buffers a file: each part is handed to the
-// session as a stream and its remaining bytes are drained afterwards, so a
-// refused or oversized file can neither desynchronize the request nor leave a
-// partial behind.
+// session as a stream. A skipped part's remainder is drained only within the
+// daemon-owned per-file bound; a sticky or drain-limit refusal rolls back and
+// stops parsing without an unbounded multipart drain.
 func serveUpload(w http.ResponseWriter, r *http.Request, stager UploadStaging) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "upload requires POST")
@@ -70,16 +80,50 @@ func serveUpload(w http.ResponseWriter, r *http.Request, stager UploadStaging) {
 			writeUploadError(w, http.StatusBadRequest, command.UploadReasonMalformed, "read multipart request: "+partErr.Error())
 			return
 		}
-		if part.FormName() == "files" {
+		var result command.UploadFileResult
+		switch part.FormName() {
+		case "files":
 			parts++
-			results = append(results, session.Stage(rawPartFileName(part), part))
+			result = session.Stage(rawPartFileName(part), part)
+		case "relative_files":
+			parts++
+			relative, ok := session.(RelativeUploadSession)
+			if !ok {
+				session.Rollback()
+				finalized = true
+				writeUploadError(w, http.StatusUnprocessableEntity, command.UploadReasonNameRejected, "this upload staging session cannot preserve folder paths; nothing was staged")
+				return
+			}
+			result = relative.StageRelative(rawPartFileName(part), part)
+		default:
+			session.Rollback()
+			finalized = true
+			writeUploadError(w, http.StatusBadRequest, command.UploadReasonMalformed, "multipart form contains an unsupported field")
+			return
 		}
-		// Drain and close every part, including refused ones, so the framing
-		// of the remaining request stays parseable.
-		_ = part.Close()
+		results = append(results, result)
+		// A sticky request-level refusal requires rollback. Do not close the part
+		// here: multipart.Part.Close drains its remaining bytes without a bound.
 		if session.Refusal() != "" {
 			break
 		}
+		if reason, err := session.DrainRemainder(part); err != nil || reason != "" {
+			session.Rollback()
+			finalized = true
+			if reason == command.UploadReasonTooLarge {
+				writeUploadError(w, http.StatusRequestEntityTooLarge, command.UploadReasonTooLarge, "discarded file content exceeds the per-file upload bound")
+				return
+			}
+			message := "read multipart part remainder"
+			if err != nil {
+				message += ": " + err.Error()
+			}
+			writeUploadError(w, http.StatusInternalServerError, command.UploadReasonIOFailed, message)
+			return
+		}
+		// The session bounded the remaining payload; close now only to finalize
+		// the multipart part before advancing to the next one.
+		_ = part.Close()
 	}
 	if parts == 0 {
 		session.Rollback()

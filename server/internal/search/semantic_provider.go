@@ -31,6 +31,30 @@ type SemanticVector struct {
 	SubjectID string
 	SegmentID string
 	Vector    []float32
+	// InputEvidence is optional because legacy, fixture, and online providers
+	// may not expose tokenizer-consumption evidence. Nil is UNKNOWN, never FULL.
+	InputEvidence *SemanticInputEvidence
+}
+
+type SemanticInputCoverage string
+
+const (
+	SemanticInputCoverageFull      SemanticInputCoverage = "FULL"
+	SemanticInputCoverageTruncated SemanticInputCoverage = "TRUNCATED"
+)
+
+// SemanticInputEvidence carries host-validated lineage for one selected
+// document segment. It is a rebuildable projection, not a durable source or
+// recovery record. Token counts do not imply byte-span coverage.
+type SemanticInputEvidence struct {
+	TextDigest                 string                `json:"text_digest"`
+	SourceRef                  string                `json:"source_ref"`
+	Ordinal                    int64                 `json:"ordinal"`
+	PreprocessingDigest        string                `json:"preprocessing_digest"`
+	AppliedPreprocessingDigest string                `json:"applied_preprocessing_digest"`
+	Coverage                   SemanticInputCoverage `json:"coverage"`
+	InputTokens                int64                 `json:"input_tokens"`
+	EmbeddedTokens             int64                 `json:"embedded_tokens"`
 }
 
 // SemanticEmbeddingRequest is a host-owned, bounded provider request. The
@@ -146,6 +170,39 @@ func validateSemanticEmbeddingResults(req SemanticEmbeddingRequest, results []Se
 		if req.Purpose == SemanticEmbeddingDocument && result.SubjectID != input.SubjectID {
 			return fmt.Errorf("%w: provider changed subject identity", ErrSemanticProviderUnavailable)
 		}
+		if result.InputEvidence != nil {
+			if req.Purpose != SemanticEmbeddingDocument {
+				return fmt.Errorf("%w: query vector carries document input evidence", ErrSemanticProviderUnavailable)
+			}
+			if err := validateSemanticInputEvidence(req, input, *result.InputEvidence); err != nil {
+				return fmt.Errorf("%w: provider returned invalid input evidence: %v", ErrSemanticProviderUnavailable, err)
+			}
+		}
+	}
+	return nil
+}
+
+func validateSemanticInputEvidence(req SemanticEmbeddingRequest, input SemanticTextInput, evidence SemanticInputEvidence) error {
+	if evidence.TextDigest != sha256Text(input.Text) || evidence.SourceRef == "" || evidence.SourceRef != input.DescriptionDocumentID || evidence.Ordinal != input.Ordinal {
+		return errors.New("source mapping or selected-text digest does not match input")
+	}
+	if evidence.PreprocessingDigest == "" || evidence.PreprocessingDigest != req.Manifest.PreprocessingDigest || !validSHA256Text(evidence.AppliedPreprocessingDigest) {
+		return errors.New("preprocessing binding does not match generation profile")
+	}
+	if evidence.InputTokens <= 0 || evidence.EmbeddedTokens <= 0 || evidence.EmbeddedTokens > evidence.InputTokens {
+		return errors.New("invalid tokenizer accounting")
+	}
+	switch evidence.Coverage {
+	case SemanticInputCoverageFull:
+		if evidence.InputTokens != evidence.EmbeddedTokens {
+			return errors.New("FULL evidence has unequal token counts")
+		}
+	case SemanticInputCoverageTruncated:
+		if evidence.InputTokens <= evidence.EmbeddedTokens {
+			return errors.New("TRUNCATED evidence is not shorter than input")
+		}
+	default:
+		return errors.New("unknown tokenizer coverage")
 	}
 	return nil
 }

@@ -3,9 +3,13 @@ package controlplane
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 	"unicode"
@@ -13,6 +17,7 @@ import (
 
 	"github.com/ailiheizi/cairn/client/command"
 	cairnconfig "github.com/ailiheizi/cairn/config"
+	"github.com/ailiheizi/cairn/server/internal/processor"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 )
@@ -25,9 +30,11 @@ const (
 )
 
 type descriptionListInput struct {
-	WorkspaceID string `json:"workspace_id"`
-	SubjectRef  string `json:"subject_ref,omitempty"`
-	Limit       int    `json:"limit,omitempty"`
+	WorkspaceID string     `json:"workspace_id"`
+	SubjectRef  string     `json:"subject_ref,omitempty"`
+	Limit       *int       `json:"limit,omitempty"`
+	CurrentOnly *bool      `json:"current_only,omitempty"`
+	Page        *pageInput `json:"page,omitempty"`
 }
 
 type descriptionGetInput struct {
@@ -70,14 +77,27 @@ func (d *Dispatcher) handleDescriptionList(ctx context.Context, env command.Enve
 		}
 		input.SubjectRef = entry.SubjectRef
 	}
-	limit := input.Limit
-	if limit == 0 {
-		limit = descriptionListDefaultLimit
+	currentOnly := input.CurrentOnly != nil && *input.CurrentOnly
+	limit := descriptionListDefaultLimit
+	if input.Limit != nil && *input.Limit != 0 {
+		limit = *input.Limit
 	}
 	if limit < 1 || limit > descriptionListMaxLimit {
 		return invalidInputResult(env, started, fmt.Errorf("limit must be between 1 and %d", descriptionListMaxLimit))
 	}
-	documents, err := d.store.ListDescriptionSummaries(ctx, input.WorkspaceID, input.SubjectRef, limit+1)
+	if input.Page != nil {
+		if input.Limit != nil {
+			return invalidInputResult(env, started, errString("limit cannot be combined with page.limit"))
+		}
+		return d.handlePagedDescriptionList(ctx, env, started, input.WorkspaceID, input.SubjectRef, currentOnly, input.Page)
+	}
+	var documents []sqlite.DescriptionDocument
+	var err error
+	if currentOnly {
+		documents, err = d.store.ListCurrentDescriptionSummaries(ctx, input.WorkspaceID, input.SubjectRef, limit+1)
+	} else {
+		documents, err = d.store.ListDescriptionSummaries(ctx, input.WorkspaceID, input.SubjectRef, limit+1)
+	}
 	if err != nil {
 		return catalogErrorResult(env, started, err)
 	}
@@ -89,7 +109,157 @@ func (d *Dispatcher) handleDescriptionList(ctx context.Context, env command.Enve
 	for _, document := range documents {
 		projected = append(projected, projectDescriptionSummary(document))
 	}
-	return succeeded(env, started, command.DescriptionListData{Documents: projected, Truncated: truncated})
+	data := command.DescriptionListData{Documents: projected, Truncated: truncated}
+	if input.CurrentOnly != nil {
+		current := currentOnly
+		data.CurrentOnly = &current
+	}
+	return succeeded(env, started, data)
+}
+
+func (d *Dispatcher) handlePagedDescriptionList(ctx context.Context, env command.Envelope, started time.Time, workspaceID, subjectRef string, currentOnly bool, page *pageInput) command.Result {
+	limit := search.DefaultPageSize
+	if page.Limit != nil {
+		if *page.Limit < 1 || *page.Limit > descriptionListMaxLimit {
+			return invalidInputResult(env, started, fmt.Errorf("page.limit must be between 1 and %d", descriptionListMaxLimit))
+		}
+		limit = *page.Limit
+	}
+	token := strings.TrimSpace(page.Token)
+	if page.Token != "" && token == "" {
+		return invalidInputResult(env, started, fmt.Errorf("page.token must not be blank"))
+	}
+	result, err := d.store.ListDescriptionSummaryPage(ctx, workspaceID, subjectRef, currentOnly, limit, nil)
+	if err != nil {
+		return catalogErrorResult(env, started, err)
+	}
+	binding, err := descriptionListPageBinding(workspaceID, subjectRef, currentOnly, result.ProjectionRef)
+	if err != nil {
+		return catalogErrorResult(env, started, err)
+	}
+	var after *sqlite.DescriptionSummaryPosition
+	if token != "" {
+		position, parseErr := search.ParseContinuation(token, binding, d.now())
+		if parseErr != nil {
+			return invalidInputResult(env, started, parseErr)
+		}
+		decoded, decodeErr := decodeDescriptionPagePosition(position.EntryID)
+		if decodeErr != nil {
+			return invalidInputResult(env, started, decodeErr)
+		}
+		after = &decoded
+		result, err = d.store.ListDescriptionSummaryPage(ctx, workspaceID, subjectRef, currentOnly, limit, after)
+		if err != nil {
+			return catalogErrorResult(env, started, err)
+		}
+		if result.ProjectionRef != binding.GenerationID {
+			return invalidInputResult(env, started, search.ErrStaleContinuation)
+		}
+	}
+	projected := make([]command.DescriptionSummaryData, 0, len(result.Documents))
+	for _, document := range result.Documents {
+		projected = append(projected, projectDescriptionSummary(document))
+	}
+	pageData := &command.PageData{
+		Mode:                  command.PageModePage,
+		Limit:                 limit,
+		Returned:              len(projected),
+		Completeness:          completenessOf(!result.HasMore, result.HasMore),
+		Complete:              !result.HasMore,
+		HasMore:               result.HasMore,
+		Lane:                  search.LaneDescriptionList,
+		Order:                 search.OrderDescriptionSubjectRevisionID,
+		ContinuationSupported: true,
+	}
+	pageData.Entries = &result.Total
+	if result.HasMore {
+		position, encodeErr := encodeDescriptionPagePosition(result.Next)
+		if encodeErr != nil {
+			return catalogErrorResult(env, started, encodeErr)
+		}
+		pageData.Token, pageData.ExpiresAt, err = d.mintDescriptionListCursor(binding, position)
+		if err != nil {
+			return catalogErrorResult(env, started, err)
+		}
+	}
+	current := currentOnly
+	return succeeded(env, started, command.DescriptionListData{
+		Documents: projected, Truncated: result.HasMore, WorkspaceID: workspaceID,
+		SubjectRef: subjectRef, CurrentOnly: &current, ProjectionRef: result.ProjectionRef, Page: pageData,
+	})
+}
+
+func descriptionListPageBinding(workspaceID, subjectRef string, currentOnly bool, projectionRef string) (search.ContinuationBinding, error) {
+	query, err := json.Marshal(struct {
+		WorkspaceID string `json:"workspace_id"`
+		SubjectRef  string `json:"subject_ref,omitempty"`
+		CurrentOnly bool   `json:"current_only"`
+		Mode        string `json:"mode"`
+		Order       string `json:"order"`
+	}{workspaceID, subjectRef, currentOnly, command.PageModePage, search.OrderDescriptionSubjectRevisionID})
+	if err != nil {
+		return search.ContinuationBinding{}, err
+	}
+	digest := sha256.Sum256(query)
+	return search.ContinuationBinding{
+		Scope:        search.AuthorizationScopeDigest(workspaceID),
+		Query:        hex.EncodeToString(digest[:]),
+		GenerationID: projectionRef,
+		Lane:         search.LaneDescriptionList,
+		Order:        search.OrderDescriptionSubjectRevisionID,
+	}, nil
+}
+
+type descriptionPagePosition struct {
+	SubjectRef string `json:"subject_ref"`
+	Revision   int64  `json:"revision"`
+	DocumentID string `json:"description_document_id"`
+}
+
+func encodeDescriptionPagePosition(position sqlite.DescriptionSummaryPosition) (string, error) {
+	if strings.TrimSpace(position.SubjectRef) == "" || position.Revision < 1 || strings.TrimSpace(position.DocumentID) == "" {
+		return "", fmt.Errorf("%w: description page position is incomplete", search.ErrInvalidContinuation)
+	}
+	encoded, err := json.Marshal(descriptionPagePosition{position.SubjectRef, position.Revision, position.DocumentID})
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(encoded), nil
+}
+
+func decodeDescriptionPagePosition(encoded string) (sqlite.DescriptionSummaryPosition, error) {
+	var position sqlite.DescriptionSummaryPosition
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return position, fmt.Errorf("%w: description page position is malformed", search.ErrInvalidContinuation)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var payload descriptionPagePosition
+	if err := decoder.Decode(&payload); err != nil {
+		return position, fmt.Errorf("%w: description page position is malformed", search.ErrInvalidContinuation)
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return position, fmt.Errorf("%w: description page position has trailing data", search.ErrInvalidContinuation)
+	}
+	if strings.TrimSpace(payload.SubjectRef) == "" || payload.Revision < 1 || strings.TrimSpace(payload.DocumentID) == "" {
+		return position, fmt.Errorf("%w: description page position is incomplete", search.ErrInvalidContinuation)
+	}
+	if err := requireStableID("description page subject_ref", payload.SubjectRef); err != nil {
+		return position, fmt.Errorf("%w: description page subject_ref is invalid", search.ErrInvalidContinuation)
+	}
+	if err := requireStableID("description page document id", payload.DocumentID); err != nil {
+		return position, fmt.Errorf("%w: description page document id is invalid", search.ErrInvalidContinuation)
+	}
+	return sqlite.DescriptionSummaryPosition{SubjectRef: payload.SubjectRef, Revision: payload.Revision, DocumentID: payload.DocumentID}, nil
+}
+
+func (d *Dispatcher) mintDescriptionListCursor(binding search.ContinuationBinding, encodedPosition string) (string, string, error) {
+	token, expires, err := search.MintContinuation(binding, search.PagePosition{Lane: search.LaneDescriptionList, EntryID: encodedPosition}, d.now())
+	if err != nil {
+		return "", "", err
+	}
+	return token, expires.UTC().Format(time.RFC3339), nil
 }
 
 func (d *Dispatcher) handleDescriptionGet(ctx context.Context, env command.Envelope, started time.Time) command.Result {
@@ -300,10 +470,13 @@ func (d *Dispatcher) admitDescriptionRevision(ctx context.Context, env command.E
 	}); err != nil {
 		return descriptionWriteResult(env, started, err)
 	}
-	if rebuildErr := d.rebuildSearch(ctx, admission.WorkspaceID); rebuildErr != nil {
-		return degradedResult(env, started, command.DescriptionCreateData{Document: projectDescription(*document, segments)}, "description saved, but search index is unavailable: "+rebuildErr.Error())
+	data := command.DescriptionCreateData{Document: projectDescription(*document, segments)}
+	searchErr := d.rebuildSearch(ctx, admission.WorkspaceID)
+	publicationErr := d.publishDescriptionFacts(ctx, admission.WorkspaceID, []sqlite.DescriptionDocument{*document})
+	if searchErr != nil || publicationErr != nil {
+		return metadataPostCommitDegradedResult(env, started, data, "description", searchErr, publicationErr)
 	}
-	return succeeded(env, started, command.DescriptionCreateData{Document: projectDescription(*document, segments)})
+	return succeeded(env, started, data)
 }
 
 func projectDescriptionSummary(document sqlite.DescriptionDocument) command.DescriptionSummaryData {
@@ -797,6 +970,9 @@ func (d *Dispatcher) describeImagePart(ctx context.Context, entry sqlite.Namespa
 	if entry.EntryType != sqlite.EntryFile || strings.TrimSpace(entry.ContentID) == "" {
 		return nil, nil
 	}
+	if _, ok := search.ImageMediaTypeForName(entry.DisplayName); !ok {
+		return nil, nil
+	}
 	if d.exact == nil || d.exact.Repo == nil {
 		return nil, errors.New("the describe image content source is not configured")
 	}
@@ -804,6 +980,9 @@ func (d *Dispatcher) describeImagePart(ctx context.Context, entry sqlite.Namespa
 	content, err := source.ReadImageContent(ctx, entry.ContentID)
 	if err != nil {
 		return nil, err
+	}
+	if err := processor.ValidateImageBytes(content.Bytes, content.MediaType); err != nil {
+		return nil, fmt.Errorf("describe image bytes are not a decodable admitted image: %w", err)
 	}
 	return &search.DescribeImagePart{ContentID: content.ContentID, MediaType: content.MediaType, Bytes: content.Bytes}, nil
 }

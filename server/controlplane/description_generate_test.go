@@ -1,10 +1,14 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,10 +19,57 @@ import (
 	"time"
 
 	"github.com/ailiheizi/cairn/client/command"
+	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/repository"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/internal/store/sqlite"
 	"github.com/ailiheizi/cairn/server/testutil"
 )
+
+func TestDescribeImagePartAdmitsOnlyBoundDecodableImages(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+	var encoded bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	good, err := repo.Place(ctx, bytes.NewReader(encoded.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatcher := &Dispatcher{exact: &exact.Service{Repo: repo}}
+
+	part, err := dispatcher.describeImagePart(ctx, sqlite.NamespaceEntry{
+		EntryType: sqlite.EntryFile, ContentID: good.ContentID, DisplayName: "photo.png",
+	})
+	if err != nil {
+		t.Fatalf("admitted PNG: %v", err)
+	}
+	if part == nil || part.ContentID != good.ContentID || part.MediaType != "image/png" || !bytes.Equal(part.Bytes, encoded.Bytes()) {
+		t.Fatalf("admitted image part = %#v", part)
+	}
+
+	// A broad image.bytes grant does not make arbitrary file contents eligible.
+	part, err = (&Dispatcher{}).describeImagePart(ctx, sqlite.NamespaceEntry{
+		EntryType: sqlite.EntryFile, ContentID: "sha256:unread", DisplayName: "notes.txt",
+	})
+	if err != nil || part != nil {
+		t.Fatalf("non-image should be omitted without requiring a content read: part=%#v err=%v", part, err)
+	}
+
+	corrupt := []byte("not an image")
+	bad, err := repo.Place(ctx, bytes.NewReader(corrupt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if part, err := dispatcher.describeImagePart(ctx, sqlite.NamespaceEntry{
+		EntryType: sqlite.EntryFile, ContentID: bad.ContentID, DisplayName: "spoofed.png",
+	}); err == nil || part != nil {
+		t.Fatalf("spoofed image should fail closed: part=%#v err=%v", part, err)
+	}
+}
 
 // seedExtractArtifact writes one admitted EXTRACT text artifact for a subject,
 // including the terminal processor attempt the artifact trigger requires.
@@ -83,12 +134,15 @@ func seedExactProtection(t *testing.T, store *sqlite.Store, workspaceID, subject
 
 // installDescribeProfile writes one valid describe profile manifest below a
 // temp models root, pointed at the loopback stub endpoint.
-func installDescribeProfile(t *testing.T, modelsRoot string, endpoint string) search.OnlineDescribeProfile {
+func installDescribeProfile(t *testing.T, modelsRoot string, endpoint string, dataClasses ...string) search.OnlineDescribeProfile {
 	t.Helper()
+	if len(dataClasses) == 0 {
+		dataClasses = []string{search.EgressDataClassTextSubjectContext}
+	}
 	scope := func() search.OnlineEgressScope {
 		return search.OnlineEgressScope{
 			DestinationHost:       strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://"),
-			DisclosedDataClasses:  []string{search.EgressDataClassTextSubjectContext},
+			DisclosedDataClasses:  append([]string(nil), dataClasses...),
 			AllowedSubjectClasses: search.EgressSubjectClasses(),
 			Minimization: search.OnlineEgressMinimization{
 				Statement: "only the model id, the chat messages, and max_tokens are transmitted",
@@ -168,10 +222,10 @@ func newDescribeStub(t *testing.T, candidate string) (*httptest.Server, func() [
 // provider bound to the loopback stub and an installed profile. The provider
 // resolves its credential reference through the default host resolver, so the
 // test sets the named environment variable explicitly.
-func wireDescribeDispatcher(t *testing.T, store *sqlite.Store, endpoint, modelsRoot string) *Dispatcher {
+func wireDescribeDispatcher(t *testing.T, store *sqlite.Store, endpoint, modelsRoot string, dataClasses ...string) *Dispatcher {
 	t.Helper()
 	t.Setenv("RW_TEST_DESCRIBE_KEY", "resolved-describe-secret")
-	profile := installDescribeProfile(t, modelsRoot, endpoint)
+	profile := installDescribeProfile(t, modelsRoot, endpoint, dataClasses...)
 	provider, err := search.NewOnlineDescribeProvider(search.OnlineDescribeProviderOptions{
 		Profile:       profile,
 		AuditSink:     describeTestAuditSink{},
@@ -196,8 +250,11 @@ func (describeTestAuditSink) RecordDescribeEgress(_ context.Context, _ search.De
 // createDescribeGrant creates a live grant through the typed operation and
 // returns the confirmation input resolved from it. This is exactly the
 // resolution the WebUI confirmation step performs against the live grant list.
-func createDescribeGrant(t *testing.T, dispatcher *Dispatcher, workspaceID string, profile search.OnlineDescribeProfile) command.EgressGrantData {
+func createDescribeGrant(t *testing.T, dispatcher *Dispatcher, workspaceID string, profile search.OnlineDescribeProfile, dataClasses ...string) command.EgressGrantData {
 	t.Helper()
+	if len(dataClasses) == 0 {
+		dataClasses = []string{search.EgressDataClassTextSubjectContext}
+	}
 	result := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpEgressGrantCreate, map[string]any{
 		"workspace_id":    workspaceID,
 		"profile_id":      profile.ProfileID,
@@ -205,7 +262,7 @@ func createDescribeGrant(t *testing.T, dispatcher *Dispatcher, workspaceID strin
 		"endpoint_host":   profile.EndpointHost(),
 		"model_id":        profile.ModelID,
 		"purpose":         "DESCRIBE",
-		"data_classes":    []string{search.EgressDataClassTextSubjectContext},
+		"data_classes":    dataClasses,
 		"subject_classes": search.EgressSubjectClasses(),
 		"max_requests":    profile.Egress.Budgets.MaxRequests,
 		"max_bytes":       profile.Egress.Budgets.MaxBytes,
@@ -296,20 +353,40 @@ func TestDescriptionGenerateAdmitsCandidateAsImmutableRevision(t *testing.T) {
 	stub, requests := newDescribeStub(t, "候选描述：主角在废墟中寻找失落的城市。")
 	store := testutil.OpenStore(t, ":memory:")
 	modelsRoot := t.TempDir()
-	dispatcher := wireDescribeDispatcher(t, store, stub.URL, modelsRoot)
+	dispatcher := wireDescribeDispatcher(t, store, stub.URL, modelsRoot,
+		search.EgressDataClassTextSubjectContext, search.EgressDataClassImageBytes)
 	seed := testutil.SeedNamespace(t, store)
 	ctx := context.Background()
-	seedExtractArtifact(t, store, seed.WorkspaceID, seed.FileEntryID, "标题：雪后的城市。\n主角在废墟中寻找失落的城市，并记录沿途的线索。")
+	textSubject := sqlite.NamespaceEntry{
+		ID: mustTestID(t, sqlite.IDPrefixNamespaceEntry), WorkspaceID: seed.WorkspaceID,
+		RootID: seed.RootID, ParentID: seed.DirEntryID, RawName: []byte("notes.txt"),
+		DisplayName: "notes.txt", FullPathKey: []byte("Music\x00notes.txt"),
+		EntryType: sqlite.EntryFile, ContentID: "sha256:file-content", FileVersionID: seed.FileVersionID,
+	}
+	if err := store.Update(ctx, func(tx *sqlite.Tx) error { return tx.InsertNamespaceEntry(ctx, &textSubject) }); err != nil {
+		t.Fatalf("insert non-image text subject: %v", err)
+	}
+	seedExtractArtifact(t, store, seed.WorkspaceID, textSubject.ID, "标题：雪后的城市。\n主角在废墟中寻找失落的城市，并记录沿途的线索。")
+	privateNote := "PRIVATE-NOTE-DO-NOT-EGRESS-4d19"
+	if err := store.Update(ctx, func(tx *sqlite.Tx) error {
+		return tx.InsertAnnotation(ctx, &sqlite.Annotation{
+			ID: mustTestID(t, sqlite.IDPrefixAnnotation), WorkspaceID: seed.WorkspaceID,
+			SubjectRef: textSubject.ID, Kind: sqlite.AnnotationNote, Body: privateNote, Revision: 1,
+		})
+	}); err != nil {
+		t.Fatalf("insert private note fixture: %v", err)
+	}
 	// The egress policy, grant ledger, and receipt ledger resolve the
 	// single default workspace, so the fixture's protection record and grant
 	// live there while the subject's artifacts stay in the seeded workspace.
 	defaultWorkspace := mustDefaultWorkspace(t, store)
-	seedExactProtection(t, store, defaultWorkspace, seed.FileEntryID)
-	grant := createDescribeGrant(t, dispatcher, defaultWorkspace, wireDescribeProviderProfile(t, dispatcher))
+	seedExactProtection(t, store, defaultWorkspace, textSubject.ID)
+	grant := createDescribeGrant(t, dispatcher, defaultWorkspace, wireDescribeProviderProfile(t, dispatcher),
+		search.EgressDataClassTextSubjectContext, search.EgressDataClassImageBytes)
 
 	result := dispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionGenerate, map[string]any{
 		"workspace_id": seed.WorkspaceID,
-		"subject_ref":  seed.FileEntryID,
+		"subject_ref":  textSubject.ID,
 		"kind":         "AI_SUMMARY",
 		"language":     "zh",
 		"egress_confirmation": map[string]any{
@@ -320,13 +397,7 @@ func TestDescriptionGenerateAdmitsCandidateAsImmutableRevision(t *testing.T) {
 			"grant_id":      grant.GrantID,
 		},
 	}))
-	if result.Status != command.StatusSucceeded {
-		t.Fatalf("generate status = %q: %+v", result.Status, result.Reasons)
-	}
-	var data command.DescriptionGenerateData
-	if err := json.Unmarshal(result.Data, &data); err != nil {
-		t.Fatal(err)
-	}
+	data := command.DescriptionGenerateData{Document: assertUnsignedDescriptionDegraded(t, result, "候选描述：主角在废墟中寻找失落的城市。", 1)}
 	document := data.Document
 	if document.Kind != "AI_SUMMARY" || document.Accepted {
 		t.Fatalf("admitted revision must be a non-accepted AI_SUMMARY: %+v", document)
@@ -371,14 +442,17 @@ func TestDescriptionGenerateAdmitsCandidateAsImmutableRevision(t *testing.T) {
 	if !strings.Contains(string(encoded), "雪后的城市") {
 		t.Fatal("the request must carry the subject's admitted extract text")
 	}
-	if strings.Contains(string(encoded), "candidate") {
+	if strings.Contains(string(encoded), "image_url") || strings.Contains(string(encoded), "sha256:file-content") {
+		t.Fatal("the broad image.bytes grant must not send image content for a regular non-image subject")
+	}
+	if strings.Contains(string(encoded), privateNote) {
 		t.Fatal("the request must never carry private note material")
 	}
 	// A second generate against the same subject creates an independent
 	// revision: the chain grows without overwriting the first candidate.
 	second := dispatcher.Handle(ctx, mustEnvelope(t, command.OpDescriptionGenerate, map[string]any{
 		"workspace_id": seed.WorkspaceID,
-		"subject_ref":  seed.FileEntryID,
+		"subject_ref":  textSubject.ID,
 		"kind":         "AI_SUMMARY",
 		"egress_confirmation": map[string]any{
 			"profile_id":    grant.ProfileID,
@@ -388,9 +462,7 @@ func TestDescriptionGenerateAdmitsCandidateAsImmutableRevision(t *testing.T) {
 			"grant_id":      grant.GrantID,
 		},
 	}))
-	if second.Status != command.StatusSucceeded {
-		t.Fatalf("second generate status = %q: %+v", second.Status, second.Reasons)
-	}
+	assertUnsignedDescriptionDegraded(t, second, "候选描述：主角在废墟中寻找失落的城市。", 1)
 }
 
 func TestDescriptionGenerateEgressRefusalChangesNothing(t *testing.T) {
@@ -441,9 +513,7 @@ func TestDescriptionGenerateEgressRefusalChangesNothing(t *testing.T) {
 			"grant_id":      grant.GrantID,
 		},
 	}))
-	if result.Status != command.StatusSucceeded {
-		t.Fatalf("generate with a live grant status = %q: %+v", result.Status, result.Reasons)
-	}
+	assertUnsignedDescriptionDegraded(t, result, "候选描述", 1)
 }
 
 func TestDescriptionGenerateAcceptanceSuccessorFlow(t *testing.T) {
@@ -472,13 +542,7 @@ func TestDescriptionGenerateAcceptanceSuccessorFlow(t *testing.T) {
 			"grant_id":      grant.GrantID,
 		},
 	}))
-	if generated.Status != command.StatusSucceeded {
-		t.Fatalf("generate status = %q: %+v", generated.Status, generated.Reasons)
-	}
-	var generateData command.DescriptionGenerateData
-	if err := json.Unmarshal(generated.Data, &generateData); err != nil {
-		t.Fatal(err)
-	}
+	generateData := command.DescriptionGenerateData{Document: assertUnsignedDescriptionDegraded(t, generated, "候选描述：模型生成的剧情摘要。", 1)}
 	// The user accepts the candidate: description.create builds the accepted
 	// successor with the same body, predecessor, and kind. The model itself
 	// never marks its own revision user-accepted.
@@ -491,13 +555,7 @@ func TestDescriptionGenerateAcceptanceSuccessorFlow(t *testing.T) {
 		"accepted":       true,
 		"producer":       "operator",
 	}))
-	if accepted.Status != command.StatusSucceeded {
-		t.Fatalf("accept status = %q: %+v", accepted.Status, accepted.Reasons)
-	}
-	var acceptData command.DescriptionCreateData
-	if err := json.Unmarshal(accepted.Data, &acceptData); err != nil {
-		t.Fatal(err)
-	}
+	acceptData := command.DescriptionCreateData{Document: assertUnsignedDescriptionDegraded(t, accepted, generateData.Document.Body, 2)}
 	if !acceptData.Document.Accepted || acceptData.Document.Revision != 2 || acceptData.Document.PredecessorID != generateData.Document.ID {
 		t.Fatalf("accepted successor = %+v", acceptData.Document)
 	}

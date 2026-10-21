@@ -1,4 +1,4 @@
-//go:build cgo && purego && arm64 && supervised_integration && (darwin || linux)
+//go:build cgo && (purego || cairn_zvec_dynamic) && arm64 && supervised_integration && (darwin || linux)
 
 package main
 
@@ -48,8 +48,8 @@ func TestCandidateOfflinePackageSemanticLifecycle(t *testing.T) {
 	if err := os.MkdirAll(binDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "purego")
-	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "purego")
+	cairnBin := buildTestBinaryWithTags(t, workspaceRoot, "./client/cmd/cairn", filepath.Join(binDir, "cairn"), "cairn_zvec_dynamic")
+	daemonBin := buildTestBinaryWithTags(t, workspaceRoot, "./server/cmd/cairnd", filepath.Join(binDir, "cairnd"), "cairn_zvec_dynamic")
 	webDist := filepath.Join(root, "build", "web-dist")
 	if err := os.MkdirAll(webDist, 0o700); err != nil {
 		t.Fatal(err)

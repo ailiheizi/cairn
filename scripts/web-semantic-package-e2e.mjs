@@ -10,8 +10,9 @@ const executablePath = process.env.CAIRN_PLAYWRIGHT_EXECUTABLE_PATH;
 assert.ok(url, "CAIRN_WEB_E2E_URL is required");
 const { chromium } = await import(playwrightModule);
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+let page;
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.goto(url, { waitUntil: "networkidle" });
   await page.getByRole("main").waitFor({ state: "visible", timeout: 15000 });
 
@@ -25,7 +26,9 @@ try {
     return response.json();
   };
 
-  await page.getByRole("button", { name: /Open settings|打开设置/ }).click();
+  const settingsButton = page.getByRole("button", { name: /Open settings|打开设置/ });
+  if (!(await settingsButton.isVisible())) await page.locator(".topbar-menu > summary").click();
+  await settingsButton.click();
   const settings = page.getByRole("dialog", { name: /Settings|设置/ });
   await settings.waitFor({ state: "visible", timeout: 10000 });
   await settings.locator(".settings-category").filter({ hasText: /Search|搜索/ }).click();
@@ -42,6 +45,7 @@ try {
   await settings.getByRole("button", { name: /Close settings|关闭设置/ }).click();
 
   const search = page.getByRole("textbox", { name: /Search content library|搜索内容库/ });
+  if (!(await search.isVisible())) await page.locator(".topbar-search > summary").click();
   await search.fill("洪水城市");
   const pendingQuery = operationResponse("search.query");
   await page.getByRole("button", { name: /^Search$|^搜索$/ }).click();
@@ -67,6 +71,14 @@ try {
     hit_count: semanticHits.length,
     segment_source: sourceSegment.source_type,
   }));
+} catch (error) {
+  const evidenceDir = process.env.CAIRN_NATIVE_EVIDENCE_DIR;
+  if (page && evidenceDir) {
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(evidenceDir, { recursive: true });
+    await page.screenshot({ path: `${evidenceDir}/web-semantic-package-failure.png` }).catch(() => {});
+  }
+  throw error;
 } finally {
   await browser.close();
 }

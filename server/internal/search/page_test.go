@@ -111,6 +111,51 @@ func TestContinuationTokenRefusals(t *testing.T) {
 	}
 }
 
+func TestSavedViewContinuationUsesOnlyCanonicalProjectionOrdinals(t *testing.T) {
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	binding := ContinuationBinding{
+		Scope:        AuthorizationScopeDigest("wsp_0123456789abcdef0123456789abcdef"),
+		Query:        strings.Repeat("c", 64),
+		GenerationID: "idx_0123456789abcdef0123456789abcdef",
+		Lane:         LaneSavedView,
+		Order:        OrderSavedViewLexical,
+	}
+	position := PagePosition{Lane: LaneSavedView, EntryID: "200"}
+	token, expires, err := MintContinuation(binding, position, now)
+	if err != nil {
+		t.Fatalf("mint saved-view continuation: %v", err)
+	}
+	if !expires.Equal(now.Add(ContinuationTTL)) {
+		t.Fatalf("expiry = %s, want %s", expires, now.Add(ContinuationTTL))
+	}
+	parsed, err := ParseContinuation(token, binding, now)
+	if err != nil || parsed != position {
+		t.Fatalf("saved-view continuation parsed %+v, %v; want %+v", parsed, err, position)
+	}
+	for _, malformed := range []string{"", "00", "-1", "+1", "1.0", "9223372036854775808"} {
+		if _, _, err := MintContinuation(binding, PagePosition{Lane: LaneSavedView, EntryID: malformed}, now); err == nil {
+			t.Fatalf("mint accepted noncanonical saved-view ordinal %q", malformed)
+		}
+	}
+	if _, _, err := MintContinuation(binding, PagePosition{Lane: LaneSavedView, EntryID: "1", HasRank: true}, now); err == nil {
+		t.Fatal("mint accepted saved-view ordinal carrying an index rank")
+	}
+	wrongOrder := binding
+	wrongOrder.Order = OrderRowID
+	if _, _, err := MintContinuation(wrongOrder, PagePosition{Lane: LaneSavedView, EntryID: "1"}, now); err == nil {
+		t.Fatal("mint accepted saved-view lane with a search-index order")
+	}
+	if _, err := ParseContinuation(token, ContinuationBinding{
+		Scope: binding.Scope, Query: binding.Query, GenerationID: binding.GenerationID,
+		Lane: LaneSavedView, Order: OrderRowID,
+	}, now); err == nil {
+		t.Fatal("parse accepted saved-view token under a different order")
+	}
+	if _, err := ParseContinuation(token, binding, now.Add(ContinuationTTL)); !errors.Is(err, ErrStaleContinuation) {
+		t.Fatalf("expired saved-view continuation = %v, want stale refusal", err)
+	}
+}
+
 // TestContinuationRefusesANonPageableLane proves a position can only be minted
 // for a lane that has a complete, seekable order.
 func TestContinuationRefusesANonPageableLane(t *testing.T) {
@@ -124,6 +169,44 @@ func TestContinuationRefusesANonPageableLane(t *testing.T) {
 	}
 	if _, _, err := MintContinuation(binding, PagePosition{Lane: DimensionSemantic, RowID: 1}, now); err == nil {
 		t.Fatal("minting a continuation for a bounded top-k lane must fail closed")
+	}
+}
+
+func TestDescriptionListContinuationUsesStrictProjectionPosition(t *testing.T) {
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	binding := ContinuationBinding{
+		Scope:        AuthorizationScopeDigest("wsp_0123456789abcdef0123456789abcdef"),
+		Query:        strings.Repeat("e", 64),
+		GenerationID: "sha256:" + strings.Repeat("f", 64),
+		Lane:         LaneDescriptionList,
+		Order:        OrderDescriptionSubjectRevisionID,
+	}
+	position := PagePosition{Lane: LaneDescriptionList, EntryID: "opaque-keyset-position"}
+	token, _, err := MintContinuation(binding, position, now)
+	if err != nil {
+		t.Fatalf("mint description continuation: %v", err)
+	}
+	parsed, err := ParseContinuation(token, binding, now)
+	if err != nil || parsed != position {
+		t.Fatalf("parse description continuation = %+v, %v", parsed, err)
+	}
+	if _, err := ParseContinuation(token, binding, now.Add(ContinuationTTL+time.Second)); !errors.Is(err, ErrStaleContinuation) {
+		t.Fatalf("expired description continuation error = %v", err)
+	}
+	for name, invalid := range map[string]PagePosition{
+		"missing keyset": {Lane: LaneDescriptionList},
+		"index row id":   {Lane: LaneDescriptionList, EntryID: "opaque", RowID: 4},
+		"index rank":     {Lane: LaneDescriptionList, EntryID: "opaque", HasRank: true, Rank: 1},
+		"stray rank":     {Lane: LaneDescriptionList, EntryID: "opaque", Rank: 1},
+	} {
+		if _, _, err := MintContinuation(binding, invalid, now); !errors.Is(err, ErrInvalidContinuation) {
+			t.Errorf("mint %s position error = %v", name, err)
+		}
+	}
+	wrongOrder := binding
+	wrongOrder.Order = OrderEntryPathID
+	if _, _, err := MintContinuation(wrongOrder, position, now); !errors.Is(err, ErrInvalidContinuation) {
+		t.Fatalf("description position with content order error = %v", err)
 	}
 }
 

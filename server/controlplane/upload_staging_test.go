@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -37,6 +38,46 @@ func (s apiUploadStagingForTest) BeginUploadSession() (api.UploadSession, error)
 type uploadFixture struct {
 	name    string
 	content []byte
+	field   string
+}
+
+type countedUploadBody struct {
+	reader *bytes.Reader
+	read   int64
+}
+
+func (b *countedUploadBody) Read(p []byte) (int, error) {
+	n, err := b.reader.Read(p)
+	b.read += int64(n)
+	return n, err
+}
+
+func (b *countedUploadBody) Close() error { return nil }
+
+func countedMultipartRequest(t *testing.T, files []uploadFixture) (*http.Request, *countedUploadBody, int64) {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for _, file := range files {
+		field := file.field
+		if field == "" {
+			field = "files"
+		}
+		part, err := writer.CreateFormFile(field, file.name)
+		if err != nil {
+			t.Fatalf("create multipart part: %v", err)
+		}
+		if _, err := part.Write(file.content); err != nil {
+			t.Fatalf("write multipart part: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	counted := &countedUploadBody{reader: bytes.NewReader(body.Bytes())}
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/upload", counted)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	return request, counted, int64(body.Len())
 }
 
 func mustUploadRequestBuilt(t *testing.T, files []uploadFixture) (*http.Request, string) {
@@ -53,7 +94,11 @@ func mustUploadRequestBuilt(t *testing.T, files []uploadFixture) (*http.Request,
 			_ = pw.Close()
 		}()
 		for _, file := range files {
-			part, err := writer.CreateFormFile("files", file.name)
+			field := file.field
+			if field == "" {
+				field = "files"
+			}
+			part, err := writer.CreateFormFile(field, file.name)
 			if err != nil {
 				writeErr = err
 				return
@@ -224,6 +269,68 @@ func TestUploadEndpointDeletesOversizedPartialAndKeepsOtherFiles(t *testing.T) {
 	if dispatcher.uploadInFlight.Load() != 0 {
 		t.Fatalf("in-flight bytes left at %d after oversized refusal", dispatcher.uploadInFlight.Load())
 	}
+}
+
+func TestUploadRefusalsBoundDiscardAndRollbackStaging(t *testing.T) {
+	large := bytesOf(t, 128<<10)
+	t.Run("unknown field does not drain payload", func(t *testing.T) {
+		dispatcher, inbox := newUploadDispatcher(t)
+		handler := api.Handler(dispatcher.Handle, api.Options{Upload: apiUploadStagingForTest{dispatcher}})
+		request, body, total := countedMultipartRequest(t, []uploadFixture{{field: "unexpected", name: "unknown.bin", content: large}})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("unknown field status=%d body=%s", recorder.Code, recorder.Body.String())
+		}
+		if body.read >= total/2 {
+			t.Fatalf("unknown-field refusal read %d of %d multipart bytes", body.read, total)
+		}
+		entries, err := os.ReadDir(inbox)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("unknown-field refusal left inbox entries=%+v err=%v", entries, err)
+		}
+	})
+	t.Run("sticky file-count refusal does not drain payload", func(t *testing.T) {
+		dispatcher, inbox := newUploadDispatcher(t)
+		dispatcher.uploadLimits.maxFiles = 1
+		handler := api.Handler(dispatcher.Handle, api.Options{Upload: apiUploadStagingForTest{dispatcher}})
+		request, body, total := countedMultipartRequest(t, []uploadFixture{{name: "first.txt", content: []byte("first")}, {name: "refused.bin", content: large}})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		code, reason, _ := mustUploadError(t, recorder)
+		if code != http.StatusUnprocessableEntity || reason != command.UploadReasonTooMany {
+			t.Fatalf("sticky file-count refusal=%d %q body=%s", code, reason, recorder.Body.String())
+		}
+		if body.read >= total/2 {
+			t.Fatalf("sticky refusal read %d of %d multipart bytes", body.read, total)
+		}
+		entries, err := os.ReadDir(inbox)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("sticky refusal left inbox entries=%+v err=%v", entries, err)
+		}
+	})
+	t.Run("discard bound rolls back earlier staged file", func(t *testing.T) {
+		dispatcher, inbox := newUploadDispatcher(t)
+		dispatcher.uploadLimits.maxFileBytes = 16
+		handler := api.Handler(dispatcher.Handle, api.Options{Upload: apiUploadStagingForTest{dispatcher}})
+		request, body, total := countedMultipartRequest(t, []uploadFixture{{name: "kept-before-refusal.txt", content: []byte("small")}, {name: "discarded.bin", content: large}})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		code, reason, _ := mustUploadError(t, recorder)
+		if code != http.StatusRequestEntityTooLarge || reason != command.UploadReasonTooLarge {
+			t.Fatalf("discard-bound refusal=%d %q body=%s", code, reason, recorder.Body.String())
+		}
+		if body.read >= total/2 {
+			t.Fatalf("bounded discard read %d of %d multipart bytes", body.read, total)
+		}
+		entries, err := os.ReadDir(inbox)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("discard-bound refusal left earlier staged file or partial data: entries=%+v err=%v", entries, err)
+		}
+		if dispatcher.uploadInFlight.Load() != 0 {
+			t.Fatalf("discard-bound refusal retained %d reserved in-flight bytes", dispatcher.uploadInFlight.Load())
+		}
+	})
 }
 
 func TestUploadEndpointRefusesMoreThanTwoHundredFilesAndRollsBack(t *testing.T) {
@@ -576,6 +683,160 @@ func TestUploadToIngestHandoffProtectsStagedBytesThroughTheOrdinaryPlan(t *testi
 	}
 	if cleanData.RemovedFiles != 2 {
 		t.Fatalf("clean report = %+v", cleanData)
+	}
+}
+
+func TestUploadRelativePathsRetainHierarchyThroughOrdinaryPlanAndRestore(t *testing.T) {
+	ctx := context.Background()
+	dispatcher, _ := newUploadDispatcher(t)
+	handler := api.Handler(dispatcher.Handle, api.Options{Upload: apiUploadStagingForTest{dispatcher}})
+	files := []uploadFixture{
+		{field: "relative_files", name: "Pictures/2026/shared.jpg", content: []byte("first image bytes")},
+		{field: "relative_files", name: "Imports/2026/shared.jpg", content: []byte("second image bytes")},
+		{field: "relative_files", name: "Pictures/2026/Trips/.caption.txt", content: []byte("hidden file stays included")},
+	}
+	request, _ := mustUploadRequestBuilt(t, files)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("relative upload status = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	_, upload := mustUploadResponse(t, recorder)
+	if upload.StagingDir == "" || len(upload.Files) != len(files) {
+		t.Fatalf("relative upload result = %+v", upload)
+	}
+	for i, file := range files {
+		receipt := upload.Files[i]
+		if receipt.StoredName != file.name || receipt.StoredPath != filepath.Join(upload.StagingDir, filepath.FromSlash(file.name)) {
+			t.Fatalf("relative receipt[%d] = %+v, want exact path %q", i, receipt, file.name)
+		}
+		if receipt.SHA256 != expectedDigest(t, file.content) || receipt.Length != int64(len(file.content)) {
+			t.Fatalf("relative receipt[%d] identity = %+v", i, receipt)
+		}
+		info, err := os.Stat(receipt.StoredPath)
+		if err != nil {
+			t.Fatalf("stat staged %q: %v", file.name, err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("staged file %q permissions = %o, want 600", file.name, info.Mode().Perm())
+		}
+	}
+
+	planned := dispatcher.Handle(ctx, mustEnvelope(t, command.OpPlanIngest, map[string]any{"root": upload.StagingDir}))
+	if planned.Status != command.StatusSucceeded {
+		t.Fatalf("plan.ingest = %q: %+v", planned.Status, planned.Reasons)
+	}
+	var plan command.PlanIngestData
+	if err := json.Unmarshal(planned.Data, &plan); err != nil {
+		t.Fatalf("decode plan.ingest: %v", err)
+	}
+	if plan.Files != len(files) || plan.Bytes != int64(len(files[0].content)+len(files[1].content)+len(files[2].content)) || !plan.Executable {
+		t.Fatalf("relative staged plan = %+v", plan)
+	}
+	applied := dispatcher.Handle(ctx, mustEnvelope(t, command.OpPlanApply, map[string]any{
+		"workspace_id": plan.WorkspaceID,
+		"plan_id":      plan.PlanID,
+		"plan_digest":  plan.PlanDigest,
+	}))
+	if applied.Status != command.StatusSucceeded {
+		t.Fatalf("plan.apply = %q: %+v", applied.Status, applied.Reasons)
+	}
+	var appliedData command.PlanApplyData
+	if err := json.Unmarshal(applied.Data, &appliedData); err != nil {
+		t.Fatalf("decode plan.apply: %v", err)
+	}
+	destination := filepath.Join(t.TempDir(), "restore")
+	restored := mustAppliedRestore(t, ctx, dispatcher, plan.WorkspaceID, appliedData.SnapshotRef, destination)
+	if restored.Files != len(files) {
+		t.Fatalf("restored files = %d, want %d", restored.Files, len(files))
+	}
+	for _, file := range files {
+		path := filepath.Join(destination, filepath.FromSlash(file.name))
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read restored hierarchy path %q: %v", file.name, err)
+		}
+		if string(body) != string(file.content) || expectedDigest(t, body) != expectedDigest(t, file.content) {
+			t.Fatalf("restored hierarchy path %q has different bytes", file.name)
+		}
+	}
+}
+
+func TestRelativeUploadRejectsUnsafePathsDuplicatesAndSymlinkParents(t *testing.T) {
+	invalid := []string{
+		"", "/absolute.txt", "../escape.txt", "a/../escape.txt", "a//b.txt", "a/./b.txt",
+		`a\\b.txt`, "C:/drive.txt", "NUL/file.txt", "folder/trailing.", "folder/trailing ",
+		"a\x01b.txt", "a\u0085b.txt", strings.Repeat("a", 2049),
+	}
+	for _, path := range invalid {
+		if err := validateRelativeUploadPath(path); err == nil {
+			t.Errorf("validateRelativeUploadPath(%q) succeeded, want refusal", path)
+		}
+	}
+	if err := validateRelativeUploadPath("Folder/.hidden.txt"); err != nil {
+		t.Fatalf("ordinary hidden relative file was refused: %v", err)
+	}
+
+	dispatcher, _ := newUploadDispatcher(t)
+	session, err := dispatcher.BeginUploadSession()
+	if err != nil {
+		t.Fatalf("begin upload session: %v", err)
+	}
+	defer session.Rollback()
+	first := session.StageRelative("Folder/item.txt", strings.NewReader("first"))
+	if first.SkippedReason != "" {
+		t.Fatalf("first relative stage = %+v", first)
+	}
+	duplicate := session.StageRelative("Folder/item.txt", strings.NewReader("second"))
+	if duplicate.SkippedReason != command.UploadReasonNameRejected {
+		t.Fatalf("duplicate relative stage = %+v, want named refusal", duplicate)
+	}
+	parentConflict := session.StageRelative("Folder", strings.NewReader("cannot replace directory"))
+	if parentConflict.SkippedReason != command.UploadReasonNameRejected {
+		t.Fatalf("file-versus-directory conflict = %+v, want named refusal", parentConflict)
+	}
+	flat := session.Stage("flat.txt", strings.NewReader("flat"))
+	if flat.SkippedReason != "" {
+		t.Fatalf("flat stage fixture = %+v", flat)
+	}
+	childConflict := session.StageRelative("flat.txt/child.txt", strings.NewReader("cannot replace file"))
+	if childConflict.SkippedReason != command.UploadReasonNameRejected {
+		t.Fatalf("directory-versus-file conflict = %+v, want named refusal", childConflict)
+	}
+
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(session.dir, "linked")); err != nil {
+		t.Fatalf("create session symlink fixture: %v", err)
+	}
+	linked := session.StageRelative("linked/escape.txt", strings.NewReader("must not escape"))
+	if linked.SkippedReason != command.UploadReasonNameRejected && linked.SkippedReason != command.UploadReasonIOFailed {
+		t.Fatalf("symlink parent result = %+v, want refusal", linked)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "escape.txt")); !os.IsNotExist(err) {
+		t.Fatalf("symlink target file exists or stat was unexpected: %v", err)
+	}
+}
+
+func TestRelativeUploadSharesMultipartLimitAndRollsBackMixedFields(t *testing.T) {
+	dispatcher, inbox := newUploadDispatcher(t)
+	dispatcher.uploadLimits.maxFiles = 1
+	handler := api.Handler(dispatcher.Handle, api.Options{Upload: apiUploadStagingForTest{dispatcher}})
+	request, _ := mustUploadRequestBuilt(t, []uploadFixture{
+		{field: "relative_files", name: "Folder/kept.txt", content: []byte("one")},
+		{field: "files", name: "second.txt", content: []byte("two")},
+	})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	code, reason, _ := mustUploadError(t, recorder)
+	if code != http.StatusUnprocessableEntity || reason != command.UploadReasonTooMany {
+		t.Fatalf("mixed-field limit response = %d %q body=%s", code, reason, recorder.Body.String())
+	}
+	entries, err := os.ReadDir(inbox)
+	if err != nil {
+		t.Fatalf("read inbox after rollback: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("mixed-field request left staging entries after rollback: %+v", entries)
 	}
 }
 

@@ -28,7 +28,7 @@ func TestOfflinePackageScriptSyntaxAndCandidateGates(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(payload)
-	for _, required := range []string{"CANDIDATE_ONLY_NOT_SUPPORTED", "semantic-bundle.tar.gz", "checksums.sha256", "SBOM.json", "semantic-bundle.sbom.json", "INCOMPLETE_NOT_RELEASE_SBOM", "LICENSE", "NOTICE", "COPYFILE_DISABLE", "gzip -n", "tags=purego", "github.com/zvec-ai/zvec-go", "zvec_expected_version", "daemon_build", "cli_build", "does not match daemon", "--redistribution-evidence", "package-redistribution-evidence.py", "PARTIAL_CANDIDATE_EVIDENCE"} {
+	for _, required := range []string{"CANDIDATE_ONLY_NOT_SUPPORTED", "semantic-bundle.tar.gz", "checksums.sha256", "SBOM.json", "semantic-bundle.sbom.json", "INCOMPLETE_NOT_RELEASE_SBOM", "LICENSE", "NOTICE", "COPYFILE_DISABLE", "gzip -n", "tags=cairn_zvec_dynamic", "github.com/zvec-ai/zvec-go", "zvec_expected_version", "zvec_expected_source_digest", "daemon_build", "cli_build", "does not match daemon", "--redistribution-evidence", "package-redistribution-evidence.py", "PARTIAL_CANDIDATE_EVIDENCE"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("script missing required candidate gate %q", required)
 		}
@@ -57,7 +57,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	input := t.TempDir()
 	targetOS, targetArch := runtime.GOOS, runtime.GOARCH
 	cairn := buildCLIBinary(t, root, input, "cairn", targetOS, targetArch)
-	daemon := buildDaemonBinary(t, root, input, "cairnd", "purego")
+	daemon := buildDaemonBinary(t, root, input, "cairnd", "cairn_zvec_dynamic")
 	web := filepath.Join(input, "web")
 	if err := os.Mkdir(web, 0o755); err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	noTagsDaemon := buildDaemonBinary(t, root, input, "cairnd-no-tags")
 	baseArgs := []string{"--version", "v-test", "--os", targetOS, "--arch", targetArch, "--cairn", cairn, "--daemon", noTagsDaemon, "--web-dist", web, "--semantic-archive", semantic, "--output", filepath.Join(input, "no-tags.tar.gz")}
 	if output, err := exec.Command("bash", append([]string{script}, baseArgs...)...).CombinedOutput(); err == nil {
-		t.Fatalf("daemon without purego accepted: %s", output)
+		t.Fatalf("daemon without cairn_zvec_dynamic accepted: %s", output)
 	}
 	baseArgs[9] = daemon
 	mismatchOS := "linux"
@@ -124,7 +124,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 	fakeGo := filepath.Join(fakeGoDir, "go")
-	fakeBuildInfo := fmt.Sprintf("#!/bin/sh\ncat <<'EOF'\n/tmp/fake: go1.26.5\n\tpath\tgithub.com/ailiheizi/cairn/server/cmd/cairnd\n\tbuild\t-tags=purego\n\tbuild\tGOOS=%s\n\tbuild\tGOARCH=%s\n\tdep\tgithub.com/zvec-ai/zvec-go\tv0.6.0\th1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=\nEOF\n", targetOS, targetArch)
+	fakeBuildInfo := fmt.Sprintf("#!/bin/sh\ncat <<'EOF'\n/tmp/fake: go1.26.5\n\tpath\tgithub.com/ailiheizi/cairn/server/cmd/cairnd\n\tbuild\t-tags=cairn_zvec_dynamic\n\tbuild\tGOOS=%s\n\tbuild\tGOARCH=%s\n\tdep\tgithub.com/zvec-ai/zvec-go\tv0.6.0\n\t=>\t./third_party/zvec-go\t(devel)\nEOF\n", targetOS, targetArch)
 	if err := os.WriteFile(fakeGo, []byte(fakeBuildInfo), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -207,10 +207,14 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 			GOARCH    string `json:"goarch"`
 			BuildTags string `json:"build_tags"`
 			ZvecGo    struct {
-				Module  string `json:"module"`
-				Version string `json:"version"`
-				Sum     string `json:"sum"`
-				Commit  string `json:"commit"`
+				Module       string `json:"module"`
+				Version      string `json:"version"`
+				Sum          string `json:"sum"`
+				SourceSum    string `json:"source_sum"`
+				Commit       string `json:"commit"`
+				Replacement  string `json:"replacement"`
+				SourceSHA256 string `json:"source_sha256"`
+				LoaderTag    string `json:"loader_build_tag"`
 			} `json:"zvec_go"`
 		} `json:"daemon_build"`
 		CLIBuild struct {
@@ -226,7 +230,7 @@ func TestOfflinePackageScriptBuildsDeterministicVerifiedArtifact(t *testing.T) {
 	if manifest.Schema != "cairn.candidate-offline-artifact.v1" || manifest.Status != "CANDIDATE_ONLY_NOT_SUPPORTED" || manifest.Version != "v-test" || manifest.Platform.OS != targetOS || manifest.Platform.Arch != targetArch {
 		t.Fatalf("manifest = %+v", manifest)
 	}
-	if manifest.DaemonBuild.MainPath != "github.com/ailiheizi/cairn/server/cmd/cairnd" || manifest.DaemonBuild.GOOS != targetOS || manifest.DaemonBuild.GOARCH != targetArch || manifest.DaemonBuild.GoVersion == "" || manifest.DaemonBuild.BuildTags != "purego" || manifest.DaemonBuild.ZvecGo.Module != "github.com/zvec-ai/zvec-go" || manifest.DaemonBuild.ZvecGo.Version != "v0.6.1-0.20260721023313-9199195b29da" || manifest.DaemonBuild.ZvecGo.Sum != "h1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=" || manifest.DaemonBuild.ZvecGo.Commit != "9199195b29da" {
+	if manifest.DaemonBuild.MainPath != "github.com/ailiheizi/cairn/server/cmd/cairnd" || manifest.DaemonBuild.GOOS != targetOS || manifest.DaemonBuild.GOARCH != targetArch || manifest.DaemonBuild.GoVersion == "" || manifest.DaemonBuild.BuildTags != "cairn_zvec_dynamic" || manifest.DaemonBuild.ZvecGo.Module != "github.com/zvec-ai/zvec-go" || manifest.DaemonBuild.ZvecGo.Version != "v0.6.1-0.20260721023313-9199195b29da" || manifest.DaemonBuild.ZvecGo.Sum != "" || manifest.DaemonBuild.ZvecGo.SourceSum != "h1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k=" || manifest.DaemonBuild.ZvecGo.Commit != "9199195b29da" || manifest.DaemonBuild.ZvecGo.Replacement != "./third_party/zvec-go" || manifest.DaemonBuild.ZvecGo.SourceSHA256 != "sha256:15f6c7c021f4e5be1232c072e381c1c7c109e5b9d428857899bcb1f91fb338be" || manifest.DaemonBuild.ZvecGo.LoaderTag != "cairn_zvec_dynamic" {
 		t.Fatalf("daemon build provenance = %+v", manifest.DaemonBuild)
 	}
 	if manifest.CLIBuild.MainPath != "github.com/ailiheizi/cairn/client/cmd/cairn" || manifest.CLIBuild.GOOS != targetOS || manifest.CLIBuild.GOARCH != targetArch || manifest.CLIBuild.GoVersion == "" {

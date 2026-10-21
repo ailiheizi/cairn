@@ -126,16 +126,35 @@ func (d *Dispatcher) handleAnnotationTagApply(ctx context.Context, env command.E
 	}
 	outcomes := make([]command.AnnotationTagApplySubjectData, 0, len(plan.Subjects))
 	wrote := false
+	var committedFacts []sqlite.Annotation
 	for _, subject := range plan.Subjects {
-		outcome, changed := d.applyTagRenameSubject(ctx, input.WorkspaceID, input.From, input.To, subject)
+		outcome, changed, facts := d.applyTagRenameSubject(ctx, input.WorkspaceID, input.From, input.To, subject)
 		outcomes = append(outcomes, outcome)
 		wrote = wrote || changed
+		committedFacts = append(committedFacts, facts...)
 	}
 	data := projectTagApplyData(input, digest, outcomes)
+	var searchErr error
 	if wrote {
-		if rebuildErr := d.rebuildSearch(ctx, input.WorkspaceID); rebuildErr != nil {
-			data.Warnings = append(data.Warnings, "the tag change was applied, but the search index is unavailable: "+rebuildErr.Error())
+		searchErr = d.rebuildSearch(ctx, input.WorkspaceID)
+		if searchErr != nil {
+			data.Warnings = append(data.Warnings, "the tag change was applied, but the search index is unavailable: "+searchErr.Error())
 		}
+	}
+	var publicationErr error
+	if len(committedFacts) > 0 {
+		publicationErr = d.publishAnnotationFacts(ctx, input.WorkspaceID, committedFacts)
+		if publicationErr != nil {
+			data.Warnings = append(data.Warnings, "authenticated recovery publication incomplete: "+publicationErr.Error())
+		}
+	}
+	if publicationErr != nil {
+		if data.Failed > 0 {
+			data.Warnings = append(data.Warnings, fmt.Sprintf(
+				"%d of %d subjects did not complete; each subject's own outcome and reason are listed and this is not a clean rename",
+				data.Failed, len(outcomes)))
+		}
+		return metadataPostCommitDegradedResult(env, started, data, "tag rename/merge", searchErr, publicationErr)
 	}
 	if data.Failed > 0 {
 		return degradedResult(env, started, data, fmt.Sprintf(
@@ -276,8 +295,9 @@ func (d *Dispatcher) applyTagRenameSubject(
 	ctx context.Context,
 	workspaceID, from, to string,
 	subject command.AnnotationTagPlanSubjectData,
-) (command.AnnotationTagApplySubjectData, bool) {
+) (command.AnnotationTagApplySubjectData, bool, []sqlite.Annotation) {
 	outcome := command.AnnotationTagApplySubjectData{SubjectRef: subject.SubjectRef}
+	var committedFacts []sqlite.Annotation
 	var tombstone command.AnnotationTagPlanChangeData
 	for _, change := range subject.Changes {
 		switch change.Action {
@@ -293,7 +313,7 @@ func (d *Dispatcher) applyTagRenameSubject(
 		// makes this unreachable for a plan this daemon derived.
 		outcome.Outcome = command.AnnotationTagOutcomeUnchanged
 		outcome.Reason = "the plan carries no source record to tombstone"
-		return outcome, false
+		return outcome, false, committedFacts
 	}
 	// Step 1: add the target name. The write is the same one annotation.upsert
 	// performs for a TAG: reuse the live record when it exists, otherwise
@@ -301,7 +321,7 @@ func (d *Dispatcher) applyTagRenameSubject(
 	if err := d.tagApplyStepFailureCheck(subject.SubjectRef, annotationTagPlanActionAddTag); err != nil {
 		outcome.Outcome = command.AnnotationTagOutcomeUnchanged
 		outcome.Reason = err.Error()
-		return outcome, false
+		return outcome, false, committedFacts
 	}
 	target, err := d.store.FindLiveTag(ctx, workspaceID, subject.SubjectRef, to)
 	switch {
@@ -312,7 +332,7 @@ func (d *Dispatcher) applyTagRenameSubject(
 		if idErr != nil {
 			outcome.Outcome = command.AnnotationTagOutcomeUnchanged
 			outcome.Reason = idErr.Error()
-			return outcome, false
+			return outcome, false, committedFacts
 		}
 		record := &sqlite.Annotation{
 			ID: id, WorkspaceID: workspaceID, SubjectRef: subject.SubjectRef,
@@ -323,48 +343,91 @@ func (d *Dispatcher) applyTagRenameSubject(
 			// subject, so the source record and the target name are unchanged.
 			outcome.Outcome = command.AnnotationTagOutcomeUnchanged
 			outcome.Reason = createErr.Error()
-			return outcome, false
+			return outcome, false, committedFacts
 		}
+		// InsertAnnotation fills the exact body digest and creation timestamps
+		// on this record. Capture that committed row now; a later live lookup
+		// cannot be used as evidence for the revision this call inserted.
+		inserted := *record
+		committedFacts = append(committedFacts, inserted)
 		// Read the live record back so the reported id is the stored one even
 		// when a concurrent writer created the same live tag first.
 		live, readErr := d.store.FindLiveTag(ctx, workspaceID, subject.SubjectRef, to)
 		if readErr != nil {
 			outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
 			outcome.Reason = "the target tag was added but its record could not be read back: " + readErr.Error()
-			return outcome, true
+			return outcome, true, committedFacts
 		}
 		outcome.TargetAnnotationID = live.ID
 		outcome.TargetCreated = live.ID == id
 	default:
 		outcome.Outcome = command.AnnotationTagOutcomeUnchanged
 		outcome.Reason = err.Error()
-		return outcome, false
+		return outcome, false, committedFacts
 	}
 	// Step 2: tombstone the source record with the revision the plan bound.
 	if err := d.tagApplyStepFailureCheck(subject.SubjectRef, annotationTagPlanActionTombstone); err != nil {
 		outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
 		outcome.Reason = err.Error()
-		return outcome, true
+		return outcome, true, committedFacts
 	}
-	if err := d.store.ReviseAnnotation(ctx, workspaceID, tombstone.AnnotationID, tombstone.ExpectedRevision, tombstone.Body, true, time.Time{}); err != nil {
+	sourceBefore, err := d.store.GetAnnotation(ctx, workspaceID, tombstone.AnnotationID)
+	if err != nil {
+		outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
+		outcome.Reason = tagApplyWriteReason(err)
+		return outcome, true, committedFacts
+	}
+	if sourceBefore.ID != tombstone.AnnotationID || sourceBefore.WorkspaceID != workspaceID ||
+		sourceBefore.SubjectRef != subject.SubjectRef || sourceBefore.Kind != sqlite.AnnotationTag ||
+		sourceBefore.Body != from || sourceBefore.BodyDigest != annotationBodyDigest(from) {
+		outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
+		outcome.Reason = tagApplyWriteReason(sqlite.ErrConflict)
+		return outcome, true, committedFacts
+	}
+	if sourceBefore.Tombstoned && sourceBefore.Revision == tombstone.ExpectedRevision+1 {
+		// Preserve the existing idempotent outcome when another writer already
+		// completed this terminal tombstone. It is not a mutation by this call,
+		// so do not synthesize a fact revision for it.
+		outcome.Reason = "the source tag was already tombstoned by another writer"
+		outcome.SourceTombstoned = true
+		outcome.Outcome = command.AnnotationTagOutcomeChanged
+		return outcome, true, committedFacts
+	}
+	if sourceBefore.Tombstoned || sourceBefore.Revision != tombstone.ExpectedRevision {
+		outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
+		outcome.Reason = tagApplyWriteReason(sqlite.ErrConflict)
+		return outcome, true, committedFacts
+	}
+	updatedAt := time.Now().UTC()
+	if err := d.store.ReviseAnnotation(ctx, workspaceID, tombstone.AnnotationID, tombstone.ExpectedRevision, tombstone.Body, true, updatedAt); err != nil {
 		outcome.Reason = tagApplyWriteReason(err)
 		if errors.Is(err, sqlite.ErrConflict) {
 			// A revision conflict also covers a record another writer already
 			// tombstoned. Re-read it: when the source name is already gone the
 			// subject has reached the planned end state and is reported as
 			// changed rather than as carrying both names.
-			if current, getErr := d.store.GetAnnotation(ctx, workspaceID, tombstone.AnnotationID); getErr == nil && current.Tombstoned {
+			if current, getErr := d.store.GetAnnotation(ctx, workspaceID, tombstone.AnnotationID); getErr == nil &&
+				current.ID == sourceBefore.ID && current.WorkspaceID == sourceBefore.WorkspaceID &&
+				current.SubjectRef == sourceBefore.SubjectRef && current.Kind == sourceBefore.Kind &&
+				current.Body == sourceBefore.Body && current.BodyDigest == sourceBefore.BodyDigest &&
+				current.Tombstoned && current.Revision == tombstone.ExpectedRevision+1 {
 				outcome.Outcome = command.AnnotationTagOutcomeChanged
 				outcome.SourceTombstoned = true
-				return outcome, true
+				return outcome, true, committedFacts
 			}
 		}
 		outcome.Outcome = command.AnnotationTagOutcomeTargetAddedSourceRemains
-		return outcome, true
+		return outcome, true, committedFacts
 	}
+	tombstoned := sourceBefore
+	tombstoned.PredecessorRevision = sourceBefore.Revision
+	tombstoned.Revision = sourceBefore.Revision + 1
+	tombstoned.Tombstoned = true
+	tombstoned.UpdatedAt = updatedAt
+	committedFacts = append(committedFacts, tombstoned)
 	outcome.SourceTombstoned = true
 	outcome.Outcome = command.AnnotationTagOutcomeChanged
-	return outcome, true
+	return outcome, true, committedFacts
 }
 
 // tagApplyStepFailureCheck consults the test-only seam. Production dispatchers

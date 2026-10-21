@@ -9,6 +9,7 @@ import (
 
 	"github.com/ailiheizi/cairn/client/command"
 	"github.com/ailiheizi/cairn/server/internal/exact"
+	"github.com/ailiheizi/cairn/server/internal/processor"
 	"github.com/ailiheizi/cairn/server/internal/repository"
 	"github.com/ailiheizi/cairn/server/internal/search"
 	"github.com/ailiheizi/cairn/server/testutil"
@@ -24,6 +25,126 @@ func TestProjectSearchSegmentsPreservesAnnotationProvenance(t *testing.T) {
 		projected[0].SourceType != "ANNOTATION" || projected[0].SourceID != "ann_0123456789abcdef0123456789abcdef" ||
 		projected[0].MatchedText != "durable note" {
 		t.Fatalf("annotation segment projection = %+v", projected)
+	}
+}
+
+func TestDefaultFusedFilterOnlyDoesNotDegradeForMissingQueryMaterial(t *testing.T) {
+	ctx := context.Background()
+	store := testutil.OpenStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	repo, err := repository.OpenDir(filepath.Join(t.TempDir(), "repository"))
+	if err != nil {
+		t.Fatalf("open repository: %v", err)
+	}
+	host := processor.NewHost(store, repo, processor.Options{
+		StagingDir: filepath.Join(repo.Root(), "staging"),
+		Processors: append(processor.DefaultProcessors(), processor.TextEmbedding{}),
+	})
+	dispatcher := NewDispatcher(store, "catalog.sqlite", "/tmp/cairn.sock", WithFixtureDimensions(), WithExact(&exact.Service{
+		Store: store, Repo: repo, Processor: host,
+	}))
+	root := t.TempDir()
+	if err := writeFile(filepath.Join(root, "report.txt"), []byte("quarterly report")); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	ingest := mustAppliedIngest(t, ctx, dispatcher, map[string]any{"root": root})
+	input := map[string]any{
+		"workspace_id": ingest.WorkspaceID,
+		"filters":      map[string]any{"entry_type": "REGULAR_FILE"},
+	}
+
+	available := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, input))
+	if available.Status != command.StatusSucceeded {
+		t.Fatalf("available filter-only broker = %q: %+v", available.Status, available.Reasons)
+	}
+	var availableData command.SearchQueryData
+	if err := json.Unmarshal(available.Data, &availableData); err != nil {
+		t.Fatalf("decode available filter-only broker: %v", err)
+	}
+	if len(availableData.Components) != 2 ||
+		availableData.Components[0].Dimension != search.DimensionLexical || availableData.Components[0].Status != string(command.StatusSucceeded) ||
+		availableData.Components[1].Dimension != search.DimensionSemantic ||
+		availableData.Components[1].Status != search.ComponentSkipped || availableData.Components[1].Reason != search.QueryTextRequiredReason ||
+		len(availableData.Hits) != 1 {
+		t.Fatalf("available filter-only components/hits = %+v / %+v", availableData.Components, availableData.Hits)
+	}
+
+	// The same lexical generation remains useful when the semantic fixture
+	// dimension is not admitted. That real unavailable state must still be
+	// surfaced as degraded for a filter-only default-broker request.
+	dispatcher.search.EnableFixtureDimensions = false
+	unavailable := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, input))
+	if unavailable.Status != command.StatusDegraded {
+		t.Fatalf("unavailable semantic filter-only broker = %q: %+v", unavailable.Status, unavailable.Reasons)
+	}
+	var unavailableData command.SearchQueryData
+	if err := json.Unmarshal(unavailable.Data, &unavailableData); err != nil {
+		t.Fatalf("decode unavailable filter-only broker: %v", err)
+	}
+	if len(unavailableData.Components) != 2 || unavailableData.Components[0].Status != string(command.StatusSucceeded) ||
+		unavailableData.Components[1].Status == string(command.StatusSucceeded) ||
+		(unavailableData.Components[1].Status == search.ComponentSkipped && unavailableData.Components[1].Reason == search.QueryTextRequiredReason) {
+		t.Fatalf("unavailable semantic component was masked: %+v", unavailableData.Components)
+	}
+}
+
+func TestProjectSearchSegmentsPreservesTextSourceProvenance(t *testing.T) {
+	provenance := &search.TextSourceProvenance{
+		SourceRevision: "revision-7", BodyDigest: "sha256:body",
+		SegmentationProfileDigest: "sha256:profile", SourceStartByte: 12,
+		SourceEndByte: 24, TextDigest: "sha256:text",
+	}
+	projected := projectSearchSegments([]search.SegmentRef{{
+		SourceType: "ANNOTATION", SourceID: "ann_0123456789abcdef0123456789abcdef",
+		SegmentID: "segment-1", MatchedText: "matched note segment", Kind: "NOTE",
+		Producer: "USER", Accepted: true, Language: "en",
+		MatchSpans:           []search.MatchSpan{{StartByte: 8, EndByte: 12}},
+		TextSourceProvenance: provenance,
+	}})
+	if len(projected) != 1 {
+		t.Fatalf("projected segment count = %d", len(projected))
+	}
+	segment := projected[0]
+	if segment.SourceType != "ANNOTATION" || segment.SourceID != "ann_0123456789abcdef0123456789abcdef" ||
+		segment.MatchedText != "matched note segment" || segment.MatchedExcerpt != "matched note segment" ||
+		len(segment.MatchSpans) != 1 || segment.TextSourceProvenance == nil ||
+		segment.TextSourceProvenance.SourceRevision != provenance.SourceRevision ||
+		segment.TextSourceProvenance.BodyDigest != provenance.BodyDigest ||
+		segment.TextSourceProvenance.SegmentationProfileDigest != provenance.SegmentationProfileDigest ||
+		segment.TextSourceProvenance.SourceStartByte != provenance.SourceStartByte ||
+		segment.TextSourceProvenance.SourceEndByte != provenance.SourceEndByte ||
+		segment.TextSourceProvenance.TextDigest != provenance.TextDigest {
+		t.Fatalf("text-source segment projection = %+v", segment)
+	}
+
+	encoded, err := json.Marshal(segment)
+	if err != nil {
+		t.Fatalf("marshal text-source segment: %v", err)
+	}
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("decode text-source segment: %v", err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(decoded["text_source_provenance"], &wire); err != nil {
+		t.Fatalf("decode text-source provenance: %v", err)
+	}
+	if wire["source_revision"] != "revision-7" || wire["body_digest"] != "sha256:body" ||
+		wire["segmentation_profile_digest"] != "sha256:profile" || wire["source_start_byte"] != float64(12) ||
+		wire["source_end_byte"] != float64(24) || wire["text_digest"] != "sha256:text" {
+		t.Fatalf("text-source provenance JSON = %s", decoded["text_source_provenance"])
+	}
+
+	legacy := projectSearchSegments([]search.SegmentRef{{SourceType: "ANNOTATION", SourceID: "legacy", MatchedText: "old"}})[0]
+	legacyJSON, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatalf("marshal legacy segment: %v", err)
+	}
+	decoded = nil
+	if err := json.Unmarshal(legacyJSON, &decoded); err != nil {
+		t.Fatalf("decode legacy segment: %v", err)
+	}
+	if _, present := decoded["text_source_provenance"]; present || legacy.TextSourceProvenance != nil {
+		t.Fatalf("legacy segment gained source provenance: %s", legacyJSON)
 	}
 }
 
@@ -82,9 +203,7 @@ func TestSearchQueryTypedStructuredFilters(t *testing.T) {
 		"language":     "EN",
 		"body":         "quarterly report in English",
 	}))
-	if described.Status != command.StatusSucceeded {
-		t.Fatalf("description.create = %q: %+v", described.Status, described.Reasons)
-	}
+	assertDescriptionPublicationDegraded(t, described, "quarterly report in English", 1, "subject-fact publication requires signed publication to be enabled")
 
 	entryTypeFilter := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, map[string]any{
 		"workspace_id": ingestData.WorkspaceID,
@@ -237,13 +356,7 @@ func TestSearchQueryDescriptionSegmentProvenanceProjectsForNormalAndFusedHits(t 
 		"accepted":         false,
 		"body":             "taggedfused tagged fused segment",
 	}))
-	if described.Status != command.StatusSucceeded {
-		t.Fatalf("description.create = %q: %+v", described.Status, described.Reasons)
-	}
-	var descriptionData command.DescriptionCreateData
-	if err := json.Unmarshal(described.Data, &descriptionData); err != nil {
-		t.Fatalf("decode description.create: %v", err)
-	}
+	descriptionData := command.DescriptionCreateData{Document: assertDescriptionPublicationDegraded(t, described, "taggedfused tagged fused segment", 1, "subject-fact publication requires signed publication to be enabled")}
 	if len(descriptionData.Document.Segments) != 1 {
 		t.Fatalf("description segments = %+v", descriptionData.Document.Segments)
 	}
@@ -258,9 +371,7 @@ func TestSearchQueryDescriptionSegmentProvenanceProjectsForNormalAndFusedHits(t 
 		"kind":         "TAG",
 		"body":         "fused",
 	}))
-	if tagged.Status != command.StatusSucceeded {
-		t.Fatalf("annotation.upsert = %q: %+v", tagged.Status, tagged.Reasons)
-	}
+	assertUnsignedFixtureTAG(t, tagged, ingestData.WorkspaceID, "fused")
 
 	assertSegment := func(t *testing.T, hit command.SearchHitData) {
 		t.Helper()

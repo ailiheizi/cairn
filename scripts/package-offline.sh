@@ -96,9 +96,31 @@ hash_file() {
   [[ "$digest" =~ ^[0-9a-fA-F]{64}$ ]] || return 1
   printf '%s' "$digest"
 }
+hash_stdin() {
+  local line digest
+  if [[ "$hash_cmd" == "sha256sum" ]]; then line="$(sha256sum)" || return 1; else line="$(shasum -a 256)" || return 1; fi
+  digest="${line%% *}"
+  [[ "$digest" =~ ^[0-9a-fA-F]{64}$ ]] || return 1
+  printf '%s' "$digest"
+}
+
+zvec_source="$script_root/third_party/zvec-go"
+regular_dir "$zvec_source"
+[[ -z "$(find "$zvec_source" -type l -print -quit)" ]] || { echo "error: vendored zvec-go source contains symlinks" >&2; exit 2; }
+zvec_source_digest="$(
+  {
+    printf 'cairn.zvec-go-source.v1\n'
+    while IFS= read -r rel; do
+      [[ "$rel" != *$'\n'* ]] || { echo "error: zvec-go source path contains newline" >&2; exit 2; }
+      printf '%s\0%s\n' "$rel" "$(hash_file "$zvec_source/$rel")"
+    done < <(find "$zvec_source" -type f -print | sed "s#^$zvec_source/##" | LC_ALL=C sort)
+  } | hash_stdin
+)" || { echo "error: hashing vendored zvec-go source failed" >&2; exit 2; }
+zvec_expected_source_digest="15f6c7c021f4e5be1232c072e381c1c7c109e5b9d428857899bcb1f91fb338be"
+[[ "$zvec_source_digest" == "$zvec_expected_source_digest" ]] || { echo "error: vendored zvec-go source digest does not match the pinned Cairn patch" >&2; exit 2; }
 
 # The wrapper must carry the real in-process zvec backend. A daemon built
-# without the purego tag compiles the unavailable placeholder, even when a
+# without the Cairn dynamic-loader tag compiles the unavailable placeholder, even when a
 # semantic archive is placed beside it. Go BuildInfo provides an auditable
 # admission check for the build tag, pinned dependency, and target platform.
 go_cmd="$(command -v go || true)"
@@ -107,14 +129,16 @@ daemon_build_info="$($go_cmd version -m "$daemon_bin" 2>/dev/null)" || { echo "e
 daemon_main_path="$(printf '%s\n' "$daemon_build_info" | awk '$1 == "path" { print $2; exit }')"
 [[ "$daemon_main_path" == "github.com/ailiheizi/cairn/server/cmd/cairnd" ]] || { echo "error: daemon BuildInfo main path is not cairnd" >&2; exit 2; }
 daemon_tags="$(printf '%s\n' "$daemon_build_info" | awk -F= '$1 ~ /\tbuild\t-tags/ { print $2; exit }')"
-[[ "$daemon_tags" == "purego" ]] || { echo "error: daemon must be built with exactly -tags=purego (in-process zvec)" >&2; exit 2; }
+[[ "$daemon_tags" == "cairn_zvec_dynamic" ]] || { echo "error: daemon must be built with exactly -tags=cairn_zvec_dynamic (in-process zvec, Go SHA assembly retained)" >&2; exit 2; }
 zvec_module="github.com/zvec-ai/zvec-go"
 zvec_version="$(printf '%s\n' "$daemon_build_info" | awk -v module="$zvec_module" '$1 == "dep" && $2 == module { print $3; exit }')"
 zvec_sum="$(printf '%s\n' "$daemon_build_info" | awk -v module="$zvec_module" '$1 == "dep" && $2 == module { print $4; exit }')"
 zvec_expected_version="v0.6.1-0.20260721023313-9199195b29da"
 zvec_expected_sum="h1:4wINeawyVOYz/Rj4mDJQlSAUYLkQ76QELU1dd2IEU3k="
 [[ "$zvec_version" == "$zvec_expected_version" ]] || { echo "error: daemon zvec-go pin $zvec_version does not match $zvec_expected_version" >&2; exit 2; }
-[[ "$zvec_sum" == "$zvec_expected_sum" ]] || { echo "error: daemon zvec-go sum does not match the pinned module" >&2; exit 2; }
+zvec_replacement="$(printf '%s\n' "$daemon_build_info" | awk -v module="$zvec_module" '$1 == "dep" && $2 == module { getline; if ($1 == "=>") print $2; exit }')"
+[[ "$zvec_replacement" == "./third_party/zvec-go" ]] || { echo "error: daemon zvec-go replacement $zvec_replacement does not match the pinned in-repository source" >&2; exit 2; }
+grep -Fqx "$zvec_module $zvec_expected_version $zvec_expected_sum" "$script_root/go.sum" || { echo "error: upstream zvec-go sum is missing from go.sum" >&2; exit 2; }
 zvec_commit="${zvec_version##*-}"
 daemon_go_version="$(printf '%s\n' "$daemon_build_info" | sed -n '1s/.*: //p')"
 [[ "$daemon_go_version" =~ ^go[0-9]+\.[0-9]+(\.[0-9]+)?([a-z0-9._+-]*)$ ]] || { echo "error: daemon Go version is not a safe token" >&2; exit 2; }
@@ -197,7 +221,7 @@ cat >"$root/manifest.json" <<EOF
   "status": "CANDIDATE_ONLY_NOT_SUPPORTED",
   "version": "${version}",
   "platform": {"os": "${target_os}", "arch": "${target_arch}"},
-  "daemon_build": {"main_path": "${daemon_main_path}", "go_version": "${daemon_go_version}", "goos": "${daemon_goos}", "goarch": "${daemon_goarch}", "build_tags": "${daemon_tags}", "zvec_go": {"module": "${zvec_module}", "version": "${zvec_version}", "sum": "${zvec_sum}", "commit": "${zvec_commit}"}},
+  "daemon_build": {"main_path": "${daemon_main_path}", "go_version": "${daemon_go_version}", "goos": "${daemon_goos}", "goarch": "${daemon_goarch}", "build_tags": "${daemon_tags}", "zvec_go": {"module": "${zvec_module}", "version": "${zvec_version}", "sum": "${zvec_sum}", "source_sum": "${zvec_expected_sum}", "commit": "${zvec_commit}", "replacement": "${zvec_replacement}", "source_sha256": "sha256:${zvec_source_digest}", "loader_build_tag": "cairn_zvec_dynamic"}},
   "cli_build": {"main_path": "${cli_main_path}", "go_version": "${cli_go_version}", "goos": "${cli_goos}", "goarch": "${cli_goarch}"},
   "semantic_archive_sha256": "sha256:${archive_digest}"$(if [[ -n "$redistribution_evidence" ]]; then printf ',\n  "redistribution_evidence": "licenses/redistribution-evidence/manifest.json"'; fi),
   "layout": {"daemon": "bin/cairnd", "cli": "bin/cairn", "web": "web/dist", "semantic": "semantic/semantic-bundle.tar.gz"}

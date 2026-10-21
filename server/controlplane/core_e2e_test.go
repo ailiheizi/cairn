@@ -123,8 +123,10 @@ func TestCoreWorkflowThroughDispatcher(t *testing.T) {
 			"kind":         annotation.kind,
 			"body":         annotation.body,
 		}))
-		if result.Status != command.StatusSucceeded {
-			t.Fatalf("annotation %s = %q: %+v", annotation.kind, result.Status, result.Reasons)
+		if annotation.kind == "NOTE" {
+			assertUnsignedNoteDegraded(t, result, annotation.body, 1)
+		} else {
+			assertUnsignedFixtureTAG(t, result, ingest.WorkspaceID, annotation.body)
 		}
 	}
 	annotations := dispatcher.Handle(ctx, mustEnvelope(t, command.OpAnnotationList, map[string]any{

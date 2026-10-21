@@ -1,6 +1,11 @@
 package command
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"strings"
+)
 
 type StatusData struct {
 	Controller    string            `json:"controller"`
@@ -410,8 +415,44 @@ type PlanAbandonData struct {
 }
 
 type DoctorData struct {
-	OK     bool          `json:"ok"`
-	Checks []DoctorCheck `json:"checks"`
+	OK            bool           `json:"ok"`
+	Checks        []DoctorCheck  `json:"checks"`
+	StorageReport *StorageReport `json:"storage_report,omitempty"`
+}
+
+// StorageReport is an explicit, read-only Phase 5 projection. Each category
+// carries its own state so an unknown measurement is never presented as zero.
+type StorageReport struct {
+	Status                                  string             `json:"status"`
+	Reason                                  string             `json:"reason,omitempty"`
+	Basis                                   string             `json:"basis"`
+	ConfigDigest                            string             `json:"config_digest,omitempty"`
+	RepositoryProfile                       string             `json:"repository_profile,omitempty"`
+	CompressionProfile                      string             `json:"compression_profile,omitempty"`
+	SnapshotCount                           *int               `json:"snapshot_count,omitempty"`
+	RetainedExactReferenceBytes             StorageByteMeasure `json:"retained_exact_reference_bytes"`
+	UniqueExactObjectLogicalBytes           StorageByteMeasure `json:"unique_exact_object_logical_bytes"`
+	WholeFileDuplicateReferenceSavingsBytes StorageByteMeasure `json:"whole_file_duplicate_reference_savings_bytes"`
+	CompressionSavingsBytes                 StorageByteMeasure `json:"compression_savings_bytes"`
+	StoredObjectFileBytes                   StorageByteMeasure `json:"stored_object_file_bytes"`
+	RepositoryMetadataFileBytes             StorageByteMeasure `json:"repository_metadata_file_bytes"`
+	RepositoryRecoveryRecordFileBytes       StorageByteMeasure `json:"repository_recovery_record_file_bytes"`
+	CatalogFileBytes                        StorageByteMeasure `json:"catalog_file_bytes"`
+	VectorIndexFileBytes                    StorageByteMeasure `json:"vector_index_file_bytes"`
+	ModelFileBytes                          StorageByteMeasure `json:"model_file_bytes"`
+	ConfiguredRecoveryRecordsFileBytes      StorageByteMeasure `json:"configured_recovery_records_file_bytes"`
+	TemporaryFileBytes                      StorageByteMeasure `json:"temporary_file_bytes"`
+	RetainedSourceBytes                     StorageByteMeasure `json:"retained_source_bytes"`
+	RepositoryFootprintFileBytes            StorageByteMeasure `json:"repository_footprint_file_bytes"`
+	NetSavingsBytes                         StorageByteMeasure `json:"net_savings_bytes"`
+}
+
+// StorageByteMeasure omits Bytes unless the measurement completed. In
+// particular, an unknown category is not encoded as a numeric zero.
+type StorageByteMeasure struct {
+	Status string `json:"status"`
+	Bytes  *int64 `json:"bytes,omitempty"`
+	Reason string `json:"reason,omitempty"`
 }
 
 type DoctorCheck struct {
@@ -964,8 +1005,13 @@ type SemanticSegmentData struct {
 }
 
 type DescriptionListData struct {
-	Documents []DescriptionSummaryData `json:"documents"`
-	Truncated bool                     `json:"truncated,omitempty"`
+	Documents     []DescriptionSummaryData `json:"documents"`
+	Truncated     bool                     `json:"truncated,omitempty"`
+	WorkspaceID   string                   `json:"workspace_id,omitempty"`
+	SubjectRef    string                   `json:"subject_ref,omitempty"`
+	CurrentOnly   *bool                    `json:"current_only,omitempty"`
+	ProjectionRef string                   `json:"projection_ref,omitempty"`
+	Page          *PageData                `json:"page,omitempty"`
 }
 
 // DescriptionSummaryData is the bounded description.list projection. Full
@@ -1040,6 +1086,7 @@ type SearchHitData struct {
 	Name          string              `json:"name"`
 	EntryType     string              `json:"entry_type"`
 	ContentID     string              `json:"content_id,omitempty"`
+	LogicalSize   *int64              `json:"logical_size,omitempty"`
 	ConstructAxes []string            `json:"construct_axes,omitempty"`
 	Dimensions    []string            `json:"dimensions,omitempty"`
 	Segments      []SearchSegmentData `json:"segments,omitempty"`
@@ -1050,18 +1097,30 @@ type SearchHitData struct {
 // produced a search hit. MatchedExcerpt and MatchSpans are query-derived and
 // remain absent when derived text cannot map to exact source bytes.
 type SearchSegmentData struct {
-	DescriptionDocumentID string                `json:"description_document_id,omitempty"`
-	SourceType            string                `json:"source_type,omitempty"`
-	SourceID              string                `json:"source_id,omitempty"`
-	SegmentID             string                `json:"semantic_segment_id"`
-	Ordinal               int64                 `json:"ordinal"`
-	MatchedText           string                `json:"matched_text"`
-	Kind                  string                `json:"kind"`
-	Producer              string                `json:"producer"`
-	Accepted              bool                  `json:"accepted"`
-	Language              string                `json:"language"`
-	MatchedExcerpt        string                `json:"matched_excerpt,omitempty"`
-	MatchSpans            []SearchMatchSpanData `json:"match_spans,omitempty"`
+	DescriptionDocumentID string                          `json:"description_document_id,omitempty"`
+	SourceType            string                          `json:"source_type,omitempty"`
+	SourceID              string                          `json:"source_id,omitempty"`
+	SegmentID             string                          `json:"semantic_segment_id"`
+	Ordinal               int64                           `json:"ordinal"`
+	MatchedText           string                          `json:"matched_text"`
+	Kind                  string                          `json:"kind"`
+	Producer              string                          `json:"producer"`
+	Accepted              bool                            `json:"accepted"`
+	Language              string                          `json:"language"`
+	MatchedExcerpt        string                          `json:"matched_excerpt,omitempty"`
+	MatchSpans            []SearchMatchSpanData           `json:"match_spans,omitempty"`
+	TextSourceProvenance  *SearchTextSourceProvenanceData `json:"text_source_provenance,omitempty"`
+}
+
+// SearchTextSourceProvenanceData identifies the immutable retained text span
+// behind a search segment. It is optional on legacy and non-text-source hits.
+type SearchTextSourceProvenanceData struct {
+	SourceRevision            string `json:"source_revision"`
+	BodyDigest                string `json:"body_digest"`
+	SegmentationProfileDigest string `json:"segmentation_profile_digest"`
+	SourceStartByte           int    `json:"source_start_byte"`
+	SourceEndByte             int    `json:"source_end_byte"`
+	TextDigest                string `json:"text_digest"`
 }
 
 // SearchMatchSpanData contains query-derived byte offsets within matched_text.
@@ -1113,6 +1172,9 @@ type SearchRebuildData struct {
 	SemanticGenerationRef string             `json:"semantic_generation_ref,omitempty"`
 	SemanticState         string             `json:"semantic_state"`
 	SemanticFailure       string             `json:"semantic_failure,omitempty"`
+	// SemanticSourceCoverage is optional generation-local source lineage.
+	// Its absence means unknown; pair-only SemanticCoverage is not source proof.
+	SemanticSourceCoverage *SearchSemanticSourceCoverageData `json:"semantic_source_coverage,omitempty"`
 	// ImageState reports the separate image embedding dimension. It is
 	// NOT_BUILT when no model artifact or binding is installed, UNAVAILABLE
 	// when an installed artifact cannot run, and READY only after a verified
@@ -1128,6 +1190,58 @@ type SearchRebuildData struct {
 	ImageIndexed          int            `json:"image_indexed,omitempty"`
 	ImageSkipped          int            `json:"image_skipped,omitempty"`
 	ImageSkipReasons      map[string]int `json:"image_skip_reasons,omitempty"`
+}
+
+type SearchSemanticSourceCoverageDisposition string
+
+const (
+	SearchSemanticSourceIndexed     SearchSemanticSourceCoverageDisposition = "INDEXED"
+	SearchSemanticSourceExcluded    SearchSemanticSourceCoverageDisposition = "EXCLUDED"
+	SearchSemanticSourceMissing     SearchSemanticSourceCoverageDisposition = "MISSING"
+	SearchSemanticSourceUnavailable SearchSemanticSourceCoverageDisposition = "UNAVAILABLE"
+)
+
+type SearchSemanticSourceCoverageRowData struct {
+	SubjectID      string                                  `json:"subject_id"`
+	SourceKind     string                                  `json:"source_kind"`
+	SourceSubtype  string                                  `json:"source_subtype,omitempty"`
+	SourceRef      string                                  `json:"source_ref"`
+	Revision       string                                  `json:"revision"`
+	BodyDigest     string                                  `json:"body_digest"`
+	Disposition    SearchSemanticSourceCoverageDisposition `json:"disposition"`
+	Reason         string                                  `json:"reason,omitempty"`
+	SegmentCount   int                                     `json:"segment_count"`
+	SegmentIndexed int                                     `json:"segment_indexed"`
+	SegmentMissing int                                     `json:"segment_missing"`
+	InputFull      int                                     `json:"input_full"`
+	InputTruncated int                                     `json:"input_truncated"`
+	InputUnknown   int                                     `json:"input_unknown"`
+}
+
+// SearchSemanticSourceCoverageData is separate from pair-based semantic
+// vector coverage: it records whether selected source revisions have complete
+// generation-bound inputs and tokenizer evidence.
+type SearchSemanticSourceCoverageData struct {
+	Scope           string                                `json:"scope"`
+	GenerationID    string                                `json:"generation_id,omitempty"`
+	SnapshotRef     string                                `json:"snapshot_ref,omitempty"`
+	NamespaceRootID string                                `json:"namespace_root_id,omitempty"`
+	ConfigDigest    string                                `json:"config_digest,omitempty"`
+	ProfileDigest   string                                `json:"profile_digest,omitempty"`
+	Available       bool                                  `json:"available"`
+	Complete        bool                                  `json:"complete"`
+	Expected        int                                   `json:"expected"`
+	Indexed         int                                   `json:"indexed"`
+	Excluded        int                                   `json:"excluded"`
+	Missing         int                                   `json:"missing"`
+	Unavailable     int                                   `json:"unavailable"`
+	InputFull       int                                   `json:"input_full"`
+	InputTruncated  int                                   `json:"input_truncated"`
+	InputUnknown    int                                   `json:"input_unknown"`
+	Truncated       bool                                  `json:"truncated"`
+	Rows            []SearchSemanticSourceCoverageRowData `json:"rows,omitempty"`
+	Reason          string                                `json:"reason,omitempty"`
+	Notes           string                                `json:"notes,omitempty"`
 }
 
 // SemanticBundleInstallInput selects the explicit installation source for the
@@ -1198,9 +1312,69 @@ type SemanticProviderInstallData struct {
 	RestartRequired       bool     `json:"restart_required"`
 }
 
-// SemanticProviderListInput is intentionally empty: the daemon lists the
-// profiles installed under its own configured models root.
-type SemanticProviderListInput struct{}
+// SemanticProviderListInput lists profiles installed under the daemon's own
+// configured models root. Describe profiles are an explicit opt-in so callers
+// that rely on the legacy embedding-only projection keep its original shape.
+type SemanticProviderListInput struct {
+	IncludeDescribe bool `json:"include_describe,omitempty"`
+}
+
+// UnmarshalJSON rejects null explicitly: encoding/json otherwise treats null
+// as the zero value for a bool, which would silently turn a malformed opt-in
+// request into a legacy embedding-only request.
+func (input *SemanticProviderListInput) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for name, value := range fields {
+		if !strings.EqualFold(name, "include_describe") {
+			return errors.New("unknown field " + name)
+		}
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return errors.New("include_describe must be a boolean, not null")
+		}
+	}
+	type plain SemanticProviderListInput
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*input = SemanticProviderListInput(decoded)
+	return nil
+}
+
+// DescribeProviderProfileData is a validated installed DESCRIBE_SUBJECT
+// profile projection. It deliberately omits credential references and profile
+// instructions; the user-facing client needs only the immutable identity and
+// declared grant ceiling.
+type DescribeProviderProfileData struct {
+	ProfileID             string   `json:"profile_id"`
+	ProfileDigest         string   `json:"profile_digest"`
+	Provider              string   `json:"provider"`
+	APIStyle              string   `json:"api_style"`
+	EndpointHost          string   `json:"endpoint_host"`
+	ModelID               string   `json:"model_id"`
+	ModelRevision         string   `json:"model_revision"`
+	OutputSchema          string   `json:"output_schema"`
+	Destination           string   `json:"destination"`
+	Expiry                string   `json:"expiry"`
+	DisclosedDataClasses  []string `json:"disclosed_data_classes"`
+	AllowedSubjectClasses []string `json:"allowed_subject_classes"`
+	MaxRequests           int64    `json:"max_requests"`
+	MaxBytes              int64    `json:"max_bytes"`
+	MaxSeconds            int64    `json:"max_seconds"`
+	AuditRequired         bool     `json:"audit_required"`
+	Expired               bool     `json:"expired"`
+}
+
+// DescribeProviderListData is returned only when semantic.provider.list is
+// explicitly asked to include the read-only describe-profile projection.
+type DescribeProviderListData struct {
+	State    string                        `json:"state"`
+	Reason   string                        `json:"reason,omitempty"`
+	Profiles []DescribeProviderProfileData `json:"profiles"`
+}
 
 // SemanticProviderProfileData is one installed online provider profile as the
 // daemon reads it from disk. It never contains credential material.
@@ -1228,6 +1402,7 @@ type SemanticProviderProfileData struct {
 type SemanticProviderListData struct {
 	ModelsRoot string                        `json:"models_root"`
 	Profiles   []SemanticProviderProfileData `json:"profiles"`
+	Describe   *DescribeProviderListData     `json:"describe,omitempty"`
 }
 
 // EgressGrantCreateInput creates one immutable egress grant. The profile,
@@ -1309,6 +1484,53 @@ type SearchCoverageData struct {
 	Fields    map[string]bool `json:"fields"`
 	Missing   []string        `json:"missing"`
 	Notes     string          `json:"notes,omitempty"`
+	// SourceCoverage is additive generation-local provenance for selected
+	// lexical text sources. A daemon that cannot read a generation's source
+	// proof returns an explicit unavailable statement; older daemon responses
+	// may omit this field and do not imply complete source coverage.
+	SourceCoverage *SearchSourceCoverageData `json:"source_coverage,omitempty"`
+}
+
+type SearchSourceCoverageDisposition string
+
+const (
+	SearchSourceCoverageIndexed     SearchSourceCoverageDisposition = "INDEXED"
+	SearchSourceCoverageExcluded    SearchSourceCoverageDisposition = "EXCLUDED"
+	SearchSourceCoverageMissing     SearchSourceCoverageDisposition = "MISSING"
+	SearchSourceCoverageUnavailable SearchSourceCoverageDisposition = "UNAVAILABLE"
+)
+
+type SearchSourceCoverageRowData struct {
+	SourceKind    string                          `json:"source_kind"`
+	SourceSubtype string                          `json:"source_subtype,omitempty"`
+	Field         string                          `json:"field"`
+	SourceRef     string                          `json:"source_ref"`
+	Revision      string                          `json:"revision"`
+	SourceDigest  string                          `json:"source_digest"`
+	Disposition   SearchSourceCoverageDisposition `json:"disposition"`
+	Reason        string                          `json:"reason,omitempty"`
+}
+
+// SearchSourceCoverageData describes selected durable text-source coverage
+// for exactly one lexical generation. It does not claim semantic coverage.
+type SearchSourceCoverageData struct {
+	Scope           string                        `json:"scope"`
+	GenerationID    string                        `json:"generation_id,omitempty"`
+	SnapshotRef     string                        `json:"snapshot_ref,omitempty"`
+	NamespaceRootID string                        `json:"namespace_root_id,omitempty"`
+	ConfigDigest    string                        `json:"config_digest,omitempty"`
+	ProfileDigest   string                        `json:"profile_digest,omitempty"`
+	Available       bool                          `json:"available"`
+	Complete        bool                          `json:"complete"`
+	Expected        int                           `json:"expected"`
+	Indexed         int                           `json:"indexed"`
+	Excluded        int                           `json:"excluded"`
+	Missing         int                           `json:"missing"`
+	Unavailable     int                           `json:"unavailable"`
+	Truncated       bool                          `json:"truncated"`
+	Rows            []SearchSourceCoverageRowData `json:"rows,omitempty"`
+	Reason          string                        `json:"reason,omitempty"`
+	Notes           string                        `json:"notes,omitempty"`
 }
 
 const (
@@ -1564,21 +1786,35 @@ type ViewData struct {
 	UpdatedAt   string   `json:"updated_at"`
 }
 
-// ViewEvaluateInput is the view.evaluate input. A generation scope may be
-// provided to pin an index generation; otherwise the live default is used.
+// ViewEvaluateInput is the view.evaluate input. Scope is retained for legacy
+// request compatibility; the saved view's stored scope remains authoritative.
 type ViewEvaluateInput struct {
-	ViewID string `json:"view_id"`
-	Name   string `json:"name,omitempty"`
-	Scope  string `json:"scope,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
+	ViewID string                 `json:"view_id"`
+	Name   string                 `json:"name,omitempty"`
+	Scope  string                 `json:"scope,omitempty"`
+	Limit  *int                   `json:"limit,omitempty"`
+	Page   *ViewEvaluatePageInput `json:"page,omitempty"`
+}
+
+// ViewEvaluatePageInput requests one explicit page of the current saved-view
+// projection. Limit is optional so omission can select the documented default
+// while an explicit zero remains invalid.
+type ViewEvaluatePageInput struct {
+	Limit *int   `json:"limit,omitempty"`
+	Token string `json:"token,omitempty"`
 }
 
 // ViewEvaluateData is the view.evaluate result.
 type ViewEvaluateData struct {
-	ViewID   string          `json:"view_id"`
-	Query    string          `json:"query"`
-	Hits     []SearchHitData `json:"hits"`
-	Coverage []string        `json:"coverage,omitempty"`
+	ViewID             string          `json:"view_id"`
+	Query              string          `json:"query"`
+	Hits               []SearchHitData `json:"hits"`
+	Coverage           []string        `json:"coverage,omitempty"`
+	ViewRevision       int64           `json:"view_revision,omitempty"`
+	WorkspaceID        string          `json:"workspace_id,omitempty"`
+	IndexGenerationRef string          `json:"index_generation_ref,omitempty"`
+	ProjectionRef      string          `json:"projection_ref,omitempty"`
+	Page               *PageData       `json:"page,omitempty"`
 }
 
 // ExportSidecarPolicyNone and ExportSidecarPolicyHandoffV1ManifestJSON are the

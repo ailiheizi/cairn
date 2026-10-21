@@ -1,4 +1,4 @@
-//go:build purego && zvec_integration && (darwin || linux) && arm64
+//go:build (purego || cairn_zvec_dynamic) && zvec_integration && (darwin || linux) && arm64
 
 package search
 
@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -134,6 +135,57 @@ func TestZvecGenerationLifecycle(t *testing.T) {
 	relocated.Path = relocatedPath
 	if _, err := driver.Open(context.Background(), relocated); !errors.Is(err, ErrZvecUnavailable) {
 		t.Fatalf("relocated path error = %v, want ErrZvecUnavailable", err)
+	}
+}
+
+func TestZvecGenerationBuildsBeyondNativeWriteBatch(t *testing.T) {
+	libraryPath := strings.TrimSpace(os.Getenv("CAIRN_ZVEC_LIBRARY"))
+	if libraryPath == "" {
+		t.Skip("CAIRN_ZVEC_LIBRARY is required for the opt-in native test")
+	}
+	payload, err := os.ReadFile(libraryPath)
+	if err != nil {
+		t.Fatalf("read native library: %v", err)
+	}
+	digest := sha256.Sum256(payload)
+	manifest := testZvecManifest()
+	spec := ZvecGenerationSpec{Path: filepath.Join(t.TempDir(), "generation-batched"), LibraryPath: libraryPath, LibraryDigest: "sha256:" + hex.EncodeToString(digest[:]), Manifest: manifest, ProfileDigest: manifest.CanonicalDigest()}
+	const documentCount = 2053
+	segments := make([]ZvecSegment, documentCount)
+	for i := range segments {
+		vector := []float32{1, 0, 0, 0}
+		if i == documentCount-1 {
+			vector = []float32{0, 1, 0, 0}
+		}
+		segments[i] = ZvecSegment{
+			SubjectID: fmt.Sprintf("subject-%04d", i), SegmentID: fmt.Sprintf("segment-%04d", i),
+			Vector: vector,
+		}
+	}
+	driver := NewZvecGenerationDriver(libraryPath)
+	receipt, err := driver.Build(context.Background(), spec, segments)
+	if err != nil {
+		t.Fatalf("Build(%d segments) error = %v", documentCount, err)
+	}
+	if receipt.SegmentCount != documentCount {
+		t.Fatalf("receipt count = %d, want %d", receipt.SegmentCount, documentCount)
+	}
+	if identities, err := driver.(interface {
+		CoveragePairs(context.Context, ZvecGenerationSpec) ([]ZvecCoverageIdentity, error)
+	}).CoveragePairs(context.Background(), spec); err != nil || len(identities) != documentCount {
+		t.Fatalf("CoveragePairs() count = %d, err = %v; want %d", len(identities), err, documentCount)
+	}
+	opened, err := driver.Open(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Open() after batched build: %v", err)
+	}
+	hits, queryErr := opened.Query(context.Background(), segments[documentCount-1].Vector, 1)
+	closeErr := opened.Close()
+	if queryErr != nil || closeErr != nil {
+		t.Fatalf("last-segment query error = %v, close error = %v", queryErr, closeErr)
+	}
+	if len(hits) != 1 || hits[0].SubjectID != segments[documentCount-1].SubjectID || hits[0].SegmentID != segments[documentCount-1].SegmentID {
+		t.Fatalf("last-segment query hits = %+v, want subject=%s segment=%s", hits, segments[documentCount-1].SubjectID, segments[documentCount-1].SegmentID)
 	}
 }
 

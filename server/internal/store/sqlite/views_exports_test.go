@@ -48,6 +48,71 @@ func assertExportManifestMatches(t *testing.T, got, want ExportManifest) {
 	}
 }
 
+func TestSavedViewFilterOnlyInsertAndUpdateRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t, filepath.Join(t.TempDir(), "catalog.sqlite"))
+	defer store.Close()
+
+	view := SavedView{
+		ViewID: testID(t, "view"), Name: "wav files", Query: "", Fields: []string{"suffix=wav"},
+		Scope: "workspace", Revision: 1,
+	}
+	inserted, err := store.InsertSavedView(ctx, view)
+	if err != nil {
+		t.Fatalf("InsertSavedView filter-only: %v", err)
+	}
+	if inserted.Query != "" || len(inserted.Fields) != 1 || inserted.Fields[0] != "suffix=wav" {
+		t.Fatalf("inserted filter-only view = %+v", inserted)
+	}
+
+	byName, err := store.GetSavedViewByName(ctx, view.Name)
+	if err != nil {
+		t.Fatalf("GetSavedViewByName: %v", err)
+	}
+	if byName.ViewID != view.ViewID || byName.Query != "" || len(byName.Fields) != 1 || byName.Fields[0] != "suffix=wav" {
+		t.Fatalf("filter-only view by name = %+v", byName)
+	}
+	byID, err := store.GetSavedViewByID(ctx, view.ViewID)
+	if err != nil {
+		t.Fatalf("GetSavedViewByID: %v", err)
+	}
+	if byID.ViewID != view.ViewID || byID.Query != "" || len(byID.Fields) != 1 || byID.Fields[0] != "suffix=wav" {
+		t.Fatalf("filter-only view by id = %+v", byID)
+	}
+
+	view.Fields = []string{"suffix=mp3"}
+	updated, err := store.UpdateSavedView(ctx, view)
+	if err != nil {
+		t.Fatalf("UpdateSavedView filter-only: %v", err)
+	}
+	if updated.Query != "" || updated.Revision != 2 || len(updated.Fields) != 1 || updated.Fields[0] != "suffix=mp3" {
+		t.Fatalf("updated filter-only view = %+v", updated)
+	}
+	listed, err := store.ListSavedViews(ctx)
+	if err != nil {
+		t.Fatalf("ListSavedViews: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ViewID != view.ViewID || listed[0].Query != "" || listed[0].Revision != 2 || len(listed[0].Fields) != 1 || listed[0].Fields[0] != "suffix=mp3" {
+		t.Fatalf("listed filter-only views = %+v", listed)
+	}
+
+	empty := SavedView{ViewID: testID(t, "view"), Name: "empty", Query: " ", Fields: []string{"  "}}
+	if _, err := store.InsertSavedView(ctx, empty); err == nil {
+		t.Fatal("InsertSavedView accepted an empty query and empty fields")
+	}
+	view.Fields = []string{"\t"}
+	if _, err := store.UpdateSavedView(ctx, view); err == nil {
+		t.Fatal("UpdateSavedView accepted an empty query and empty fields")
+	}
+	unchanged, err := store.GetSavedViewByName(ctx, view.Name)
+	if err != nil {
+		t.Fatalf("GetSavedViewByName after refused update: %v", err)
+	}
+	if unchanged.Revision != 2 || len(unchanged.Fields) != 1 || unchanged.Fields[0] != "suffix=mp3" {
+		t.Fatalf("refused empty update changed the stored view: %+v", unchanged)
+	}
+}
+
 func TestExportManifestSidecarsRoundTripAcrossReadPathsAndReopen(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "catalog.sqlite")

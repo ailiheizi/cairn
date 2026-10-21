@@ -98,18 +98,28 @@ func projectOnlineProviderInstall(receipt OnlineProviderInstallReceipt) command.
 }
 
 func (d *Dispatcher) handleSemanticProviderList(_ context.Context, env command.Envelope, started time.Time) command.Result {
-	if err := requireOptionalEmptyObject(env.Input); err != nil {
+	var input command.SemanticProviderListInput
+	if err := decodeOptionalStrictInput(env.Input, &input); err != nil {
 		return invalidInputResult(env, started, err)
 	}
-	if d == nil || strings.TrimSpace(d.onlineProviderModelsRoot) == "" {
+	if d == nil {
+		return failed(env, started, newReason(ReasonCodeUnavailable, "online provider registry is unavailable"))
+	}
+	onlineModelsRoot := strings.TrimSpace(d.onlineProviderModelsRoot)
+	describeModelsRoot := strings.TrimSpace(d.describeModelsRoot)
+	if onlineModelsRoot == "" && (!input.IncludeDescribe || describeModelsRoot == "") {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "online provider registry is unavailable: no models root is configured"))
 	}
-	profiles, err := search.ListOnlineEmbeddingProfiles(d.onlineProviderModelsRoot)
-	if err != nil {
-		return failed(env, started, newReason(ReasonCodeUnavailable, "online provider profile listing unavailable: "+err.Error()))
+	profiles := []search.InstalledOnlineEmbeddingProfile{}
+	if onlineModelsRoot != "" {
+		var err error
+		profiles, err = search.ListOnlineEmbeddingProfiles(onlineModelsRoot)
+		if err != nil {
+			return failed(env, started, newReason(ReasonCodeUnavailable, "online provider profile listing unavailable: "+err.Error()))
+		}
 	}
 	data := command.SemanticProviderListData{
-		ModelsRoot: d.onlineProviderModelsRoot,
+		ModelsRoot: onlineModelsRoot,
 		Profiles:   make([]command.SemanticProviderProfileData, 0, len(profiles)),
 	}
 	for _, installed := range profiles {
@@ -135,7 +145,55 @@ func (d *Dispatcher) handleSemanticProviderList(_ context.Context, env command.E
 			Expired:               installed.Expired,
 		})
 	}
+	if input.IncludeDescribe {
+		root := describeModelsRoot
+		if root == "" {
+			root = onlineModelsRoot
+		}
+		data.Describe = projectDescribeProviderList(root, onlineModelsRoot, describeModelsRoot)
+	}
 	return succeeded(env, started, data)
+}
+
+func projectDescribeProviderList(modelsRoot, onlineModelsRoot, describeModelsRoot string) *command.DescribeProviderListData {
+	data := &command.DescribeProviderListData{
+		State:    "AVAILABLE",
+		Profiles: []command.DescribeProviderProfileData{},
+	}
+	if onlineModelsRoot != "" && describeModelsRoot != "" && onlineModelsRoot != describeModelsRoot {
+		data.State = "UNAVAILABLE"
+		data.Reason = "the configured embedding and describe profile roots do not match"
+		return data
+	}
+	profiles, err := search.ListOnlineDescribeProfiles(modelsRoot)
+	if err != nil {
+		data.State = "UNAVAILABLE"
+		data.Reason = "describe profile listing unavailable: " + err.Error()
+		return data
+	}
+	for _, installed := range profiles {
+		profile := installed.Profile
+		data.Profiles = append(data.Profiles, command.DescribeProviderProfileData{
+			ProfileID:             profile.ProfileID,
+			ProfileDigest:         profile.ProviderProfileDigest(),
+			Provider:              profile.Provider,
+			APIStyle:              profile.APIStyle,
+			EndpointHost:          profile.EndpointHost(),
+			ModelID:               profile.ModelID,
+			ModelRevision:         profile.ModelRevision,
+			OutputSchema:          search.OnlineDescribeOutputSchema,
+			Destination:           installed.Destination,
+			Expiry:                profile.Egress.Expiry,
+			DisclosedDataClasses:  append([]string(nil), profile.Egress.DisclosedDataClasses...),
+			AllowedSubjectClasses: append([]string(nil), profile.Egress.AllowedSubjectClasses...),
+			MaxRequests:           profile.Egress.Budgets.MaxRequests,
+			MaxBytes:              profile.Egress.Budgets.MaxBytes,
+			MaxSeconds:            profile.Egress.Budgets.MaxSeconds,
+			AuditRequired:         profile.Egress.AuditRequired,
+			Expired:               installed.Expired,
+		})
+	}
+	return data
 }
 
 // decodeStrictOperationInput decodes one typed input object and refuses

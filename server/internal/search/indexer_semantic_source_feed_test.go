@@ -147,7 +147,7 @@ func TestIndexerSemanticSourceFeedFilenameAndAdmittedExtractArtifact(t *testing.
 	driver := &selectiveSourceFeedDriver{}
 	artifactID := mustSearchID(t, sqlite.IDPrefixArtifact)
 	attemptID := mustSearchID(t, sqlite.IDPrefixAttempt)
-	body := "extracted semantic prose"
+	body := strings.Repeat("extracted semantic prose ", 30) + "extracted tail-marker"
 	digest := sha256.Sum256([]byte(body))
 	if err := store.InsertProcessorAttempt(ctx, &sqlite.ProcessorAttempt{
 		ID: attemptID, WorkspaceID: seed.WorkspaceID, SubjectRef: seed.FileEntryID,
@@ -182,12 +182,29 @@ func TestIndexerSemanticSourceFeedFilenameAndAdmittedExtractArtifact(t *testing.
 	if err != nil {
 		t.Fatalf("read semantic generation: %v", err)
 	}
-	if got := len(driver.byPath[semantic.DBPath]); got != 4 {
-		t.Fatalf("source feed segment count = %d, want three filenames plus artifact", got)
+	expectedExtractSegments, ok := deriveSemanticTextSourceSegments("EXTRACT", seed.FileEntryID, artifactID, artifactID, body,
+		"sha256:"+hex.EncodeToString(digest[:]), "sha256:source-feed-producer")
+	if !ok {
+		t.Fatal("long admitted extract did not produce semantic segments")
+	}
+	if got, want := len(driver.byPath[semantic.DBPath]), 3+len(expectedExtractSegments); got != want {
+		t.Fatalf("source feed segment count = %d, want three filenames plus %d extract segments", got, len(expectedExtractSegments))
 	}
 	coverage, err := indexer.SemanticCoverage(ctx, seed.WorkspaceID)
-	if err != nil || !coverage.Available || !coverage.Complete || coverage.Expected != 4 || coverage.Indexed != 4 {
+	if err != nil || !coverage.Available || !coverage.Complete || coverage.Expected != 3+len(expectedExtractSegments) || coverage.Indexed != 3+len(expectedExtractSegments) {
 		t.Fatalf("source feed coverage = %+v, err=%v", coverage, err)
+	}
+	if coverage.SourceCoverage == nil || coverage.SourceCoverage.Expected != 4 || coverage.SourceCoverage.InputFull != 0 || coverage.SourceCoverage.InputUnknown != 3+len(expectedExtractSegments) {
+		t.Fatalf("source-level versus input-level coverage = %+v", coverage.SourceCoverage)
+	}
+	foundExtractCoverage := false
+	for _, source := range coverage.SourceCoverage.Rows {
+		if source.SourceRef == artifactID {
+			foundExtractCoverage = source.SegmentCount == len(expectedExtractSegments) && source.SegmentIndexed == len(expectedExtractSegments)
+		}
+	}
+	if !foundExtractCoverage {
+		t.Fatalf("extract source row did not retain segment/input counts: %+v", coverage.SourceCoverage.Rows)
 	}
 
 	_, filenameHits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "track"})
@@ -200,12 +217,30 @@ func TestIndexerSemanticSourceFeedFilenameAndAdmittedExtractArtifact(t *testing.
 	}
 
 	_, artifactHits, err := indexer.Query(ctx, QueryRequest{WorkspaceID: seed.WorkspaceID, Dimension: DimensionSemantic, Text: "extracted"})
-	if err != nil || len(artifactHits) != 1 || artifactHits[0].SubjectID != seed.FileEntryID || len(artifactHits[0].Segments) != 1 {
+	var expectedExtractedHits int
+	for _, segment := range expectedExtractSegments {
+		if strings.Contains(segment.MatchedText, "extracted") {
+			expectedExtractedHits++
+		}
+	}
+	if err != nil || len(artifactHits) != 1 || artifactHits[0].SubjectID != seed.FileEntryID || len(artifactHits[0].Segments) != expectedExtractedHits {
 		t.Fatalf("artifact semantic hit = %+v, err=%v", artifactHits, err)
 	}
-	artifact := artifactHits[0].Segments[0]
-	if artifact.SourceType != "ARTIFACT" || artifact.SourceID != artifactID || artifact.SegmentID != artifactID || artifact.MatchedText != body || artifact.Kind != "EXTRACT" || artifact.Producer != "sha256:source-feed-producer" || !artifact.Accepted {
-		t.Fatalf("artifact provenance = %+v", artifact)
+	foundTail := false
+	for _, artifact := range artifactHits[0].Segments {
+		prov := artifact.TextSourceProvenance
+		if artifact.SourceType != "ARTIFACT" || artifact.SourceID != artifactID || artifact.Kind != "EXTRACT" || artifact.Producer != "sha256:source-feed-producer" || !artifact.Accepted || prov == nil {
+			t.Fatalf("artifact provenance = %+v", artifact)
+		}
+		if artifact.MatchedText != body[prov.SourceStartByte:prov.SourceEndByte] || prov.SourceRevision != artifactID || prov.BodyDigest != "sha256:"+hex.EncodeToString(digest[:]) || prov.TextDigest != sha256Text(artifact.MatchedText) {
+			t.Fatalf("artifact span provenance = %+v segment=%+v", prov, artifact)
+		}
+		if strings.Contains(artifact.MatchedText, "tail-marker") {
+			foundTail = true
+		}
+	}
+	if !foundTail {
+		t.Fatal("semantic extracted feed did not return the suffix segment")
 	}
 }
 

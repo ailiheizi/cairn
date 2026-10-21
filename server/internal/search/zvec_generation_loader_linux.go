@@ -1,4 +1,4 @@
-//go:build purego && linux
+//go:build (purego || cairn_zvec_dynamic) && linux
 
 package search
 

@@ -1,4 +1,4 @@
-//go:build cgo && purego && arm64 && supervised_integration && (darwin || linux)
+//go:build cgo && (purego || cairn_zvec_dynamic) && arm64 && supervised_integration && (darwin || linux)
 
 package processor
 

@@ -122,6 +122,125 @@ func TestPortableFactClosureIsCatalogFreeAndIdempotent(t *testing.T) {
 	}
 }
 
+func TestPortableFactVisitorPreservesRecordBeforeManifestValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutate     func(*subjectMappingPayload)
+		want       string
+		wantAbsent string
+	}{
+		{
+			name: "invalid payload",
+			mutate: func(mapping *subjectMappingPayload) {
+				mapping.SelectedRepresentationRefs = nil
+			},
+			want: "portable subject mapping is incomplete",
+		},
+		{
+			name: "manifest mismatch after valid record checks",
+			mutate: func(mapping *subjectMappingPayload) {
+				mapping.RawName = []byte("different-name.txt")
+			},
+			want: "differs from manifest",
+		},
+		{
+			name: "record error wins when payload and manifest both mismatch",
+			mutate: func(mapping *subjectMappingPayload) {
+				mapping.SelectedRepresentationRefs = nil
+				mapping.RawName = []byte("different-name.txt")
+			},
+			want:       "portable subject mapping is incomplete",
+			wantAbsent: "differs from manifest",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newSignedPublicationFixture(t, "validation-order.txt", []byte("authenticated bytes"))
+			result := fixture.ingest(t, "sha256:validation-order-plan")
+			addPortableFactValidationSuccessor(t, fixture, result, test.mutate)
+			reader := &Service{Repo: fixture.repo, TrustAnchor: fixture.service.TrustAnchor, PublicationDomain: testPublicationDomain, RequireSignedPublication: true}
+			_, err := reader.ListPortableFactClosures(context.Background(), result.SnapshotRef)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("visitor error = %v, want %q", err, test.want)
+			}
+			if test.wantAbsent != "" && strings.Contains(err.Error(), test.wantAbsent) {
+				t.Fatalf("visitor error = %v; manifest validation ran before the record validation error", err)
+			}
+		})
+	}
+}
+
+func addPortableFactValidationSuccessor(
+	t *testing.T,
+	fixture signedPublicationFixture,
+	result IngestResult,
+	mutate func(*subjectMappingPayload),
+) {
+	t.Helper()
+	ctx := context.Background()
+	closures, err := fixture.service.ListPortableFactClosures(ctx, result.SnapshotRef)
+	if err != nil || len(closures) != 1 {
+		t.Fatalf("initial authenticated closure count=%d err=%v", len(closures), err)
+	}
+	bundle, err := validatePortableFactBundle(closures[0].Bundle, closures[0].Closure.WorkspaceID, closures[0].Closure.SnapshotRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for i := range bundle.Records {
+		record := &bundle.Records[i]
+		if record.RecordKind != "SUBJECT_MAPPING" {
+			continue
+		}
+		var mapping subjectMappingPayload
+		if err := decodeStrictRecord(record.Payload, &mapping); err != nil {
+			t.Fatal(err)
+		}
+		mutate(&mapping)
+		record.Payload, err = CanonicalJSON(mapping)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record.PayloadDigest = DigestBytes(record.Payload)
+		record.PayloadLength = int64(len(record.Payload))
+		found = true
+		break
+	}
+	if !found {
+		t.Fatal("signed fixture has no subject mapping to mutate")
+	}
+	bundleBytes, err := CanonicalJSON(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := closures[0].Closure
+	predecessorDigest, err := previous.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	successor := previous
+	successor.Signature = nil
+	successor.ClosureSequence = previous.ClosureSequence + 1
+	successor.PredecessorClosureDigest = predecessorDigest
+	successor.BundleDigest = DigestBytes(bundleBytes)
+	successor.BundleLength = int64(len(bundleBytes))
+	successor.RecordCount = int64(len(bundle.Records))
+	successor.AttachmentCount = int64(len(bundle.Attachments))
+	successor.SignedAt = previous.SignedAt.Add(time.Nanosecond)
+	successor, err = SignPortableFactClosure(*fixture.service.SigningIdentity, successor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := PortableFactClosureEnvelope{Schema: PortableFactClosureEnvelopeSchemaV2, Closure: successor, Bundle: bundleBytes}
+	payload, err := CanonicalJSON(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.repo.PlaceRecord(ctx, repository.RecordPortableFactClosure, bytes.NewReader(payload)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPortableExtendedFactsNormalizeZeroState(t *testing.T) {
 	binding := capture.BindingRecord{
 		Schema: capture.SchemaBindingV1, Profile: capture.ProfileLocalTree,

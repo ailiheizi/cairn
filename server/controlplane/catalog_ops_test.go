@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ailiheizi/cairn/client/command"
@@ -93,9 +94,7 @@ func TestIndexLossDegradesSearchOnly(t *testing.T) {
 		"kind":         "TAG",
 		"body":         "reviewed",
 	}))
-	if tagged.Status != command.StatusSucceeded {
-		t.Fatalf("tag = %q: %+v", tagged.Status, tagged.Reasons)
-	}
+	assertUnsignedFixtureTAG(t, tagged, ingestData.WorkspaceID, "reviewed")
 
 	defaultQuery := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, map[string]any{
 		"workspace_id": ingestData.WorkspaceID,
@@ -113,7 +112,11 @@ func TestIndexLossDegradesSearchOnly(t *testing.T) {
 		defaultData.Components[0].Dimension != search.DimensionLexical ||
 		defaultData.Components[0].Status != string(command.StatusSucceeded) ||
 		defaultData.Components[1].Dimension != search.DimensionSemantic ||
-		defaultData.Components[1].Status != string(command.StatusDegraded) ||
+		defaultData.Components[1].Provider != search.ProviderSemanticONNX ||
+		defaultData.Components[1].ScoreSemantics != search.ScoreSemanticCosine ||
+		defaultData.Components[1].Status != "UNAVAILABLE" ||
+		defaultData.Components[1].Reason != search.SemanticIndexUnavailableReason ||
+		defaultData.Components[1].Hits != 0 ||
 		len(defaultData.Hits) != 1 || defaultData.Hits[0].SubjectRef != fileSubject {
 		t.Fatalf("default broker payload = %+v", defaultData)
 	}
@@ -343,9 +346,7 @@ func TestContentListProjectsPublishedWorkspaceWithoutDirectoryNavigation(t *test
 		"workspace_id": ingest.WorkspaceID, "subject_ref": item.SubjectRef,
 		"kind": "TAG", "body": "reviewed",
 	}))
-	if tagged.Status != command.StatusSucceeded {
-		t.Fatalf("tag = %q: %+v", tagged.Status, tagged.Reasons)
-	}
+	assertUnsignedFixtureTAG(t, tagged, ingest.WorkspaceID, "reviewed")
 	listed = dispatcher.Handle(ctx, mustEnvelope(t, command.OpContentList, map[string]any{"workspace_id": ingest.WorkspaceID}))
 	var taggedData command.ContentListData
 	if err := json.Unmarshal(listed.Data, &taggedData); err != nil {
@@ -481,13 +482,7 @@ func TestAnnotationRevisionConflict(t *testing.T) {
 		"kind":         "NOTE",
 		"body":         "first",
 	}))
-	if note.Status != command.StatusSucceeded {
-		t.Fatalf("create note = %q: %+v", note.Status, note.Reasons)
-	}
-	var created command.AnnotationUpsertData
-	if err := json.Unmarshal(note.Data, &created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := assertUnsignedNoteDegraded(t, note, "first", 1)
 	conflict := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationUpsert, map[string]any{
 		"workspace_id":      seed.WorkspaceID,
 		"subject_ref":       seed.FileEntryID,
@@ -554,9 +549,11 @@ func TestAnnotationSubjectMustBelongToWorkspace(t *testing.T) {
 			"kind":         annotation["kind"],
 			"body":         annotation["body"],
 		}))
-		if result.Status != command.StatusSucceeded {
-			t.Fatalf("valid %v result = %q reasons=%+v", annotation, result.Status, result.Reasons)
+		if annotation["kind"] == "NOTE" {
+			assertUnsignedNoteDegraded(t, result, "durable context", 1)
+			continue
 		}
+		assertUnsignedFixtureTAG(t, result, first.WorkspaceID, annotation["body"].(string))
 	}
 	annotations := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationList, map[string]any{
 		"workspace_id": first.WorkspaceID,
@@ -617,13 +614,7 @@ func TestAnnotationImportConflictPolicy(t *testing.T) {
 		"kind":         "NOTE",
 		"body":         "local",
 	}))
-	if created.Status != command.StatusSucceeded {
-		t.Fatalf("create = %q: %+v", created.Status, created.Reasons)
-	}
-	var local command.AnnotationUpsertData
-	if err := json.Unmarshal(created.Data, &local); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	local := assertUnsignedNoteDegraded(t, created, "local", 1)
 	fork := command.AnnotationExportData{
 		Schema: command.AnnotationBundleSchema,
 		Annotations: []command.AnnotationData{{
@@ -647,8 +638,17 @@ func TestAnnotationImportConflictPolicy(t *testing.T) {
 
 	fork.Conflict = command.AnnotationConflictKeepLocal
 	keep := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationImport, fork))
-	if keep.Status != command.StatusSucceeded {
-		t.Fatalf("keep-local = %q: %+v", keep.Status, keep.Reasons)
+	if keep.Status != command.StatusDegraded || len(keep.Reasons) != 1 || keep.Reasons[0].Code != ReasonCodeUnavailable ||
+		!strings.Contains(keep.Reasons[0].Message, "signed publication to be enabled") {
+		t.Fatalf("unsigned keep-local = %q: %+v", keep.Status, keep.Reasons)
+	}
+	var keepData command.AnnotationExportData
+	if err := json.Unmarshal(keep.Data, &keepData); err != nil {
+		t.Fatal(err)
+	}
+	if len(keepData.Annotations) != 1 || keepData.Annotations[0].ID != local.Annotation.ID || keepData.Annotations[0].Body != "local" ||
+		keepData.Annotations[0].Revision != 1 || keepData.Annotations[0].BodyDigest != local.Annotation.BodyDigest {
+		t.Fatalf("unsigned keep-local lost selected local row: %+v", keepData.Annotations)
 	}
 	kept, err := store.GetAnnotation(context.Background(), seed.WorkspaceID, local.Annotation.ID)
 	if err != nil || kept.Body != "local" || kept.Revision != 1 {
@@ -657,11 +657,20 @@ func TestAnnotationImportConflictPolicy(t *testing.T) {
 
 	fork.Conflict = command.AnnotationConflictKeepImported
 	take := dispatcher.Handle(context.Background(), mustEnvelope(t, command.OpAnnotationImport, fork))
-	if take.Status != command.StatusSucceeded {
-		t.Fatalf("keep-imported = %q: %+v", take.Status, take.Reasons)
+	if take.Status != command.StatusDegraded || len(take.Reasons) != 1 || take.Reasons[0].Code != ReasonCodeUnavailable ||
+		!strings.Contains(take.Reasons[0].Message, "signed publication to be enabled") {
+		t.Fatalf("unsigned keep-imported = %q: %+v", take.Status, take.Reasons)
+	}
+	var takeData command.AnnotationExportData
+	if err := json.Unmarshal(take.Data, &takeData); err != nil {
+		t.Fatal(err)
+	}
+	if len(takeData.Annotations) != 1 || takeData.Annotations[0].ID != local.Annotation.ID || takeData.Annotations[0].Body != "imported" ||
+		takeData.Annotations[0].Revision != 2 || takeData.Annotations[0].BodyDigest == "" || takeData.Annotations[0].BodyDigest == local.Annotation.BodyDigest {
+		t.Fatalf("unsigned keep-imported lost committed successor row: %+v", takeData.Annotations)
 	}
 	updated, err := store.GetAnnotation(context.Background(), seed.WorkspaceID, local.Annotation.ID)
-	if err != nil || updated.Body != "imported" || updated.Revision != 2 {
+	if err != nil || updated.Body != "imported" || updated.Revision != 2 || updated.BodyDigest != takeData.Annotations[0].BodyDigest {
 		t.Fatalf("keep-imported = %+v %v", updated, err)
 	}
 }
@@ -769,13 +778,7 @@ func TestAnnotationImportRejectsOrphanSubjectsBeforeMutation(t *testing.T) {
 		"kind":         "NOTE",
 		"body":         "original subject",
 	}))
-	if created.Status != command.StatusSucceeded {
-		t.Fatalf("create note = %q reasons=%+v", created.Status, created.Reasons)
-	}
-	var createdData command.AnnotationUpsertData
-	if err := json.Unmarshal(created.Data, &createdData); err != nil {
-		t.Fatalf("decode created note: %v", err)
-	}
+	createdData := assertUnsignedNoteDegraded(t, created, "original subject", 1)
 	conflicting := command.AnnotationExportData{
 		Schema: command.AnnotationBundleSchema,
 		Annotations: []command.AnnotationData{
@@ -902,9 +905,7 @@ func TestSearchQueryDimensions(t *testing.T) {
 		"kind":         "TAG",
 		"body":         "reviewed",
 	}))
-	if tagged.Status != command.StatusSucceeded {
-		t.Fatalf("tag = %q: %+v", tagged.Status, tagged.Reasons)
-	}
+	assertUnsignedFixtureTAG(t, tagged, ingestData.WorkspaceID, "reviewed")
 
 	unknown := dispatcher.Handle(ctx, mustEnvelope(t, command.OpSearchQuery, map[string]any{
 		"workspace_id": ingestData.WorkspaceID,
