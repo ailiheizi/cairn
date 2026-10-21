@@ -44,7 +44,8 @@ material and its live Notes/Tags are unchanged.
 
 Before any product edit, identify a concrete obstacle in that existing flow:
 the exact entry, draft handoff or selection state that prevents completion.
-Specify the smallest changed interaction and affected files in AIL-7. If the
+Specify the smallest changed interaction and affected files in the design
+checklist of F11/AIL-8 (the former AIL-7 record is merged there). If the
 existing combination suffices, document it and reuse applicable evidence;
 do not invent code, a new library or a new page to fill AIL-8.
 
@@ -63,13 +64,16 @@ saved Skill or silently replace the selected instructions. No second Notes
 concept, artificial description copy, AI call, tag mutation or automatic
 refresh is introduced.
 
-AIL-7 exits with the owner-reviewed choice and an actual-gap decision. AIL-8
-then delivers only that admitted gap, or documents that the existing flow
+F11/AIL-8 first records the reviewed choice and an actual-gap decision inside
+the same feature card, then delivers only that admitted gap or documents that
+the existing flow
 already satisfies the result. If code changes, the single journey above must
 prove frozen A/B text identities and unchanged originals after integration.
 Local diagnostics are reserved for actual failures or uncovered trust
 invariants; documentation-only delivery runs no application tests.
 
-This design does not admit an AI executor. AIL-9 must separately resolve
+This design does not admit an AI executor. F12/AIL-10 must first resolve
 authorized body reads, provider location and disclosure, budgets, exact input
-bindings, stale/canceled work and candidate confirmation before AIL-10 starts.
+bindings, stale/canceled work and candidate confirmation in its own design
+checklist. The former AIL-9 record is merged into that function; necessary
+review/admission remains required before executor implementation.

@@ -340,6 +340,21 @@ document-head convention, schema, endpoint or signed format.
 
 ### Product delivery and testing order (owner decision, 2026-10-19)
 
+#### Function-level issue rule (owner clarification, 2026-10-21)
+
+Issues track a user capability and the subfunctions needed to use it. Each
+issue states existing usable/partly connected/missing behavior, the smallest
+reuse-based implementation, and what the owner can do after delivery. Merge
+design and necessary validation into that feature's checklist; do not create
+standalone testing, speculative hardening, architecture or qualification work
+as apparent product delivery. Keep distant profiles and research in the idea
+record unless a concrete feature needs them. Compare mature products to find
+relevant gaps, then narrow; their feature lists do not expand scope. Deliver
+and integrate first, demonstrate the useful outcome, and investigate locally
+only for actual failures or concrete changed invariants. Existing trust
+contracts and release gates still apply when affected or actually qualifying
+a release; do not turn them into an unrelated campaign for ordinary UX work.
+
 Use [Cairn testing](.agents/skills/cairn-testing/SKILL.md) when selecting,
 writing, or running tests. The delivery unit is a complete user-visible
 feature, not an individual button, handler, file, or test case.

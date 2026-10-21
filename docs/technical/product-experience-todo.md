@@ -4,22 +4,30 @@
 
 ## Current direction
 
-### Visible next action and board (2026-10-21)
+### Function-level delivery and board (2026-10-21)
 
-Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536)
-and [focused delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
-They represent this same queue; the Core MVP Execution Plan still owns core
-phase order. **Only next action: AIL-7, review and finish the single-guide reuse
-design. No product implementation is active during this planning batch.**
+Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536),
+[function delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md),
+the [Chinese function overview](https://linear.app/ailiheizi/document/cairn-功能交付能用什么补什么交付成什么样-1fa39dca65df),
+and [mature-product capability comparison](../references/functional-capability-comparison-20261021.md).
+The 67-row draft has been consolidated into **28 functional deliverables and
+127 subfeature states**. Design and necessary validation belong inside each
+feature. Pure research and release records are not active product tasks.
+The Core MVP Execution Plan still owns core phase order.
 
-| Queue | Task | State |
+| Delivery position | Function | Current scope |
 | --- | --- | --- |
-| Existing delivery | [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Done for stated local scope |
-| Existing delivery | [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Done for stated local scope |
-| **Next** | [AIL-7](https://linear.app/ailiheizi/issue/AIL-7), ordinary Skill/correction reuse design | Todo |
-| After review | [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), close actual reuse friction | Backlog; blocked by AIL-7 |
-| Then design | [AIL-9](https://linear.app/ailiheizi/issue/AIL-9), explicit AI organizer contract | Backlog; blocked by AIL-8 |
-| After AI admission | [AIL-10](https://linear.app/ailiheizi/issue/AIL-10), AI candidate → confirm → saved list | Backlog; blocked by AIL-9 |
+| Existing delivery | F09 / [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Ordinary saved list snapshots, locally delivered |
+| Existing delivery | F10 / [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Saved-list playback and unique takeout, locally delivered |
+| **Next** | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), Skill correction/reuse | Todo; actual-gap/design work is inside this feature |
+| Next large capability | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10), explicit AI organization | Backlog; necessary contract/admission remains inside this feature |
+| Then select by user impact | F14 Photos, F15 Music, F03 global retrieval | Existing usable subfeatures plus explicitly named residuals |
+
+AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
+No product implementation is active during this requirements/planning batch.
+The [superseded complete idea draft](../history/whole-product-planning-draft-20261021.md)
+preserves historical goals; its rows are not another queue. Canceled planning
+cards mean merged or documentation-only, not successful feature completion.
 
 Read-only source inspection confirms standalone text saving, Skill selection
 and frozen guide capture already exist. The proposed refinement uses one
@@ -30,7 +38,8 @@ If no actual gap remains, document the current combination and move on.
 Design status does not authorize new interfaces, an executor or a current head.
 
 At most one complete feature enters implementation. Each continuation names
-the task/result/boundary/exit journey. Unrelated tests, platforms, refactors and
+the functional result, existing subfeatures, actual gap and normal-use finish.
+Unrelated tests, platforms, refactors and
 new surfaces do not enter the batch. Completion requires evidence, review and
 commit/push; update this ledger and the same Linear issue together.
 
@@ -163,7 +172,7 @@ on 4648/4654 were not redeployed.
 
 ## Historical unresolved work
 
-The full ledger is preserved in [Product Experience Ledger Through 2026-10-20](../history/product-experience-ledger-through-20261020.md). Unchecked items and their original evidence remain there; they have not been copied into a parallel queue or marked complete here. Start with its [open batch and priority record](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20), [core gates](../history/product-experience-ledger-through-20261020.md#gates), [verification and honesty limits](../history/product-experience-ledger-through-20261020.md#verification-and-honesty), and [out-of-scope record](../history/product-experience-ledger-through-20261020.md#out-of-scope).
+The full ledger is preserved in [Product Experience Ledger Through 2026-10-20](../history/product-experience-ledger-through-20261020.md). Unchecked items and their original evidence remain there. Major goals map to the current function plan; they are neither a parallel queue nor automatically complete. Start with its [open batch and priority record](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20), [core gates](../history/product-experience-ledger-through-20261020.md#gates), [verification and honesty limits](../history/product-experience-ledger-through-20261020.md#verification-and-honesty), and [out-of-scope record](../history/product-experience-ledger-through-20261020.md#out-of-scope).
 
 ## Compatible historical anchors
 

@@ -54,7 +54,39 @@ Immediate personal-client development prioritizes the local Mac/browser daily
 experience. Separate release-host qualification is required for release claims,
 but is not a prerequisite for the admitted client slice above.
 
-### 1.1 Normative and supporting documents
+### 1.1 Feature delivery priority — owner decision, 2026-10-21
+
+The ordinary development unit is a usable user capability with its necessary
+subfunctions, not a test campaign, architecture investigation or release gate.
+For each selected capability, state what already works, what is partially
+connected, what is missing, the smallest reusable implementation, and the
+observable result delivered to the owner. Code existence alone is not evidence
+that a user journey is connected; retained local evidence is not a fresh run.
+
+Compare relevant functions with mature products at the subfunction level.
+Classify each difference as an actual gap, an intentional alternative, or not
+selected. Competitor breadth does not expand Cairn's scope. Preserve the full
+idea inventory as context, but keep the issue queue focused on functional
+deliverables. Design decisions and necessary validation belong inside their
+owning feature rather than becoming independent product-progress items.
+
+Implement and integrate the complete selected capability first, then
+demonstrate its normal user outcome once. Do not delay useful delivery for
+speculative hardening, unrelated platforms, exhaustive negative-case matrices
+or numerous local tests. Diagnose and test locally when an actual failure or
+a concrete changed invariant requires it. Existing exact-preservation and
+authorization behavior stays in the implementation; this priority does not
+authorize data loss or claim release qualification. Apply full release gates
+only when qualifying the stated release profile.
+
+The current [function delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md)
+and [capability comparison](../references/functional-capability-comparison-20261021.md)
+record this breakdown. They do not replace the sole core phase order or admit
+new schemas, processors, interfaces or runtime extensions.
+
+<a id="11-normative-and-supporting-documents"></a>
+
+### 1.2 Normative and supporting documents
 
 - [MVP and Operator Contract](mvp-and-operator-contract.md) freezes the first qualified profile.
 - [Core Kernel and Interface Requirements](core-kernel-and-interface.md) define authority and compatibility boundaries.

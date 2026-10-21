@@ -34,7 +34,9 @@ Recovery evidence is specified by [Restore Manifest](requirements/restore-manife
 
 - [Core MVP Execution Plan](technical/core-mvp-execution-plan.md) is the sole dependency-ordered implementation plan.
 - [Product Experience Todo](technical/product-experience-todo.md) is an informative client progress ledger; it cannot reorder phases or redefine requirements.
-- [Focused Delivery Plan](superpowers/plans/2026-10-21-cairn-focused-delivery.md) expands that same queue into explicit design gates and feature journeys, mirrored on the linked Cairn Linear board. Its only next task is the ordinary-guide reuse design; unapproved AI work remains blocked.
+- [Function Delivery Plan](superpowers/plans/2026-10-21-cairn-focused-delivery.md) is the current 28-card functional index with 127 subfeature states, implementation approach and usable delivery outcomes, mirrored on the Cairn Linear board. F11/AIL-8 is next; design and necessary validation stay inside that feature. Integrated AI remains conditional inside F12/AIL-10.
+- [Functional Capability Comparison](references/functional-capability-comparison-20261021.md) compares relevant mature-product functions and explicitly distinguishes current Cairn coverage, real gaps and unselected breadth.
+- [Superseded 67-row Planning Draft](history/whole-product-planning-draft-20261021.md) preserves earlier ideas and their disposition; it is not an active queue.
 - [Repository Structure Review — 2026-10-21](technical/repository-structure-review-20261021.md) records whole-repository coverage, shared-code ownership and deliberately retained differences. It grants no product phase or release credit.
 - [Remaining Work and Closed Decisions](technical/remaining-work-and-closed-decisions.md) is a dated 2026-09-17 checkpoint, retained for context. Its capability and frontier summaries are not current status.
 - Dated acceptance files record bounded evidence. Read the matching contract and report together; do not treat the report as a new requirement.
