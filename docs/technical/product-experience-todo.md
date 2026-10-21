@@ -4,6 +4,36 @@
 
 ## Current direction
 
+### Visible next action and board (2026-10-21)
+
+Use the [Cairn Linear board](https://linear.app/waoffer/project/cairn-c2dec938b522)
+and [focused delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
+They represent this same queue; the Core MVP Execution Plan still owns core
+phase order. **Only next action: WAO-7, review and finish the single-guide reuse
+design. No product implementation is active during this planning batch.**
+
+| Queue | Task | State |
+| --- | --- | --- |
+| Existing delivery | [WAO-5](https://linear.app/waoffer/issue/WAO-5), ML-1 | Done for stated local scope |
+| Existing delivery | [WAO-6](https://linear.app/waoffer/issue/WAO-6), ML-2 | Done for stated local scope |
+| **Next** | [WAO-7](https://linear.app/waoffer/issue/WAO-7), ordinary Skill/correction reuse design | Todo |
+| After review | [WAO-8](https://linear.app/waoffer/issue/WAO-8), close actual reuse friction | Backlog; blocked by WAO-7 |
+| Then design | [WAO-9](https://linear.app/waoffer/issue/WAO-9), explicit AI organizer contract | Backlog; blocked by WAO-8 |
+| After AI admission | [WAO-10](https://linear.app/waoffer/issue/WAO-10), AI candidate → confirm → saved list | Backlog; blocked by WAO-9 |
+
+Read-only source inspection confirms standalone text saving, Skill selection
+and frozen guide capture already exist. The proposed refinement uses one
+ordinary guide with corrections merged into it; it must not rebuild those
+capabilities or introduce a second instruction type. See the
+[design for review](../superpowers/specs/2026-10-21-skill-reuse-design.md).
+If no actual gap remains, document the current combination and move on.
+Design status does not authorize new interfaces, an executor or a current head.
+
+At most one complete feature enters implementation. Each continuation names
+the task/result/boundary/exit journey. Unrelated tests, platforms, refactors and
+new surfaces do not enter the batch. Completion requires evidence, review and
+commit/push; update this ledger and the same Linear issue together.
+
 After the repository review, the owner selected the bounded material/Notes/Skill/list client loop. ML-1 snapshots and ML-2 playback/takeout actions are implemented with local evidence below. Their [normative admission](../requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions) and [client contract](material-list-client-contract.md#use-saved-lists-ml-2) reuse ordinary files and host-owned actions without changing the core phase gates.
 
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).

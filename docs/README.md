@@ -34,6 +34,7 @@ Recovery evidence is specified by [Restore Manifest](requirements/restore-manife
 
 - [Core MVP Execution Plan](technical/core-mvp-execution-plan.md) is the sole dependency-ordered implementation plan.
 - [Product Experience Todo](technical/product-experience-todo.md) is an informative client progress ledger; it cannot reorder phases or redefine requirements.
+- [Focused Delivery Plan](superpowers/plans/2026-10-21-cairn-focused-delivery.md) expands that same queue into explicit design gates and feature journeys, mirrored on the linked Cairn Linear board. Its only next task is the ordinary-guide reuse design; unapproved AI work remains blocked.
 - [Repository Structure Review — 2026-10-21](technical/repository-structure-review-20261021.md) records whole-repository coverage, shared-code ownership and deliberately retained differences. It grants no product phase or release credit.
 - [Remaining Work and Closed Decisions](technical/remaining-work-and-closed-decisions.md) is a dated 2026-09-17 checkpoint, retained for context. Its capability and frontier summaries are not current status.
 - Dated acceptance files record bounded evidence. Read the matching contract and report together; do not treat the report as a new requirement.
