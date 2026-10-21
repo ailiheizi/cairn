@@ -7,8 +7,10 @@ import type { useAppearance } from "../app/useAppearance";
 import type { useLibraryViews } from "../app/useLibraryViews";
 import { AppearancePreferences } from "./AppearancePreferences";
 import { LibraryViewPreferences } from "./LibraryViewPreferences";
+import { StorageReport } from "./StorageReport";
 import type { ActionFeedback, Notice, SettingsSection } from "../lib/types";
 import { formatBytes } from "../lib/format";
+import { validateDescribeProfile } from "../lib/describeAuthorization";
 
 // The settings dialog.
 //
@@ -25,6 +27,11 @@ function ConfigSelect({ label, value, options, disabled = false, onChange }: { l
 function ConfigReadonly({ label, value, t, mono = false, wide = false }: { label: string; value?: string; t: Translator; mono?: boolean; wide?: boolean }) { return <div className={`config-field readonly ${wide ? "wide" : ""}`}><span>{label}</span><strong className={mono ? "mono" : ""}>{value || t("Not reported")}</strong></div>; }
 function ConfigToggle({ label, copy, checked, disabled = false, wide = false, onChange }: { label: string; copy: string; checked: boolean; disabled?: boolean; wide?: boolean; onChange: (value: boolean) => void }) { return <label className={`toggle-field ${disabled ? "disabled" : ""} ${wide ? "wide" : ""}`}><span className="toggle-copy"><strong>{label}</strong><small>{copy}</small></span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i /></label>; }
 function ConfigNotice({ kind = "info", children }: { kind?: "info" | "warning"; children: ReactNode }) { return <div className={`config-notice ${kind}`}>{children}</div>; }
+function egressProfileMatchSavedConfig(profileID: string, savedConfig: any): boolean {
+  return savedConfig?.descriptions?.enabled === true
+    && String(savedConfig?.descriptions?.generate ?? "").trim() === "on_demand"
+    && String(savedConfig?.descriptions?.provider_profile ?? "").trim() === profileID;
+}
 
 type ClientSettingsSection = SettingsSection | "appearance";
 
@@ -112,6 +119,12 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
   const rebuildVisible = searchRebuildAvailable && Boolean(workspaceID) && !restartRequired;
   const rebuildDisabled = actionBlocked || !searchRebuildAvailable || !workspaceID || searchRebuild.state === "RUNNING";
   const egressProfiles: any[] = Array.isArray(egressFacts.profiles) ? egressFacts.profiles : [];
+  const describeProfileRows = (Array.isArray(egressFacts.describeProfiles) ? egressFacts.describeProfiles : []).map((raw: unknown, index: number) => ({
+    raw,
+    key: `${String((raw as any)?.profile_id ?? "invalid")}-${index}`,
+    validation: validateDescribeProfile(raw),
+  }));
+  const installedDescribeProfiles = describeProfileRows.filter((row) => row.validation.valid);
   const egressGrants: any[] = Array.isArray(egressFacts.grants) ? egressFacts.grants : [];
   const liveEgressGrants = egressGrants.filter((grant) => grant?.live === true);
   const egressBusy = egressAction.state === "RUNNING";
@@ -189,6 +202,7 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
             {activeSection === "storage" && <section className="config-section"><ConfigHeading eyebrow={t("CONTENT LOCATIONS")} title={t("Storage")} copy={t("Choose the content location and storage mode.")} />
               <ConfigGroup title={t("Content location")} copy={t("The repository contains exact file bytes; changing this path does not move existing data.")}><div className="form-grid"><ConfigInput label={t("Content repository")} value={config.paths?.repository} onChange={(value) => settings.setConfigField("paths", "repository", value)} wide /></div></ConfigGroup>
               <ConfigGroup title={t("Storage plan")} copy={t("Choose how exact file bytes are stored. Both options keep SHA-256 whole-file deduplication.")}><ConfigOptions value={config.storage?.repository_profile} onChange={settings.setRepositoryProfile} options={[{ value: "directory-cas-dev-v1", title: t("Directory CAS"), state: t("Development"), copy: t("Stores exact bytes without compression. Best for inspection and compatibility tests.") }, { value: "local-zstd-v1", title: t("Local zstd"), state: t("Candidate"), copy: t("Keeps exact recovery while compressing each unique whole file.") }]} /><p className="current-policy" aria-label={t("Current storage policy")}>{t("Compression")}: <strong>{config.storage?.compression_profile || t("Unknown")}</strong> · {t("Default storage mode")}: <strong>{config.storage?.default_protection || "STORE_EXACT"}</strong></p></ConfigGroup>
+              <StorageReport t={t} locale={locale} />
               <ConfigGroup title={t("Protection exception")} copy={t("LINK_ONLY remains visibly unprotected until it is independently reacquired and verified.")}><div className="form-grid"><ConfigToggle label={t("Allow explicit link-only plans")} copy={t("The user must still confirm that bytes are not stored locally.")} checked={Boolean(config.storage?.allow_link_only)} onChange={(value) => settings.setConfigField("storage", "allow_link_only", value)} wide /></div></ConfigGroup>
               <details className="config-advanced"><summary>{t("Advanced paths")}<ChevronRight size={15} /></summary><p>{t("Catalog, vector, model, and signing-material paths for operators and migrations. Signed portable recovery records live with the content repository.")}</p><div className="form-grid"><ConfigInput label={t("Catalog database")} value={config.paths?.catalog} onChange={(value) => settings.setConfigField("paths", "catalog", value)} /><ConfigInput label={t("Vector indexes")} value={config.paths?.vectors} onChange={(value) => settings.setConfigField("paths", "vectors", value)} /><ConfigInput label={t("Models")} value={config.paths?.models} onChange={(value) => settings.setConfigField("paths", "models", value)} /><ConfigInput label={t("Signing material & recovery workflow")} value={config.paths?.recovery_records} onChange={(value) => settings.setConfigField("paths", "recovery_records", value)} /></div></details>
               <ConfigNotice kind="warning">{t("Changing a repository or catalog path does not move existing data. Restart only after the target has been prepared or migrated.")}</ConfigNotice>
@@ -210,7 +224,7 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
                       <small>{t("Declared scope: {{data}} · subjects {{subjects}} · profile expiry {{expiry}}", { data: (profile?.disclosed_data_classes ?? []).join(", ") || t("none declared"), subjects: (profile?.allowed_subject_classes ?? []).join(", ") || t("none declared"), expiry: String(profile?.expiry ?? "") || t("not reported") })}</small>
                       <small>{t("Declared budgets per run: {{requests}} requests · {{bytes}} · {{seconds}}s", { requests: String(profile?.max_requests ?? ""), bytes: formatBytes(Number(profile?.max_bytes ?? 0)), seconds: String(profile?.max_seconds ?? "") })}</small>
                       <div className="egress-row-actions">
-                        <button type="button" className="secondary-button compact" onClick={() => void settings.authorizeProfile(profile)} disabled={egressBusy || expired || !workspaceID}>{t("Authorize for 30 days")}</button>
+                        <button type="button" className="secondary-button compact" onClick={() => void settings.authorizeProfile(profile)} disabled={egressBusy || expired || !workspaceID}>{t("Authorize within profile limits")}</button>
                         {expired && <small>{t("This profile has expired; install a current profile before authorizing egress.")}</small>}
                         {!expired && !workspaceID && <small>{t("Add a source before authorizing egress.")}</small>}
                       </div>
@@ -232,8 +246,53 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
               {semanticMode === "local" ? <ConfigNotice kind={bundleInstalled ? "info" : "warning"}>{t(bundleNotice)}</ConfigNotice> : <ConfigNotice kind="warning">{t("Online and hybrid use an installed provider profile. Nothing is sent until you issue an egress grant below and the provider resolves its credential; without both, semantic search reports its own unavailable state and keyword search is unaffected.")}</ConfigNotice>}
             </section>}
             {activeSection === "descriptions" && <section className="config-section"><ConfigHeading eyebrow={t("NOTES")} title={t("Notes")} copy={t("Notes remain durable facts; optional AI notes are added only when requested.")} />
-              <ConfigNotice>{t("This build binds no description provider yet: the profile and credential reference below are recorded configuration, and no model runs during ingest or on demand until a provider profile is admitted.")}</ConfigNotice>
+              {egressFacts.describeState === "UNAVAILABLE"
+                ? <ConfigNotice kind="warning">{t("Installed description profiles are unavailable: {{reason}}", { reason: egressFacts.describeReason || t("reason not reported") })}</ConfigNotice>
+                : egressFacts.state === "LOADING" || egressFacts.describeState === "IDLE"
+                  ? <ConfigNotice>{t("Reading installed description profile metadata.")}</ConfigNotice>
+                : installedDescribeProfiles.length === 0
+                  ? <ConfigNotice kind="warning">{describeProfileRows.length
+                    ? t("No installed description profile has valid metadata. Invalid profile rows are listed below.")
+                    : t("No installed description provider profile is available. On-demand generation remains unavailable.")}</ConfigNotice>
+                  : <ConfigNotice>{t("Installed profile metadata does not prove credentials or provider health. A separate DESCRIBE grant is required, and each description still needs your confirmation.")}</ConfigNotice>}
               <ConfigGroup title={t("Notes storage")} copy={t("Your notes are always available; imported, extracted, and AI-created text appears in this same Notes list.")}><div className="form-grid two"><ConfigToggle label={t("Keep additional notes")} copy={t("Keep imported, extracted, and generated text alongside your notes.")} checked={Boolean(config.descriptions?.enabled)} onChange={(value) => { settings.setConfigField("descriptions", "enabled", value); settings.setConfigField("descriptions", "generate", value ? "on_demand" : "disabled"); if (value) settings.setConfigField("descriptions", "retain_full_text", true); }} /><ConfigSelect label={t("Generation")} value={config.descriptions?.generate} onChange={(value) => settings.setConfigField("descriptions", "generate", value)} options={config.descriptions?.generate === "on_ingest" ? [{ value: "on_ingest", label: t("on_ingest (recorded; this build does not run it)") }] : [{ value: "disabled", label: t("Disabled") }, { value: "on_demand", label: t("On demand") }]} disabled={!config.descriptions?.enabled} /><ConfigInput label={t("Provider profile")} value={config.descriptions?.provider_profile} placeholder="optional-describe-profile" onChange={(value) => settings.setConfigField("descriptions", "provider_profile", value)} disabled={!config.descriptions?.enabled || config.descriptions?.generate === "disabled"} /><ConfigInput label={t("Credential reference")} value={config.descriptions?.credential_ref} placeholder="keychain://cairn/notes" onChange={(value) => settings.setConfigField("descriptions", "credential_ref", value)} disabled={!config.descriptions?.enabled || config.descriptions?.generate === "disabled"} /><ConfigToggle label={t("Retain full text")} copy={t("Required when model-generated notes are enabled.")} checked={Boolean(config.descriptions?.retain_full_text)} onChange={(value) => settings.setConfigField("descriptions", "retain_full_text", value)} disabled={config.descriptions?.enabled && config.descriptions?.generate !== "disabled"} /></div></ConfigGroup>
+              <ConfigGroup title={t("Installed description profiles")} copy={t("This read-only list uses the configured models path. It does not resolve credentials, contact a provider, or activate a profile.")}>
+                {egressFacts.state === "UNAVAILABLE" && <ConfigNotice kind="warning">{t("Egress grant facts are unavailable; grant actions are disabled: {{reason}}", { reason: egressFacts.reason || t("reason not reported") })}</ConfigNotice>}
+                {egressFacts.state === "LOADING" && <p role="status">{t("Reading installed description profiles…")}</p>}
+                {describeProfileRows.map((row) => row.validation.valid
+                  ? <div className="egress-row" data-describe-profile={row.validation.profile.profile_id} key={row.key}>
+                    <div className="egress-row-head"><strong>{row.validation.profile.profile_id}</strong><small>{row.validation.profile.provider} · {row.validation.profile.model_id}@{row.validation.profile.model_revision} · {row.validation.profile.endpoint_host}</small></div>
+                    <small>{t("Installed destination: {{destination}} · output {{schema}}", { destination: row.validation.profile.destination, schema: row.validation.profile.output_schema })} · {t(row.validation.profile.audit_required ? "Audit required" : "Audit not required by profile")}</small>
+                    <small>{t("Declared scope: {{data}} · subjects {{subjects}} · profile expiry {{expiry}}", { data: row.validation.profile.disclosed_data_classes.join(", "), subjects: row.validation.profile.allowed_subject_classes.join(", "), expiry: row.validation.profile.expiry })}</small>
+                    <small>{t("Declared budgets per run: {{requests}} requests · {{bytes}} · {{seconds}}s", { requests: row.validation.profile.max_requests, bytes: formatBytes(row.validation.profile.max_bytes), seconds: row.validation.profile.max_seconds })}</small>
+                    <div className="egress-row-actions">
+                      {(() => {
+                        const profileID = row.validation.profile.profile_id;
+                        const selectedInDraft = String(config.descriptions?.provider_profile ?? "").trim() === profileID;
+                        const draftReady = egressProfileMatchSavedConfig(profileID, config);
+                        const savedReady = egressProfileMatchSavedConfig(profileID, savedConfig);
+                        return <>
+                      <button type="button" className="secondary-button compact" onClick={() => void settings.authorizeDescribeProfile(row.raw)} disabled={egressBusy || row.validation.profile.expired || !workspaceID || !egressProfileMatchSavedConfig(row.validation.profile.profile_id, savedConfig) || egressFacts.state !== "READY" || egressFacts.describeState !== "AVAILABLE" || dirty || restartRequired}>{t("Authorize DESCRIBE for up to 30 days")}</button>
+                      {!row.validation.profile.expired && !draftReady && <button type="button" className="secondary-button compact" onClick={() => {
+                        settings.setConfigField("descriptions", "enabled", true);
+                        settings.setConfigField("descriptions", "generate", "on_demand");
+                        settings.setConfigField("descriptions", "retain_full_text", true);
+                        settings.setConfigField("descriptions", "provider_profile", profileID);
+                      }} disabled={loading || egressBusy || egressFacts.state !== "READY" || egressFacts.describeState !== "AVAILABLE"}>{t("Use this installed profile")}</button>}
+                      {row.validation.profile.expired && <small>{t("This description profile has expired and cannot receive a grant.")}</small>}
+                      {!row.validation.profile.expired && draftReady && savedReady && <small>{t("This is the saved description profile for on-demand generation.")}</small>}
+                      {!row.validation.profile.expired && draftReady && !savedReady && <small>{t("Selected in the unsaved settings draft. Save settings, then restart if required and authorize before generation. The credential reference was left unchanged.")}</small>}
+                      {!row.validation.profile.expired && !draftReady && selectedInDraft && <small>{t("This profile is named in the draft, but on-demand generation is not enabled. Use the installed-profile action to enable it without changing credentials.")}</small>}
+                      {!row.validation.profile.expired && !draftReady && !selectedInDraft && <small>{t("Save this profile as the description provider before authorizing it for generation.")}</small>}
+                      {(dirty || restartRequired) && <small>{t(configData?.restart_required ? "Restart required before model actions." : "Save settings before model actions.")}</small>}
+                        </>;
+                      })()}
+                    </div>
+                  </div>
+                  : <div className="egress-row" data-describe-profile={row.key} key={row.key}><strong>{t("Invalid installed description profile")}</strong><small>{t(row.validation.reason)}</small></div>)}
+                {egressFacts.describeState === "AVAILABLE" && describeProfileRows.length === 0 && <p className="current-policy">{t("No installed description provider profile is available.")}</p>}
+              </ConfigGroup>
+              {egressAction.message && <div className={`model-action-message ${egressAction.state === "FAILED" ? "error" : "success"}`} role={egressAction.state === "FAILED" ? "alert" : "status"}>{egressAction.message}</div>}
             </section>}
             {activeSection === "recovery" && <section className="config-section"><ConfigHeading eyebrow={t("SAFETY CONTRACT")} title={t("Recovery")} copy={t("Recovery settings protect the exact-byte promise and signed portable records.")} />
               <ConfigGroup title={t("Recovery authority")} copy={t("These values define the signed recovery lineage. Change them only as part of a reviewed migration.")}><div className="form-grid two"><ConfigReadonly label={t("Exact fallback")} value={config.recovery?.require_exact_fallback === false ? t("Not required by this configuration") : t("Required")} t={t} /><ConfigReadonly label={t("Publication signing")} value={config.recovery?.publication_signing} t={t} /><ConfigInput label={t("Publication domain")} value={config.recovery?.publication_domain} onChange={(value) => settings.setConfigField("recovery", "publication_domain", value)} /><ConfigReadonly label={t("Automatic external reacquisition")} value={config.recovery?.allow_external_reacquisition ? t("Recorded as allowed; this build performs no external reacquisition") : t("Disabled")} t={t} /></div></ConfigGroup>

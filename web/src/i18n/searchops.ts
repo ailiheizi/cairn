@@ -21,7 +21,7 @@ export const searchops: Record<string, string> = {
   // selected image's stable subject as the image dimension's query material.
   "Search by this image": "以这张图搜索",
   "Search the library for images that look like this one": "在资料库中搜索与这张图相似的图片",
-  "Image search results": "以图搜索结果",
+  "Image search results": "图片搜索结果",
 
   // The predicate row and the operator autocomplete.
   "Search predicates": "搜索谓词",
@@ -97,5 +97,7 @@ export const searchops: Record<string, string> = {
   "Evaluated over the loaded results only: the daemon has no expression for this predicate, so it is applied to the hits this query returned.": "仅对已加载结果求值：守护进程无法表达该谓词，因此它只作用于本次查询返回的命中结果。",
   "Free text widens every field-scoped predicate: the daemon matches each token against all of its indexed fields in one query.": "自由文本会放宽所有限定字段的谓词：一次查询中守护进程会把每个词元与全部已索引字段匹配。",
   "Evaluated over the loaded results": "仅对已加载结果求值",
+  "Exact duplicates": "精确重复项",
+  "Could not apply these filters: {{conditions}}. Their data is unavailable or changed. Previous results are unchanged; refresh and try again.": "无法应用这些条件：{{conditions}}。相关信息暂不可用或已变化，已保留原来的结果，请刷新后重试。",
   "{{tokens}} cannot be expressed by the daemon's search.query, so this browser applied it to the hits this query returned. Hits without a recorded content id, size, or modification time are not classified.": "{{tokens}} 无法由守护进程的 search.query 表达，因此浏览器把它应用于本次查询返回的命中结果。未记录内容标识、大小或修改时间的命中不会被归类。",
 };

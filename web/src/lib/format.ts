@@ -1,5 +1,6 @@
 import type { Locale, Translator } from "../i18n";
 import type { BrowseRoot, SearchHit, SearchSegment, SnapshotSummary, SnapshotVerificationData, SortDirection, SortField } from "./types";
+import { capturedModificationTimeMillis } from "./capturedTime";
 
 // Pure presentation and listing helpers.
 //
@@ -67,6 +68,55 @@ export function searchSegmentMetadata(segment: SearchSegment, t: Translator) {
   return metadata;
 }
 
+// Image metadata is a presentation convenience over an existing matched
+// processor artifact. This bound limits parsing only; it never truncates or
+// changes the matched text retained by the daemon or shown in Details.
+export const SEARCH_IMAGE_METADATA_DISPLAY_LIMIT = 16 * 1024;
+
+export type SearchImageMetadata = {
+  raw: string;
+  properties: Array<[string, unknown]>;
+};
+
+export function searchImageMetadata(segment: SearchSegment): SearchImageMetadata | undefined {
+  if (segment.source_type?.trim().toUpperCase() !== "ARTIFACT" || segment.kind?.trim().toUpperCase() !== "EXTRACT") return undefined;
+  const raw = segment.matched_text;
+  if (typeof raw !== "string" || raw.length > SEARCH_IMAGE_METADATA_DISPLAY_LIMIT) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || (parsed as Record<string, unknown>).schema !== "cairn.domain.image.meta/v1") return undefined;
+    return { raw, properties: Object.entries(parsed as Record<string, unknown>) };
+  } catch {
+    return undefined;
+  }
+}
+
+export function searchImageMetadataPropertyText(value: unknown, t?: Translator): string {
+  if (typeof value === "string") return value;
+  if (value === null) return "null";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === "string" ? serialized : (t ? t("See original matched JSON") : "See original matched JSON");
+  } catch {
+    return t ? t("See original matched JSON") : "See original matched JSON";
+  }
+}
+
+export function searchImageMetadataSummary(metadata: SearchImageMetadata, t: Translator): string {
+  const values = new Map(metadata.properties);
+  const parts: string[] = [];
+  const format = values.get("format");
+  if (typeof format === "string" && format.length > 0) parts.push(`${t("Image format")}: ${format}`);
+  const width = values.get("width");
+  if (typeof width === "number" && Number.isSafeInteger(width) && width >= 0) parts.push(`${t("Width")}: ${width}`);
+  const height = values.get("height");
+  if (typeof height === "number" && Number.isSafeInteger(height) && height >= 0) parts.push(`${t("Height")}: ${height}`);
+  const bytes = values.get("bytes");
+  if (typeof bytes === "number" && Number.isSafeInteger(bytes) && bytes >= 0) parts.push(`${t("Bytes")}: ${formatBytes(bytes)}`);
+  return parts.length ? parts.join(" · ") : t("Image metadata");
+}
+
 export function formatFacetValue(hit: SearchHit) {
   if (hit.entry_type === "DIRECTORY" || hit.entry_type === "SYMLINK") return "";
   const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || "";
@@ -104,19 +154,28 @@ export function sortLibraryHits(hits: SearchHit[], field: SortField, direction: 
       if (leftSize === null || rightSize === null) return leftSize === rightSize ? 0 : leftSize === null ? 1 : -1;
       return leftSize === rightSize ? 0 : leftSize < rightSize ? -1 : 1;
     }
+    if (field === "modified") {
+      const leftTime = rowModificationTime(left);
+      const rightTime = rowModificationTime(right);
+      if (leftTime === undefined || rightTime === undefined) return leftTime === rightTime ? 0 : leftTime === undefined ? 1 : -1;
+      return leftTime === rightTime ? 0 : leftTime < rightTime ? -1 : 1;
+    }
     const value = (hit: SearchHit) => field === "name" ? sortableName(hit) : field === "type" ? (hit.entry_type ?? "") : (hit.path?.trim() || sortableName(hit));
     return collator(value(left), value(right));
   };
   return [...hits].sort((left, right) => {
-    if (field === "size") {
-      const leftSize = sortableSize(left);
-      const rightSize = sortableSize(right);
-      // Keep unknown sizes at the end independently of the requested value
-      // direction. Equal unknowns still use the same directional name tie-break.
-      if (leftSize === null && rightSize !== null) return 1;
-      if (rightSize === null && leftSize !== null) return -1;
+    if (field === "size" || field === "modified") {
+      const leftKnown = field === "size" ? sortableSize(left) !== null : rowModificationTime(left) !== undefined;
+      const rightKnown = field === "size" ? sortableSize(right) !== null : rowModificationTime(right) !== undefined;
+      // Missing numeric metadata remains last in either requested direction.
+      if (!leftKnown && rightKnown) return 1;
+      if (!rightKnown && leftKnown) return -1;
     }
     const primary = comparePrimary(left, right);
+    // Captured timestamps at the browser's millisecond precision are equal
+    // when their order cannot be distinguished here. Preserve the existing
+    // loaded order instead of inventing a name-based reorder.
+    if (field === "modified" && primary === 0) return 0;
     if (primary !== 0) return direction === "asc" ? primary : -primary;
     // Equal keys keep a deterministic, locale-aware name order that follows the
     // requested direction, so toggling it always visibly reorders the tiles.
@@ -253,21 +312,10 @@ export function shortManifestID(value: string | undefined) {
 }
 
 // Timeline browse: a browser-local month projection over the loaded listing.
-// The daemon's `content.list` rows carry no modification time in this build
-// (see ContentItemData in client/command/data.go), so this reader yields
-// nothing for every row today and a strip over zero dated rows renders
-// absent, never zero-filled. When the daemon starts projecting a per-row
-// time, it is read here: epoch milliseconds (the unit of the daemon's own
-// mtime search axis) or an RFC 3339 string (the daemon's JSON timestamp
-// convention elsewhere).
+// Only the daemon's captured content.list timestamp is eligible; malformed or
+// absent values remain unknown rather than being parsed loosely or inferred.
 export function rowModificationTime(item: SearchHit): number | undefined {
-  const value = (item as { modified_at?: unknown }).modified_at;
-  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : undefined;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
-  }
-  return undefined;
+  return capturedModificationTimeMillis(item.modified_at);
 }
 
 export function monthBucketKey(timeMs: number) {

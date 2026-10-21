@@ -68,6 +68,157 @@
   font-size: 11px;
 }
 
+.source-drawer--upload .upload-folder-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 0;
+}
+
+.source-drawer--upload .upload-folder-picker > small {
+  flex: 1 1 220px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.source-drawer--upload .upload-folder-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.source-drawer--upload .upload-continuation {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 2px;
+}
+
+.source-search-preparation {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0;
+}
+
+.source-search-preparation > .planning-note { margin: 0; }
+
+.source-drawer--upload .pasted-text-composer {
+  margin-top: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--card-radius-sm);
+  background: var(--card-fill-quiet);
+}
+
+.source-drawer--upload .pasted-text-toggle {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  padding: 9px 12px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.source-drawer--upload .pasted-text-toggle svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+
+.source-drawer--upload .pasted-text-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.source-drawer--upload .pasted-text-toggle:disabled { cursor: default; }
+
+.source-drawer--upload .pasted-text-form {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.source-drawer--upload .pasted-text-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.source-drawer--upload .pasted-text-form input,
+.source-drawer--upload .pasted-text-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--card-radius-sm);
+  padding: 9px 10px;
+  color: var(--ink);
+  background: var(--card-fill);
+  font: inherit;
+  font-size: 12px;
+}
+
+.source-drawer--upload .pasted-text-form textarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.source-drawer--upload .pasted-text-form input:focus-visible,
+.source-drawer--upload .pasted-text-form textarea:focus-visible,
+.source-drawer--upload .pasted-text-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.source-drawer--upload .pasted-text-form :disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.source-drawer--upload .pasted-text-size,
+.source-drawer--upload .pasted-text-error {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.source-drawer--upload .pasted-text-size { color: var(--muted); }
+.source-drawer--upload .pasted-text-error { color: var(--gold); }
+
+.source-drawer--upload .pasted-text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-drawer--upload .pasted-text-actions .secondary-button { margin: 0; }
+
+.source-drawer--upload .pasted-text-clear {
+  min-height: 44px;
+  border: 0;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.source-drawer--upload .pasted-text-clear:hover { color: var(--ink); }
+
 /* The derived status of the one mounted surface. It reports an existing
    upload/plan phase only; it never invents a percentage or a new machine. */
 .source-drawer--upload .upload-status {
@@ -83,6 +234,36 @@
   font-size: 12px;
   line-height: 1.45;
 }
+
+.source-drawer--upload .upload-transfer-progress {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.source-drawer--upload .upload-transfer-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.source-drawer--upload .upload-stop-button {
+  min-height: 40px;
+  margin: 0 0 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--card-radius-sm);
+  padding: 7px 12px;
+  color: var(--ink);
+  background: var(--card-fill-quiet);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.source-drawer--upload .upload-stop-button:hover { border-color: var(--accent); }
 
 .source-drawer--upload .upload-status svg {
   flex: 0 0 auto;

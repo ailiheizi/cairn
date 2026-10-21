@@ -9,7 +9,7 @@ import { libraryModeForRoute, libraryPageForMode } from "./libraryViews";
 // Vocabulary (hash-based only, written with history.replaceState so a change
 // never spams the session history):
 //   v      the host view or a registered library page route: content | photos |
-//          music | exhibition | tag | search | sources | activity | duplicates | tags.
+//          music | exhibition | tag | search | sources | activity | duplicates | tags | notes.
 //          "path" is deliberately never written: its
 //          browse crumbs are browser-local namespace ids a reload cannot
 //          rebuild, so it falls back to the default view.
@@ -20,7 +20,7 @@ import { libraryModeForRoute, libraryPageForMode } from "./libraryViews";
 
 export type HashView = { mode: ViewMode | ""; presentation: ViewMode | ""; invalidPresentation?: boolean; q: string; tags: string[]; month: string };
 
-const HASH_VIEW_MODES: ViewMode[] = ["content", "tag", "path", "search", "sources", "activity", "duplicates", "tags"];
+const HASH_VIEW_MODES: ViewMode[] = ["content", "tag", "path", "search", "sources", "activity", "duplicates", "tags", "notes"];
 export const MONTH_BUCKET_PATTERN = /^\d{4}-\d{2}$/;
 
 export function isMonthBucketKey(value: string) { return MONTH_BUCKET_PATTERN.test(value); }
@@ -70,7 +70,7 @@ export function writeHashView(state: HashView): void {
     }
   } else if (state.mode !== "" && libraryPageForMode(state.mode)) {
     params.set("v", libraryPageForMode(state.mode)!.route);
-  } else if (state.mode === "sources" || state.mode === "activity" || state.mode === "duplicates" || state.mode === "tags") {
+  } else if (state.mode === "sources" || state.mode === "activity" || state.mode === "duplicates" || state.mode === "tags" || state.mode === "notes") {
     params.set("v", state.mode);
   }
   const hash = params.toString();

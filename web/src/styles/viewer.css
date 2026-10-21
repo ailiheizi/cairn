@@ -3,8 +3,15 @@
 How the content viewer and its thumbnails sit inside the inspector and the
 result tiles. The viewer component itself keeps its own stylesheet next to it. */
 
-.details > .preview-section { order: 2; }
 .preview-section .cairn-content-preview { margin-top: 2px; }
+.detail-result-navigation {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 16px; padding: 6px 8px;
+  border: 1px solid var(--hairline); border-radius: 10px; color: var(--muted); font-size: 12px;
+}
+.detail-result-navigation > span { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
+.detail-result-navigation > small { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.detail-result-navigation > button { min-width: 28px; min-height: 28px; justify-content: center; padding: 4px; }
+.detail-result-navigation > button:disabled { opacity: .45; cursor: default; }
 .details .media-section .media-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
 .details .media-section .media-facts dd { font-variant-numeric: tabular-nums; }
 .details .media-fact-group { margin-top: 14px; }

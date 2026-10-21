@@ -11,6 +11,14 @@
 // confirmation step names exactly what will be sent before anything leaves.
 
 export const description: Record<string, string> = {
+  "Matched sources": "匹配来源",
+  "{{count}} returned segments": "已返回 {{count}} 个片段",
+  "Matched-source pages": "匹配来源分页",
+  "Showing {{first}}–{{last}} of {{total}} segments · Page {{page}} of {{pages}}": "显示第 {{first}}–{{last}} 个，共 {{total}} 个片段 · 第 {{page}} / {{pages}} 页",
+  "Previous segments": "上一组片段",
+  "Next segments": "下一组片段",
+  "Source unavailable": "来源不可用",
+  "This source segment was returned without a text excerpt.": "已返回此来源片段，但没有文本摘录。",
   "Generate a description": "生成描述",
   "Checking description availability...": "正在检查描述生成功能是否可用……",
   "Could not check description availability right now.": "目前无法检查描述生成功能是否可用。",
@@ -39,4 +47,16 @@ export const description: Record<string, string> = {
   "Send to the model provider": "发送给模型提供方",
   "Generation failed: {{message}}": "生成失败：{{message}}",
   "Accept": "接受",
+  "Edit before accepting": "接受前编辑",
+  "Edit description before accepting": "接受前编辑描述",
+  "Cancel edit": "取消编辑",
+  "Generated description did not match this subject.": "生成的描述与当前条目不匹配。",
+  "Enter a description before accepting it.": "请先填写描述再接受。",
+  "Accepted description did not match the saved successor.": "已接受的描述与保存的后续版本不匹配。",
+  "The description was saved, but the service reported a degraded result.": "描述已保存，但服务报告了降级结果。",
+  "Unsaved edits": "有未保存的修改",
+  "Save reviewed changes": "保存审核后的修改",
+  "Finish or cancel the current review before generating another note.": "请先完成或取消当前审核，再生成另一条备注。",
+  "Loading current descriptions…": "正在加载当前描述……",
+  "Current descriptions are unavailable: {{message}}": "当前描述不可用：{{message}}",
 };

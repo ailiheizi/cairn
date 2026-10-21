@@ -1,9 +1,10 @@
 import { AlertCircle, ArchiveRestore, CheckCircle2, History, LoaderCircle, PanelLeft, Plus, RefreshCw, Search, Settings, ShieldCheck, X } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { ReactNode, RefObject, SyntheticEvent } from "react";
+import type { FormEvent, ReactNode, RefObject, SyntheticEvent } from "react";
 import type { Translator } from "../i18n";
 import type { SearchFlow } from "../app/useSearch";
 import { predicateWireLabel, searchOperatorInfo } from "../lib/searchops";
+import { SearchFilterBuilder } from "./SearchFilterBuilder";
 import { StatusPanel } from "./StatusPanel";
 
 // The top bar and the trusted status surface.
@@ -73,8 +74,12 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
   const showOperators = parsed.predicates.length > 0 || Boolean(error);
   const usesDestinationHeader = Boolean(focused || destinationHeader);
   const searchDisclosureRef = useRef<HTMLDetailsElement | null>(null);
+  const searchInteractionRef = useRef(0);
   const searchHelpRef = useRef<HTMLDetailsElement | null>(null);
   const menuDisclosureRef = useRef<HTMLDetailsElement | null>(null);
+  function invalidateSearchInteraction() {
+    searchInteractionRef.current += 1;
+  }
 
   // The destination header overlays dismiss like every other transient surface: an outside
   // pointer, or an Escape no inner control consumed, closes the open disclosure
@@ -88,13 +93,17 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
       const target = event.target;
       if (!(target instanceof Node)) return;
       for (const disclosure of openDisclosures()) {
-        if (!disclosure.contains(target)) disclosure.open = false;
+        if (!disclosure.contains(target)) {
+          if (disclosure === searchDisclosureRef.current) invalidateSearchInteraction();
+          disclosure.open = false;
+        }
       }
     }
     function closeFromEscape(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       const open = openDisclosures();
       if (!open.length) return;
+      if (searchDisclosureRef.current && open.includes(searchDisclosureRef.current)) invalidateSearchInteraction();
       for (const disclosure of open) disclosure.open = false;
       open[0].querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
     }
@@ -115,9 +124,24 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
     if (menuDisclosureRef.current?.open) menuDisclosureRef.current.open = false;
     search.searchInputRef.current?.focus({ preventScroll: true });
   }
+  async function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    const disclosure = searchDisclosureRef.current;
+    const field = event.currentTarget.querySelector<HTMLInputElement>("input");
+    const submittedQuery = field?.value.trim() ?? "";
+    const interaction = searchInteractionRef.current;
+    const committed = await search.runSearch(event);
+    if (!committed || !usesDestinationHeader || !disclosure?.isConnected || !disclosure.open ||
+      interaction !== searchInteractionRef.current || field?.value.trim() !== submittedQuery) return;
+    const focusWasInside = disclosure.contains(document.activeElement);
+    disclosure.open = false;
+    if (focusWasInside) disclosure.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
+  }
   function handleMenuToggle(event: SyntheticEvent<HTMLDetailsElement>) {
     if (!event.currentTarget.open) return;
-    if (searchDisclosureRef.current?.open) searchDisclosureRef.current.open = false;
+    if (searchDisclosureRef.current?.open) {
+      invalidateSearchInteraction();
+      searchDisclosureRef.current.open = false;
+    }
   }
   function closeMenu() {
     const menu = menuDisclosureRef.current;
@@ -132,13 +156,16 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
     return menuDisclosureRef.current?.querySelector<HTMLElement>("summary") ?? fallback;
   }
   function closeFocusedOverlays() {
-    if (searchDisclosureRef.current?.open) searchDisclosureRef.current.open = false;
+    if (searchDisclosureRef.current?.open) {
+      invalidateSearchInteraction();
+      searchDisclosureRef.current.open = false;
+    }
     closeMenu();
   }
 
-  const searchForm = <form className="global-search" onSubmit={search.runSearch} onFocus={(event) => { search.handleSearchFieldFocus(event.target); }} onBlur={(event) => { search.handleSearchFieldBlur(event.currentTarget.contains(event.relatedTarget as Node | null)); }} onKeyDown={search.handleSearchFieldKeyDown}>
+  const searchForm = <form className="global-search" onSubmit={handleSearchSubmit} onFocus={(event) => { if (event.target instanceof Element && event.target.matches(".global-search > input")) invalidateSearchInteraction(); search.handleSearchFieldFocus(event.target); }} onBlur={(event) => { search.handleSearchFieldBlur(event.currentTarget.contains(event.relatedTarget as Node | null)); }} onKeyDown={search.handleSearchFieldKeyDown}>
     <Search size={17} aria-hidden="true" />
-    <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="cairn-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
+    <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="cairn-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { invalidateSearchInteraction(); search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
     <span className="sr-only" id="cairn-search-hint">{t("Command or Control plus K focuses this field. Recent searches are kept in this browser only; saving a query as a view is the durable form.")}</span>
     {Boolean(query.trim()) && <button type="button" className="search-clear" aria-label={t("Clear search text")} title={t("Clears the field only. Current results stay until you search again or return to All content.")} onClick={search.clearSearchText}><X size={14} aria-hidden="true" /></button>}
     <button type="submit" className="search-submit" disabled={busy || !query.trim() || !isConnected || !catalogHealthy}>{busy ? <LoaderCircle className="spin" size={16} /> : t("Search")}</button>
@@ -156,6 +183,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
         </div>
       </details>
     </div>
+    <SearchFilterBuilder t={t} query={query} tagVocabulary={ops.tagVocabulary} onQueryChange={search.handleSearchFieldChange} disabled={!isConnected || !catalogHealthy} />
     {suggestionsOpen && <div className="search-suggest" role="listbox" aria-label={t("Search operators and values")} aria-describedby="cairn-search-suggest-note">
       <p className="search-suggest-note" id="cairn-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary, and protection modes from the daemon's closed protection vocabulary.")}</p>
       {suggestions.map((suggestion, index) => <button key={suggestion.key} type="button" role="option" aria-selected={index === activeSuggestion} className={`search-suggest-entry ${index === activeSuggestion ? "active" : ""}`} onClick={() => ops.acceptSuggestion(index)}>
@@ -202,7 +230,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
       {presentationNavigation && <div className="topbar-focused-domains">{presentationNavigation}</div>}
       <div className="top-actions top-actions--focused">
         <details className="topbar-disclosure topbar-search" ref={searchDisclosureRef} onToggle={handleSearchToggle}>
-          <summary className="topbar-entry topbar-search-summary" aria-label={t("Search content library")} title={t("Search content library")} aria-invalid={error ? true : undefined}><Search size={17} aria-hidden="true" /><span className="topbar-entry-label">{t("Search")}</span>{error && <AlertCircle className="topbar-entry-alert" size={14} aria-hidden="true" />}</summary>
+          <summary className="topbar-entry topbar-search-summary" aria-label={t("Search content library")} title={t("Search content library")} aria-invalid={error ? true : undefined} onClick={invalidateSearchInteraction}><Search size={17} aria-hidden="true" /><span className="topbar-entry-label">{t("Search")}</span>{error && <AlertCircle className="topbar-entry-alert" size={14} aria-hidden="true" />}</summary>
           <div className="topbar-overlay topbar-search-overlay">{searchForm}{operatorPanel}</div>
         </details>
         <button className="primary-button add-button" aria-label={t("Add content")} title={t("Add content")} onClick={(event) => { closeFocusedOverlays(); onOpenAdd(undefined, event.currentTarget); }} disabled={!isConnected || !coreStorageReady}><Plus size={16} /><span className="topbar-entry-label">{t("Add content")}</span></button>

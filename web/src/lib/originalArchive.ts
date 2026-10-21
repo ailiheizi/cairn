@@ -22,30 +22,56 @@ export type CapturedArchiveItem = {
   name: string;
 };
 
+export type OriginalTakeoutFallbackSubject = Readonly<Pick<SearchHit, "subject_ref" | "entry_id" | "entry_type" | "content_id" | "logical_size" | "name">>;
+export type ArchiveSelectionPreflight =
+  | { ok: true; captured: CapturedArchiveItem[] }
+  | { ok: false; reason: string; refusal: "budget" | "invalid"; fallbackSubjects?: readonly OriginalTakeoutFallbackSubject[] };
+
 const canonicalContentID = /^sha256:[0-9a-f]{64}$/;
 
-export function captureArchiveSelection(hits: SearchHit[]): CapturedArchiveItem[] {
-  if (!Array.isArray(hits) || hits.length === 0) throw new Error("Select one or more files first.");
-  if (hits.length > ORIGINAL_ARCHIVE_LIMITS.files) throw new Error("A ZIP can contain at most 32 files.");
-  let total = 0;
-  const seen = new Set<string>();
-  return hits.map((hit) => {
-    const subjectRef = hit.subject_ref?.trim() ?? "";
-    const entryID = hit.entry_id?.trim() ?? "";
-    const contentID = hit.content_id?.trim() ?? "";
-    const name = hit.name ?? "";
-    const size = hit.logical_size;
-    if (!subjectRef || !entryID || hit.entry_type !== "REGULAR_FILE" || !canonicalContentID.test(contentID)) {
-      throw new Error("Every selected item must be a regular file with a verified identity.");
+/** Validate the complete attempted selection before classifying a budget refusal. */
+export function preflightArchiveSelection(hits: SearchHit[]): ArchiveSelectionPreflight {
+  if (!Array.isArray(hits) || hits.length === 0) return { ok: false, refusal: "invalid", reason: "Select one or more files first." };
+  const seenSubjects = new Set<string>();
+  const seenEntries = new Set<string>();
+  const fallbackSubjects: OriginalTakeoutFallbackSubject[] = [];
+  const identities: Array<{ subjectRef: string; entryID: string; contentID: string; name: string }> = [];
+  for (const hit of hits) {
+    const subjectRef = hit?.subject_ref?.trim() ?? "";
+    const entryID = hit?.entry_id?.trim() ?? "";
+    const contentID = hit?.content_id?.trim() ?? "";
+    if (!subjectRef || !entryID || hit?.entry_type !== "REGULAR_FILE" || !canonicalContentID.test(contentID)) {
+      return { ok: false, refusal: "invalid", reason: "Every selected item must be a regular file with a verified identity." };
     }
-    if (!Number.isSafeInteger(size) || size! < 0) throw new Error("ZIP takeout requires a known nonnegative file size.");
-    if (size! > ORIGINAL_ARCHIVE_LIMITS.perFileBytes) throw new Error("A selected file exceeds the 32 MiB ZIP limit; use its original download instead.");
+    if (seenSubjects.has(subjectRef) || seenEntries.has(entryID)) {
+      return { ok: false, refusal: "invalid", reason: "The selection contains a repeated file." };
+    }
+    seenSubjects.add(subjectRef);
+    seenEntries.add(entryID);
+    const name = typeof hit.name === "string" ? hit.name : "";
+    identities.push({ subjectRef, entryID, contentID, name });
+    fallbackSubjects.push(Object.freeze({ subject_ref: subjectRef, entry_id: entryID, entry_type: "REGULAR_FILE", content_id: contentID, logical_size: hit.logical_size, name }));
+  }
+  const frozenFallbackSubjects = Object.freeze(fallbackSubjects);
+  if (hits.length > ORIGINAL_ARCHIVE_LIMITS.files) return { ok: false, refusal: "budget", reason: "A ZIP can contain at most 32 files.", fallbackSubjects: frozenFallbackSubjects };
+  let total = 0;
+  for (let index = 0; index < hits.length; index += 1) {
+    const size = hits[index]?.logical_size;
+    if (!Number.isSafeInteger(size) || size! < 0) return { ok: false, refusal: "budget", reason: "ZIP takeout requires a known nonnegative file size.", fallbackSubjects: frozenFallbackSubjects };
+    if (size! > ORIGINAL_ARCHIVE_LIMITS.perFileBytes) return { ok: false, refusal: "budget", reason: "A selected file exceeds the 32 MiB ZIP limit; use its original download instead.", fallbackSubjects: frozenFallbackSubjects };
     total += size!;
-    if (total > ORIGINAL_ARCHIVE_LIMITS.totalBytes) throw new Error("The selection exceeds the 64 MiB ZIP limit.");
-    if (seen.has(subjectRef)) throw new Error("The selection contains a repeated file.");
-    seen.add(subjectRef);
-    return { subject_ref: subjectRef, entry_id: entryID, content_id: contentID, logical_size: size!, name };
-  });
+    if (total > ORIGINAL_ARCHIVE_LIMITS.totalBytes) return { ok: false, refusal: "budget", reason: "The selection exceeds the 64 MiB ZIP limit.", fallbackSubjects: frozenFallbackSubjects };
+  }
+  return {
+    ok: true,
+    captured: identities.map((item, index) => ({ subject_ref: item.subjectRef, entry_id: item.entryID, content_id: item.contentID, logical_size: hits[index]!.logical_size!, name: item.name })),
+  };
+}
+
+export function captureArchiveSelection(hits: SearchHit[]): CapturedArchiveItem[] {
+  const result = preflightArchiveSelection(hits);
+  if (!result.ok) throw new Error(result.reason);
+  return result.captured;
 }
 
 function safeZipName(name: string): boolean {
@@ -92,7 +118,7 @@ export function resolveArchiveSelectionSizes(hits: SearchHit[], loaded: SearchHi
     const subject = hit.subject_ref?.trim();
     const entry = hit.entry_id?.trim();
     const content = hit.content_id?.trim();
-    return subject && entry && content ? `${subject}\u0000${entry}\u0000${content}` : undefined;
+    return subject && entry && content && canonicalContentID.test(content) ? `${subject}\u0000${entry}\u0000${content}` : undefined;
   };
   const sizes = new Map<string, number | null>();
   for (const row of loaded) {
@@ -181,7 +207,7 @@ export async function sha256ContentID(bytes: Uint8Array): Promise<string> {
   return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export async function readBoundedOriginalResponse(response: Response, expectedSize: number, signal: AbortSignal): Promise<Uint8Array> {
+export async function readBoundedOriginalResponse(response: Response, expectedSize: number, signal: AbortSignal, onBytesReceived?: (bytesReceived: number) => void): Promise<Uint8Array> {
   const reject = async (message: string): Promise<never> => {
     try { await response.body?.cancel(message); } catch { /* The transport may already be closed. */ }
     throw new Error(message);
@@ -201,6 +227,7 @@ export async function readBoundedOriginalResponse(response: Response, expectedSi
       total += value.byteLength;
       if (total > expectedSize || total > ORIGINAL_ARCHIVE_LIMITS.perFileBytes) throw new Error("The download exceeded its frozen size.");
       parts.push(value);
+      onBytesReceived?.(total);
     }
     if (total !== expectedSize) throw new Error("The downloaded length did not match the frozen original.");
     const bytes = new Uint8Array(total);
@@ -220,27 +247,45 @@ export function releaseDownloadLease(url: string, timer: number, revoke: (value:
   revoke(url);
 }
 
+export type OriginalArchiveProgress = {
+  phase: "transferring" | "verifying" | "verified";
+  currentFile: number;
+  currentName: string;
+  receivedBytes: number;
+  verifiedFiles: number;
+  verifiedBytes: number;
+};
+
 export async function materializeVerifiedArchive(
   items: FrozenArchiveItem[],
-  read: (item: FrozenArchiveItem) => Promise<Uint8Array>,
+  read: (item: FrozenArchiveItem, onBytesReceived: (bytesReceived: number) => void) => Promise<Uint8Array>,
   signal: AbortSignal,
-  onProgress: (index: number, name: string) => void,
+  onProgress: (progress: OriginalArchiveProgress) => void,
 ): Promise<Uint8Array> {
   if (items.length === 0 || items.length > ORIGINAL_ARCHIVE_LIMITS.files) throw new Error("The frozen export exceeds the browser ZIP limits.");
   const entries: ZipEntry[] = [];
   let total = 0;
+  let verifiedFiles = 0;
+  let receivedBytes = 0;
   for (let index = 0; index < items.length; index += 1) {
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
     const item = items[index]!;
-    onProgress(index + 1, item.output_name);
-    const bytes = await read(item);
+    onProgress({ phase: "transferring", currentFile: index + 1, currentName: item.output_name, receivedBytes, verifiedFiles, verifiedBytes: total });
+    const bytes = await read(item, (currentFileBytes) => {
+      onProgress({ phase: "transferring", currentFile: index + 1, currentName: item.output_name, receivedBytes: receivedBytes + currentFileBytes, verifiedFiles, verifiedBytes: total });
+    });
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
-    if (!(bytes instanceof Uint8Array) || bytes.byteLength !== item.logical_size || await sha256ContentID(bytes) !== item.content_id) {
+    if (!(bytes instanceof Uint8Array)) throw new Error(`The downloaded identity for ${item.output_name} did not match the frozen original.`);
+    receivedBytes += bytes.byteLength;
+    onProgress({ phase: "verifying", currentFile: index + 1, currentName: item.output_name, receivedBytes, verifiedFiles, verifiedBytes: total });
+    if (bytes.byteLength !== item.logical_size || await sha256ContentID(bytes) !== item.content_id) {
       throw new Error(`The downloaded identity for ${item.output_name} did not match the frozen original.`);
     }
     total += bytes.byteLength;
     if (bytes.byteLength > ORIGINAL_ARCHIVE_LIMITS.perFileBytes || total > ORIGINAL_ARCHIVE_LIMITS.totalBytes) throw new Error("The downloaded originals exceed the browser ZIP limits.");
     entries.push({ name: item.output_name, bytes });
+    verifiedFiles += 1;
+    onProgress({ phase: "verified", currentFile: index + 1, currentName: item.output_name, receivedBytes, verifiedFiles, verifiedBytes: total });
   }
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
   return buildStoredZip(entries);

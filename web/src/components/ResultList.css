@@ -60,6 +60,77 @@
   border-color: var(--accent);
 }
 
+/* Routine actions stay behind a compact disclosure and never participate in
+   the row's selection/open click. The open row may overflow its window slot so
+   the bounded menu remains usable without changing the tile/list geometry. */
+.result-list .result-row:not(.music-track) .result-row-actions {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 3;
+  color: var(--ink);
+}
+.result-list .result-row:not(.music-track) .result-row-actions > summary {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--surface);
+  box-shadow: var(--card-shadow-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.result-list .result-row:not(.music-track) .result-row-actions > summary::-webkit-details-marker { display: none; }
+.result-list .result-row:not(.music-track) .result-row-actions > summary:hover,
+.result-list .result-row:not(.music-track) .result-row-actions > summary:focus-visible,
+.result-list .result-row:not(.music-track) .result-row-actions[open] > summary {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  outline: 2px solid var(--accent-soft);
+}
+.result-list .result-row:not(.music-track) .result-row-actions__panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  width: min(230px, calc(100vw - 32px));
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+.result-list .result-row:not(.music-track) .result-row-actions__panel button {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.result-list .result-row:not(.music-track) .result-row-actions__panel button:hover:not(:disabled),
+.result-list .result-row:not(.music-track) .result-row-actions__panel button:focus-visible { background: var(--surface-soft); outline: 2px solid var(--accent-soft); }
+.result-list .result-row:not(.music-track) .result-row-actions__panel button:disabled { color: var(--muted); cursor: not-allowed; opacity: .78; }
+.result-list .result-row:not(.music-track) .result-row-actions__panel [role="status"] { padding: 5px 9px; color: var(--muted); font-size: 12px; }
+.result-list .result-row-actions-open { z-index: 5; overflow: visible !important; }
+.result-list .result-row:not(.music-track) .result-row-actions { opacity: 0; pointer-events: none; }
+.result-list .result-row:not(.music-track):hover .result-row-actions,
+.result-list .result-row:not(.music-track):focus-within .result-row-actions,
+.result-list .result-row:not(.music-track) .result-row-actions[open] { opacity: 1; pointer-events: auto; }
+@media (hover: none), (max-width: 640px) {
+  .result-list .result-row:not(.music-track) .result-row-actions { opacity: 1; pointer-events: auto; }
+}
+
 /* Dense list: the target sits inline at the row start so the filename and
    metadata keep their full width. */
 /* Position relative (not static) keeps the absolutely placed indicator anchored
@@ -91,4 +162,17 @@
 }
 .result-list .result-row:not(.music-track).multi-selected .result-open-copy strong {
   color: var(--ink);
+}
+
+/* A deferred later-page thumbnail keeps the existing image glyph visible
+   until PhotoThumbnail observes it in the viewport. The accessible fallback
+   remains on the wrapper, but it does not replace the compact tile icon. */
+.result-list .file-icon .result-thumb-deferred[data-preview-state="deferred"] {
+  opacity: 0;
+  padding: 0;
+}
+.result-list .file-icon .result-thumb-deferred {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
 }

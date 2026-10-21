@@ -6,10 +6,12 @@ import type { Locale } from "./i18n";
 import { command } from "./app/command";
 import { endpoints, operations } from "./lib/operations";
 import { parseHashView, writeHashView } from "./lib/hashView";
+import { parseSearchQuery } from "./lib/searchops";
 import { isTextEntryTarget, useSearch } from "./app/useSearch";
 import { useSettings } from "./app/useSettings";
 import { useRecents } from "./app/useRecents";
 import { useViewMode } from "./app/useViewMode";
+import { captureActiveBrowsePosition, markActiveBrowsePositionPending, ClientBrowseSessionProvider, createBrowsePositionRegistry } from "./app/ClientBrowseSession";
 import { useAppearance } from "./app/useAppearance";
 import { useLibraryViews } from "./app/useLibraryViews";
 import { bootstrapAppearance } from "./lib/appearance";
@@ -22,11 +24,13 @@ import { useSelection } from "./app/useSelection";
 import { useSources } from "./app/useSources";
 import { useRestore } from "./app/useRestore";
 import { useExport } from "./app/useExport";
+import { useSavedViews } from "./app/useSavedViews";
 import { useAudioPlayback } from "./app/useAudioPlayback";
 import { useMusicMetadata } from "./app/useMusicMetadata";
 import { useFavorites } from "./app/useFavorites";
 import { useOriginalTakeout } from "./app/useOriginalTakeout";
 import { resolveArchiveSelectionSizes } from "./lib/originalArchive";
+import { downloadOriginal } from "./lib/contentDownload";
 import { AudioPlayer } from "./components/AudioPlayer";
 import { OriginalTakeoutStatus } from "./components/OriginalTakeoutStatus";
 import { TopBar } from "./components/TopBar";
@@ -45,9 +49,11 @@ import { RestoreDrawer } from "./components/RestoreDrawer";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { VerificationDrawer } from "./components/VerificationDrawer";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { MaterialListComposer } from "./components/material/MaterialListComposer";
+import type { MaterialListDocument } from "./lib/materialList";
 import "./styles/index.css";
 import "antd/dist/reset.css";
-import type { LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary } from "./lib/types";
+import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary, ViewMode } from "./lib/types";
 
 // The application shell.
 //
@@ -86,7 +92,13 @@ function App() {
   const [focusedSubjectRef, setFocusedSubjectRef] = useState("");
   useEffect(() => { setFocusedSubjectRef(""); }, [workspaceID]);
   const [addOpen, setAddOpen] = useState(false);
+  const addOpenRef = useRef(addOpen);
+  addOpenRef.current = addOpen;
   const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
+  const [materialListEditor, setMaterialListEditor] = useState<{ workspaceID: string; subjects: SearchHit[]; initialDocument?: MaterialListDocument }>();
+  useEffect(() => { setMaterialListEditor(undefined); }, [workspaceID]);
+  const pendingPasteFilesRef = useRef(false);
+  const mainPagePasteHandlerRef = useRef<(event: ClipboardEvent) => void>(() => {});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -99,12 +111,21 @@ function App() {
   const [railOpen, setRailOpen] = useState(false);
   const compactLayout = useCompactLayout();
   const refreshGenerationRef = useRef(0);
+  const notesReturnScopeRef = useRef<{
+    workspaceID: string;
+    refreshGeneration: number;
+    scopeViewMode: ViewMode;
+    scopeHits: SearchHit[];
+    identity: string;
+  } | undefined>(undefined);
   // Capture the invoking control before React changes the surface. This keeps
   // close/escape dismissal predictable when a page-level surface unmounts the
   // normal library controls.
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const railTriggerRef = useRef<HTMLButtonElement | null>(null);
   const libraryListRef = useRef<HTMLDivElement | null>(null);
+  const browsePositionRegistryRef = useRef(createBrowsePositionRegistry());
+  const browseSessionScopeRef = useRef("");
   // The activity view hands focus back to the rail entry it was opened from.
   const duplicatesRailRef = useRef<HTMLButtonElement | null>(null);
   const tagsRailRef = useRef<HTMLButtonElement | null>(null);
@@ -162,10 +183,11 @@ function App() {
       : t("Service connected, but catalog is unavailable.");
   const repositoryPath = statusData?.repository?.path || t("Configured content repository");
   // Settings is a full page in the document flow. Only the add, restore,
-  // export, verification, and workspace-rail surfaces participate in the modal
-  // focus trap and body lock.
-  const drawerOpen = addOpen || restoreOpen || exportOpen || verificationOpen || (compactLayout && railOpen);
-  const drawerKind = addOpen ? "add" : restoreOpen ? "restore" : exportOpen ? "export" : verificationOpen ? "verification" : railOpen ? "rail" : "closed";
+  // export, verification, material-list composer, and workspace-rail surfaces
+  // participate in the modal focus trap and body lock.
+  const materialListEditorOpen = Boolean(materialListEditor && materialListEditor.workspaceID === workspaceID);
+  const drawerOpen = addOpen || restoreOpen || exportOpen || verificationOpen || materialListEditorOpen || (compactLayout && railOpen);
+  const drawerKind = addOpen ? "add" : restoreOpen ? "restore" : exportOpen ? "export" : verificationOpen ? "verification" : materialListEditorOpen ? "material-list" : railOpen ? "rail" : "closed";
 
   async function refreshCapabilities() {
     try {
@@ -264,6 +286,24 @@ function App() {
     if (activeWorkspaceID) {
       try {
         await sources.loadSources(activeWorkspaceID, refreshGeneration, snapshots);
+        if (!isCurrentRefresh()) return;
+        const snapshotRows = snapshotResult.status === "fulfilled" ? snapshotResult.value.data?.snapshots : undefined;
+        const confirmedEmptyBeforeFirstPublication =
+          nextCoreStorageReady &&
+          statusResponse.status === "SUCCEEDED" &&
+          nextStatusData?.repository?.snapshots === 0 &&
+          snapshotResult.status === "fulfilled" &&
+          snapshotResult.value.status === "SUCCEEDED" &&
+          Array.isArray(snapshotRows) &&
+          snapshotRows.length === 0;
+        if (confirmedEmptyBeforeFirstPublication) {
+          // A cold profile with a prepared ingest plan has a real workspace but
+          // no published catalog contents yet. Keep the source review and
+          // workspace intact; only clear the empty library projection instead
+          // of asking content.list for a namespace that does not exist yet.
+          library.resetLibraryProjection();
+          return;
+        }
         await library.loadContentLibrary(activeWorkspaceID, refreshGeneration);
       } catch (error) {
         if (!isCurrentRefresh()) return;
@@ -282,13 +322,22 @@ function App() {
   const appearance = useAppearance();
   const libraryViews = useLibraryViews();
   const drafts = useLibraryDrafts({ t });
-  const library = useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode: view.viewMode, presentationMode: view.presentationMode, setViewMode: view.setViewMode, setPresentationMode: view.setPresentationMode, sortField: view.sortField, sortDirection: view.sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify: setNotice, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, discardDetailDrafts: drafts.discardDetailDrafts });
-  const details = useDetails({ t, workspaceID, selected, setSelected, drafts, library, setViewMode: view.setViewMode, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice });
-  const selection = useSelection({ t, workspaceID, hits: library.hits, renderedHits: library.renderedHits, selected, details, library, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice, libraryListRef });
+  const scopeViewMode: ViewMode = view.viewMode === "notes" ? notesReturnScopeRef.current?.scopeViewMode ?? "content" : view.viewMode;
+  const library = useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode: view.viewMode, scopeViewMode, presentationMode: view.presentationMode, selected, setViewMode: view.setViewMode, setPresentationMode: view.setPresentationMode, sortField: view.sortField, sortDirection: view.sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify: setNotice, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, hasDetailDrafts: drafts.detailDraftIsDirty, detailDraftFingerprint: drafts.detailDraftFingerprint, discardDetailDrafts: drafts.discardDetailDrafts });
+  const details = useDetails({ t, workspaceID, selected, setSelected, drafts, library, browsePositionRegistry: browsePositionRegistryRef.current, getBrowseContextIdentity: () => JSON.stringify([workspaceID, browseSessionScopeRef.current, view.viewMode, view.presentationMode]), annotationStorageReady, catalogStorageMessage, refreshCapabilities, busy, setBusy, notify: setNotice });
+  const selection = useSelection({ t, workspaceID, hits: library.scopeHits, renderedHits: library.renderedHits, selected, details, library, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice, libraryListRef });
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const selectionChangeRef = useRef(selection.changeScopeSelection);
+  selectionChangeRef.current = selection.changeScopeSelection;
   const sources = useSources({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, refresh, refreshGenerationRef, lastPlannedSource: recents.lastPlannedSource, rememberLastSourcePath: recents.rememberLastSourcePath, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setRestoreOpen(false); setExportOpen(false); setSettingsOpen(false); }, setAddOpen, library, rememberWorkspace });
+  const sourcePlanIDRef = useRef(String(sources.plan?.plan_id ?? ""));
+  sourcePlanIDRef.current = String(sources.plan?.plan_id ?? "");
+  const pendingSavedSourceOpenRef = useRef<{ workspaceID: string; planID: string } | undefined>(undefined);
   const restore = useRestore({ t, snapshotRef, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, pushRecentDestination: recents.pushRecentDestination, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setExportOpen(false); setSettingsOpen(false); }, setRestoreOpen });
-  const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode: view.setViewMode, selection, library, drafts, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
-  const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
+  const savedViewFlow = useSavedViews({ t, workspaceID, viewMode: view.viewMode, lastExecutedQuery, library, selection, drafts, setQuery, setLastExecutedQuery, setSelected, setViewMode: view.setViewMode, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts });
+  const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, presentationMode: view.presentationMode, lastExecutedQuery, activeTags: library.activeTags, activeSystemFacets: library.activeSystemFacets, activeTimelineMonth: library.activeTimelineMonth, selected, selection, library, savedViews: savedViewFlow, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
+  const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration: refreshGenerationRef.current, viewMode: view.viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
   const topBarSearch = {
     ...search,
     async runSearch(event?: Parameters<typeof search.runSearch>[0], explicitQuery?: string) {
@@ -300,6 +349,33 @@ function App() {
       search.handleSearchFieldChange(value);
       void search.runSearch(undefined, value).then((succeeded) => { if (succeeded) completeUserNavigation(); });
     },
+  };
+  const searchNotesTextInLibrary = (literalText: string) => {
+    const text = literalText.trim();
+    if (!text || !workspaceID) return;
+    // The ordinary search field treats parsed predicates and malformed
+    // operator attempts as grammar. Quote those Notes strings as one literal
+    // phrase, using a delimiter absent from the input because searchops has no
+    // escape syntax for embedded quotes.
+    let query = text;
+    const parsedText = parseSearchQuery(text);
+    if (parsedText.predicates.length || parsedText.errors.length) {
+      const quote = !text.includes('"') ? '"' : !text.includes("'") ? "'" : "";
+      if (!quote) {
+        setNotice({ kind: "warning", text: t("This text contains both quote marks and cannot be sent as a literal Library search.") });
+        return;
+      }
+      query = `${quote}${text}${quote}`;
+      const parsedLiteral = parseSearchQuery(query);
+      if (parsedLiteral.predicates.length || parsedLiteral.errors.length) {
+        setNotice({ kind: "warning", text: t("This text cannot be safely sent as a literal Library search.") });
+        return;
+      }
+    }
+    // Update the visible field and submit the explicit value in the same turn;
+    // runSearch never reads the previous render's query closure here.
+    search.handleSearchFieldChange(query);
+    void topBarSearch.runSearch(undefined, query);
   };
   const audioPlayback = useAudioPlayback(workspaceID);
   // Recorded audio facts feed exactly two presentations: the Music page and the
@@ -328,14 +404,29 @@ function App() {
   // even when a domain presentation is remembered.
   const focusedChrome = activePresentationPage?.composition === "focused";
   const headerDestination = activePresentationPage || view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" ? view.presentationMode : "content";
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [presentationRootKey]);
+  // Domain-page choices belong to the current shared result context, never to
+  // its Photos/Music rendering. Management screens leave that context intact.
+  if (view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" || libraryPageForMode(view.viewMode)) {
+    browseSessionScopeRef.current = JSON.stringify([
+      view.viewMode === "search" ? "search" : view.viewMode === "path" ? "path" : "library",
+      view.viewMode === "search" ? lastExecutedQuery : "",
+      [...library.activeTags].sort(), library.activeSystemFacets,
+      library.activeTimelineMonth, library.browseRootID,
+      library.browseCrumbs.map((crumb) => crumb.entry_id || crumb.subject_ref),
+    ]);
+  }
+  useEffect(() => {
+    // Photos/Music own a stable subject bookmark and restore it when their
+    // registered page mounts. Other host roots keep the ordinary top reset.
+    if (presentationRoot?.mediaClass === "image" || presentationRoot?.mediaClass === "audio") return;
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [presentationRoot?.mediaClass, presentationRootKey]);
 
   // Hiding a library lens changes presentation only. Keep the inspected subject
   // and its unsaved Notes intact while restoring the shared loaded listing.
   useEffect(() => {
     if (isLibraryViewEnabled(view.presentationMode, libraryViews.enabledViewIds)) return;
     view.setPresentationMode("content");
-    selection.clearSelection();
     showPresentationFallbackNotice(t("This presentation is disabled. Showing all types for the same results."));
   }, [view.presentationMode, libraryViews.enabledViewIds]);
 
@@ -358,6 +449,12 @@ function App() {
     if (hashRestoreSupersededRef.current) { setHashViewApplied(true); return; }
     const pending = pendingHashView.current;
     if (!pending.mode) { setHashViewApplied(true); setHashRestoreComplete(true); return; }
+    if (library.hasCurrentSearchIntent(workspaceID)) {
+      hashRestoreSupersededRef.current = true;
+      setHashViewApplied(true);
+      setHashRestoreComplete(true);
+      return;
+    }
     if (!isConnected) return;
     if ((pending.mode === "search" || pending.mode === "content" || pending.mode === "tag" || libraryPageForMode(pending.mode)) && !library.libraryLoaded) return;
     setHashViewApplied(true);
@@ -402,7 +499,7 @@ function App() {
     if (libraryPageForMode(pending.mode)) { openLibrarySurface(pending.mode as LibraryPageMode); setHashRestoreComplete(true); return; }
     view.setViewMode(pending.mode);
     setHashRestoreComplete(true);
-  }, [hashViewApplied, isConnected, library.libraryLoaded]);
+  }, [hashViewApplied, isConnected, library.hasCurrentSearchIntent, library.libraryLoaded, workspaceID]);
   useEffect(() => {
     if (!hashRestoreComplete) return;
     const mode = libraryPageForMode(view.viewMode) ? "content" : view.viewMode;
@@ -424,16 +521,6 @@ function App() {
   // The panel exists only below the compact boundary. A resize across it
   // closes the panel instead of leaving a stale open flag behind.
   useEffect(() => { if (!compactLayout) setRailOpen(false); }, [compactLayout]);
-  // A selected subject that leaves the current listing is dropped instead of
-  // being kept as a hidden member of the batch. Reordering (sorting) keeps the
-  // same subjects and therefore the same selection.
-  useEffect(() => {
-    const visible = new Set(library.renderedHits.map((hit) => hit.subject_ref?.trim()).filter((value): value is string => Boolean(value)));
-    selection.setSelectionRefs((current) => {
-      const next = current.filter((subjectRef) => visible.has(subjectRef));
-      return next.length === current.length ? current : next;
-    });
-  }, [library.renderedHits]);
   // Escape clears the batch selection only when no drawer, modal viewer, or
   // settings surface owns the key; those keep their own dismiss behavior.
   useEffect(() => {
@@ -483,14 +570,16 @@ function App() {
       // Prefer the task's first field over the dismiss button. Drawers have
       // an actionable input; falling back to a button keeps empty/error
       // states keyboard reachable.
-      const firstField = drawer?.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [autofocus]');
+      const requestedInitialFocus = drawer?.querySelector<HTMLElement>('[data-drawer-initial-focus="true"]');
+      const firstField = requestedInitialFocus ?? drawer?.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [autofocus]');
       const first = firstField ?? drawer?.querySelector<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])');
       first?.focus();
     };
     requestAnimationFrame(focusFirstControl);
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        if (addOpen) sources.closeAdd(); else { setRailOpen(false); setSettingsOpen(false); setRestoreOpen(false); setExportOpen(false); setVerificationOpen(false); }
+        if (materialListEditorOpen) setMaterialListEditor(undefined);
+        else if (addOpen) sources.closeAdd(); else { setRailOpen(false); setSettingsOpen(false); setRestoreOpen(false); setExportOpen(false); setVerificationOpen(false); }
         return;
       }
       if (event.key !== "Tab") return;
@@ -509,7 +598,7 @@ function App() {
       previouslyFocused?.focus();
       drawerTriggerRef.current = null;
     };
-  }, [drawerOpen, drawerKind, addOpen, sources.planAction, sources.planCheckBusy]);
+  }, [drawerOpen, drawerKind, addOpen, materialListEditorOpen, sources.planAction, sources.planCheckBusy]);
 
   async function openLibraryEntry(hit: SearchHit) {
     if (hit.entry_type === "DIRECTORY" && (hit.entry_id || hit.subject_ref) && library.browseRootID) {
@@ -528,7 +617,7 @@ function App() {
     if (event.shiftKey) { event.preventDefault(); selection.extendSelectionTo(index); return; }
     const hit = library.renderedHits[index];
     if (!hit) return;
-    void (view.viewMode === "path" ? openLibraryEntry(hit) : details.loadDetails(hit));
+    void (view.viewMode === "path" ? openLibraryEntry(hit) : details.loadDetails(hit, hit.subject_ref ?? ""));
   }
   function openSettings(trigger?: EventTarget | null) {
     if (!settings.canLeaveSettings()) return;
@@ -554,6 +643,69 @@ function App() {
   function viewSource(sourceItem: SourceSummary) { void sources.viewSource(sourceItem); }
   function recheckSource(sourceItem: SourceSummary, trigger?: EventTarget | null) { sources.openAdd(sourceItem, trigger); }
   function addSource(trigger?: EventTarget | null) { sources.openAdd(undefined, trigger); }
+  function openMaterialListEditor(subjects: SearchHit[], initialDocument?: MaterialListDocument) {
+    if (!workspaceID || !isConnected || isUnavailable || !coreStorageReady || !library.libraryLoaded
+      || drawerOpen || settingsOpen || sourceIntakeIsPending()) {
+      const message = !workspaceID || !isConnected
+        ? t("Connect to Cairn before saving text as a file.")
+        : isUnavailable
+          ? t("Start the Cairn service before saving text as a file.")
+          : !coreStorageReady || !library.libraryLoaded
+            ? coreStorageMessage || t("The content library is not ready for saving text as a file.")
+            : drawerOpen || settingsOpen
+              ? t("Close the current panel before opening the text file composer.")
+              : t("Wait until the current operation finishes before opening the text file composer.");
+      setNotice({ kind: "warning", text: message });
+      return;
+    }
+    if (!settings.canLeaveSettings() || !drafts.canLeaveDetailDrafts()) return;
+    if (drafts.detailDraftIsDirty()) drafts.discardDetailDrafts();
+    rememberDrawerTrigger();
+    setMaterialListEditor({ workspaceID, subjects: [...subjects], ...(initialDocument ? { initialDocument } : {}) });
+  }
+  function saveMaterialListFiles(files: File[], capturedWorkspaceID: string) {
+    if (workspaceIDRef.current !== capturedWorkspaceID || !files.length || !isConnected || isUnavailable || !coreStorageReady
+      || settingsOpen || addOpen || restoreOpen || exportOpen || verificationOpen || sourceIntakeIsPending()) {
+      setNotice({ kind: "warning", text: t("Finish the current source operation before uploading files.") });
+      setMaterialListEditor(undefined);
+      return;
+    }
+    setMaterialListEditor(undefined);
+    pendingPasteFilesRef.current = true;
+    setPendingUploadFiles(files);
+    setNotice(undefined);
+    sources.openAdd();
+  }
+  function notesTextFileEntryDisabledReason() {
+    if (!isConnected) return t("Connect to Cairn before saving text as a file.");
+    if (isUnavailable) return t("Start the Cairn service before saving text as a file.");
+    if (!coreStorageReady) return coreStorageMessage || t("The content library is not ready for saving text as a file.");
+    if (drawerOpen) return t("Close the current panel before opening the text file composer.");
+    if (sourceIntakeIsPending()) return t("Wait until the current operation finishes before opening the text file composer.");
+    return "";
+  }
+  function openNotesTextFileComposer(trigger?: EventTarget | null) {
+    const blockedReason = notesTextFileEntryDisabledReason();
+    if (blockedReason) { setNotice({ kind: "warning", text: blockedReason }); return; }
+    sources.openAdd(undefined, trigger, {
+      openTextComposer: true,
+      beforeOpen: () => {
+        if (!drafts.canLeaveDetailDrafts()) return false;
+        if (drafts.detailDraftIsDirty()) drafts.discardDetailDrafts();
+        return true;
+      },
+    });
+  }
+  function sourceIntakeIsPending() {
+    const completedPlan = sources.planAction === "SUCCEEDED"
+      && sources.plan?.state === "SUCCEEDED"
+      && !sources.plan.awaiting_confirmation
+      && sources.plan.executable !== true;
+    return busy || (sources.planAction !== "IDLE" && !completedPlan)
+      || sources.planCheckBusy || Boolean(sources.plan && !completedPlan)
+      || sources.pastedTextDraft.locked || sources.pastedTextDraft.receiving
+      || pendingPasteFilesRef.current || pendingUploadFiles.length > 0;
+  }
   function handleLibraryFileDrop(event: DragEvent<HTMLElement>) {
     if (!event.dataTransfer.types.includes("Files")) return;
     event.preventDefault();
@@ -565,14 +717,49 @@ function App() {
     if (!event.dataTransfer.files.length) return;
     if (isUnavailable) { setNotice({ kind: "error", text: t("Start the Cairn service before previewing this source.") }); return; }
     if (!coreStorageReady) { setNotice({ kind: "error", text: coreStorageMessage }); return; }
-    if (drawerOpen || settingsOpen || busy || sources.planAction !== "IDLE" || sources.planCheckBusy) {
+    if (drawerOpen || settingsOpen || sourceIntakeIsPending()) {
       setNotice({ kind: "warning", text: t("Finish the current source operation before uploading files.") });
       return;
     }
+    pendingPasteFilesRef.current = true;
     setPendingUploadFiles(Array.from(event.dataTransfer.files));
     setNotice(undefined);
     sources.openAdd();
   }
+  function handleMainPagePaste(event: ClipboardEvent) {
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return;
+    const files = Array.from(clipboardData.files);
+    if (!files.length) return;
+    const target = event.target;
+    if (isTextEntryTarget(target) || (target instanceof HTMLElement && target.closest('dialog, [role="dialog"]'))) return;
+    const libraryMainView = view.viewMode === "content" || view.viewMode === "path" || view.viewMode === "search" || view.viewMode === "tag" || Boolean(libraryPageForMode(view.viewMode));
+    if (!libraryMainView || drawerOpen || settingsOpen || document.querySelector('[aria-modal="true"]')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const directory = Array.from(clipboardData.items).some((item) => {
+      const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => { isDirectory?: boolean } | null }).webkitGetAsEntry?.();
+      return entry?.isDirectory === true;
+    });
+    if (directory) { setNotice({ kind: "warning", text: t("Folders cannot be pasted. Choose individual files or use a server folder.") }); return; }
+    if (isUnavailable) { setNotice({ kind: "error", text: t("Start the Cairn service before previewing this source.") }); return; }
+    if (!coreStorageReady) { setNotice({ kind: "error", text: coreStorageMessage }); return; }
+    if (sourceIntakeIsPending()) {
+      setNotice({ kind: "warning", text: t("Finish the current source operation before pasting files.") });
+      return;
+    }
+    pendingPasteFilesRef.current = true;
+    setPendingUploadFiles(files);
+    setNotice(undefined);
+    sources.openAdd();
+  }
+  mainPagePasteHandlerRef.current = handleMainPagePaste;
+  useEffect(() => {
+    const listener = (event: ClipboardEvent) => mainPagePasteHandlerRef.current(event);
+    document.addEventListener("paste", listener);
+    return () => document.removeEventListener("paste", listener);
+  }, []);
   // The compact workspace panel is opened from the topbar button and dismissed
   // like every other modal surface: Escape, the backdrop, or its own close
   // control. The shell's drawer effect owns the focus trap, the `drawer-open`
@@ -605,28 +792,21 @@ function App() {
   // does, through the same unsaved-draft guard the library owns.
   function openActivity() {
     if (!drafts.canLeaveDetailDrafts()) return;
+    library.cancelSearchIntent();
     drafts.discardDetailDrafts();
     setSelected(undefined);
     view.setViewMode("activity");
     completeUserNavigation();
   }
   function openLibrarySurface(mode: "content" | LibraryPageMode) {
+    captureActiveBrowsePosition(browsePositionRegistryRef.current);
     const availableMode = isLibraryViewEnabled(mode, libraryViews.enabledViewIds) ? mode : "content";
-    const currentPage = libraryPageForMode(view.presentationMode);
-    const nextPage = libraryPageForMode(availableMode);
-    const sameDomain = currentPage && nextPage && libraryPageRoot(currentPage)?.id === libraryPageRoot(nextPage)?.id;
-    if ((view.viewMode === "search" || view.viewMode === "tag") && availableMode === "content") {
-      if (view.presentationMode !== "content" && !drafts.canLeaveDetailDrafts()) return;
-      if (view.presentationMode !== "content") { drafts.discardDetailDrafts(); selection.clearSelection(); }
-      view.setPresentationMode("content");
-      completeUserNavigation();
-      return;
-    }
-    if (sameDomain) { view.setPresentationMode(availableMode); completeUserNavigation(); return; }
-    if (view.viewMode === "search" || view.viewMode === "tag") {
-      if (!drafts.canLeaveDetailDrafts()) return;
-      drafts.discardDetailDrafts();
-      selection.clearSelection();
+    const currentLoadedScope = view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" || Boolean(libraryPageForMode(view.viewMode));
+    if (currentLoadedScope) {
+      if (libraryPageForMode(view.viewMode) || availableMode !== view.presentationMode) {
+        markActiveBrowsePositionPending(browsePositionRegistryRef.current);
+      }
+      if (libraryPageForMode(view.viewMode)) view.setViewMode("content");
       view.setPresentationMode(availableMode);
       completeUserNavigation();
       return;
@@ -636,12 +816,166 @@ function App() {
   // The rail has one Library destination; its internal views stay local to the
   // already-loaded set, while a true return from other workspaces reloads it.
   function openLibrary(event: { currentTarget: EventTarget | null }) {
-    if (libraryPageForMode(view.viewMode)) { openLibrarySurface("content"); return; }
+    if (libraryPageForMode(view.viewMode) || (view.viewMode === "content" && view.presentationMode !== "content")) { openLibrarySurface("content"); return; }
+    if (view.viewMode === "path") {
+      if (workspaceID) void library.loadContentLibrary(workspaceID, refreshGenerationRef.current, true, true);
+      return;
+    }
     if (view.viewMode === "activity") { library.clearLibraryFilters(); return; }
     if (library.hasActiveFilters) library.clearLibraryFilters();
     else reloadLibrary();
   }
+  function openWorkspaceMode(mode: "duplicates" | "tags" | "notes") {
+    if (!drafts.canLeaveDetailDrafts()) return;
+    if (mode === "notes" && view.viewMode !== "notes") {
+      const scopeHits = library.scopeHits.map((hit) => ({ ...hit }));
+      const scopeViewMode: ViewMode = view.viewMode === "search" || view.viewMode === "path" || view.viewMode === "tag" || view.viewMode === "content" ? view.viewMode : "content";
+      const identity = JSON.stringify([workspaceID, refreshGenerationRef.current, scopeViewMode, scopeHits.map(notesHitIdentity)]);
+      notesReturnScopeRef.current = { workspaceID, refreshGeneration: refreshGenerationRef.current, scopeViewMode, scopeHits, identity };
+    }
+    library.cancelSearchIntent();
+    drafts.discardDetailDrafts();
+    selection.clearSelection();
+    view.setViewMode(mode);
+    completeUserNavigation();
+  }
+  function notesHitIdentity(hit: SearchHit) {
+    const logicalSize = typeof hit.logical_size === "number" && Number.isFinite(hit.logical_size) ? hit.logical_size : null;
+    return [hit.subject_ref?.trim() ?? "", hit.entry_id?.trim() ?? "", hit.content_id?.trim() ?? "", hit.entry_type?.trim().toUpperCase() ?? "", logicalSize] as [string, string, string, string, number | null];
+  }
+  function notesScopeMatchesCurrentScope() {
+    const captured = notesReturnScopeRef.current;
+    if (!captured || captured.workspaceID !== workspaceIDRef.current || captured.refreshGeneration !== refreshGenerationRef.current) return false;
+    const signature = (hits: SearchHit[]) => JSON.stringify(hits.map(notesHitIdentity));
+    return signature(captured.scopeHits) === signature(library.scopeHits)
+      && captured.identity === JSON.stringify([captured.workspaceID, captured.refreshGeneration, captured.scopeViewMode, captured.scopeHits.map(notesHitIdentity)]);
+  }
+  function notesScopeIsCurrent(identity: string) {
+    const captured = notesReturnScopeRef.current;
+    return Boolean(captured && captured.identity === identity && captured.workspaceID === workspaceIDRef.current
+      && captured.refreshGeneration === refreshGenerationRef.current && view.viewMode === "notes"
+      && notesScopeMatchesCurrentScope() && !busyRef.current && !scopeRestoring);
+  }
+  function changeNotesScopeSelection(hits: SearchHit[], mode: "add" | "remove", identity: string) {
+    if (!notesScopeIsCurrent(identity)) return;
+    const captured = notesReturnScopeRef.current!;
+    const bySubject = new Map<string, SearchHit[]>();
+    for (const hit of captured.scopeHits) {
+      const ref = hit.subject_ref?.trim() ?? "";
+      if (ref) bySubject.set(ref, [...(bySubject.get(ref) ?? []), hit]);
+    }
+    const safeHits: SearchHit[] = [];
+    const seen = new Set<string>();
+    for (const hit of hits) {
+      const ref = hit.subject_ref?.trim() ?? "";
+      const matches = bySubject.get(ref) ?? [];
+      const identityTuple = notesHitIdentity;
+      const tuple = identityTuple(hit);
+      if (!ref || seen.has(ref) || matches.length !== 1 || !tuple[1] || !/^sha256:[0-9a-f]{64}$/.test(tuple[2]) || tuple[3] !== "REGULAR_FILE"
+        || !identityTuple(matches[0]).every((value, index) => value === tuple[index])) continue;
+      seen.add(ref);
+      safeHits.push(matches[0]);
+    }
+    selectionChangeRef.current(safeHits, mode);
+  }
+  function returnFromNotesToLibrary(identity: string) {
+    if (!notesScopeIsCurrent(identity) || !drafts.canLeaveDetailDrafts()) return;
+    const captured = notesReturnScopeRef.current!;
+    view.setViewMode(captured.scopeViewMode);
+    view.setPresentationMode("content");
+    completeUserNavigation();
+  }
+  async function prepareSearchForSavedSource(requestedWorkspaceID: string, requestedPlanID: string): Promise<ActionFeedback> {
+    const plan = sources.plan;
+    if (!workspaceID || requestedWorkspaceID !== workspaceID
+      || plan?.workspace_id !== requestedWorkspaceID
+      || plan?.plan_id !== requestedPlanID
+      || sources.planAction !== "SUCCEEDED"
+      || sources.planCheckBusy
+      || plan?.state !== "SUCCEEDED"
+      || plan?.awaiting_confirmation === true) {
+      return { state: "FAILED", message: t("The saved source is no longer the current confirmed plan.") };
+    }
+    if (busy) return { state: "FAILED", message: t("Another operation is still running. Try again after it finishes.") };
+    return settings.rebuildSearch(requestedWorkspaceID);
+  }
   function reloadLibrary() { if (workspaceID) void library.loadContentLibrary(workspaceID, refreshGenerationRef.current, true); }
+  async function viewSavedSource() {
+    if (busy) {
+      const plan = sources.plan;
+      const planID = typeof plan?.plan_id === "string" ? plan.plan_id : "";
+      const confirmed = sources.planAction === "SUCCEEDED"
+        && !sources.planCheckBusy
+        && plan?.state === "SUCCEEDED"
+        && plan?.awaiting_confirmation !== true
+        && Boolean(workspaceID)
+        && plan?.workspace_id === workspaceID
+        && Boolean(plan?.root_id)
+        && Boolean(planID);
+      if (confirmed) {
+        // The successful apply can still be refreshing the shared library.
+        // Preserve this explicit navigation intent and open the saved source
+        // once that refresh releases the host busy flag.
+        pendingSavedSourceOpenRef.current = { workspaceID, planID };
+        return;
+      }
+      setNotice({ kind: "warning", text: t("The source operation is still finishing. Try opening it again shortly.") });
+      return;
+    }
+    if (sources.sourceBarState === "UP_TO_DATE") {
+      sources.closeAdd(); openLibrarySurface("content");
+      reloadLibrary();
+      return;
+    }
+    const plan = sources.plan;
+    const confirmed = sources.planAction === "SUCCEEDED"
+      && !sources.planCheckBusy
+      && plan?.state === "SUCCEEDED"
+      && plan?.awaiting_confirmation !== true;
+    if (!confirmed) {
+      setNotice({ kind: "warning", text: t("This save is not confirmed yet. Check its status before opening the source.") });
+      return;
+    }
+    const planWorkspaceID = typeof plan?.workspace_id === "string" ? plan.workspace_id : "";
+    const rootID = typeof plan?.root_id === "string" ? plan.root_id : "";
+    if (!workspaceID || planWorkspaceID !== workspaceID || !rootID) {
+      sources.closeAdd(); openLibrarySurface("content");
+      reloadLibrary();
+      setNotice({ kind: "warning", text: t("The save is confirmed, but its source could not be opened. Showing all content.") });
+      return;
+    }
+    const planID = typeof plan?.plan_id === "string" ? plan.plan_id : "";
+    if (!planID) {
+      sources.closeAdd(); openLibrarySurface("content");
+      reloadLibrary();
+      setNotice({ kind: "warning", text: t("The save is confirmed, but its source could not be opened. Showing all content.") });
+      return;
+    }
+    const stillThisSavedSource = () => addOpenRef.current && sourcePlanIDRef.current === planID;
+    setBusy(true);
+    try {
+      const opened = await library.loadNamespace(planWorkspaceID, rootID, "", [], stillThisSavedSource);
+      if (!opened || !stillThisSavedSource()) return;
+      selection.clearSelection();
+      view.setPresentationMode("content");
+      sources.closeAdd();
+      completeUserNavigation();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : t("Could not open source content") });
+    } finally { setBusy(false); }
+  }
+  useEffect(() => {
+    const pending = pendingSavedSourceOpenRef.current;
+    if (!pending) return;
+    if (!addOpen || !addOpenRef.current) {
+      pendingSavedSourceOpenRef.current = undefined;
+      return;
+    }
+    if (busy) return;
+    pendingSavedSourceOpenRef.current = undefined;
+    if (pending.workspaceID !== workspaceID || pending.planID !== sourcePlanIDRef.current) return;
+    void viewSavedSource();
+  }, [addOpen, busy, workspaceID, sources.plan?.plan_id]);
   // The workspace layout and the library's first-source empty state describe
   // the same condition, so the shell computes it once and passes it down.
   const showFirstSource = view.viewMode === "content" && library.libraryItems.length === 0 && sources.sources.length === 0 && sources.sourceProjection.state !== "DEGRADED";
@@ -661,9 +995,9 @@ function App() {
     onLibrary={selectRailView((event) => openLibrary(event))}
     onSources={selectRailView(library.showSourcesSurface)}
     onActivity={selectRailView(openActivity)}
-    onDuplicates={selectRailView(() => view.setViewMode("duplicates"))}
-    onTags={selectRailView(() => view.setViewMode("tags"))}
-    onNotes={selectRailView(() => view.setViewMode("notes"))}
+    onDuplicates={selectRailView(() => openWorkspaceMode("duplicates"))}
+    onTags={selectRailView(() => openWorkspaceMode("tags"))}
+    onNotes={selectRailView(() => openWorkspaceMode("notes"))}
     activityRef={activityRailRef}
     duplicatesRef={duplicatesRailRef}
     tagsRef={tagsRailRef}
@@ -684,7 +1018,7 @@ function App() {
     />
   </WorkspaceRailPanel>;
 
-  return <div className="app-shell client-host">
+  return <ClientBrowseSessionProvider workspaceID={workspaceID} scopeKey={browseSessionScopeRef.current} positionRegistry={browsePositionRegistryRef.current}><div className="app-shell client-host">
     <InterfaceRenderBoundary
       interfaceId={appearance.preference.interfaceId}
       immersive={activePresentationPage?.chrome === "immersive"}
@@ -726,6 +1060,19 @@ function App() {
           locale={locale}
           workspaceID={workspaceID}
           onOpenSubject={(hit) => void details.loadDetails(hit)}
+          hostScopeHits={notesReturnScopeRef.current?.scopeHits ?? []}
+          scopeIdentity={notesReturnScopeRef.current?.identity ?? ""}
+          scopeAvailable={notesScopeMatchesCurrentScope()}
+          busy={busy}
+          scopeRestoring={scopeRestoring}
+          selectionRefs={selection.selectionRefs}
+          onChangeScopeSelection={changeNotesScopeSelection}
+          onReturnToLibrary={returnFromNotesToLibrary}
+          onSearchLibrary={searchNotesTextInLibrary}
+          onSaveTextAsFile={openNotesTextFileComposer}
+          saveTextAsFileDisabledReason={notesTextFileEntryDisabledReason()}
+          notice={notice}
+          onClearNotice={() => setNotice(undefined)}
         /> : view.viewMode === "activity" ? <ActivitySurface
           t={t}
           locale={locale}
@@ -749,6 +1096,9 @@ function App() {
           showFirstSource={showFirstSource}
           recalledView={exportFlow.recalledView}
           lastExecutedQuery={lastExecutedQuery}
+          keywordBrowse={search.keywordBrowse}
+          onRunKeywordBrowseAction={() => void search.runKeywordBrowseAction()}
+          onInvalidateKeywordBrowse={search.invalidateKeywordBrowse}
           sortAvailable={view.sortAvailable}
           canOpenExport={exportFlow.canOpenExport}
           isConnected={isConnected}
@@ -761,6 +1111,8 @@ function App() {
           scopeRestoreFailed={hashRestoreFailed}
           originalTakeoutBusy={originalTakeoutBusy}
           onDownloadOriginals={(subjects) => { void originalTakeout.start(resolveArchiveSelectionSizes(subjects, library.libraryItems)); }}
+          onCreateMaterialList={(subjects) => openMaterialListEditor(resolveArchiveSelectionSizes(subjects, library.libraryItems))}
+          materialListCreationDisabled={!workspaceID || !isConnected || isUnavailable || !coreStorageReady || !library.libraryLoaded || drawerOpen || settingsOpen || sourceIntakeIsPending()}
           refresh={() => void refresh()}
           onOpenAdd={addSource}
           onViewSource={viewSource}
@@ -770,6 +1122,7 @@ function App() {
           onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
           onClearNotice={() => setNotice(undefined)}
           onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
+          onVisualTextSearch={(description) => void search.runVisualTextSearch(description)}
           onOpenHit={(hit) => void details.loadDetails(hit)}
           onFocusSearch={() => search.focusSearchField()}
           libraryListRef={libraryListRef}
@@ -778,7 +1131,35 @@ function App() {
           onPlayTracks={(tracks) => { void audioPlayback.playQueue(tracks); }}
           musicMetadata={musicMetadata}
           favoriteControls={favoriteControls}
-          musicQueueControls={{ count: audioPlayback.queue.length, addTracks: (tracks) => { audioPlayback.addTracksToQueue(tracks); }, addNext: (track) => { audioPlayback.addNextToQueue(track); }, show: audioPlayback.showQueue }}
+          musicQueueControls={{
+            count: audioPlayback.queue.length,
+            addTracks: (tracks) => { audioPlayback.addTracksToQueue(tracks); },
+            addNext: (track) => { audioPlayback.addNextToQueue(track); },
+            addNextTracks: (tracks) => { audioPlayback.addNextTracksToQueue(tracks); },
+            show: audioPlayback.showQueue,
+            currentPlayback: audioPlayback.track
+              && audioPlayback.track.workspaceID === workspaceID
+              && /^sha256:[a-f0-9]{64}$/.test(audioPlayback.track.contentID)
+              && Number.isSafeInteger(audioPlayback.track.logicalSize)
+              && audioPlayback.track.logicalSize >= 0
+              ? {
+                workspaceID: audioPlayback.track.workspaceID,
+                entryID: audioPlayback.track.entryID,
+                contentID: audioPlayback.track.contentID,
+                logicalSize: audioPlayback.track.logicalSize,
+                name: audioPlayback.track.name,
+                status: audioPlayback.error ? "error"
+                  : audioPlayback.loading ? "loading"
+                    : audioPlayback.starting ? "starting"
+                      : audioPlayback.url ? audioPlayback.playing ? "playing" : "paused"
+                        : "error",
+              }
+              : undefined,
+            toggleCurrentPlayback: () => {
+              if (!audioPlayback.url || audioPlayback.loading || audioPlayback.starting || audioPlayback.audioRef.current?.src !== audioPlayback.url) return;
+              void audioPlayback.toggle();
+            },
+          }}
           focusedSubjectRef={focusedSubjectRef}
           onFocusSubject={setFocusedSubjectRef}
           retrievalFlow={exportFlow}
@@ -791,6 +1172,11 @@ function App() {
         representations={details.representations}
         descriptions={details.descriptions}
         descriptionsTruncated={details.descriptionsTruncated}
+        descriptionsTotal={details.descriptionsTotal}
+        descriptionsPagePending={details.descriptionsPagePending}
+        descriptionsPageError={details.descriptionsPageError}
+        onLoadMoreDescriptions={() => { void details.loadMoreDescriptions(); }}
+        onRefreshDescriptions={() => { void details.refreshDescriptions(); }}
         mediaFacts={details.mediaFacts}
         mediaFactsState={details.mediaFactsState}
         track={details.track}
@@ -804,11 +1190,19 @@ function App() {
         tagVocabulary={library.tagVocabulary}
         editingNoteID={drafts.editingNoteID}
         editingBody={drafts.editingBody}
+        descriptionDraft={drafts.descriptionDraft}
+        onBeginDescriptionDraft={drafts.beginDescriptionDraft}
+        onUpdateDescriptionDraft={drafts.updateDescriptionDraft}
+        onRebaseDescriptionDraft={drafts.rebaseDescriptionDraft}
+        onClearDescriptionDraft={drafts.clearDescriptionDraft}
         busy={busy}
+        navigation={details.navigation}
         t={t}
         locale={locale}
         onBack={details.closeDetails}
         onExport={selected.entry_type !== "DIRECTORY" ? () => exportFlow.openExport() : undefined}
+        catalogItems={library.libraryItems}
+        onEditMaterialList={(document) => openMaterialListEditor([], document)}
         onDraft={drafts.setNoteDraft}
         onTagDraft={drafts.setTagDraft}
         onAddTag={() => void details.saveTag()}
@@ -827,8 +1221,22 @@ function App() {
       onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
       onDrop={handleLibraryFileDrop}
     />
-    <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => { const hit = library.libraryItems.find((item) => item.entry_id === track.entryID); if (hit) void details.loadDetails(hit); }} />
-    <OriginalTakeoutStatus takeout={originalTakeout} t={t} />
+    <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => {
+      const matchesTrack = (hit: SearchHit | undefined): hit is SearchHit => Boolean(
+        track.workspaceID === workspaceID && hit && hit.entry_type === "REGULAR_FILE" && hit.subject_ref?.trim() &&
+        hit.entry_id === track.entryID && hit.content_id === track.contentID && hit.logical_size === track.logicalSize,
+      );
+      const hit = [...library.renderedHits, ...library.libraryItems, track.sourceHit].find(matchesTrack);
+      if (!hit) {
+        setNotice({ kind: "error", text: t("Current track details are unavailable in the current library scope.") });
+        return false;
+      }
+      // Keep the host draft guard and detail loading behavior in the existing
+      // flow; opening Details does not alter the verified player Blob.
+      void details.loadDetails(hit);
+      return true;
+    }} />
+    <OriginalTakeoutStatus takeout={originalTakeout} t={t} workspaceID={workspaceID} exportOpen={exportOpen} fallbackActionsReady={Boolean(workspaceID && isConnected && coreStorageReady)} fallbackActionsMessage={coreStorageMessage} onOpenServerExport={(subjects, trigger) => exportFlow.openExport(trigger, subjects)} onDownloadOriginal={(entryID, filename) => downloadOriginal(workspaceID, entryID, filename)} />
     {compactLayout && !focusedChrome && railOpen && railPanel}
     {settingsOpen && <SettingsDialog
       t={t}
@@ -853,6 +1261,18 @@ function App() {
       onClose={closeSettings}
       onDismissNotice={() => setNotice(undefined)}
     />}
+    {materialListEditorOpen && materialListEditor && <div className="settings-backdrop" style={{ zIndex: 42 }} onMouseDown={(event) => { if (event.target === event.currentTarget) setMaterialListEditor(undefined); }}>
+      <MaterialListComposer
+        t={t}
+        workspaceID={materialListEditor.workspaceID}
+        subjects={materialListEditor.subjects}
+        catalogItems={library.libraryItems}
+        initialDocument={materialListEditor.initialDocument}
+        busy={busy}
+        onClose={() => setMaterialListEditor(undefined)}
+        onSaveFiles={(files) => saveMaterialListFiles(files, materialListEditor.workspaceID)}
+      />
+    </div>}
     {addOpen && <SourceDrawer
       t={t}
       sources={sources}
@@ -861,11 +1281,16 @@ function App() {
       coreStorageMessage={coreStorageMessage}
       notice={notice}
       repositoryPath={repositoryPath}
+      workspaceID={workspaceID}
+      busy={busy}
+      searchRebuildAvailable={searchRebuildAvailable}
+      onPrepareSearch={prepareSearchForSavedSource}
       pendingFiles={pendingUploadFiles}
-      onPendingFilesConsumed={() => setPendingUploadFiles([])}
+      initialTextComposerOpen={sources.openTextComposerRequested}
+      onPendingFilesConsumed={() => { setPendingUploadFiles([]); pendingPasteFilesRef.current = false; }}
       onStaged={() => void refresh()}
-      onClose={sources.closeAdd}
-      onDone={() => { sources.closeAdd(); openLibrarySurface("content"); reloadLibrary(); }}
+      onClose={() => { pendingSavedSourceOpenRef.current = undefined; sources.closeAdd(); }}
+      onDone={() => { void viewSavedSource(); }}
     />}
     {restoreOpen && <RestoreDrawer
       t={t}
@@ -876,6 +1301,7 @@ function App() {
     />}
     {exportOpen && <ExportDrawer
       export={exportFlow}
+      workspaceID={workspaceID}
       query={lastExecutedQuery}
       locale={locale}
       t={t}
@@ -893,7 +1319,7 @@ function App() {
       onRefresh={() => void refresh()}
       onClose={() => setVerificationOpen(false)}
     />}
-  </div>;
+  </div></ClientBrowseSessionProvider>;
 }
 
 bootstrapAppearance();

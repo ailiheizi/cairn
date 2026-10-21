@@ -1,4 +1,8 @@
 export const overviewExperience: Record<string, string> = {
+  "Select displayed items": "选择当前显示的资料",
+  "{{eligible}} of {{displayed}} displayed items can be selected; {{skipped}} items without one clear identity were skipped.": "当前显示的 {{displayed}} 项中有 {{eligible}} 项可选择；{{skipped}} 项因身份不明确已跳过。",
+  "Select displayed items ({{count}})": "选择当前显示的资料（{{count}} 项）",
+  "Clear displayed selection ({{count}})": "清除当前显示资料的选择（{{count}} 项）",
   "A cross-section of this library": "浏览当前内容范围",
   "Photos in this scope": "当前范围内的照片",
   "Audio in this scope": "当前范围内的音频",

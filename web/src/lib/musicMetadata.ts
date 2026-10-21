@@ -147,7 +147,7 @@ export function sortMusicRows<T extends { index: number; hit: Pick<SearchHit, "n
 }
 
 /** The same loaded-original guard used by individual play actions. */
-export function playableMusicTrack(hit: SearchHit, workspaceID?: string): AudioTrack | undefined {
+export function playableMusicTrack(hit: SearchHit, workspaceID?: string, projectedFacts?: MusicTrackFacts): AudioTrack | undefined {
   const name = hit.name || "";
   if (playbackEligibilityReason(hit, workspaceID)) return undefined;
   const entryID = hit.entry_id;
@@ -156,5 +156,14 @@ export function playableMusicTrack(hit: SearchHit, workspaceID?: string): AudioT
   if (typeof workspaceID !== "string" || !workspaceID.trim()) return undefined;
   if (typeof entryID !== "string" || !entryID || typeof contentID !== "string" || audioIdentityDigest(contentID) === undefined) return undefined;
   if (typeof logicalSize !== "number" || !Number.isSafeInteger(logicalSize) || logicalSize < 0 || logicalSize > AUDIO_PLAYBACK_LIMIT) return undefined;
-  return { workspaceID, entryID, name, contentID, logicalSize };
+  const factsMatch = projectedFacts?.subjectRef === hit.subject_ref;
+  return {
+    workspaceID, entryID, name, contentID, logicalSize,
+    ...(factsMatch && projectedFacts?.title ? { displayTitle: projectedFacts.title } : {}),
+    ...(factsMatch && projectedFacts?.artist ? { displayArtist: projectedFacts.artist } : {}),
+    ...(factsMatch && projectedFacts?.album ? { displayAlbum: projectedFacts.album } : {}),
+    // Retain the original loaded client projection for the global player's
+    // Details action. The host revalidates every identity field before use.
+    sourceHit: { ...hit },
+  };
 }

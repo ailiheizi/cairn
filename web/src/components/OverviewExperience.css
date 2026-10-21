@@ -23,6 +23,15 @@
 .overview-eyebrow { color: var(--overview-muted); font-size: .76rem; font-weight: 700; letter-spacing: .12em; margin: 0; text-transform: uppercase; }
 .overview-scope-note { color: var(--overview-muted); font-size: .8rem; margin: 0 0 3px; max-width: 310px; text-align: right; }
 
+.overview-selection-tools { border: 1px solid var(--overview-line); border-radius: 10px; padding: 9px 12px; }
+.overview-selection-tools > summary { color: var(--overview-muted); cursor: pointer; font-size: .8rem; font-weight: 650; }
+.overview-selection-tools > div { display: grid; gap: 10px; margin-top: 10px; }
+.overview-selection-block { border-top: 1px solid var(--overview-line); display: grid; gap: 5px; padding-top: 9px; }
+.overview-selection-block > strong { font-size: .78rem; }
+.overview-selection-block > p { color: var(--overview-muted); font-size: .73rem; margin: 0; }
+.overview-selection-block > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.overview-selection-block button { background: var(--overview-paper); color: var(--overview-ink); font-size: .74rem !important; }
+
 .overview-photos, .overview-audio, .overview-other {
   background: var(--overview-paper);
   border: 1px solid var(--overview-line);

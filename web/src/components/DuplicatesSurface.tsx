@@ -3,6 +3,8 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AlertCircle, ChevronRight, Copy, RefreshCw, Tag as TagIcon } from "lucide-react";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
+import { lexicalProtectionAxisAnswered, PROTECTION_OUTCOMES, projectProtectionAxis } from "../lib/protectionAxis";
+import { workspaceIDFromStatus } from "../lib/workspace";
 import { exactIdentityKey, formatBytes, formatEntryType } from "../lib/format";
 import type { Translator } from "../i18n";
 import type { AnnotationRecord, SearchHit } from "../lib/types";
@@ -51,22 +53,7 @@ const GROUP_CONCURRENCY = 2;
 /** Bounded concurrency for the per-member representation reads. */
 const MEMBER_CONCURRENCY = 3;
 
-// The protection outcomes this surface asks the daemon's protection axis
-// about, in the order a member's answer resolves. The first outcome whose
-// filtered answer contains the member is the outcome the daemon claims for it.
-// These are the admitted protection outcomes of the catalog contract.
-const PROTECTION_OUTCOMES = [
-  "EXACT_PROTECTED",
-  "EXACT_FALLBACK",
-  "EXTERNAL_REPLAYABLE",
-  "LINK_ONLY_UNPROTECTED",
-  "EXPLICITLY_UNPROTECTED",
-  "BLOCKED",
-  "UNAVAILABLE",
-] as const;
-
-/** The lexical component of a fused search answer reports whether it answered. */
-const LEXICAL_DIMENSION = "lexical-metadata-fts";
+const lexicalAnswered = lexicalProtectionAxisAnswered;
 
 type SurfaceState = "IDLE" | "LOADING" | "READY" | "BLOCKED";
 type DuplicateGroup = { key: string; contentID: string; logicalSize: number; members: SearchHit[] };
@@ -136,10 +123,13 @@ function messageOf(reason: unknown) {
   return reason instanceof Error ? reason.message : String(reason ?? "");
 }
 
-/** True when the daemon's lexical projection actually answered this query. */
-function lexicalAnswered(data: any) {
-  const components = Array.isArray(data?.components) ? data.components : [];
-  return components.some((component: any) => component?.dimension === LEXICAL_DIMENSION && component?.status === "SUCCEEDED" && Boolean(component?.index_generation_ref));
+function followupReason(response: { reasons?: Array<{ message?: string }> }) {
+  return (response.reasons ?? [])
+    .map((reason) => reason.message?.trim() ?? "")
+    .filter(Boolean)
+    .slice(0, 3)
+    .join("; ")
+    .slice(0, 300);
 }
 
 /** One exact-identity group per (content_id, logical_size) key of two or more subjects. */
@@ -280,15 +270,7 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     // the published workspace; this is a read.
     try {
       const response = await command(operations.status.get, {});
-      const candidates = [
-        response.data?.recent_plans?.[0]?.workspace_id,
-        response.data?.recent_jobs?.[0]?.workspace_id,
-        response.data?.index?.[0]?.workspace_id,
-      ];
-      for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) return { workspaceID: candidate.trim(), error: "" };
-      }
-      return { workspaceID: "", error: "" };
+      return { workspaceID: workspaceIDFromStatus(response.data), error: "" };
     } catch (error) {
       return { workspaceID: "", error: messageOf(error) };
     }
@@ -335,23 +317,10 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     } else {
       error = messageOf(membership.reason);
     }
-    const protectionBySubject: Record<string, string> = {};
-    let protectionAnswered = false;
-    let protectionReason = "";
-    for (let index = 0; index < PROTECTION_OUTCOMES.length; index += 1) {
-      const result = settled[index + 1];
-      if (result.status !== "fulfilled") {
-        if (!protectionReason) protectionReason = messageOf(result.reason);
-        continue;
-      }
-      if (lexicalAnswered(result.value.data)) protectionAnswered = true;
-      else if (!protectionReason) protectionReason = String(result.value.reasons?.[0]?.message ?? "");
-      for (const hit of (Array.isArray(result.value.data?.hits) ? result.value.data.hits : [])) {
-        const subjectRef = String(hit?.subject_ref ?? "").trim();
-        if (subjectRef && !protectionBySubject[subjectRef]) protectionBySubject[subjectRef] = PROTECTION_OUTCOMES[index];
-      }
-    }
-    if (!protectionAnswered) protectionReason ||= t("the daemon did not report a protection generation for the content here");
+    const axis = projectProtectionAxis(settled.slice(1), PROTECTION_OUTCOMES, messageOf, t("the daemon did not report a protection generation for the content here"));
+    const protectionBySubject = Object.fromEntries(axis.bySubject);
+    const protectionAnswered = axis.answered;
+    const protectionReason = axis.answered ? "" : axis.reason;
     return {
       status: "READY",
       confirmation,
@@ -500,27 +469,50 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
     if (!body || !workspaceID || !targets.length) return;
     setTagAction({ state: "RUNNING", text: "" });
     let added = 0;
+    let degraded = 0;
+    let failedCount = 0;
     const failures: string[] = [];
+    const degradedReasons: string[] = [];
     for (const subjectRef of targets) {
       try {
         const response = await command(operations.annotation.upsert, { workspace_id: workspaceID, subject_ref: subjectRef, kind: "TAG", body, expected_revision: 0 });
         const annotation = response.data?.annotation as AnnotationRecord | undefined;
         if (annotation) setAnnotations((current) => current.some((item) => item.annotation_id === annotation.annotation_id) ? current : [...current, annotation]);
         added += 1;
+        if (response.status === "DEGRADED") {
+          degraded += 1;
+          const reason = followupReason(response);
+          if (reason && degradedReasons.length < 3) degradedReasons.push(reason);
+        }
       } catch (error) {
-        failures.push(messageOf(error));
+        failedCount += 1;
+        if (failures.length < 3) failures.push(messageOf(error).slice(0, 300));
       }
     }
-    setTagAction(failures.length
-      ? { state: "DONE", text: t("Tag added to {{added}} of {{total}} selected members. The other writes failed: {{reason}}", { added, total: targets.length, reason: failures[0] }) }
-      : { state: "DONE", text: t("Tag added to every selected member.") });
+    const failureReason = failures.join("; ").slice(0, 300);
+    const followup = degradedReasons.join("; ").slice(0, 300);
+    let text: string;
+    if (failedCount && degraded) {
+      text = t("Tag added to {{added}} of {{total}} selected members; {{degraded}} saved writes have incomplete follow-up ({{degradedReason}}), and {{failed}} writes failed ({{failureReason}}).", {
+        added, total: targets.length, degraded, degradedReason: followup || t("follow-up work is incomplete"), failed: failedCount, failureReason,
+      });
+    } else if (failedCount) {
+      text = t("Tag added to {{added}} of {{total}} selected members. The other writes failed: {{reason}}", { added, total: targets.length, reason: failureReason });
+    } else if (degraded) {
+      text = t("Tag added to {{added}} of {{total}} selected members; follow-up work is incomplete for {{degraded}} saved writes: {{reason}}", {
+        added, total: targets.length, degraded, reason: followup || t("follow-up work is incomplete"),
+      });
+    } else {
+      text = t("Tag added to every selected member.");
+    }
+    setTagAction({ state: "DONE", text });
   }
 
   async function addNote(member: SearchHit) {
     const subjectRef = member.subject_ref?.trim() ?? "";
-    const body = (noteDrafts[subjectRef] ?? "").trim();
+    const body = noteDrafts[subjectRef] ?? "";
     if (!subjectRef || !workspaceID) return;
-    if (!body) {
+    if (!body.trim()) {
       setNoteActions((current) => ({ ...current, [subjectRef]: { state: "DONE", text: t("Allow note text before the note can be added.") } }));
       return;
     }
@@ -530,7 +522,10 @@ export function DuplicatesSurface({ t }: { t: Translator }) {
       const annotation = response.data?.annotation as AnnotationRecord | undefined;
       if (annotation) setAnnotations((current) => [...current, annotation]);
       setNoteDrafts((current) => ({ ...current, [subjectRef]: "" }));
-      setNoteActions((current) => ({ ...current, [subjectRef]: { state: "DONE", text: t("Note added to this member.") } }));
+      const text = response.status === "DEGRADED"
+        ? t("This member's note was saved, but follow-up work is incomplete: {{reason}}", { reason: followupReason(response) || t("follow-up work is incomplete") })
+        : t("Note added to this member.");
+      setNoteActions((current) => ({ ...current, [subjectRef]: { state: "DONE", text } }));
     } catch (error) {
       setNoteActions((current) => ({ ...current, [subjectRef]: { state: "DONE", text: t("The note could not be saved: {{message}}", { message: messageOf(error) }) } }));
     }

@@ -3,7 +3,8 @@
 The modal drawer shell, the sticky drawer action bar, the plan cards, and the
 add-source, restore, and export drawers. */
 
-.drawer-backdrop { position: fixed; inset: 0; z-index: 20; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.68); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+/* Modal drawers must cover the sticky global audio player (z-index 30). */
+.drawer-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.68); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 .drawer {
   width: min(500px, 100%); height: 100%; overflow-y: auto; padding: 28px;
   border-left: 1px solid rgba(201, 187, 255, 0.25); color: var(--ink); background: rgba(14, 12, 23, 0.94);
@@ -107,6 +108,21 @@ add-source, restore, and export drawers. */
 .export-view-saved svg { flex: 0 0 auto; margin-top: 1px; }
 .export-query-boundary { color: #9b8fba; font-size: 10px; line-height: 1.45; }
 .export-form { margin-top: 20px; }
+/* Optional export choices and records use native disclosures. The selected
+   source, destination, preview and frozen review remain in the main flow. */
+.export-other-sources, .export-options, .export-history { display: grid; gap: 8px; }
+.export-other-sources, .export-options { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.export-other-sources > summary, .export-options > summary, .export-history > summary { min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 11px; font-weight: 720; list-style: none; cursor: pointer; }
+.export-other-sources > summary::after, .export-options > summary::after, .export-history > summary::after { content: "›"; flex: 0 0 auto; margin-left: 3px; color: var(--muted); font-size: 18px; line-height: 1; transition: transform 150ms ease; }
+.export-other-sources[open] > summary::after, .export-options[open] > summary::after, .export-history[open] > summary::after { transform: rotate(90deg); }
+.export-other-sources > summary small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 520; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.export-other-sources > summary::-webkit-details-marker, .export-options > summary::-webkit-details-marker, .export-history > summary::-webkit-details-marker { display: none; }
+.export-options > summary small { color: var(--muted); font-size: 10px; font-weight: 520; text-align: right; }
+.export-source-status, .export-history-status { margin: 8px 0 0; }
+.export-saved-views { margin-top: 4px; padding-top: 10px; }
+.export-history { margin-top: 20px; }
+.export-history-content { display: grid; gap: 7px; }
+.export-history-content > .muted { margin: 0; font-size: 10px; }
 /* The browser-local preset label. It states where the pre-filled destination
    and sidecar came from and carries no durable meaning: the daemon stores
    nothing from the preset, and it is removed as soon as either field is
@@ -164,6 +180,8 @@ add-source, restore, and export drawers. */
 .export-choice.active > svg:first-child { color: var(--accent); }
 .export-view-editor { border-left-color: var(--accent); }
 .export-view-saved { color: var(--health); }
+.export-form label, .export-choice-heading { color: var(--ink); }
+.export-drawer input { background: var(--card-fill-quiet); }
 
 /* Saved views and export history are daemon-backed lists inside the export
    drawer. They stay compact rows beside the existing export cards. */
@@ -209,6 +227,32 @@ add-source, restore, and export drawers. */
 .plan-file { border-bottom-color: var(--hairline); }
 .plan-file-mode { border-color: var(--hairline-strong); border-radius: 8px; color: var(--ink); background: var(--card-fill-quiet); }
 .export-trigger { color: var(--ink); border-color: var(--hairline-strong); }
+
+/* Recovery artifacts are two independent, explicitly-created server files.
+   Keep their metadata readable without implying a combined backup. */
+.recovery-records { display: grid; gap: 9px; margin-top: 18px; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); padding: 10px; background: var(--card-fill-quiet); }
+.recovery-records > summary { min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 11px; font-weight: 740; list-style: none; cursor: pointer; }
+.recovery-records > summary::-webkit-details-marker { display: none; }
+.recovery-records-badge { color: var(--muted); font-size: 9px; font-weight: 550; text-align: right; }
+.recovery-records-content { display: grid; gap: 12px; min-width: 0; }
+.recovery-records-copy, .recovery-records-selected, .recovery-records-status { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.recovery-records-inflight { position: sticky; bottom: 0; z-index: 2; margin: 10px -10px -10px; border-top: 1px solid var(--hairline); padding: 13px 10px; color: var(--ink); background: var(--card-fill); font-size: 11px; text-align: center; }
+.recovery-records-selected { color: var(--ink); }
+.recovery-records-action { display: grid; gap: 8px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.recovery-records-action h3 { margin: 0; color: var(--ink); font-size: 11px; }
+.recovery-records-action label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+.recovery-records-action input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--hairline-strong); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: var(--card-fill); font-size: 11px; }
+.recovery-records-action > button { justify-self: start; min-height: 34px; border: 1px solid var(--hairline-strong); border-radius: 9px; padding: 0 11px; color: var(--ink); background: var(--card-fill); font-size: 10px; font-weight: 700; }
+.recovery-records-action > button:disabled { opacity: .45; cursor: not-allowed; }
+.recovery-records-unknown { display: grid; gap: 5px; min-width: 0; margin: 0; border-left: 2px solid var(--gold); padding: 7px 9px; color: var(--muted); background: var(--accent-soft); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.recovery-records-unknown p { margin: 0; }
+.recovery-records-unknown strong { color: var(--ink); }
+.recovery-records-unknown code, .recovery-records-result code { overflow-wrap: anywhere; }
+.recovery-records-result { display: grid; gap: 6px; min-width: 0; margin: 0; }
+.recovery-records-result > div { display: grid; grid-template-columns: minmax(90px, .55fr) minmax(0, 1fr); gap: 8px; font-size: 10px; line-height: 1.4; }
+.recovery-records-result dt { color: var(--muted); }
+.recovery-records-result dd { min-width: 0; margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.recovery-records-note { margin: 2px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
 
 :root[data-appearance="light"] .drawer { background: var(--glass); box-shadow: var(--card-shadow); }
 @media (max-width: 640px) {
@@ -265,6 +309,28 @@ add-source, restore, and export drawers. */
 .upload-picker input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .upload-picker:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .upload-picker:has(input:disabled) { opacity: 0.6; cursor: default; }
+.restore-point-picker { display: grid; gap: 8px; border: 1px solid var(--hairline); border-radius: 8px; padding: 10px; background: var(--card-fill-quiet); }
+.restore-point-picker > summary { cursor: pointer; color: var(--ink); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.restore-point-picker-panel { display: grid; gap: 8px; min-width: 0; }
+.restore-point-picker-panel > p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.restore-points-error { display: grid; gap: 6px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--danger, #a33); border-radius: 8px; color: var(--danger, #a33); background: var(--card-fill-quiet); }
+.restore-points-error p { margin: 0; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.restore-points-error button { justify-self: start; width: auto; min-height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--card-fill); color: var(--ink); font-size: 11px; }
+.restore-point-error-details { margin: 0 0 8px; color: var(--muted); font-size: 11px; }
+.restore-point-error-details > summary { cursor: pointer; }
+.restore-point-error-details > p { margin: 5px 0 0; overflow-wrap: anywhere; }
+.restore-point-picker-panel > .restore-point-refresh { justify-self: start; width: auto; min-height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--card-fill); color: var(--ink); font-size: 11px; }
+.restore-point-controls { display: grid; gap: 8px; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-fill); }
+.restore-point-controls > label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; font-weight: 650; }
+.restore-point-controls input, .restore-point-controls select { width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--card-fill-quiet); color: var(--ink); font: inherit; }
+.restore-point-filter-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; color: var(--muted); font-size: 11px; }
+.restore-point-filter-status .text-button, .restore-point-selection-hidden .text-button { width: auto; min-height: 28px; padding: 3px 6px; }
+.restore-point-selection-hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--card-fill); color: var(--ink) !important; }
+.restore-point-no-matches { padding: 8px; border: 1px dashed var(--line-strong); border-radius: 7px; background: var(--card-fill); }
+.restore-point-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.restore-point-list button { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--hairline); border-radius: 7px; background: var(--card-fill); color: var(--ink); text-align: left; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.restore-point-list button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.restore-point-picker button:disabled { opacity: 0.55; }
 .upload-rows { display: grid; gap: 6px; }
 .upload-row { display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--hairline); border-radius: 7px; padding: 8px 10px; background: var(--card-fill-quiet); }
 .upload-row > svg { flex: 0 0 auto; margin-top: 2px; color: var(--health); }

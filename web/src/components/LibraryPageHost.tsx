@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef, useState } from "react";
 import type { ComponentProps, ErrorInfo, ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { ContentPreview } from "./ContentPreview";
 import { ResultList } from "./ResultList";
 import { PhotoLibraryExperience } from "./PhotoLibraryExperience";
@@ -15,6 +15,7 @@ import type { LibraryPageMode, SearchHit, ViewMode } from "../lib/types";
 import type { MusicMetadataState } from "../lib/musicMetadata";
 import type { FavoriteControls } from "../lib/favorites";
 import type { MusicQueueControls } from "../lib/musicQueueControls";
+import { downloadOriginal } from "../lib/contentDownload";
 
 export type LibraryResultProps = ComponentProps<typeof ResultList>;
 type ExhibitionProps = {
@@ -47,6 +48,12 @@ export type LibraryPageHostProps = {
   onPlayTrack?: (track: AudioTrack) => void;
   onQueueTrack?: (track: AudioTrack) => void;
   onPlayTracks?: (tracks: AudioTrack[]) => void;
+  onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove" | "invert") => void;
+  onImageSearch?: (subjectRef: string) => void;
+  onVisualTextSearch?: (description: string) => void;
+  imageSearchBusy?: boolean;
+  onDownloadOriginals?: (subjects: SearchHit[]) => void;
+  originalTakeoutBusy?: boolean;
   musicMetadata?: MusicMetadataState;
   favoriteControls?: FavoriteControls;
   musicQueueControls?: MusicQueueControls;
@@ -58,7 +65,7 @@ export type LibraryPageHostProps = {
   onNavigate?: (mode: "content" | LibraryPageMode) => void;
 };
 
-function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls }: LibraryPageHostProps) {
+function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
   return <PhotoLibraryExperience
     {...resultProps}
     onOpenHit={onOpenHit}
@@ -67,10 +74,16 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubjec
     onShowSelectionActions={onShowSelectionActions}
     loading={photoLoading}
     favoriteControls={favoriteControls}
+    onSelectSubjects={onSelectSubjects}
+    onImageSearch={onImageSearch}
+    onVisualTextSearch={onVisualTextSearch}
+    imageSearchBusy={imageSearchBusy}
+    onDownloadOriginals={onDownloadOriginals}
+    originalTakeoutBusy={originalTakeoutBusy}
   />;
 }
 
-function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls }: LibraryPageHostProps) {
+function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy }: LibraryPageHostProps) {
   return <MusicLibraryExperience
     {...resultProps}
     onPlayTrack={onPlayTrack ?? (() => undefined)}
@@ -79,6 +92,9 @@ function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, mus
     {...(musicMetadata ? { metadata: musicMetadata } : {})}
     favoriteControls={favoriteControls}
     queueControls={musicQueueControls}
+    onSelectSubjects={onSelectSubjects}
+    onDownloadOriginals={onDownloadOriginals}
+    originalTakeoutBusy={originalTakeoutBusy}
   />;
 }
 
@@ -123,7 +139,7 @@ function renderExhibition({ resultProps, onOpenHit, focusedSubjectRef, onFocusSu
   return <PhotoExhibition {...props} />;
 }
 
-function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, musicMetadata, onPlayTrack, onQueueTrack, onPlayTracks, favoriteControls }: LibraryPageHostProps) {
+function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, musicMetadata, onPlayTrack, onQueueTrack, onPlayTracks, favoriteControls, onSelectSubjects }: LibraryPageHostProps) {
   const groups = enabledLibraryPageGroups(enabledPageIds ?? allLibraryPageIds);
   const destination = (mediaClass: "image" | "audio") => {
     const group = groups.find((candidate) => candidate.root.navigationKind !== "layout" && candidate.root.mediaClass === mediaClass);
@@ -143,6 +159,7 @@ function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, mu
     musicDestination={destination("audio")}
     renderThumbnail={(hit) => renderLibraryThumbnail(hit, resultProps)}
     onToggleSelection={resultProps.onToggleSelection}
+    onSelectSubjects={onSelectSubjects}
     onOpenHit={onOpenHit}
     onNavigate={onNavigate ?? (() => undefined)}
     onPlayTrack={onPlayTrack}
@@ -244,6 +261,7 @@ export function LibraryPageHost(props: LibraryPageHostProps) {
             <button type="button" aria-pressed={photoPreviewSelected} aria-label={resultProps.t(photoPreviewSelected ? "Deselect {{name}}" : "Select {{name}}", { name: photoPreviewHit.name || resultProps.t("Untitled subject") })} disabled={photoPreviewIndex < 0 || !photoPreviewHit.subject_ref} onClick={() => photoPreviewIndex >= 0 && resultProps.onToggleSelection(photoPreviewIndex)}>{resultProps.t(photoPreviewSelected ? "Selected" : "Select")}</button>
             {props.onShowSelectionActions && resultProps.selectionRefs.length > 0 && <button type="button" onClick={showPreviewBatchActions}>{resultProps.t("Show batch actions")}</button>}
             <button type="button" onClick={() => { closePhotoPreview(false); props.onOpenHit(photoPreviewHit); }}>{resultProps.t("Details")}</button>
+            {photoPreviewHit.entry_type === "REGULAR_FILE" && photoPreviewHit.entry_id && photoPreviewHit.content_id && <button type="button" onClick={() => downloadOriginal(resultProps.workspaceID ?? "", photoPreviewHit.entry_id!, photoPreviewHit.name || "download.bin")}><Download size={16} />{resultProps.t("Download original")}</button>}
             <button type="button" aria-label={resultProps.t("Close preview")} onClick={() => closePhotoPreview()}><X size={18} /></button>
           </div>
         </header>

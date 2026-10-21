@@ -24,21 +24,58 @@ export type SelectionFlow = {
   setRovingIndex: (value: number) => void;
   selectionTagDraft: string;
   setSelectionTagDraft: Dispatch<SetStateAction<string>>;
+  selectionTagQueue: string[];
+  selectionTagQueueDraft: string;
+  setSelectionTagQueueDraft: Dispatch<SetStateAction<string>>;
   selectionSubjects: SearchHit[];
   tagActionsReady: boolean;
   tagActionsUnavailableMessage: string;
+  tagMutationProgress: SelectionTagMutationProgress | null;
+  stopSelectionTagMutation: () => void;
+  refreshSelectionTagState: () => Promise<void>;
   rovingRow: number;
   selectionTagMatchCount: (tag: string) => number;
   toggleSelectionAt: (index: number) => void;
   extendSelectionTo: (index: number) => void;
   selectAllVisible: () => void;
+  changeScopeSelection: (subjects: SearchHit[], mode: "add" | "remove" | "invert") => void;
+  invertVisibleSelection: () => void;
   clearSelection: () => void;
   applySelectionTag: () => Promise<void>;
+  addSelectionTagToQueue: () => void;
+  removeQueuedSelectionTag: (tag: string) => void;
+  clearQueuedSelectionTags: () => void;
+  applySelectionTagQueue: () => Promise<void>;
   removeSelectionTag: () => Promise<void>;
   addSelectionFavorite: () => Promise<void>;
   removeSelectionFavorite: () => Promise<void>;
   handleLibraryKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 };
+
+export type SelectionTagMutationProgress = {
+  id: number;
+  workspaceID: string;
+  subjectRefs: string[];
+  kind: "single" | "queued";
+  action: "add" | "remove" | "queued";
+  totalSubjects: number;
+  totalItemTags: number;
+  startedSubjects: number;
+  settledSubjects: number;
+  startedItemTags: number;
+  settledItemTags: number;
+  startedWrites: number;
+  changed: number;
+  unchanged: number;
+  uncertain: number;
+  currentSubject: string;
+  currentTag: string;
+  phase: "running" | "stopping" | "complete" | "stopped" | "paused" | "unknown";
+  refreshState: "none" | "required" | "refreshing" | "ready" | "unavailable";
+};
+
+type SelectionTagMutationAttempt = { id: number; workspaceID: string; stopRequested: boolean };
+type SelectionTagRefreshAttempt = { id: number; workspaceID: string };
 
 export function useSelection({ t, workspaceID, hits, renderedHits, selected, details, library, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify, libraryListRef }: {
   t: Translator;
@@ -59,9 +96,96 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
   const [selectionAnchor, setSelectionAnchor] = useState("");
   const [rovingIndex, setRovingIndex] = useState(0);
   const [selectionTagDraft, setSelectionTagDraft] = useState("");
+  const [selectionTagQueue, setSelectionTagQueue] = useState<string[]>([]);
+  const [selectionTagQueueDraft, setSelectionTagQueueDraft] = useState("");
+  const [tagMutationProgress, setTagMutationProgress] = useState<SelectionTagMutationProgress | null>(null);
   const currentWorkspaceID = useRef(workspaceID);
   currentWorkspaceID.current = workspaceID;
-  const tagMutationInFlight = useRef(false);
+  const tagMutationAttemptRef = useRef<SelectionTagMutationAttempt | null>(null);
+  const tagMutationSequence = useRef(0);
+  const tagRefreshAttemptRef = useRef<SelectionTagRefreshAttempt | null>(null);
+  const tagRefreshSequence = useRef(0);
+
+  function beginTagMutation(kind: "single" | "queued", action: "add" | "remove" | "queued", subjectCount: number, tagCount: number, subjectRefs: string[]) {
+    const attempt: SelectionTagMutationAttempt = { id: ++tagMutationSequence.current, workspaceID, stopRequested: false };
+    tagMutationAttemptRef.current = attempt;
+    setTagMutationProgress({
+      id: attempt.id, workspaceID, subjectRefs: [...subjectRefs], kind, action, totalSubjects: subjectCount, totalItemTags: subjectCount * tagCount,
+      startedSubjects: 0, settledSubjects: 0, startedItemTags: 0, settledItemTags: 0, startedWrites: 0,
+      changed: 0, unchanged: 0, uncertain: 0, currentSubject: "", currentTag: "", phase: "running", refreshState: "none",
+    });
+    setBusy(true);
+    return attempt;
+  }
+
+  function isCurrentTagMutation(attempt: SelectionTagMutationAttempt) {
+    return tagMutationAttemptRef.current === attempt && currentWorkspaceID.current === attempt.workspaceID;
+  }
+
+  function publishTagProgress(attempt: SelectionTagMutationAttempt, patch: Partial<SelectionTagMutationProgress>) {
+    if (!isCurrentTagMutation(attempt)) return;
+    const requestedPhase = patch.phase;
+    const terminalPhase = requestedPhase === "stopped" || requestedPhase === "unknown" || requestedPhase === "paused" || requestedPhase === "complete";
+    setTagMutationProgress((current) => current?.id === attempt.id
+      ? { ...current, ...patch, phase: attempt.stopRequested && !terminalPhase ? "stopping" : (patch.phase ?? current.phase) }
+      : current);
+  }
+
+  function stopSelectionTagMutation() {
+    const attempt = tagMutationAttemptRef.current;
+    if (!attempt || attempt.stopRequested) return;
+    attempt.stopRequested = true;
+    publishTagProgress(attempt, { phase: "stopping" });
+  }
+
+  async function refreshSelectionTagState() {
+    const progress = tagMutationProgress;
+    if (!progress || progress.workspaceID !== workspaceID || progress.refreshState === "refreshing" || tagMutationAttemptRef.current) return;
+    const activeWorkspaceID = workspaceID;
+    const attempt: SelectionTagRefreshAttempt = { id: ++tagRefreshSequence.current, workspaceID: activeWorkspaceID };
+    if (tagRefreshAttemptRef.current) return;
+    tagRefreshAttemptRef.current = attempt;
+    const capturedRefs = [...progress.subjectRefs];
+    setTagMutationProgress((current) => current?.id === progress.id ? { ...current, refreshState: "refreshing" } : current);
+    setBusy(true);
+    try {
+      const result = await library.reloadTagVocabulary(activeWorkspaceID);
+      if (tagRefreshAttemptRef.current !== attempt || currentWorkspaceID.current !== activeWorkspaceID) return;
+      if (result.status === "ready" && result.workspaceID === activeWorkspaceID) {
+        for (const subjectRef of capturedRefs) library.syncTagCoverage(subjectRef, result.records);
+        setTagMutationProgress((current) => current?.id === progress.id ? { ...current, refreshState: "ready" } : current);
+      } else {
+        setTagMutationProgress((current) => current?.id === progress.id ? { ...current, refreshState: "unavailable" } : current);
+      }
+    } catch {
+      if (tagRefreshAttemptRef.current === attempt && currentWorkspaceID.current === activeWorkspaceID) {
+        setTagMutationProgress((current) => current?.id === progress.id ? { ...current, refreshState: "unavailable" } : current);
+      }
+    } finally {
+      if (tagRefreshAttemptRef.current === attempt) {
+        tagRefreshAttemptRef.current = null;
+        setBusy(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    const activeMutation = tagMutationAttemptRef.current;
+    if (activeMutation && activeMutation.workspaceID !== workspaceID) {
+      tagMutationAttemptRef.current = null;
+      setTagMutationProgress(null);
+      setBusy(false);
+    }
+    const activeRefresh = tagRefreshAttemptRef.current;
+    if (activeRefresh && activeRefresh.workspaceID !== workspaceID) {
+      tagRefreshAttemptRef.current = null;
+      setTagMutationProgress(null);
+      setBusy(false);
+    }
+    setTagMutationProgress(null);
+    setSelectionTagQueue([]);
+    setSelectionTagQueueDraft("");
+  }, [workspaceID]);
 
   const selectionSubjects = useMemo(() => {
     const byRef = new Map<string, SearchHit>();
@@ -113,7 +237,55 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     setSelectionRefs(refs);
     setSelectionAnchor(refs.at(-1) ?? "");
   }
-  function clearSelection() { setSelectionRefs([]); setSelectionAnchor(""); }
+  function changeScopeSelection(subjects: SearchHit[], mode: "add" | "remove" | "invert") {
+    // Only stable subject references that are present in the currently loaded
+    // result set can participate. Names and provenance paths never identify a
+    // selection.
+    const loadedRefs = new Set(hits.map((hit) => hit.subject_ref?.trim() ?? "").filter(Boolean));
+    const scopeRefs = [...new Set(subjects
+      .map((hit) => hit.subject_ref?.trim() ?? "")
+      .filter((subjectRef) => Boolean(subjectRef) && loadedRefs.has(subjectRef)))];
+    if (!scopeRefs.length) return;
+    const scope = new Set(scopeRefs);
+    setSelectionRefs((current) => {
+      const next = new Set(current);
+      for (const subjectRef of scopeRefs) {
+        if (mode === "remove") {
+          next.delete(subjectRef);
+        } else if (mode === "add") {
+          next.add(subjectRef);
+        } else if (next.has(subjectRef)) {
+          next.delete(subjectRef);
+        } else {
+          next.add(subjectRef);
+        }
+      }
+      return [...next];
+    });
+
+    // Keep a useful range anchor within the changed scope when possible;
+    // otherwise preserve the existing anchor if it remains selected.
+    setSelectionAnchor((currentAnchor) => {
+      const currentlySelected = new Set(selectionRefs);
+      for (const subjectRef of scopeRefs) {
+        if (mode === "remove") currentlySelected.delete(subjectRef);
+        else if (mode === "add") currentlySelected.add(subjectRef);
+        else if (currentlySelected.has(subjectRef)) currentlySelected.delete(subjectRef);
+        else currentlySelected.add(subjectRef);
+      }
+      const preferred = [...scopeRefs].reverse().find((subjectRef) => currentlySelected.has(subjectRef));
+      if (preferred) return preferred;
+      if (currentAnchor && !scope.has(currentAnchor) && currentlySelected.has(currentAnchor)) return currentAnchor;
+      return selectionRefs.filter((subjectRef) => currentlySelected.has(subjectRef)).at(-1) ?? "";
+    });
+  }
+  function invertVisibleSelection() { changeScopeSelection(renderedHits, "invert"); }
+  function clearSelection() {
+    setSelectionRefs([]); setSelectionAnchor("");
+    // Clearing a finished batch also dismisses its transient receipt. During
+    // a write or refresh the progress/Stop controls must remain reachable.
+    if (!tagMutationAttemptRef.current && !tagRefreshAttemptRef.current) setTagMutationProgress(null);
+  }
 
   // One tab stop for the whole list, with a roving tabindex: arrow keys move
   // focus between the tiles, Space toggles the focused tile, Enter opens its
@@ -196,20 +368,27 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     return parseCompleteSubjectAnnotations(response.data?.annotations, activeWorkspaceID, subjectRef);
   }
 
-  async function runSelectionTagMutation(rawBody: string, action: "add" | "remove") {
-    const body = rawBody.trim();
+  function prepareSelectionTagMutation(hasInput: boolean): { operationWorkspaceID: string; targets: Array<SearchHit & { subject_ref: string }>; capturedRefs: string[] } | undefined {
+    if (!hasInput) return;
     const operationWorkspaceID = workspaceID;
     const targets = selectionSubjects.map((hit) => ({ ...hit, subject_ref: hit.subject_ref?.trim() ?? "" }));
     const capturedRefs = [...selectionRefs];
-    if (!body || !operationWorkspaceID || targets.length === 0) return;
+    if (!operationWorkspaceID || targets.length === 0) return;
     if (!annotationStorageReady) { notify({ kind: "error", text: catalogStorageMessage }); return; }
     if (!tagSnapshotReady || !selectionResolved || capturedRefs.length !== targets.length) {
       notify({ kind: "warning", text: !tagSnapshotReady ? t("Tags and favorites could not be read. Retry before editing them.") : t("Some selected items are unavailable in this result scope. Batch tag actions are paused.") });
       return;
     }
-    if (tagMutationInFlight.current) return;
-    tagMutationInFlight.current = true;
-    setBusy(true);
+    if (tagMutationAttemptRef.current || tagRefreshAttemptRef.current) return;
+    return { operationWorkspaceID, targets, capturedRefs };
+  }
+
+  async function runSelectionTagMutation(rawBody: string, action: "add" | "remove") {
+    const body = rawBody.trim();
+    const prepared = prepareSelectionTagMutation(Boolean(body));
+    if (!prepared) return;
+    const { operationWorkspaceID, targets } = prepared;
+    const attempt = beginTagMutation("single", action, targets.length, 1, targets.map((hit) => hit.subject_ref));
     notify({ kind: "warning", text: action === "add"
       ? t("Checking {{count}} selected items before adding tag {{tag}}.", { count: targets.length, tag: body })
       : t("Checking {{count}} selected items before removing tag {{tag}}.", { count: targets.length, tag: body }) });
@@ -218,18 +397,54 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     const unchangedRefs = new Set<string>();
     const failures: Array<{ name: string; message: string }> = [];
     const degradedRefs = new Set<string>();
+    const degradedMessages: string[] = [];
     const uncertainRefs = new Set<string>();
+    const progressCounts = { startedSubjects: 0, settledSubjects: 0, startedWrites: 0 };
+    const publishProgress = (currentSubject = "") => publishTagProgress(attempt, {
+      ...progressCounts,
+      startedItemTags: progressCounts.startedSubjects,
+      settledItemTags: progressCounts.settledSubjects,
+      changed: changedRefs.size,
+      unchanged: unchangedRefs.size,
+      uncertain: uncertainRefs.size,
+      currentSubject,
+      currentTag: body,
+    });
     const confirmedAnnotations = new Map<string, AnnotationRecord[]>();
     const visitedRefs = new Set<string>();
     const attemptedRefs = new Set<string>();
     let stopAfterUnknownMutation = false;
     let anyMutationAttempted = false;
+    let omittedDegradedMessages = false;
+    function recordDegradedResponse(
+      subjectRef: string,
+      label: string,
+      response: { status?: string; reasons?: Array<{ message?: string }> },
+    ) {
+      if (response.status === "SUCCEEDED") return;
+      degradedRefs.add(subjectRef);
+      const messages = response.reasons?.map((reason) => reason.message?.trim()).filter((message): message is string => Boolean(message)) ?? [];
+      if (messages.length === 0) messages.push(t("A saved change needs follow-up."));
+      for (const message of messages) {
+        const localizedMessage = t(message);
+        const boundedMessage = localizedMessage.length > 240 ? `${localizedMessage.slice(0, 240)}…` : localizedMessage;
+        const summary = t("{{name}}: {{reason}}", { name: label.slice(0, 120), reason: boundedMessage });
+        if (degradedMessages.includes(summary)) continue;
+        if (degradedMessages.length >= 3) {
+          omittedDegradedMessages = true;
+          break;
+        }
+        degradedMessages.push(summary);
+      }
+    }
     try {
       for (const hit of targets) {
-        if (currentWorkspaceID.current !== operationWorkspaceID) break;
+        if (!isCurrentTagMutation(attempt) || attempt.stopRequested) break;
         const subjectRef = hit.subject_ref;
-        if (subjectRef) visitedRefs.add(subjectRef);
         const label = hit.name?.trim() || subjectRef || t("Untitled subject");
+        progressCounts.startedSubjects += 1;
+        publishProgress(label);
+        if (subjectRef) visitedRefs.add(subjectRef);
         if (!subjectRef) {
           failures.push({ name: label, message: t("This item has no stable subject reference.") });
           continue;
@@ -238,23 +453,28 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
         try {
           before = await readCompleteSubjectAnnotations(operationWorkspaceID, subjectRef);
         } catch (error) {
-          if (currentWorkspaceID.current !== operationWorkspaceID) break;
+          if (!isCurrentTagMutation(attempt)) break;
           failures.push({ name: label, message: error instanceof Error ? error.message : t("The complete tag and note list is unavailable; nothing was changed for this item.") });
           continue;
         }
+        if (!isCurrentTagMutation(attempt) || attempt.stopRequested) break;
         const matches = before.filter((record) => record.kind === "TAG" && record.body?.trim() === body);
         if ((action === "add" && matches.length > 0) || (action === "remove" && matches.length === 0)) {
           unchangedRefs.add(subjectRef);
           confirmedAnnotations.set(subjectRef, before);
+          progressCounts.settledSubjects += 1;
+          publishProgress();
           continue;
         }
 
         let mutationOutcomeUnknown = false;
         try {
           if (action === "add") {
-            if (currentWorkspaceID.current !== operationWorkspaceID) break;
+            if (!isCurrentTagMutation(attempt) || attempt.stopRequested) break;
             anyMutationAttempted = true;
             attemptedRefs.add(subjectRef);
+            progressCounts.startedWrites += 1;
+            publishProgress(label);
             const response = await command(operations.annotation.upsert, {
               workspace_id: operationWorkspaceID,
               subject_ref: subjectRef,
@@ -262,10 +482,10 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
               body,
               expected_revision: 0,
             });
-            if (response.status !== "SUCCEEDED") degradedRefs.add(subjectRef);
+            recordDegradedResponse(subjectRef, label, response);
           } else {
             for (const annotation of matches) {
-              if (currentWorkspaceID.current !== operationWorkspaceID) break;
+              if (!isCurrentTagMutation(attempt) || attempt.stopRequested) break;
               const annotationID = annotation.annotation_id?.trim() ?? "";
               const expectedRevision = annotation.revision;
               if (!annotationID || !Number.isSafeInteger(expectedRevision) || (expectedRevision ?? 0) < 1) {
@@ -273,16 +493,18 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
               }
               anyMutationAttempted = true;
               attemptedRefs.add(subjectRef);
+              progressCounts.startedWrites += 1;
+              publishProgress(label);
               const response = await command(operations.annotation.delete, {
                 workspace_id: operationWorkspaceID,
                 annotation_id: annotationID,
                 expected_revision: expectedRevision,
               });
-              if (response.status !== "SUCCEEDED") degradedRefs.add(subjectRef);
+              recordDegradedResponse(subjectRef, label, response);
             }
           }
         } catch (error) {
-          if (currentWorkspaceID.current !== operationWorkspaceID) break;
+          if (!isCurrentTagMutation(attempt)) break;
           mutationOutcomeUnknown = anyMutationAttempted;
           const reason = error instanceof Error ? error.message : t("The tag write outcome could not be confirmed.");
           // A write transport/refusal answer may not prove whether bytes of the
@@ -306,13 +528,15 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
                 : reason });
             }
             if (mutationOutcomeUnknown) uncertainRefs.add(subjectRef);
+            progressCounts.settledSubjects += 1;
+            publishProgress();
           } else {
             failures.push({ name: label, message: t("The tag write outcome is unknown because the current tag and note list could not be read: {{reason}}", { reason }) });
           }
           if (mutationOutcomeUnknown) { stopAfterUnknownMutation = true; break; }
           continue;
         }
-        if (currentWorkspaceID.current !== operationWorkspaceID) break;
+        if (!isCurrentTagMutation(attempt)) break;
         try {
           const after = await readCompleteSubjectAnnotations(operationWorkspaceID, subjectRef);
           confirmedAnnotations.set(subjectRef, after);
@@ -325,8 +549,10 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
               : t("The tag list did not confirm the requested change.") });
           }
           else changedRefs.add(subjectRef);
+          progressCounts.settledSubjects += 1;
+          publishProgress();
         } catch (error) {
-          if (currentWorkspaceID.current !== operationWorkspaceID) break;
+          if (!isCurrentTagMutation(attempt)) break;
           failures.push({ name: label, message: t("The tag write was sent, but its result could not be confirmed: {{reason}}", { reason: error instanceof Error ? error.message : t("The tag write outcome could not be confirmed.") }) });
           stopAfterUnknownMutation = true;
           break;
@@ -334,7 +560,7 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
         if (stopAfterUnknownMutation) break;
       }
 
-      if (currentWorkspaceID.current !== operationWorkspaceID) return;
+      if (!isCurrentTagMutation(attempt)) return;
       if (stopAfterUnknownMutation) {
         for (const hit of targets) {
           const subjectRef = hit.subject_ref;
@@ -344,7 +570,7 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
         }
       }
       const reread = await library.reloadTagVocabulary(operationWorkspaceID);
-      if (currentWorkspaceID.current !== operationWorkspaceID) return;
+      if (!isCurrentTagMutation(attempt)) return;
       if (reread.status === "ready" && reread.workspaceID === operationWorkspaceID) {
         for (const subjectRef of visitedRefs) library.syncTagCoverage(subjectRef, reread.records);
       } else {
@@ -357,13 +583,19 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
       }
       if (anyMutationAttempted) {
         await refreshCapabilities();
-        if (currentWorkspaceID.current !== operationWorkspaceID) return;
+        if (!isCurrentTagMutation(attempt)) return;
       }
+      const finalPhase = stopAfterUnknownMutation || uncertainRefs.size > 0 ? "unknown" : attempt.stopRequested ? "stopped" : failures.length || degradedRefs.size ? "paused" : "complete";
+      publishTagProgress(attempt, { phase: finalPhase, refreshState: reread.status === "ready" && reread.workspaceID === operationWorkspaceID ? "ready" : "unavailable", currentSubject: "", currentTag: "" });
 
       const failureText = failures.map((failure) => `${failure.name}: ${failure.message}`).join("; ");
+      const degradedText = [
+        ...degradedMessages,
+        ...(omittedDegradedMessages ? [t("Additional degraded item reasons were omitted.")] : []),
+      ].join("; ");
       const completed = changedRefs.size + unchangedRefs.size;
       const actionLabel = action === "add" ? t("added") : t("removed");
-      if (failures.length === 0 && degradedRefs.size === 0 && uncertainRefs.size === 0) {
+      if (!attempt.stopRequested && failures.length === 0 && degradedRefs.size === 0 && uncertainRefs.size === 0) {
         if (action === "add") setSelectionTagDraft((currentDraft) => currentDraft.trim() === body ? "" : currentDraft);
         notify({ kind: "success", text: action === "add"
           ? t("Tag \"{{tag}}\" is present on all {{count}} selected items ({{changed}} added; {{unchanged}} already present).", { tag: body, count: targets.length, changed: changedRefs.size, unchanged: unchangedRefs.size })
@@ -376,20 +608,258 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
           total: targets.length,
           degraded: degradedRefs.size,
           uncertain: uncertainRefs.size,
-          failures: failureText || (degradedRefs.size > 0
-            ? t("No per-item failures were reported, but the daemon reported degraded search indexing.")
+          failures: [failureText, degradedText].filter(Boolean).join("; ") || (degradedRefs.size > 0
+            ? t("No per-item failures were reported, but saved changes need follow-up.")
+            : attempt.stopRequested
+              ? t("Stopped after the current operation; remaining items were not started.")
             : t("Some write responses were uncertain; the current tags were checked again.")),
         }) });
       }
     } catch (error) {
+      publishTagProgress(attempt, { phase: uncertainRefs.size ? "unknown" : "paused", refreshState: "unavailable", currentSubject: "", currentTag: "" });
       if (currentWorkspaceID.current === operationWorkspaceID) {
         notify({ kind: "warning", text: t("Tag batch follow-up could not be completed: {{reason}}", {
           reason: error instanceof Error ? error.message : t("The tag write outcome could not be confirmed."),
         }) });
       }
     } finally {
-      tagMutationInFlight.current = false;
-      setBusy(false);
+      if (isCurrentTagMutation(attempt)) {
+        tagMutationAttemptRef.current = null;
+        setBusy(false);
+      }
+    }
+  }
+
+  function addSelectionTagToQueue() {
+    if (tagMutationAttemptRef.current || tagRefreshAttemptRef.current) return;
+    const body = selectionTagQueueDraft.trim();
+    if (!body) return;
+    if (!tagActionsReady) {
+      notify({ kind: "warning", text: tagActionsUnavailableMessage || t("Tags and favorites could not be read. Retry before editing them.") });
+      return;
+    }
+    if (selectionTagQueue.includes(body)) {
+      notify({ kind: "warning", text: t("Tag {{tag}} is already in the pending list.", { tag: body }) });
+      return;
+    }
+    if (selectionTagQueue.length >= 20) {
+      notify({ kind: "warning", text: t("You can queue up to {{count}} tags at a time.", { count: 20 }) });
+      return;
+    }
+    // A tag is one exact string. In particular, commas are never separators.
+    setSelectionTagQueue((current) => current.length < 20 && !current.includes(body) ? [...current, body] : current);
+    setSelectionTagQueueDraft("");
+  }
+
+  function removeQueuedSelectionTag(tag: string) {
+    if (tagMutationAttemptRef.current || tagRefreshAttemptRef.current) return;
+    setSelectionTagQueue((current) => current.filter((value) => value !== tag));
+  }
+
+  function clearQueuedSelectionTags() {
+    if (tagMutationAttemptRef.current || tagRefreshAttemptRef.current) return;
+    setSelectionTagQueue([]);
+  }
+
+  async function applySelectionTagQueue() {
+    const tags = [...selectionTagQueue];
+    const prepared = prepareSelectionTagMutation(tags.length > 0);
+    if (!prepared) return;
+    const { operationWorkspaceID, targets, capturedRefs } = prepared;
+    const attempt = beginTagMutation("queued", "queued", targets.length, tags.length, targets.map((hit) => hit.subject_ref));
+    const progressCounts = { startedSubjects: 0, settledSubjects: 0, startedItemTags: 0, settledItemTags: 0, startedWrites: 0 };
+    notify({ kind: "warning", text: t("Checking {{tags}} queued tags across {{count}} selected items.", { tags: tags.length, count: targets.length }) });
+
+    const changedByTag = new Map<string, Set<string>>(tags.map((tag) => [tag, new Set<string>()] as const));
+    const unchangedByTag = new Map<string, Set<string>>(tags.map((tag) => [tag, new Set<string>()] as const));
+    const visitedRefs = new Set<string>();
+    const failures: Array<{ name: string; message: string }> = [];
+    const degradedSubjects = new Set<string>();
+    const uncertainSubjects = new Set<string>();
+    const degradedMessages: string[] = [];
+    const confirmedAnnotations = new Map<string, AnnotationRecord[]>();
+    const publishProgress = (currentSubject = "", currentTag = "") => publishTagProgress(attempt, {
+      ...progressCounts,
+      changed: [...changedByTag.values()].reduce((sum, refs) => sum + refs.size, 0),
+      unchanged: [...unchangedByTag.values()].reduce((sum, refs) => sum + refs.size, 0),
+      uncertain: uncertainSubjects.size,
+      currentSubject,
+      currentTag,
+    });
+    let anyMutationAttempted = false;
+    let stopFurtherWrites = false;
+    let omittedDegradedMessages = false;
+
+    function recordDegradedResponse(subjectRef: string, label: string, response: { status?: string; reasons?: Array<{ message?: string }> }) {
+      if (response.status === "SUCCEEDED") return;
+      degradedSubjects.add(subjectRef);
+      const messages = response.reasons?.map((reason) => reason.message?.trim()).filter((message): message is string => Boolean(message)) ?? [];
+      if (messages.length === 0) messages.push(t("A saved change needs follow-up."));
+      for (const message of messages) {
+        const localized = t(message);
+        const bounded = localized.length > 240 ? `${localized.slice(0, 240)}…` : localized;
+        const summary = t("{{name}}: {{reason}}", { name: label.slice(0, 120), reason: bounded });
+        if (degradedMessages.includes(summary)) continue;
+        if (degradedMessages.length >= 3) { omittedDegradedMessages = true; break; }
+        degradedMessages.push(summary);
+      }
+    }
+
+    try {
+      for (const hit of targets) {
+        if (!isCurrentTagMutation(attempt)) return;
+        if (attempt.stopRequested) break;
+        const subjectRef = hit.subject_ref;
+        const subjectStartedBefore = progressCounts.startedItemTags;
+        const subjectSettledBefore = progressCounts.settledItemTags;
+        progressCounts.startedSubjects += 1;
+        const label = hit.name?.trim() || subjectRef || t("Untitled subject");
+        publishProgress(label);
+        if (!subjectRef) {
+          failures.push({ name: label, message: t("This item has no stable subject reference.") });
+          stopFurtherWrites = true;
+          break;
+        }
+        visitedRefs.add(subjectRef);
+        let currentAnnotations: AnnotationRecord[];
+        try {
+          currentAnnotations = await readCompleteSubjectAnnotations(operationWorkspaceID, subjectRef);
+        } catch (error) {
+          if (!isCurrentTagMutation(attempt)) return;
+          failures.push({ name: label, message: error instanceof Error ? error.message : t("The complete tag and note list is unavailable; nothing was changed for this item.") });
+          stopFurtherWrites = true;
+          break;
+        }
+        if (!isCurrentTagMutation(attempt)) return;
+        if (attempt.stopRequested) break;
+
+        for (const tag of tags) {
+          if (!isCurrentTagMutation(attempt)) return;
+          if (attempt.stopRequested) break;
+          progressCounts.startedItemTags += 1;
+          publishProgress(label, tag);
+          const matches = currentAnnotations.filter((record) => record.kind === "TAG" && record.body?.trim() === tag);
+          if (matches.length > 0) {
+            unchangedByTag.get(tag)?.add(subjectRef);
+            progressCounts.settledItemTags += 1;
+            publishProgress(label, tag);
+            continue;
+          }
+
+          let response: { status?: string; reasons?: Array<{ message?: string }> };
+          try {
+            anyMutationAttempted = true;
+            progressCounts.startedWrites += 1;
+            publishProgress(label, tag);
+            response = await command(operations.annotation.upsert, {
+              workspace_id: operationWorkspaceID,
+              subject_ref: subjectRef,
+              kind: "TAG",
+              body: tag,
+              expected_revision: 0,
+            });
+          } catch (error) {
+            if (!isCurrentTagMutation(attempt)) return;
+            const reason = error instanceof Error ? error.message : t("The tag write outcome could not be confirmed.");
+            try {
+              const observed = await readCompleteSubjectAnnotations(operationWorkspaceID, subjectRef);
+              confirmedAnnotations.set(subjectRef, observed);
+              currentAnnotations = observed;
+              uncertainSubjects.add(subjectRef);
+              if (observed.some((record) => record.kind === "TAG" && record.body?.trim() === tag)) {
+                changedByTag.get(tag)?.add(subjectRef);
+              } else {
+                failures.push({ name: label, message: reason });
+              }
+              progressCounts.settledItemTags += 1;
+            } catch {
+              failures.push({ name: label, message: t("The tag write outcome is unknown because the current tag and note list could not be read: {{reason}}", { reason }) });
+            }
+            publishProgress(label, tag);
+            stopFurtherWrites = true;
+            break;
+          }
+          recordDegradedResponse(subjectRef, label, response);
+          try {
+            const after = await readCompleteSubjectAnnotations(operationWorkspaceID, subjectRef);
+            confirmedAnnotations.set(subjectRef, after);
+            currentAnnotations = after;
+            if (after.some((record) => record.kind === "TAG" && record.body?.trim() === tag)) {
+              changedByTag.get(tag)?.add(subjectRef);
+            } else {
+              failures.push({ name: label, message: t("The tag list did not confirm the requested change.") });
+              stopFurtherWrites = true;
+            }
+            progressCounts.settledItemTags += 1;
+            publishProgress(label, tag);
+            if (stopFurtherWrites) break;
+          } catch (error) {
+            if (!isCurrentTagMutation(attempt)) return;
+            failures.push({ name: label, message: t("The tag write was sent, but its result could not be confirmed: {{reason}}", { reason: error instanceof Error ? error.message : t("The tag write outcome could not be confirmed.") }) });
+            stopFurtherWrites = true;
+            break;
+          }
+          // A degraded response may represent a saved write with unfinished
+          // follow-up. Readback above records its state; pause the rest of this
+          // batch so it can be reconciled before another tag is written.
+          if (response.status !== "SUCCEEDED") {
+            stopFurtherWrites = true;
+            break;
+          }
+        }
+        if (progressCounts.startedItemTags - subjectStartedBefore === tags.length
+          && progressCounts.settledItemTags - subjectSettledBefore === tags.length) progressCounts.settledSubjects += 1;
+        publishProgress();
+        if (stopFurtherWrites) break;
+      }
+
+      if (!isCurrentTagMutation(attempt)) return;
+      if (stopFurtherWrites) {
+        for (const subjectRef of capturedRefs) {
+          if (!visitedRefs.has(subjectRef)) failures.push({ name: subjectRef, message: t("Not attempted because an earlier tag write needed reconciliation.") });
+        }
+      }
+      const reread = await library.reloadTagVocabulary(operationWorkspaceID);
+      if (!isCurrentTagMutation(attempt)) return;
+      if (reread.status === "ready" && reread.workspaceID === operationWorkspaceID) {
+        for (const subjectRef of visitedRefs) library.syncTagCoverage(subjectRef, reread.records);
+      } else {
+        failures.push({ name: t("Tag coverage"), message: t("Tags and favorites could not be reread after the batch action.") });
+      }
+      const detailRef = selected?.subject_ref?.trim() ?? "";
+      const detailAnnotations = detailRef ? confirmedAnnotations.get(detailRef) : undefined;
+      if (details.detailSubjectRef.current === detailRef && detailRef && detailAnnotations) details.setAnnotations(detailAnnotations);
+      if (anyMutationAttempted) {
+        await refreshCapabilities();
+        if (!isCurrentTagMutation(attempt)) return;
+      }
+      const finalPhase = stopFurtherWrites || uncertainSubjects.size ? "unknown" : attempt.stopRequested ? "stopped" : failures.length || degradedSubjects.size ? "paused" : "complete";
+      publishTagProgress(attempt, { phase: finalPhase, refreshState: reread.status === "ready" && reread.workspaceID === operationWorkspaceID ? "ready" : "unavailable", currentSubject: "", currentTag: "" });
+
+      const completed = tags.reduce((sum, tag) => sum + (changedByTag.get(tag)?.size ?? 0) + (unchangedByTag.get(tag)?.size ?? 0), 0);
+      const total = tags.length * targets.length;
+      const failed = failures.length > 0 || degradedSubjects.size > 0 || uncertainSubjects.size > 0 || stopFurtherWrites || attempt.stopRequested;
+      if (!failed) {
+        setSelectionTagQueue((current) => current.length === tags.length && current.every((tag, index) => tag === tags[index]) ? [] : current);
+        notify({ kind: "success", text: t("Applied {{tagCount}} queued tags: {{completed}} of {{total}} item-tag changes confirmed.", { tagCount: tags.length, completed, total }) });
+      } else {
+        const failureText = failures.map((failure) => `${failure.name}: ${failure.message}`).join("; ");
+        const degradedText = [...degradedMessages, ...(omittedDegradedMessages ? [t("Additional degraded item reasons were omitted.")] : [])].join("; ");
+        const pauseText = attempt.stopRequested
+          ? t("Stopped after the current operation; remaining item-tag changes were not started.")
+          : stopFurtherWrites ? t("Further writes stopped after an uncertain or incomplete operation; readback results are shown in the confirmed count.") : "";
+        notify({ kind: "warning", text: t("Queued tags were applied to {{completed}} of {{total}} item-tag changes before the batch paused. {{failures}}", { completed, total, failures: [failureText, degradedText, pauseText].filter(Boolean).join("; ") }) });
+      }
+    } catch (error) {
+      publishTagProgress(attempt, { phase: uncertainSubjects.size ? "unknown" : "paused", refreshState: "unavailable", currentSubject: "", currentTag: "" });
+      if (currentWorkspaceID.current === operationWorkspaceID) {
+        notify({ kind: "warning", text: t("Tag batch follow-up could not be completed: {{reason}}", { reason: error instanceof Error ? error.message : t("The tag write outcome could not be confirmed.") }) });
+      }
+    } finally {
+      if (isCurrentTagMutation(attempt)) {
+        tagMutationAttemptRef.current = null;
+        setBusy(false);
+      }
     }
   }
 
@@ -407,7 +877,13 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     setRovingIndex,
     selectionTagDraft,
     setSelectionTagDraft,
+    selectionTagQueue,
+    selectionTagQueueDraft,
+    setSelectionTagQueueDraft,
     selectionSubjects,
+    tagMutationProgress,
+    stopSelectionTagMutation,
+    refreshSelectionTagState,
     tagActionsReady,
     tagActionsUnavailableMessage,
     rovingRow,
@@ -415,8 +891,14 @@ export function useSelection({ t, workspaceID, hits, renderedHits, selected, det
     toggleSelectionAt,
     extendSelectionTo,
     selectAllVisible,
+    changeScopeSelection,
+    invertVisibleSelection,
     clearSelection,
     applySelectionTag,
+    addSelectionTagToQueue,
+    removeQueuedSelectionTag,
+    clearQueuedSelectionTags,
+    applySelectionTagQueue,
     removeSelectionTag,
     addSelectionFavorite,
     removeSelectionFavorite,

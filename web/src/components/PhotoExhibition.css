@@ -77,6 +77,8 @@
 }
 .photo-exhibition__return { grid-column: 2; grid-row: 1 / span 3; white-space: nowrap; }
 .photo-exhibition__return svg { width: 16px; height: 16px; }
+.photo-exhibition__header-actions { grid-column: 2; grid-row: 1 / span 3; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.photo-exhibition__header-actions .photo-exhibition__return { grid-column: auto; grid-row: auto; }
 .photo-exhibition__return:hover,
 .photo-exhibition__controls button:hover,
 .photo-exhibition__empty button:hover,
@@ -85,6 +87,59 @@
   border-color: color-mix(in srgb, var(--exhibition-accent) 70%, white);
   background: #ffffff17;
 }
+
+.photo-exhibition__slideshow {
+  display: flex;
+  max-width: 1320px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 14px auto 0;
+  border: 1px solid var(--exhibition-line);
+  border-radius: 14px;
+  padding: 11px 14px;
+  background: #0002;
+}
+.photo-exhibition__slideshow-heading { display: grid; gap: 3px; }
+.photo-exhibition__slideshow-heading strong { color: var(--exhibition-ink); font-size: 14px; }
+.photo-exhibition__slideshow-heading span { color: var(--exhibition-muted); font-size: 11px; }
+.photo-exhibition__slideshow-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.photo-exhibition__slideshow-controls label { display: inline-flex; align-items: center; gap: 7px; color: var(--exhibition-muted); font-size: 12px; }
+.photo-exhibition__slideshow-controls select {
+  min-height: 40px;
+  border: 1px solid var(--exhibition-line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: #111820d9;
+  color: var(--exhibition-ink);
+  font: inherit;
+}
+.photo-exhibition__slideshow-controls .photo-exhibition__loop { min-height: 40px; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; cursor: pointer; }
+.photo-exhibition__loop input { width: 16px; height: 16px; accent-color: var(--exhibition-accent); }
+.photo-exhibition__loop svg { width: 15px; height: 15px; }
+.photo-exhibition__slideshow-controls button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--exhibition-line);
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: var(--exhibition-panel);
+  color: var(--exhibition-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.photo-exhibition__slideshow-controls button svg { width: 16px; height: 16px; }
+.photo-exhibition__slideshow-controls .photo-exhibition__slideshow-toggle { border-color: color-mix(in srgb, var(--exhibition-accent) 65%, transparent); background: color-mix(in srgb, var(--exhibition-accent) 18%, transparent); color: var(--exhibition-ink); font-weight: 650; }
+.photo-exhibition__slideshow-controls button:disabled { opacity: .45; cursor: default; }
+.photo-exhibition__slideshow-controls button:hover:not(:disabled) { border-color: var(--exhibition-accent); background: #ffffff17; }
+.photo-exhibition__slideshow-notice { width: 100%; margin: 0; color: var(--exhibition-muted); font-size: 12px; }
+.photo-exhibition__immersive-exit { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; border: 1px solid var(--exhibition-line); border-radius: 999px; padding: 7px 12px; background: var(--exhibition-panel); color: var(--exhibition-ink); font: inherit; cursor: pointer; }
+.photo-exhibition__immersive-exit svg { width: 16px; height: 16px; }
 
 .photo-exhibition__stage {
   position: relative;
@@ -279,7 +334,29 @@
   background: #0003;
   color: var(--exhibition-ink);
 }
+.photo-exhibition.is-immersive {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 0;
+  padding: clamp(12px, 2vh, 24px) clamp(12px, 3vw, 36px);
+  isolation: isolate;
+}
+.photo-exhibition.is-immersive .photo-exhibition__header { width: 100%; }
+.photo-exhibition.is-immersive .photo-exhibition__slideshow { width: min(100%, 1320px); margin-top: 10px; }
+.photo-exhibition.is-immersive .photo-exhibition__stage { flex: 1 0 200px; width: min(100%, 1500px); height: auto; min-height: 200px; max-height: 70vh; }
+.photo-exhibition.is-immersive .photo-exhibition__footer { flex-shrink: 0; margin-bottom: 4px; }
+.photo-exhibition.is-immersive .photo-exhibition__header-actions { gap: 6px; }
 .photo-exhibition button:focus-visible,
+.photo-exhibition select:focus-visible,
+.photo-exhibition input:focus-visible,
 .photo-exhibition__stage:focus-visible { outline: 3px solid var(--exhibition-accent); outline-offset: 3px; }
 
 :root[data-appearance="light"] .photo-exhibition {
@@ -310,6 +387,13 @@
   .photo-exhibition { padding: 12px 12px 15px; border-radius: 10px; }
   .photo-exhibition__header { gap: 1px 10px; }
   .photo-exhibition__return { grid-row: 1 / span 3; min-height: 44px; padding: 7px 11px; font-size: 12px; }
+  .photo-exhibition__header-actions { grid-row: 1 / span 3; flex-direction: column; align-items: flex-end; }
+  .photo-exhibition__header-actions .photo-exhibition__return { grid-row: auto; }
+  .photo-exhibition__slideshow { align-items: flex-start; }
+  .photo-exhibition__slideshow-heading { width: 100%; }
+  .photo-exhibition__slideshow-controls { width: 100%; justify-content: flex-start; }
+  .photo-exhibition__slideshow-controls label:first-child { flex: 1 1 100%; }
+  .photo-exhibition__slideshow-controls select { flex: 1; }
   .photo-exhibition__stage { height: clamp(260px, 48svh, 520px); margin-top: 6px; }
   .photo-exhibition__piece,
   .photo-exhibition__piece[data-offset="-1"],
@@ -324,6 +408,9 @@
   .photo-exhibition__actions { gap: 6px; }
   .photo-exhibition__actions button { flex: 1 1 0; padding-inline: 8px; }
   .photo-exhibition__help { grid-column: 1; justify-self: start; margin-top: 2px; }
+  .photo-exhibition.is-immersive { padding: 10px; }
+  .photo-exhibition.is-immersive .photo-exhibition__stage { flex: 1 0 190px; max-height: none; height: auto; }
+  .photo-exhibition.is-immersive .photo-exhibition__slideshow-controls button { flex: 1 1 auto; }
 }
 
 @media (max-width: 380px) {

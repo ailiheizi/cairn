@@ -1,0 +1,22 @@
+// Catalog partial for matched OCR text shown in the existing Details panel.
+export const ocrSearch: Record<string, string> = {
+  "Recognized image text": "识别出的图像文本",
+  "{{count}} returned OCR segments": "已返回 {{count}} 个 OCR 片段",
+  "OCR segment pages": "OCR 片段分页",
+  "OCR page {{page}} of {{pages}}": "OCR 第 {{page}} / {{pages}} 页",
+  "OCR text": "OCR 文本",
+  "Text recognized": "已识别文本",
+  "Partially recognized": "部分识别",
+  "No text recognized": "未识别到文本",
+  "Recognition state unknown": "识别状态未知",
+  "No recognized text was returned.": "没有返回识别文本。",
+  "Showing a returned text fragment.": "当前显示的是已返回的文本片段。",
+  "Showing the first 6,000 characters of this returned OCR text.": "此处仅显示已返回 OCR 文本的前 6,000 个字符。",
+  "Recognition quality": "识别质量",
+  "Mean confidence": "平均置信度",
+  "Low-confidence regions": "低置信度区域数",
+  "Recognized regions": "识别区域数",
+  "Text truncated": "文本已截断",
+  "Quality details are unavailable in this returned text fragment.": "当前返回的文本片段不包含质量详情。",
+  "Quality details were not returned.": "未返回质量详情。",
+};

@@ -2,41 +2,38 @@ import { useEffect, useRef, useState } from "react";
 import type { Translator } from "../i18n";
 import { command } from "./command";
 import { operations } from "../lib/operations";
-import type { LibraryDraftsFlow } from "./useLibraryDrafts";
+import { resolveArchiveSelectionSizes } from "../lib/originalArchive";
+import { buildSavedRetrievalCandidate } from "../lib/savedRetrievalCandidate";
 import type { LibraryFlow } from "./useLibrary";
 import type { SelectionFlow } from "./useSelection";
-import type { ExportActionState, ExportManifestData, ExportManifestSource, ExportMode, Notice, RecalledView, SavedViewData, SearchHit, ViewMode } from "../lib/types";
+import type { ExportActionState, ExportManifestData, ExportManifestSource, ExportMode, LibraryPageMode, Notice, SavedViewData, SearchHit, SystemFacetState, ViewMode } from "../lib/types";
+import type { RecallOutcome, SavedViewsFlow } from "./useSavedViews";
+export type { FailedRecall, RecalledViewState } from "../lib/types";
 
 // The export drawer.
 //
-// A frozen manifest is a durable catalog record: this flow plans, materializes
-// once, and verifies against the same frozen digest. A manifest recalled from
-// history may be verified again but is never written again.
+// A frozen manifest is a durable catalog record. This flow can plan and
+// materialize it, or explicitly reuse a history manifest at a different
+// destination without changing the frozen unit. The active write attempt is
+// transient browser-session context, not a durable receipt or recovery
+// guarantee. Because the current command contract does not attest that an
+// apply error wrote nothing, every unconfirmed attempt stays pinned to its
+// manifest and destination until verification; the client never retries the
+// write automatically.
 
-// A recalled saved view plus the scope disclosure this browser can honestly
-// make about it. The stored scope is a durable catalog fact owned by the view
-// record; `foreignScope` is only this render's comparison of that fact with the
-// workspace currently open, so it is presentation state and is never written
-// back to the catalog. It is never rendered as a raw scope/workspace id: the
-// operator is told the results came from another stored scope, not shown an
-// internal identifier.
-export type RecalledViewState = RecalledView & {
-  /** True only when a stored scope and the current workspace are both known and differ. */
-  foreignScope?: boolean;
-};
+export type ExportWriteAttempt = Readonly<{
+  manifestID: string;
+  manifestDigest: string;
+  destination: string;
+  workspaceID: string;
+  outcome: "applying" | "uncertain" | "written" | "verified";
+}>;
 
-// A saved view this browser failed to open, kept only long enough to explain
-// the failure. It is not a durable record and never becomes one.
-export type FailedRecall = { name: string; message: string };
-
-export type ExportFlow = {
+export type ExportFlow = Omit<SavedViewsFlow, "recallSavedView" | "refreshRecalledView" | "resetRecallProjection"> & {
   exportMode: ExportMode;
-  exportViewName: string;
-  setViewName: (value: string) => void;
   exportView: any;
   exportDestination: string;
   exportSidecars: string;
-  /** At least one field still holds the browser-local preset read on open. */
   exportPresetApplied: boolean;
   changeExportSidecars: (value: string) => void;
   exportManifest: ExportManifestData | undefined;
@@ -44,48 +41,34 @@ export type ExportFlow = {
   exportResult: any;
   exportAction: ExportActionState;
   exportMessage: string;
+  exportWriteUncertain: boolean;
+  exportVerificationOnly: boolean;
+  exportHistoryReproductionReady: boolean;
+  exportWriteAttempt?: ExportWriteAttempt;
+  exportAttemptLocked: boolean;
   exportSelection: SearchHit[];
-  savedViews: SavedViewData[];
-  savedViewsLoading: boolean;
-  savedViewsError: string;
-  savedRetrievalSaving: boolean;
-  savedRetrievalMessage: string;
-  savedRetrievalError: boolean;
+  retrievalCandidate: { query: string; fields: string[]; unsupportedConditions: string[] };
   exportHistory: ExportManifestData[];
   exportHistoryLoading: boolean;
   exportHistoryError: string;
   canOpenExport: boolean;
-  recalledView: RecalledViewState | undefined;
-  /**
-   * A saved view this browser failed to open while the library was displaying
-   * another recalled view. That view's outcome and hits were retracted, so the
-   * library shows this failure instead; it is cleared by any new search or
-   * recall attempt, and a failure that retracted nothing sets nothing here.
-   */
-  failedRecall: FailedRecall | undefined;
+  canExportSavedView: boolean;
   openExport: (trigger?: EventTarget | null, explicitSelection?: SearchHit[]) => void;
+  openSavedViewExport: (view: SavedViewData, trigger?: EventTarget | null) => void;
   closeExport: () => void;
   changeExportMode: (mode: ExportMode) => void;
   changeExportDestination: (value: string) => void;
-  saveViewForExport: () => Promise<void>;
-  saveSavedRetrievalView: (name: string, query: string, fields: string[]) => Promise<void>;
+  recallSavedView: (view: SavedViewData) => Promise<void>;
+  refreshRecalledView: () => Promise<void>;
   previewExport: () => Promise<void>;
   applyExport: () => Promise<void>;
   verifyExport: () => Promise<void>;
-  loadSavedViews: () => Promise<void>;
   loadExportHistory: () => Promise<void>;
   pickSavedViewForExport: (view: SavedViewData) => void;
-  recallSavedView: (view: SavedViewData) => Promise<void>;
   pickHistoryManifest: (manifest: ExportManifestData) => void;
-  invalidateForSearch: () => void;
+  beginHistoryReproduction: () => void;
   resetExportProjection: () => void;
 };
-
-// The flat content library is served as one unbounded projection, so a saved
-// view recall asks for the same practical page size instead of silently
-// truncating dynamic membership to a small default.
-const libraryPageSize = 200;
-
 // The export destination and sidecar choice this browser last used for one
 // workspace. This is a convenience for this browser only, following the
 // `cairn.*` recents prefix and its try/catch storage pattern: it is
@@ -125,7 +108,7 @@ function writeExportPreset(workspaceID: string, preset: ExportPreset) {
   } catch { /* a browser that refuses storage keeps no preset; the drawer still works */ }
 }
 
-export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode, lastExecutedQuery, setQuery, setLastExecutedQuery, selected, setSelected, setViewMode, selection, library, drafts, setBusy, notify, canLeaveSettings, canLeaveDetailDrafts, rememberDrawerTrigger, closeOtherDrawers, setExportOpen }: {
+export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode, presentationMode, lastExecutedQuery, activeTags, activeSystemFacets, activeTimelineMonth, selected, selection, library, savedViews: savedViewsFlow, setBusy, notify, canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers, setExportOpen }: {
   t: Translator;
   workspaceID: string;
   isConnected: boolean;
@@ -133,26 +116,24 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   coreStorageMessage: string;
   exportOpen: boolean;
   viewMode: ViewMode;
+  presentationMode: "content" | LibraryPageMode;
   lastExecutedQuery: string;
-  setQuery: (value: string) => void;
-  setLastExecutedQuery: (value: string) => void;
+  activeTags: string[];
+  activeSystemFacets: SystemFacetState;
+  activeTimelineMonth: string;
   selected: SearchHit | undefined;
-  setSelected: (hit: SearchHit | undefined) => void;
-  setViewMode: (mode: ViewMode) => void;
   selection: SelectionFlow;
   library: LibraryFlow;
-  drafts: LibraryDraftsFlow;
+  savedViews: SavedViewsFlow;
   setBusy: (value: boolean) => void;
   notify: (notice: Notice | undefined) => void;
   canLeaveSettings: () => boolean;
-  canLeaveDetailDrafts: () => boolean;
   rememberDrawerTrigger: (trigger?: EventTarget | null) => void;
   closeOtherDrawers: () => void;
   setExportOpen: (value: boolean) => void;
 }): ExportFlow {
   const [exportSelection, setExportSelection] = useState<SearchHit[]>([]);
   const [exportMode, setExportMode] = useState<ExportMode>("selected");
-  const [exportViewName, setExportViewName] = useState("");
   const [exportView, setExportView] = useState<any>();
   const [exportDestination, setExportDestination] = useState("");
   // The daemon implements one sidecar policy besides the empty default. The
@@ -167,55 +148,95 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   const [exportResult, setExportResult] = useState<any>();
   const [exportAction, setExportAction] = useState<ExportActionState>("IDLE");
   const [exportMessage, setExportMessage] = useState("");
+  const [exportWriteUncertain, setExportWriteUncertain] = useState(false);
   const [exportManifestSource, setExportManifestSource] = useState<ExportManifestSource>("planned");
-  const [savedViews, setSavedViews] = useState<SavedViewData[]>([]);
-  const [savedViewsLoading, setSavedViewsLoading] = useState(false);
-  const [savedViewsError, setSavedViewsError] = useState("");
-  const [savedRetrievalSaving, setSavedRetrievalSaving] = useState(false);
-  const [savedRetrievalMessage, setSavedRetrievalMessage] = useState("");
-  const [savedRetrievalError, setSavedRetrievalError] = useState(false);
+  const [exportHistoryReproductionReady, setExportHistoryReproductionReady] = useState(false);
+  const [exportWriteAttempt, setExportWriteAttemptState] = useState<ExportWriteAttempt>();
   const [exportHistory, setExportHistory] = useState<ExportManifestData[]>([]);
   const [exportHistoryLoading, setExportHistoryLoading] = useState(false);
   const [exportHistoryError, setExportHistoryError] = useState("");
-  const [recalledView, setRecalledView] = useState<RecalledViewState>();
-  const [failedRecall, setFailedRecall] = useState<FailedRecall>();
   const exportRequestRef = useRef(0);
-  const recallRequestRef = useRef(0);
+  const applyInFlightRef = useRef("");
+  const exportWriteAttemptRef = useRef<ExportWriteAttempt | undefined>(undefined);
+  const exportHistoryReadRef = useRef(0);
+  const workspaceReadContextRef = useRef({ workspaceID, generation: 0 });
+  if (workspaceReadContextRef.current.workspaceID !== workspaceID) {
+    workspaceReadContextRef.current = {
+      workspaceID,
+      generation: workspaceReadContextRef.current.generation + 1,
+    };
+    exportHistoryReadRef.current += 1;
+  }
   const currentWorkspaceRef = useRef(workspaceID);
   currentWorkspaceRef.current = workspaceID;
-  // Read at failure time so a retraction only clears hits the library is still
-  // showing in the search view it was displaying when the recall was asked for.
-  const currentViewModeRef = useRef(viewMode);
-  currentViewModeRef.current = viewMode;
+  function updateExportWriteAttempt(attempt: ExportWriteAttempt | undefined) {
+    exportWriteAttemptRef.current = attempt;
+    setExportWriteAttemptState(attempt);
+  }
+  function isExportAttemptLocked(attempt = exportWriteAttemptRef.current) {
+    return Boolean(attempt && attempt.outcome !== "verified");
+  }
 
   useEffect(() => {
-    setSavedViews([]);
-    setSavedViewsLoading(false);
-    setSavedViewsError("");
-    setSavedRetrievalSaving(false);
-    setSavedRetrievalMessage("");
-    setSavedRetrievalError(false);
-    setRecalledView(undefined);
-    setFailedRecall(undefined);
-  }, [workspaceID]);
+    const attempt = exportWriteAttemptRef.current;
+    if (attempt && attempt.outcome !== "verified" && attempt.workspaceID !== workspaceID) {
+      exportRequestRef.current += 1;
+      if (attempt.outcome === "applying") {
+        updateExportWriteAttempt({ ...attempt, outcome: "uncertain" });
+        setExportWriteUncertain(true);
+      }
+      setExportAction("FAILED");
+      setExportMessage(t("The content workspace changed during this write. Verify the same frozen manifest at its attempted directory before continuing."));
+    }
+    setExportHistoryLoading(false);
+    setExportHistoryError("");
+  }, [workspaceID, t]);
 
-  const canUseSearch = viewMode === "search" && Boolean(lastExecutedQuery.trim());
+  const retrievalCandidate = buildSavedRetrievalCandidate({
+    t,
+    lastExecutedQuery,
+    viewMode,
+    presentationMode,
+    recalledView: savedViewsFlow.recalledView,
+    activeTags,
+    activeSystemFacets: { ...activeSystemFacets },
+    activeTimelineMonth,
+  });
+  const canUseSearch = retrievalCandidate.unsupportedConditions.length === 0
+    && Boolean(retrievalCandidate.query.trim() || retrievalCandidate.fields.length > 0);
+  const exportAttemptLocked = isExportAttemptLocked(exportWriteAttempt);
+  const exportVerificationOnly = (exportManifestSource === "history" && !exportHistoryReproductionReady)
+    || exportAttemptLocked
+    || exportWriteUncertain
+    || exportResult?.materialized === true
+    || exportResult?.verified?.verified === true;
   // An explicit multi-selection is a stronger statement of intent than the
   // open details subject, so it becomes the frozen selection when present.
   const detailSelection = selected?.subject_ref?.trim() && selected.entry_type !== "DIRECTORY" ? [selected] : [];
   const canOpenExport = selection.selectionSubjects.length > 0 || detailSelection.length > 0 || canUseSearch;
+  const canExportSavedView = Boolean(isConnected && coreStorageReady && workspaceID);
 
-  function openExport(trigger?: EventTarget | null, explicitSelection?: SearchHit[]) {
-    const selectionForExport = explicitSelection && explicitSelection.length
+  function openExport(trigger?: EventTarget | null, explicitSelection?: SearchHit[], initialSavedView?: SavedViewData) {
+    if (isExportAttemptLocked()) {
+      if (!canLeaveSettings()) return;
+      rememberDrawerTrigger(trigger);
+      closeOtherDrawers();
+      setExportOpen(true);
+      notify(undefined);
+      return;
+    }
+    const selectionForExport = initialSavedView ? [] : explicitSelection && explicitSelection.length
       ? explicitSelection
-      : detailSelection;
-    if (!isConnected || !coreStorageReady || !workspaceID || (selectionForExport.length === 0 && !canUseSearch)) {
+      : selection.selectionSubjects.length > 0
+        ? selection.selectionSubjects
+        : detailSelection;
+    if (!isConnected || !coreStorageReady || !workspaceID || (selectionForExport.length === 0 && !canUseSearch && !initialSavedView?.view_id)) {
       notify({ kind: "error", text: coreStorageMessage });
       return;
     }
     if (!canLeaveSettings()) return;
     rememberDrawerTrigger(trigger);
-    const nextMode: ExportMode = selectionForExport.length ? "selected" : "view";
+    const nextMode: ExportMode = initialSavedView ? "view" : selectionForExport.length ? "selected" : "view";
     closeOtherDrawers();
     exportRequestRef.current += 1;
     // The prefill is the last destination and sidecar choice this browser used
@@ -224,26 +245,48 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     // a default.
     const preset = readExportPreset(workspaceID);
     setExportSelection(selectionForExport);
-    setExportMode(nextMode); setExportView(undefined); setExportManifest(undefined); setExportResult(undefined);
+    setExportMode(nextMode); setExportView(initialSavedView); setExportManifest(undefined); setExportResult(undefined);
     setExportManifestSource("planned");
+    setExportHistoryReproductionReady(false);
+    updateExportWriteAttempt(undefined);
     setExportAction("IDLE"); setExportMessage(""); setExportDestination(preset.destination); setExportSidecars(preset.sidecars);
     setExportPresetApplied(Boolean(preset.destination || preset.sidecars));
-    setExportViewName(lastExecutedQuery.trim() ? `Search · ${lastExecutedQuery.trim().slice(0, 48)}` : "My saved search");
+    setExportWriteUncertain(false);
     setExportOpen(true); notify(undefined);
     // Recalling a saved view and re-verifying a frozen manifest are the
     // durability surfaces of this drawer: both come from the daemon catalog,
     // never from browser state.
-    void loadSavedViews();
+    void savedViewsFlow.loadSavedViews();
     void loadExportHistory();
   }
-  function closeExport() { exportRequestRef.current += 1; setExportOpen(false); setExportAction("IDLE"); setExportSelection([]); }
+  function openSavedViewExport(view: SavedViewData, trigger?: EventTarget | null) {
+    if (!view.view_id?.trim()) return;
+    openExport(trigger, undefined, view);
+  }
+  function closeExport() {
+    setExportOpen(false);
+    if (isExportAttemptLocked()) return;
+    exportRequestRef.current += 1;
+    setExportAction("IDLE"); setExportSelection([]);
+  }
   function changeExportMode(nextMode: ExportMode) {
+    if (isExportAttemptLocked()) return;
     if (nextMode === exportMode) return;
     exportRequestRef.current += 1;
-    setExportMode(nextMode); setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
+    setExportMode(nextMode); setExportManifest(undefined); setExportResult(undefined); setExportManifestSource("planned"); setExportWriteUncertain(false); setExportAction("IDLE");
+    setExportHistoryReproductionReady(false); updateExportWriteAttempt(undefined);
     setExportMessage(t("Export source changed. Preview a new frozen manifest."));
   }
   function changeExportDestination(value: string) {
+    const activeAttempt = exportWriteAttemptRef.current;
+    if (isExportAttemptLocked(activeAttempt)) {
+      if (value.trim() !== activeAttempt!.destination.trim()) {
+        setExportDestination(activeAttempt!.destination);
+        setExportMessage(t("This write is unresolved. Verify the same frozen manifest at its attempted directory before choosing another destination."));
+      }
+      return;
+    }
+    const destinationChanged = value.trim() !== exportDestination.trim();
     setExportDestination(value);
     // Editing either field ends the preset claim, so the drawer never labels a
     // value the operator has replaced as the stored browser default.
@@ -251,7 +294,14 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     // A manifest recalled from history is already frozen: the destination is
     // only the place a later verify reads, so editing it must not discard the
     // frozen unit. A planned manifest still describes a write to one target.
-    if (exportManifestSource === "history" && exportManifest) return;
+    if (exportManifest && (exportManifestSource === "history" || exportVerificationOnly || exportResult?.materialized)) {
+      if (destinationChanged) {
+        exportRequestRef.current += 1;
+        setExportAction("IDLE");
+        setExportMessage(t("Verification directory changed. Verify this frozen manifest at the selected directory."));
+      }
+      return;
+    }
     if (!exportManifest && exportAction === "IDLE") return;
     exportRequestRef.current += 1;
     setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
@@ -271,58 +321,8 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     if (!exportDestination.trim()) return;
     writeExportPreset(workspaceID, { destination: exportDestination, sidecars: exportSidecars });
   }
-  async function saveViewForExport() {
-    const name = exportViewName.trim();
-    const submittedQuery = lastExecutedQuery.trim();
-    if (!submittedQuery || !name) return;
-    const request = ++exportRequestRef.current;
-    setExportManifest(undefined); setExportResult(undefined);
-    setExportAction("SAVING_VIEW"); setExportMessage("");
-    try {
-      const response = await command(operations.view.save, { name, query: submittedQuery });
-      if (exportRequestRef.current !== request) return;
-      setExportView(response.data);
-      setExportMode("view");
-      setExportAction("IDLE");
-      setExportMessage(t("Query saved. The view remains dynamic until you freeze an export."));
-      void loadSavedViews();
-    } catch (error) {
-      if (exportRequestRef.current !== request) return;
-      setExportAction("FAILED");
-      setExportMessage(error instanceof Error ? error.message : t("Could not save query"));
-    }
-  }
-  // Daily retrieval has its own explicit save path. It records only the
-  // already-submitted lexical query and field constraints the caller has
-  // confirmed are supported by view.evaluate; the export drawer's legacy
-  // query-only save flow above remains unchanged.
-  async function saveSavedRetrievalView(name: string, query: string, fields: string[]) {
-    const requestWorkspaceID = workspaceID;
-    const savedName = name.trim();
-    const savedQuery = query.trim();
-    if (!savedName || !savedQuery || !workspaceID || savedRetrievalSaving) return;
-    setSavedRetrievalSaving(true);
-    setSavedRetrievalMessage("");
-    setSavedRetrievalError(false);
-    try {
-      await command(operations.view.save, {
-        name: savedName,
-        query: savedQuery,
-        scope: workspaceID,
-        fields: [...new Set(fields.map((field) => field.trim()).filter(Boolean))],
-      });
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      setSavedRetrievalMessage(t("Saved view updated. It will be evaluated against current lexical results when opened."));
-      await loadSavedViews();
-    } catch (error) {
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      setSavedRetrievalMessage(error instanceof Error ? error.message : t("Could not save this view."));
-      setSavedRetrievalError(true);
-    } finally {
-      if (currentWorkspaceRef.current === requestWorkspaceID) setSavedRetrievalSaving(false);
-    }
-  }
   async function previewExport() {
+    if (exportManifest) return;
     if (!exportDestination.trim()) return;
     const exportRefs = exportSelection.map((hit) => hit.subject_ref?.trim() ?? "").filter(Boolean);
     if (exportMode === "selected" && exportRefs.length === 0) {
@@ -347,6 +347,7 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       if (exportRequestRef.current !== request) return;
       setExportManifest(response.data as ExportManifestData);
       setExportManifestSource("planned");
+      setExportWriteUncertain(false);
       setExportResult(undefined); setExportAction("IDLE");
       // The daemon accepted this destination and sidecar pair, so it is the
       // pair this browser offers next time in this workspace.
@@ -360,25 +361,47 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     }
   }
   async function applyExport() {
-    if (!exportManifest?.manifest_id || !exportManifest.manifest_digest || !exportDestination.trim()) return;
+    if (!exportManifest?.manifest_id || !exportManifest.manifest_digest || !exportDestination.trim() || exportVerificationOnly) return;
+    if (exportManifestSource === "history") {
+      if (!exportHistoryReproductionReady) return;
+      if (exportDestination.trim() === exportManifest.target?.trim()) {
+        setExportAction("FAILED");
+        setExportMessage(t("Choose a destination different from the manifest's recorded directory."));
+        return;
+      }
+    }
+    const manifestKey = `${exportManifest.manifest_id}\u0000${exportManifest.manifest_digest}\u0000${exportDestination.trim()}`;
+    if (applyInFlightRef.current === manifestKey) return;
+    applyInFlightRef.current = manifestKey;
     const request = ++exportRequestRef.current;
+    const attempt: ExportWriteAttempt = {
+      manifestID: exportManifest.manifest_id,
+      manifestDigest: exportManifest.manifest_digest,
+      destination: exportDestination.trim(),
+      workspaceID,
+      outcome: "applying",
+    };
+    updateExportWriteAttempt(attempt);
+    setExportHistoryReproductionReady(false);
     setExportAction("APPLYING"); setExportMessage("");
     try {
-      const applied = await command(operations.export.apply, { manifest_id: exportManifest.manifest_id, manifest_digest: exportManifest.manifest_digest, destination: exportDestination.trim() });
-      if (exportRequestRef.current !== request) return;
+      const applied = await command(operations.export.apply, { manifest_id: attempt.manifestID, manifest_digest: attempt.manifestDigest, destination: attempt.destination });
+      if (exportRequestRef.current !== request || attempt.workspaceID !== currentWorkspaceRef.current) return;
+      updateExportWriteAttempt({ ...attempt, outcome: "written" });
       setExportResult({ applied: applied.data, materialized: true, status: applied.status });
       setExportAction("VERIFYING");
       try {
-        const verified = await command(operations.export.verify, { manifest_id: exportManifest.manifest_id, manifest_digest: exportManifest.manifest_digest, destination: exportDestination.trim() });
-        if (exportRequestRef.current !== request) return;
-        setExportResult((current: any) => ({ ...current, verified: verified.data, status: verified.status }));
+        const verified = await command(operations.export.verify, { manifest_id: attempt.manifestID, manifest_digest: attempt.manifestDigest, destination: attempt.destination });
+        if (exportRequestRef.current !== request || attempt.workspaceID !== currentWorkspaceRef.current) return;
+        setExportResult((current: any) => ({ ...current, verified: verified.data, verifiedDestination: attempt.destination, status: verified.status }));
         if (verified.data?.verified !== true) {
           setExportAction("FAILED");
           setExportMessage(t("Verification returned without a verified result. Retry verification against the frozen manifest."));
           return;
         }
+        updateExportWriteAttempt({ ...attempt, outcome: "verified" });
       } catch (error) {
-        if (exportRequestRef.current !== request) return;
+        if (exportRequestRef.current !== request || attempt.workspaceID !== currentWorkspaceRef.current) return;
         setExportAction("FAILED");
         setExportMessage(`${t("Output was written, but verification failed. Retry verification against the same frozen manifest; do not materialize again.")} ${error instanceof Error ? error.message : ""}`.trim());
         return;
@@ -386,161 +409,121 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
       setExportAction("SUCCEEDED");
       setExportMessage(t("Export materialized and verified in the server directory."));
     } catch (error) {
-      if (exportRequestRef.current !== request) return;
+      if (exportRequestRef.current !== request || attempt.workspaceID !== currentWorkspaceRef.current) return;
+      updateExportWriteAttempt({ ...attempt, outcome: "uncertain" });
+      setExportWriteUncertain(true);
       setExportAction("FAILED");
-      setExportMessage(error instanceof Error ? error.message : t("Export failed; no verified output claim was made."));
+      setExportMessage(`${t("Materialize did not return a confirmed result. Verify this same frozen manifest and destination before taking any further action.")} ${error instanceof Error ? error.message : ""}`.trim());
+    } finally {
+      if (applyInFlightRef.current === manifestKey) applyInFlightRef.current = "";
     }
   }
   async function verifyExport() {
-    if (!exportManifest?.manifest_id || !exportManifest.manifest_digest || !exportDestination.trim()) return;
+    const activeAttempt = exportWriteAttemptRef.current;
+    const attemptNeedsVerification = isExportAttemptLocked(activeAttempt);
+    const manifestID = attemptNeedsVerification ? activeAttempt!.manifestID : exportManifest?.manifest_id;
+    const manifestDigest = attemptNeedsVerification ? activeAttempt!.manifestDigest : exportManifest?.manifest_digest;
+    const destination = attemptNeedsVerification ? activeAttempt!.destination : exportDestination.trim();
+    if (!manifestID || !manifestDigest || !destination) return;
+    if (attemptNeedsVerification && (manifestID !== exportManifest?.manifest_id || manifestDigest !== exportManifest?.manifest_digest)) return;
+    if (attemptNeedsVerification && activeAttempt!.workspaceID !== workspaceID) {
+      setExportAction("FAILED");
+      setExportMessage(t("The content workspace changed during this write. Verify the same frozen manifest at its attempted directory before continuing."));
+      return;
+    }
     const request = ++exportRequestRef.current;
     setExportAction("VERIFYING"); setExportMessage("");
     try {
-      const response = await command(operations.export.verify, { manifest_id: exportManifest.manifest_id, manifest_digest: exportManifest.manifest_digest, destination: exportDestination.trim() });
-      if (exportRequestRef.current !== request) return;
-      setExportResult((current: any) => ({ ...current, verified: response.data, status: response.status }));
+      const response = await command(operations.export.verify, { manifest_id: manifestID, manifest_digest: manifestDigest, destination });
+      if (exportRequestRef.current !== request || (attemptNeedsVerification && activeAttempt!.workspaceID !== currentWorkspaceRef.current)) return;
+      setExportResult((current: any) => ({ ...current, verified: response.data, verifiedDestination: destination, status: response.status }));
       if (response.data?.verified !== true) {
         setExportAction("FAILED");
         setExportMessage(t("Verification returned without a verified result. Retry verification against the frozen manifest."));
         return;
       }
+      if (attemptNeedsVerification) {
+        updateExportWriteAttempt({ ...activeAttempt!, outcome: "verified" });
+        setExportWriteUncertain(false);
+      } else if (exportWriteUncertain && exportManifest?.target?.trim() === destination) setExportWriteUncertain(false);
       setExportAction("SUCCEEDED");
       setExportMessage(t("Export verification passed against the frozen manifest."));
     } catch (error) {
-      if (exportRequestRef.current !== request) return;
+      if (exportRequestRef.current !== request || (attemptNeedsVerification && activeAttempt!.workspaceID !== currentWorkspaceRef.current)) return;
       setExportAction("FAILED");
       setExportMessage(error instanceof Error ? error.message : t("Export verification failed."));
     }
   }
-  // Saved views and frozen manifests are durable catalog records. The drawer
-  // reads them back from the daemon instead of caching them in the browser, so
-  // a reload or a second browser sees the same organization.
-  async function loadSavedViews() {
-    const requestWorkspaceID = workspaceID;
-    setSavedViewsLoading(true); setSavedViewsError("");
-    try {
-      const response = await command(operations.view.list, {});
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      setSavedViews(Array.isArray(response.data) ? (response.data as SavedViewData[]) : []);
-    } catch (error) {
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      setSavedViews([]);
-      setSavedViewsError(error instanceof Error ? error.message : t("Saved views are unavailable."));
-    } finally { if (currentWorkspaceRef.current === requestWorkspaceID) setSavedViewsLoading(false); }
-  }
+  // Frozen manifests are durable catalog records. The drawer reads export
+  // history back from the daemon instead of caching it in the browser.
   async function loadExportHistory() {
+    const requestWorkspaceID = workspaceID;
+    const requestWorkspaceGeneration = workspaceReadContextRef.current.generation;
+    const requestID = ++exportHistoryReadRef.current;
+    const isCurrentRead = () => exportHistoryReadRef.current === requestID
+      && workspaceReadContextRef.current.workspaceID === requestWorkspaceID
+      && workspaceReadContextRef.current.generation === requestWorkspaceGeneration
+      && currentWorkspaceRef.current === requestWorkspaceID;
     setExportHistoryLoading(true); setExportHistoryError("");
     try {
       const response = await command(operations.export.list, {});
-      setExportHistory(Array.isArray(response.data) ? (response.data as ExportManifestData[]) : []);
+      if (!isCurrentRead()) return;
+      if (response.status !== "SUCCEEDED" || !Array.isArray(response.data)) {
+        setExportHistoryError(t("Export history is unavailable."));
+        return;
+      }
+      setExportHistory(response.data as ExportManifestData[]);
     } catch (error) {
-      setExportHistory([]);
+      if (!isCurrentRead()) return;
       setExportHistoryError(error instanceof Error ? error.message : t("Export history is unavailable."));
-    } finally { setExportHistoryLoading(false); }
+    } finally { if (isCurrentRead()) setExportHistoryLoading(false); }
   }
   // Choosing a stored view reuses the existing view export path: the view
   // becomes the live source and a manifest is frozen only on preview.
   function pickSavedViewForExport(view: SavedViewData) {
-    if (!view?.view_id) return;
+    if (!view?.view_id || isExportAttemptLocked()) return;
     exportRequestRef.current += 1;
-    setExportMode("view"); setExportView(view); setExportViewName(view.name || "");
+    setExportMode("view"); setExportView(view); setExportManifestSource("planned"); setExportWriteUncertain(false);
+    setExportHistoryReproductionReady(false); updateExportWriteAttempt(undefined);
     setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
     setExportMessage(t("Saved view selected as the export source. Preview a frozen manifest to freeze its current membership."));
   }
-  async function recallSavedView(view: SavedViewData) {
-    const viewID = view?.view_id?.trim() ?? "";
-    if (!viewID) return;
-    if (!canLeaveSettings() || !canLeaveDetailDrafts()) return;
-    const requestWorkspaceID = workspaceID;
-    const request = ++recallRequestRef.current;
-    // The listed name is what the operator asked to open. It is the honest
-    // label if resolution or evaluation fails before a resolved name exists.
-    const requestedName = view.name?.trim() || t("Unnamed saved view");
-    // Whether the library was actually displaying a recalled view's hits: only
-    // then does a failure have stale results to retract, and only then does the
-    // failure surface need to replace them. The test matches the library's own
-    // "recalled view is active" test: the same view, in the search view, with
-    // the query it was recalled with.
-    const retractsDisplayedResults = Boolean(recalledView && viewMode === "search" && lastExecutedQuery === recalledView.query);
-    // No older view may stay described as "live" or "opened" while this
-    // request is in flight, and a failure below must not resurrect that claim.
-    setRecalledView(undefined);
-    setFailedRecall(undefined);
-    setBusy(true); setSavedRetrievalMessage(""); setSavedRetrievalError(false); notify(undefined);
-    try {
-      // Re-read the durable revision before evaluating: the listed row may
-      // predate a successor revision, and the library caption must describe
-      // the view that was actually evaluated.
-      const current = await command(operations.view.get, { view_id: viewID });
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      const resolved = ((current.data ?? view) ?? {}) as SavedViewData;
-      // view.evaluate resolves its workspace from the stored record, not from
-      // the workspace this browser has open. Comparing the two is the only way
-      // this client can tell the operator that the hits below came from a
-      // different saved scope instead of the library they are looking at.
-      const storedScope = resolved.scope?.trim() ?? "";
-      const foreignScope = Boolean(storedScope && workspaceID && storedScope !== workspaceID);
-      const evaluation = await command(operations.view.evaluate, { view_id: viewID, limit: libraryPageSize });
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
-      const evaluatedHits = ((evaluation.data?.hits ?? []) as SearchHit[]);
-      const viewQuery = resolved.query?.trim() ?? "";
-      const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
-      drafts.discardDetailDrafts();
-      setQuery(viewQuery); setLastExecutedQuery(viewQuery);
-      library.setHits(evaluatedHits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
-      setSelected(undefined); selection.clearSelection(); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth("");
-      setViewMode("search");
-      const degradedReason = evaluation.status === "DEGRADED"
-        ? (evaluation.reasons ?? []).map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.")
-        : "";
-      setRecalledView({
-        view_id: viewID,
-        name: resolved.name || t("Unnamed saved view"),
-        revision: Number(resolved.revision ?? 0),
-        query: viewQuery,
-        fields: [...(resolved.fields ?? [])],
-        foreignScope,
-        state: evaluation.status === "DEGRADED" ? "DEGRADED" : evaluatedHits.length === 0 ? "EMPTY" : "READY",
-        message: degradedReason
-          ? t("Saved view evaluation is degraded: {{reason}}", { reason: degradedReason })
-          : evaluatedHits.length === 0
-            ? t("This saved view currently matches no content.")
-            : "",
-      });
-      // The recalled hits render in the library, so the drawer has delivered
-      // its result and closes instead of covering the result list.
-      closeExport();
-    } catch (error) {
-      if (currentWorkspaceRef.current !== requestWorkspaceID) return;
+  function showRecallOutcome(outcome: RecallOutcome) {
+    if (outcome.kind === "success") closeExport();
+    else if (outcome.kind === "failure") {
       setExportAction("FAILED");
-      const message = error instanceof Error ? error.message : t("Could not evaluate this saved view.");
-      // A refused view has no membership to show. Drop the recalled projection,
-      // and when the library was actually displaying a previous view's hits,
-      // drop those too so neither the earlier view's "opened"/"live" claim nor
-      // its rows can be read as this view's outcome. A failure that retracted
-      // nothing keeps its explanation in the saved-retrieval panel only.
-      setRecalledView(undefined);
-      if (retractsDisplayedResults && currentViewModeRef.current === "search") {
-        library.setHits([]);
-        setFailedRecall({ name: requestedName, message });
-      }
-      setExportMessage(message);
-      setSavedRetrievalMessage(message);
-      setSavedRetrievalError(true);
-    } finally {
-      // Workspace changes suppress stale data writes, but must not strand the
-      // busy flag this request acquired. A request token keeps an older recall
-      // from releasing a newer recall's busy state.
-      if (recallRequestRef.current === request) setBusy(false);
+      setExportMessage(outcome.message);
     }
   }
+  async function recallSavedView(view: SavedViewData) {
+    showRecallOutcome(await savedViewsFlow.recallSavedView(view));
+  }
+  async function refreshRecalledView() {
+    showRecallOutcome(await savedViewsFlow.refreshRecalledView());
+  }
   function pickHistoryManifest(manifest: ExportManifestData) {
-    if (!manifest?.manifest_id || !manifest?.manifest_digest) return;
+    if (!manifest?.manifest_id || !manifest?.manifest_digest || isExportAttemptLocked()) return;
     exportRequestRef.current += 1;
     setExportManifest(manifest);
     setExportManifestSource("history");
+    setExportHistoryReproductionReady(false);
+    updateExportWriteAttempt(undefined);
+    setExportDestination(typeof manifest.target === "string" ? manifest.target : "");
+    setExportPresetApplied(false);
+    setExportWriteUncertain(false);
     setExportResult(undefined); setExportAction("IDLE");
     setExportMessage(t("Frozen manifest loaded from history. Verify it against its destination; verification never writes files again."));
+  }
+  function beginHistoryReproduction() {
+    if (exportManifestSource !== "history" || !exportManifest?.manifest_id || !exportManifest.manifest_digest || isExportAttemptLocked()) return;
+    exportRequestRef.current += 1;
+    updateExportWriteAttempt(undefined);
+    setExportHistoryReproductionReady(true);
+    setExportDestination("");
+    setExportResult(undefined);
+    setExportWriteUncertain(false);
+    setExportAction("IDLE");
+    setExportMessage(t("Choose a new empty server directory. The frozen files, names, sidecar policy, and recorded target stay unchanged."));
   }
   // A search changes what a "last submitted query" export would freeze, so the
   // drawer's frozen unit is discarded with an explicit reason instead of
@@ -554,26 +537,26 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
   // deliberately independent of the export drawer's own state, because the
   // recalled projection is shown while the drawer is closed.
   function invalidateForSearch() {
-    setRecalledView(undefined);
+    savedViewsFlow.invalidateForSearch();
     // A new search is a result the browser did produce, so the previous
     // recall's failure explanation no longer describes what is on screen.
-    setFailedRecall(undefined);
-    if (!exportOpen) return;
+    if (!exportOpen || isExportAttemptLocked()) return;
     exportRequestRef.current += 1;
-    setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE");
+    setExportManifest(undefined); setExportResult(undefined); setExportManifestSource("planned"); setExportWriteUncertain(false); setExportAction("IDLE");
     setExportMessage(t("Search changed. Preview a new frozen manifest."));
   }
   function resetExportProjection() {
+    if (isExportAttemptLocked()) return;
     exportRequestRef.current += 1;
     setExportSelection([]);
-    setExportManifest(undefined); setExportResult(undefined); setExportAction("IDLE"); setExportMessage("");
-    setRecalledView(undefined);
+    setExportManifest(undefined); setExportResult(undefined); setExportManifestSource("planned"); setExportWriteUncertain(false); setExportAction("IDLE"); setExportMessage("");
+    setExportHistoryReproductionReady(false); updateExportWriteAttempt(undefined);
+    savedViewsFlow.resetRecallProjection();
   }
 
   return {
+    ...savedViewsFlow,
     exportMode,
-    exportViewName,
-    setViewName: setExportViewName,
     exportView,
     exportDestination,
     exportSidecars,
@@ -584,33 +567,32 @@ export function useExport({ t, workspaceID, isConnected, coreStorageReady, coreS
     exportResult,
     exportAction,
     exportMessage,
+    exportWriteUncertain,
+    exportVerificationOnly,
+    exportHistoryReproductionReady,
+    exportWriteAttempt,
+    exportAttemptLocked,
     exportSelection,
-    savedViews,
-    savedViewsLoading,
-    savedViewsError,
-    savedRetrievalSaving,
-    savedRetrievalMessage,
-    savedRetrievalError,
+    retrievalCandidate,
     exportHistory,
     exportHistoryLoading,
     exportHistoryError,
     canOpenExport,
-    recalledView,
-    failedRecall,
+    canExportSavedView,
     openExport,
+    openSavedViewExport,
+    recallSavedView,
+    refreshRecalledView,
     closeExport,
     changeExportMode,
     changeExportDestination,
-    saveViewForExport,
-    saveSavedRetrievalView,
     previewExport,
     applyExport,
     verifyExport,
-    loadSavedViews,
     loadExportHistory,
     pickSavedViewForExport,
-    recallSavedView,
     pickHistoryManifest,
+    beginHistoryReproduction,
     invalidateForSearch,
     resetExportProjection,
   };

@@ -31,32 +31,42 @@ export type PhotoThumbnailProps = {
   logicalSize?: number;
   exactAvailable?: boolean;
   className?: string;
+  /** Wait for actual viewport intersection before mounting a legacy tile read. */
+  deferUntilVisible?: boolean;
 };
 
 type LargePreviewState = { status: "deferred" | "loading" } | { status: "ready"; url: string } | { status: "unavailable"; message: string };
+type VisibilityObservation = { token: object; visible: boolean };
 
 export function PhotoThumbnail(props: PhotoThumbnailProps) {
-  const { command, locale, workspaceId, entryId, subjectRef, contentId, name, logicalSize, exactAvailable = true, className = "" } = props;
+  const { command, locale, workspaceId, entryId, subjectRef, contentId, name, logicalSize, exactAvailable = true, className = "", deferUntilVisible = false } = props;
   const containerRef = useRef<HTMLSpanElement>(null);
   const requestRef = useRef(0);
-  const [visible, setVisible] = useState(false);
+  const [visibilityObservation, setVisibilityObservation] = useState<VisibilityObservation>();
   const [largeState, setLargeState] = useState<LargePreviewState>({ status: "deferred" });
   const t = useMemo(() => createTranslator(locale ?? "en"), [locale]);
   const largeCandidate = logicalSize !== undefined && logicalSize > PHOTO_LEGACY_THUMB_LIMIT;
   const mime = photoCandidateMime(name);
+  const visibilityToken = useMemo(() => ({}), [contentId, deferUntilVisible, entryId, exactAvailable, largeCandidate, logicalSize, name, subjectRef, workspaceId]);
+  const visible = visibilityObservation?.token === visibilityToken && visibilityObservation.visible;
 
   useEffect(() => {
-    if (!largeCandidate || !containerRef.current) return undefined;
+    if ((!largeCandidate && !deferUntilVisible) || !containerRef.current) return undefined;
     if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
+      // Preserve the established large-image fallback behavior, but do not
+      // turn deferred legacy thumbnails into eager reads when visibility
+      // cannot be observed.
+      if (largeCandidate) setVisibilityObservation({ token: visibilityToken, visible: true });
       return undefined;
     }
+    let active = true;
     const observer = new IntersectionObserver((entries) => {
-      setVisible(entries.some((entry) => entry.isIntersecting));
+      if (!active) return;
+      setVisibilityObservation({ token: visibilityToken, visible: entries.some((entry) => entry.isIntersecting) });
     }, { rootMargin: "0px" });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [largeCandidate]);
+    return () => { active = false; observer.disconnect(); };
+  }, [deferUntilVisible, largeCandidate, visibilityToken]);
 
   useEffect(() => {
     if (!largeCandidate) return undefined;
@@ -117,7 +127,10 @@ export function PhotoThumbnail(props: PhotoThumbnailProps) {
   }, [command, contentId, entryId, exactAvailable, largeCandidate, logicalSize, mime, name, subjectRef, t, visible, workspaceId]);
 
   if (!largeCandidate) {
-    return <span className={`photo-thumbnail ${className}`} data-testid="photo-thumbnail" data-preview-state="legacy">
+    if (deferUntilVisible && !visible) {
+      return <span ref={containerRef} className={`photo-thumbnail photo-thumbnail--fallback ${className}`} data-testid="photo-thumbnail" data-preview-state="deferred" role="img" aria-label={t("Thumbnail not loaded")}>{t("Thumbnail not loaded")}</span>;
+    }
+    return <span ref={deferUntilVisible ? containerRef : undefined} className={`photo-thumbnail ${className}`} data-testid="photo-thumbnail" data-preview-state="legacy">
       <ContentPreview command={command} locale={locale} workspaceId={workspaceId} entryId={entryId} subjectRef={subjectRef} contentId={contentId} name={name} logicalSize={logicalSize} exactAvailable={exactAvailable} variant="thumb" />
     </span>;
   }

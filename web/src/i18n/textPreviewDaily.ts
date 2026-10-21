@@ -1,0 +1,15 @@
+export const textPreviewDaily: Record<string, string> = {
+  "Find in text": "在文本中查找",
+  "Close find": "关闭查找",
+  "Find in loaded text": "查找已加载文本",
+  "Enter text to find": "输入要查找的内容",
+  "No matches": "没有匹配项",
+  "Match {{current}} of {{total}}": "第 {{current}} 项，共 {{total}} 项",
+  "Previous match": "上一个匹配项",
+  "Next match": "下一个匹配项",
+  "Enable line wrap": "启用自动换行",
+  "Disable line wrap": "关闭自动换行",
+  "Copy full text": "复制完整文本",
+  "Copied the full loaded text.": "已复制完整的已加载文本。",
+  "Could not copy text. Clipboard access is unavailable or was denied.": "无法复制文本。剪贴板不可用或访问被拒绝。",
+};

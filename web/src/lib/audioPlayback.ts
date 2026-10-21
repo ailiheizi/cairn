@@ -1,4 +1,5 @@
 import { endpoints } from "./operations";
+import type { SearchHit } from "./types";
 
 export const AUDIO_PLAYBACK_LIMIT = 32 * 1024 * 1024;
 const AUDIO_TYPES: Record<string, string> = {
@@ -6,7 +7,7 @@ const AUDIO_TYPES: Record<string, string> = {
   aac: "audio/aac", wav: "audio/wav", wave: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
   opus: "audio/ogg", flac: "audio/flac", weba: "audio/webm", webm: "audio/webm", aif: "audio/aiff", aiff: "audio/aiff",
 };
-export type AudioTrack = { workspaceID: string; entryID: string; name: string; contentID: string; logicalSize: number };
+export type AudioTrack = { workspaceID: string; entryID: string; name: string; contentID: string; logicalSize: number; displayTitle?: string; displayArtist?: string; displayAlbum?: string; sourceHit?: SearchHit };
 /** One insertion of a playable file; repeated file identities are separate occurrences. */
 export type AudioQueueEntry = AudioTrack & { occurrenceID: string };
 export function audioIdentityDigest(contentID: string | undefined): string | undefined {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Translator } from "../i18n";
 import { command } from "./command";
@@ -43,6 +43,50 @@ export type SearchSuggestion =
 
 export type PredicateEdit = { index: number; value: string };
 
+export type KeywordBrowsePhase = "available" | "loading-first" | "more" | "loading-more" | "complete" | "bounded" | "first-error" | "more-error" | "stale";
+export type KeywordBrowseState = { query: string; phase: KeywordBrowsePhase; loaded: number; error: string };
+
+type KeywordBrowseCapture = { query: string; request: SearchPlan["request"]; plan: SearchPlan; workspaceID: string; refreshGeneration: number };
+type KeywordBrowseChain = { capture: KeywordBrowseCapture; token: string; loaded: number; phase: KeywordBrowsePhase };
+const KEYWORD_BROWSE_PAGE_SIZE = 200;
+const KEYWORD_BROWSE_DIMENSION = "lexical-metadata-fts";
+
+type KeywordPageFacts = {
+  mode?: unknown;
+  lane?: unknown;
+  limit?: unknown;
+  returned?: unknown;
+  completeness?: unknown;
+  complete?: unknown;
+  has_more?: unknown;
+  truncated?: unknown;
+  continuation_supported?: unknown;
+  token?: unknown;
+};
+
+function readKeywordPage(response: Awaited<ReturnType<typeof command>>, t: Translator) {
+  const data = response.data as { hits?: unknown; page?: KeywordPageFacts } | undefined;
+  const page = data?.page;
+  const hits = data?.hits;
+  if (response.status !== "SUCCEEDED" || !page || !Array.isArray(hits) || hits.some((hit) => !hit || typeof hit !== "object")) {
+    throw new Error(t("The server did not return a usable results page."));
+  }
+  if (page.mode !== "page" || page.lane !== KEYWORD_BROWSE_DIMENSION || page.limit !== KEYWORD_BROWSE_PAGE_SIZE || page.returned !== hits.length) {
+    throw new Error(t("The server returned an incomplete or mismatched results page."));
+  }
+  if (page.completeness === "MORE_AVAILABLE") {
+    if (page.complete !== false || page.has_more !== true || page.truncated !== false || page.continuation_supported !== true || typeof page.token !== "string" || !page.token.trim()) {
+      throw new Error(t("The server did not provide a valid next page."));
+    }
+    return { hits: hits as SearchHit[], page, more: true, token: page.token };
+  }
+  if (page.completeness === "COMPLETE") {
+    if (page.complete !== true || page.has_more !== false || page.truncated !== false || page.continuation_supported !== true || (page.token !== undefined && page.token !== "")) throw new Error(t("The server returned conflicting completeness information."));
+    return { hits: hits as SearchHit[], page, more: false, token: "" };
+  }
+  throw new Error(t("The server did not provide a complete or pageable results set."));
+}
+
 export type SearchOpsFlow = {
   parsed: ParsedSearchQuery;
   plan: SearchPlan;
@@ -80,16 +124,20 @@ export type SearchFlow = {
   handleSearchFieldKeyDown: (event: ReactKeyboardEvent<HTMLFormElement>) => void;
   handleRecentsListKeyDown: (event: ReactKeyboardEvent<HTMLUListElement>) => void;
   runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<boolean>;
+  keywordBrowse: KeywordBrowseState | undefined;
+  runKeywordBrowseAction: () => Promise<void>;
+  invalidateKeywordBrowse: () => void;
   /** Submits search.query with one selected image as the query material (search by image). */
   runImageSearch: (subjectRef: string) => Promise<void>;
+  /** Submits a text description directly to the existing multimodal image dimension. */
+  runVisualTextSearch: (description: string) => Promise<void>;
   ops: SearchOpsFlow;
 };
 
 // The client-side half of the plan: predicates the daemon cannot express are
 // evaluated over the hits this query returned, and every one of them is
 // labelled as such. A predicate whose projection this browser does not have
-// (an empty tag vocabulary, no exact-identity counts) narrows nothing and is
-// reported instead of pretending to filter.
+// refuses the query instead of showing broad hits as though they were filtered.
 export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
   tagsBySubject: Map<string, string[]>;
   identityCounts: Map<string, number>;
@@ -104,6 +152,13 @@ export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
 }): { hits: SearchHit[]; unavailable: string[] } {
   if (plan.overLoadedResults.length === 0) return { hits, unavailable: [] };
   const unavailable: string[] = [];
+  for (const predicate of plan.overLoadedResults) {
+    if (predicate.operator === "tag" && !context.tagProjectionAvailable && !unavailable.includes("tag")) unavailable.push("tag");
+    if (predicate.operator === "dup" && !context.identityProjectionAvailable && !unavailable.includes("dup")) unavailable.push("dup");
+  }
+  // A missing projection invalidates the requested local predicate as a
+  // whole. Never keep broad hits and let the caller present them as filtered.
+  if (unavailable.length > 0) return { hits: [], unavailable };
   const tagsOf = (hit: SearchHit) => context.tagsBySubject.get(hit.subject_ref ?? "") ?? [];
   const identityCount = (hit: SearchHit) => {
     const key = context.identityKeyFor(hit);
@@ -127,7 +182,6 @@ export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
     for (const predicate of plan.overLoadedResults) {
       switch (predicate.operator) {
         case "tag": {
-          if (!context.tagProjectionAvailable) { if (!unavailable.includes("tag")) unavailable.push("tag"); continue; }
           const matches = tagsOf(hit).some((tag) => tag.toLowerCase() === predicate.value.toLowerCase());
           if (predicate.negated ? matches : !matches) return false;
           break;
@@ -150,7 +204,6 @@ export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
           break;
         }
         case "dup": {
-          if (!context.identityProjectionAvailable) { if (!unavailable.includes("dup")) unavailable.push("dup"); continue; }
           const duplicate = identityCount(hit) > 1;
           if (predicate.value === "yes" ? !duplicate : duplicate) return false;
           break;
@@ -164,12 +217,14 @@ export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
   return { hits: hits.filter(keeps), unavailable };
 }
 
-export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify, markConnected, recents, drafts, canLeaveSettings, exportFlow, library, setSelected, setViewMode }: {
+export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration, viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify, markConnected, recents, drafts, canLeaveSettings, exportFlow, library, setSelected, setViewMode }: {
   t: Translator;
   query: string;
   setQuery: (value: string) => void;
   setLastExecutedQuery: (value: string) => void;
   workspaceID: string;
+  refreshGeneration: number;
+  viewMode: ViewMode;
   isConnected: boolean;
   catalogHealthy: boolean;
   catalogStorageMessage: string;
@@ -196,6 +251,74 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const [editing, setEditing] = useState<PredicateEdit | undefined>(undefined);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [keywordBrowse, setKeywordBrowse] = useState<KeywordBrowseState>();
+  const keywordBrowseRef = useRef<KeywordBrowseChain | null>(null);
+  const keywordBrowseRequestRef = useRef(0);
+  const imageSearchInFlightRef = useRef(false);
+  const currentBrowseContextRef = useRef({ workspaceID, refreshGeneration, viewMode });
+  currentBrowseContextRef.current = { workspaceID, refreshGeneration, viewMode };
+  const localProjectionRef = useRef({
+    workspaceID,
+    tagReady: library.tagStatus === "ready" && library.tagSnapshotKnown && library.tagVocabularyWorkspaceID === workspaceID,
+    tagStatus: library.tagStatus,
+    tagSnapshotKnown: library.tagSnapshotKnown,
+    tagVocabularyWorkspaceID: library.tagVocabularyWorkspaceID,
+    workspaceTags: library.workspaceTags,
+    tagsBySubject: library.tagsBySubject,
+    identityCounts: library.identityCounts,
+  });
+  localProjectionRef.current = {
+    workspaceID,
+    tagReady: library.tagStatus === "ready" && library.tagSnapshotKnown && library.tagVocabularyWorkspaceID === workspaceID,
+    tagStatus: library.tagStatus,
+    tagSnapshotKnown: library.tagSnapshotKnown,
+    tagVocabularyWorkspaceID: library.tagVocabularyWorkspaceID,
+    workspaceTags: library.workspaceTags,
+    tagsBySubject: library.tagsBySubject,
+    identityCounts: library.identityCounts,
+  };
+
+  function unavailableLocalProjections(plan: SearchPlan, activeWorkspaceID: string, snapshot = localProjectionRef.current) {
+    const unavailable: string[] = [];
+    for (const predicate of plan.overLoadedResults) {
+      if (predicate.operator === "tag" && (snapshot.workspaceID !== activeWorkspaceID || !snapshot.tagReady)) unavailable.push("tag");
+      if (predicate.operator === "dup" && (snapshot.workspaceID !== activeWorkspaceID || snapshot.identityCounts.size === 0)) unavailable.push("dup");
+    }
+    return [...new Set(unavailable)];
+  }
+
+  function requiredLocalProjectionNames(plan: SearchPlan) {
+    return [...new Set(plan.overLoadedResults.flatMap((predicate) => predicate.operator === "tag" || predicate.operator === "dup" ? [predicate.operator] : []))];
+  }
+
+  function changedLocalProjectionNames(plan: SearchPlan, activeWorkspaceID: string, before: typeof localProjectionRef.current) {
+    const after = localProjectionRef.current;
+    const changed: string[] = [];
+    if (before.workspaceID !== activeWorkspaceID || after.workspaceID !== activeWorkspaceID) return requiredLocalProjectionNames(plan);
+    if (plan.overLoadedResults.some((predicate) => predicate.operator === "tag") && (before.tagReady !== after.tagReady || before.tagStatus !== after.tagStatus || before.tagSnapshotKnown !== after.tagSnapshotKnown || before.tagVocabularyWorkspaceID !== after.tagVocabularyWorkspaceID || before.workspaceTags !== after.workspaceTags || before.tagsBySubject !== after.tagsBySubject)) changed.push("tag");
+    if (plan.overLoadedResults.some((predicate) => predicate.operator === "dup") && before.identityCounts !== after.identityCounts) changed.push("dup");
+    return changed;
+  }
+
+  function localProjectionError(unavailable: string[]) {
+    const conditions = unavailable.map((condition) => condition === "tag" ? t("Tags") : t("Exact duplicates")).join(", ");
+    return t("Could not apply these filters: {{conditions}}. Their data is unavailable or changed. Previous results are unchanged; refresh and try again.", { conditions });
+  }
+
+  function invalidateKeywordBrowse() {
+    keywordBrowseRequestRef.current += 1;
+    keywordBrowseRef.current = null;
+    setKeywordBrowse(undefined);
+  }
+
+  useEffect(() => {
+    const chain = keywordBrowseRef.current;
+    if (!chain) return;
+    const context = currentBrowseContextRef.current;
+    if (context.viewMode !== "search" || context.workspaceID !== chain.capture.workspaceID || context.refreshGeneration !== chain.capture.refreshGeneration || exportFlow.recalledView) {
+      invalidateKeywordBrowse();
+    }
+  }, [exportFlow.recalledView, refreshGeneration, viewMode, workspaceID]);
 
   // The predicate row is a projection of the field text, never a second
   // source of truth: the same parse decides the chips, the errors, and the
@@ -428,6 +551,113 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     if (next) next.focus({ preventScroll: true });
     else if (event.key === "ArrowUp") focusSearchField();
   }
+  async function runKeywordBrowseAction() {
+    let chain = keywordBrowseRef.current;
+    if (!chain) return;
+    const firstPage = chain.phase === "available" || chain.phase === "first-error" || chain.phase === "stale";
+    const nextPage = chain.phase === "more" || chain.phase === "more-error";
+    if (!firstPage && !nextPage) return;
+    const context = currentBrowseContextRef.current;
+    if (context.viewMode !== "search" || context.workspaceID !== chain.capture.workspaceID || context.refreshGeneration !== chain.capture.refreshGeneration || exportFlow.recalledView) {
+      invalidateKeywordBrowse();
+      return;
+    }
+    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return; }
+    if (!chain.capture.workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return; }
+    if (firstPage && (!canLeaveSettings() || !drafts.canLeaveDetailDrafts())) return;
+
+    const projectionAtStart = localProjectionRef.current;
+    const unavailableAtStart = unavailableLocalProjections(chain.capture.plan, chain.capture.workspaceID, projectionAtStart);
+    if (unavailableAtStart.length > 0) {
+      const message = localProjectionError(unavailableAtStart);
+      chain.phase = firstPage ? "first-error" : "more-error";
+      setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: message });
+      notify({ kind: "error", text: message });
+      return;
+    }
+
+    const requestSequence = ++keywordBrowseRequestRef.current;
+    if (firstPage) {
+      chain = { ...chain, token: "", loaded: 0 };
+      keywordBrowseRef.current = chain;
+    }
+    chain.phase = firstPage ? "loading-first" : "loading-more";
+    const searchIntent = library.beginSearchIntent(chain.capture.workspaceID);
+    setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: "" });
+    notify(undefined);
+    try {
+      const response = await command(operations.search.query, {
+        workspace_id: chain.capture.workspaceID,
+        ...chain.capture.request,
+        dimension: KEYWORD_BROWSE_DIMENSION,
+        page: { limit: KEYWORD_BROWSE_PAGE_SIZE, ...(firstPage ? {} : { token: chain.token }) },
+      });
+      const liveContext = currentBrowseContextRef.current;
+      if (requestSequence !== keywordBrowseRequestRef.current || keywordBrowseRef.current !== chain || !library.isCurrentSearchIntent(searchIntent, chain.capture.workspaceID)) return;
+      if (liveContext.viewMode !== "search" || liveContext.workspaceID !== chain.capture.workspaceID || liveContext.refreshGeneration !== chain.capture.refreshGeneration || exportFlow.recalledView) {
+        invalidateKeywordBrowse();
+        return;
+      }
+      const changedProjections = changedLocalProjectionNames(chain.capture.plan, chain.capture.workspaceID, projectionAtStart);
+      if (changedProjections.length > 0) {
+        const message = localProjectionError(changedProjections);
+        chain.phase = firstPage ? "first-error" : "more-error";
+        setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: message });
+        notify({ kind: "error", text: message });
+        return;
+      }
+      const rawPage = (response.data as { page?: KeywordPageFacts } | undefined)?.page;
+      if (rawPage?.completeness === "BOUNDED_UNKNOWN") {
+        const rawHits = (response.data as { hits?: unknown } | undefined)?.hits;
+        if ((response.status !== "SUCCEEDED" && response.status !== "DEGRADED") || rawPage.mode !== "page" || rawPage.lane !== KEYWORD_BROWSE_DIMENSION || (rawPage.limit !== 0 && rawPage.limit !== KEYWORD_BROWSE_PAGE_SIZE) || !Array.isArray(rawHits) || rawPage.returned !== rawHits.length || rawPage.complete !== false || rawPage.has_more !== false || rawPage.truncated !== true || rawPage.continuation_supported !== false || (rawPage.token !== undefined && rawPage.token !== "")) {
+          throw new Error(t("The server returned conflicting completeness information."));
+        }
+        chain.phase = "bounded";
+        setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: "" });
+        return;
+      }
+      const page = readKeywordPage(response, t);
+      const loadedItems = library.currentLibraryItems(chain.capture.workspaceID);
+      const statusBySubject = new Map(loadedItems.map((item) => [item.subject_ref, item.index_status]));
+      const returned = resolveArchiveSelectionSizes(page.hits, loadedItems);
+      const identityBySubject = new Map(loadedItems.map((item) => [item.subject_ref ?? "", exactIdentityKey(item)]));
+      const narrowed = narrowSearchHits(returned, chain.capture.plan, {
+        tagsBySubject: library.tagsBySubject,
+        identityCounts: library.identityCounts,
+        identityKeyFor: (hit) => identityBySubject.get(hit.subject_ref ?? "") ?? "",
+        tagProjectionAvailable: projectionAtStart.tagReady,
+        identityProjectionAvailable: projectionAtStart.identityCounts.size > 0,
+      });
+      if (narrowed.unavailable.length > 0) throw new Error(localProjectionError(narrowed.unavailable));
+      const visibleHits = narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") }));
+      if (firstPage) {
+        if (!canLeaveSettings() || !drafts.canLeaveDetailDrafts()) {
+          chain.phase = "available";
+          setKeywordBrowse({ query: chain.capture.query, phase: "available", loaded: 0, error: "" });
+          return;
+        }
+        drafts.discardDetailDrafts();
+        library.setHits(visibleHits);
+      } else {
+        // The daemon's opaque token advances one exact lexical chain. Preserve
+        // its order and every returned subject; it owns exact-once paging.
+        library.setHits((current) => [...current, ...visibleHits]);
+      }
+      chain.loaded += page.hits.length;
+      chain.token = page.more ? page.token : "";
+      chain.phase = page.more ? "more" : "complete";
+      setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: "" });
+      markConnected();
+    } catch (caught) {
+      if (requestSequence !== keywordBrowseRequestRef.current || keywordBrowseRef.current !== chain || !library.isCurrentSearchIntent(searchIntent, chain.capture.workspaceID)) return;
+      const rawMessage = caught instanceof Error ? caught.message : "Search failed";
+      const message = t(rawMessage);
+      const refusedContinuation = !firstPage && /continuation|cursor/i.test(rawMessage);
+      chain.phase = firstPage ? "first-error" : refusedContinuation ? "stale" : "more-error";
+      if (refusedContinuation) chain.token = "";
+      setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: message });
+    }
+  }
   async function runSearch(event?: FormEvent, explicitQuery?: string) {
     event?.preventDefault();
     if (!canLeaveSettings()) return false;
@@ -447,6 +677,14 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return false; }
     if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return false; }
     if (!drafts.canLeaveDetailDrafts()) return false;
+    const projectionAtStart = localProjectionRef.current;
+    const unavailableAtStart = unavailableLocalProjections(submittedPlan, workspaceID, projectionAtStart);
+    if (unavailableAtStart.length > 0) {
+      notify({ kind: "error", text: localProjectionError(unavailableAtStart) });
+      return false;
+    }
+    invalidateKeywordBrowse();
+    const searchIntent = library.beginSearchIntent(workspaceID);
     setBusy(true); notify(undefined);
     try {
       // Leave dimension selection to the typed dispatcher so ordinary search
@@ -454,16 +692,24 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // operators only add the typed filters and the lexical field scope the
       // daemon already accepts.
       const response = await command(operations.search.query, { workspace_id: workspaceID, ...submittedPlan.request });
-      const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
-      const returned = resolveArchiveSelectionSizes((response.data?.hits ?? []) as SearchHit[], library.libraryItems);
-      const identityBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref ?? "", exactIdentityKey(item)]));
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
+      const changedProjections = changedLocalProjectionNames(submittedPlan, workspaceID, projectionAtStart);
+      if (changedProjections.length > 0) {
+        notify({ kind: "error", text: localProjectionError(changedProjections) });
+        return false;
+      }
+      const loadedItems = library.currentLibraryItems(workspaceID);
+      const statusBySubject = new Map(loadedItems.map((item) => [item.subject_ref, item.index_status]));
+      const returned = resolveArchiveSelectionSizes((response.data?.hits ?? []) as SearchHit[], loadedItems);
+      const identityBySubject = new Map(loadedItems.map((item) => [item.subject_ref ?? "", exactIdentityKey(item)]));
       const narrowed = narrowSearchHits(returned, submittedPlan, {
         tagsBySubject: library.tagsBySubject,
         identityCounts: library.identityCounts,
         identityKeyFor: (hit) => identityBySubject.get(hit.subject_ref ?? "") ?? "",
-        tagProjectionAvailable: library.workspaceTags.length > 0,
-        identityProjectionAvailable: library.identityCounts.size > 0,
+        tagProjectionAvailable: projectionAtStart.tagReady,
+        identityProjectionAvailable: projectionAtStart.identityCounts.size > 0,
       });
+      if (narrowed.unavailable.length > 0) throw new Error(localProjectionError(narrowed.unavailable));
       drafts.discardDetailDrafts();
       library.setHits(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
       setLastExecutedQuery(submittedQuery);
@@ -475,6 +721,24 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setActiveSuggestion(-1);
       setEditing(undefined);
       recents.pushRecentSearch(submittedQuery);
+      if (submittedPlan.request.query.trim() || Object.keys(submittedPlan.request.filters ?? {}).length > 0) {
+        keywordBrowseRef.current = {
+          capture: {
+            query: submittedQuery,
+            request: { ...submittedPlan.request, filters: { ...submittedPlan.request.filters }, ...(submittedPlan.request.construct_axes ? { construct_axes: [...submittedPlan.request.construct_axes] } : {}) },
+            plan: submittedPlan,
+            workspaceID,
+            refreshGeneration: currentBrowseContextRef.current.refreshGeneration,
+          },
+          token: "",
+          loaded: 0,
+          phase: "available",
+        };
+        setKeywordBrowse({ query: submittedQuery, phase: "available", loaded: 0, error: "" });
+      } else {
+        keywordBrowseRef.current = null;
+        setKeywordBrowse(undefined);
+      }
       exportFlow.invalidateForSearch();
       setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       if (response.status === "DEGRADED") {
@@ -483,7 +747,11 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       }
       markConnected();
       return true;
-    } catch (error) { notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") }); return false; }
+    } catch (error) {
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
+      notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") });
+      return false;
+    }
     finally { setBusy(false); }
   }
 
@@ -492,34 +760,74 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   // `search.query` operation and renders through the same fused pipeline; the
   // image is retrieval material the daemon resolves itself, and this browser
   // never reads or uploads the bytes.
-  async function runImageSearch(subjectRef: string) {
-    const imageSubjectRef = subjectRef.trim();
-    if (!imageSubjectRef) return;
+  async function runMultimodalSearch(input: { imageSubjectRef?: string; description?: string }) {
+    const imageSubjectRef = input.imageSubjectRef?.trim() ?? "";
+    const description = input.description?.trim() ?? "";
+    if (!imageSubjectRef && !description) return;
+    if (imageSearchInFlightRef.current) return;
     if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return; }
     if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return; }
     if (!drafts.canLeaveDetailDrafts()) return;
+    imageSearchInFlightRef.current = true;
+    const searchIntent = library.beginSearchIntent(workspaceID);
     setBusy(true); notify(undefined);
     try {
-      // The typed dispatcher owns the default broker; the image-only request
-      // carries no text and no filters, so the daemon skips every dimension
-      // that has no material for it and reports each one's reason.
-      const response = await command(operations.search.query, { workspace_id: workspaceID, image_subject_ref: imageSubjectRef });
-      const statusBySubject = new Map(library.libraryItems.map((item) => [item.subject_ref, item.index_status]));
-      const returned = resolveArchiveSelectionSizes((response.data?.hits ?? []) as SearchHit[], library.libraryItems);
+      // Pin the visual dimension so BGE/lexical results cannot stand in for a
+      // missing CLIP text or image result. The daemon still owns query policy,
+      // subject resolution and every source read.
+      const response = await command(operations.search.query, {
+        workspace_id: workspaceID,
+        dimension: "multimodal-clip",
+        ...(description ? { query: description } : { image_subject_ref: imageSubjectRef }),
+      });
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return;
+      const responseData = response.data as {
+        dimension?: string;
+        index_generation_ref?: string;
+        query_provider_ref?: string;
+        hits?: unknown;
+      } | undefined;
+      const generationRef = responseData?.index_generation_ref?.trim() ?? "";
+      const validGenerationRef = /^[a-z0-9]{2,12}_[a-f0-9]{32}$/.test(generationRef);
+      if (response.status !== "SUCCEEDED"
+        || responseData?.dimension !== "multimodal-clip"
+        || responseData?.query_provider_ref !== "query.multimodal.onnx-clip-zvec.v1"
+        || !validGenerationRef) {
+        const reason = response.reasons?.map((item) => item.message?.trim()).find(Boolean);
+        notify({ kind: "error", text: reason ? `${t("Visual search is unavailable")}: ${t(reason)}` : t("Visual search is unavailable") });
+        return;
+      }
+      if (!Array.isArray(responseData?.hits) || responseData.hits.some((hit) => !hit || typeof hit !== "object" || Array.isArray(hit) || !String((hit as SearchHit).subject_ref ?? "").trim())) {
+        throw new Error(t("The server did not return a usable results page."));
+      }
+      const loadedItems = library.currentLibraryItems(workspaceID);
+      const statusBySubject = new Map(loadedItems.map((item) => [item.subject_ref, item.index_status]));
+      const returned = resolveArchiveSelectionSizes(responseData.hits as SearchHit[], loadedItems);
+      invalidateKeywordBrowse();
       drafts.discardDetailDrafts();
       library.setHits(returned.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
-      // An image query has no field text: the results heading says so instead
-      // of echoing a query that was never run.
+      // Neither query is a lexical SavedView candidate: keep it out of the
+      // shared lexical field and let the Photos form retain its own prompt.
       setLastExecutedQuery("");
       setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       exportFlow.invalidateForSearch();
-      if (response.status === "DEGRADED") {
-        const reason = response.reasons?.map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.");
-        notify({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
-      }
       markConnected();
-    } catch (error) { notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") }); }
-    finally { setBusy(false); }
+    } catch (error) {
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return;
+      notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") });
+    }
+    finally {
+      imageSearchInFlightRef.current = false;
+      if (library.isCurrentSearchIntent(searchIntent, workspaceID)) setBusy(false);
+    }
+  }
+
+  async function runImageSearch(subjectRef: string) {
+    await runMultimodalSearch({ imageSubjectRef: subjectRef });
+  }
+
+  async function runVisualTextSearch(description: string) {
+    await runMultimodalSearch({ description });
   }
 
   return {
@@ -540,7 +848,11 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     handleSearchFieldKeyDown,
     handleRecentsListKeyDown,
     runSearch,
+    keywordBrowse,
+    runKeywordBrowseAction,
+    invalidateKeywordBrowse,
     runImageSearch,
+    runVisualTextSearch,
     ops,
   };
 }

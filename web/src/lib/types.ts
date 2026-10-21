@@ -23,9 +23,17 @@ export type SearchSegment = {
   language?: string;
   matched_excerpt?: string;
   match_spans?: Array<{ start_byte: number; end_byte: number }>;
+  text_source_provenance?: {
+    source_revision: string;
+    body_digest: string;
+    segmentation_profile_digest: string;
+    source_start_byte: number;
+    source_end_byte: number;
+    text_digest: string;
+  };
 };
 
-export type SearchHit = { subject_ref?: string; entry_id?: string; name?: string; path?: string; entry_type?: string; content_id?: string; logical_size?: number; segments?: SearchSegment[]; index_status?: { lexical?: string; semantic?: string; tags?: string } };
+export type SearchHit = { subject_ref?: string; entry_id?: string; name?: string; path?: string; entry_type?: string; content_id?: string; logical_size?: number; modified_at?: string; segments?: SearchSegment[]; index_status?: { lexical?: string; semantic?: string; tags?: string } };
 
 export type ExportItem = { subject_ref?: string; output_name?: string; content_id?: string; logical_size?: number; exact?: boolean };
 export type ExportManifestData = { manifest_id?: string; manifest_digest?: string; view_id?: string; subject_count?: number; representation?: string; target?: string; created_at?: string; items?: string[] };
@@ -67,6 +75,32 @@ export type SourceStaging = { path?: string; files?: number; bytes?: number; pro
 export type UploadFileRow = { original_name?: string; stored_name?: string; stored_path?: string; sha256?: string; length?: number; name_rewritten?: boolean; skipped_reason?: string; message?: string };
 export type UploadOutcome = { staging_dir?: string; files?: UploadFileRow[]; reason?: string; message?: string; error?: string };
 export type SourceProjection = { state: "READY" | "DEGRADED"; message?: string };
+
+export type StorageMeasure = { status?: "MEASURED" | "UNMEASURED" | "UNAVAILABLE" | string; bytes?: number; reason?: string };
+export type StorageReport = {
+  status?: "MEASURED" | "PARTIAL" | "UNAVAILABLE" | string;
+  reason?: string;
+  basis?: string;
+  config_digest?: string;
+  repository_profile?: string;
+  compression_profile?: string;
+  snapshot_count?: number;
+  retained_exact_reference_bytes?: StorageMeasure;
+  unique_exact_object_logical_bytes?: StorageMeasure;
+  whole_file_duplicate_reference_savings_bytes?: StorageMeasure;
+  compression_savings_bytes?: StorageMeasure;
+  stored_object_file_bytes?: StorageMeasure;
+  repository_metadata_file_bytes?: StorageMeasure;
+  repository_recovery_record_file_bytes?: StorageMeasure;
+  configured_recovery_records_file_bytes?: StorageMeasure;
+  catalog_file_bytes?: StorageMeasure;
+  vector_index_file_bytes?: StorageMeasure;
+  model_file_bytes?: StorageMeasure;
+  temporary_file_bytes?: StorageMeasure;
+  retained_source_bytes?: StorageMeasure;
+  repository_footprint_file_bytes?: StorageMeasure;
+  net_savings_bytes?: StorageMeasure;
+};
 
 // The path-level change the daemon classified between two restore points
 // (`snapshot.diff`). `kind` is the daemon's own token (`added`, `removed`,
@@ -138,10 +172,15 @@ export type ExportManifestSource = "planned" | "history";
 // set that `content.list` returns. Sorting is therefore a browser-side order
 // over items already loaded, never a server query; search results keep the
 // relevance order the daemon returned.
-export type SortField = "name" | "size" | "type" | "path";
+export type SortField = "name" | "size" | "type" | "path" | "modified";
 export type SortDirection = "asc" | "desc";
 export type LibraryLayout = "grid" | "list";
-export type RecalledView = { view_id: string; name: string; revision: number; query: string; fields?: string[]; state: "READY" | "DEGRADED" | "EMPTY"; message?: string };
+export type RecalledView = { view_id: string; name: string; revision: number; query: string; fields?: string[]; loadedCount: number; totalCount?: number; mayHaveMore: boolean; pageState?: "more" | "paging" | "complete" | "stale"; state: "READY" | "DEGRADED" | "EMPTY"; message?: string };
+// Stored scope belongs to the saved record; foreignScope is a transient
+// comparison with the currently open workspace, never a catalog mutation.
+export type RecalledViewState = RecalledView & { foreignScope?: boolean };
+// Explains a failed recall that retracted a previously displayed view.
+export type FailedRecall = { name: string; message: string };
 export type SavedViewData = { view_id?: string; name?: string; query?: string; fields?: string[]; scope?: string; sort?: string; output_names?: string; when_missing?: string; required_capabilities?: string[]; revision?: number; created_at?: string; updated_at?: string };
 export type ExportActionState = "IDLE" | "SAVING_VIEW" | "PLANNING" | "APPLYING" | "VERIFYING" | "SUCCEEDED" | "FAILED";
 export type PlanActionState = "IDLE" | "INSPECTING" | "PROTECTING" | "SUCCEEDED" | "FAILED";

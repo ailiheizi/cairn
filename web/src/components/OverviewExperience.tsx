@@ -1,5 +1,5 @@
 import { ArrowRight, Check, File, Image as ImageIcon, Music2, Play, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { AudioTrack } from "../lib/audioPlayback";
 import { formatBytes } from "../lib/format";
 import { playableMusicTrack, type MusicMetadataState } from "../lib/musicMetadata";
@@ -24,6 +24,7 @@ export type OverviewExperienceProps = {
   musicDestination?: LibraryPageMode;
   renderThumbnail: (hit: SearchHit) => ReactNode;
   onToggleSelection: (index: number) => void;
+  onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove") => void;
   onOpenHit: (hit: SearchHit) => void;
   onNavigate: (mode: "content" | LibraryPageMode) => void;
   onPlayTrack?: (track: AudioTrack) => void;
@@ -34,9 +35,42 @@ export type OverviewExperienceProps = {
 export function OverviewExperience(props: OverviewExperienceProps) {
   const { hits, t, workspaceID, selectedRef, selectionRefs, tagsBySubject, metadata, photoDestination, musicDestination, onNavigate, onPlayTrack, onQueueTrack, onPlayTracks } = props;
   const sections = projectOverviewSections(hits);
+  const scopeSubjectOccurrences = new Map<string, number>();
+  for (const hit of props.hits) {
+    const ref = hit.subject_ref?.trim() ?? "";
+    if (ref) scopeSubjectOccurrences.set(ref, (scopeSubjectOccurrences.get(ref) ?? 0) + 1);
+  }
+  const sectionSelectionTargets = (rows: OverviewRow[]) => {
+    const byRef = new Map<string, SearchHit[]>();
+    for (const { hit } of rows) {
+      const ref = hit.subject_ref?.trim() ?? "";
+      if (ref) byRef.set(ref, [...(byRef.get(ref) ?? []), hit]);
+    }
+    const eligible = [...byRef.entries()].flatMap(([ref, matches]) => matches.length === 1 && scopeSubjectOccurrences.get(ref) === 1 ? matches : []);
+    const selected = eligible.filter((hit) => selectionRefs.includes(hit.subject_ref!.trim()));
+    return { eligible, selected, skipped: rows.length - eligible.length };
+  };
+  const sectionSelectionActions = (label: string, section: OverviewSection) => {
+    if (!props.onSelectSubjects || !section.rows.length) return null;
+    const targets = sectionSelectionTargets(section.rows);
+    return <div className="overview-selection-block" key={label}>
+      <strong>{t(label)}</strong>
+      <p>{t("{{eligible}} of {{displayed}} displayed items can be selected; {{skipped}} items without one clear identity were skipped.", { eligible: targets.eligible.length, displayed: section.rows.length, skipped: targets.skipped })}</p>
+      <div>
+        {targets.eligible.length > 0 && <button type="button" onClick={() => props.onSelectSubjects?.(targets.eligible, "add")}>{t("Select displayed items ({{count}})", { count: targets.eligible.length })}</button>}
+        {targets.selected.length > 0 && <button type="button" onClick={() => props.onSelectSubjects?.(targets.selected, "remove")}>{t("Clear displayed selection ({{count}})", { count: targets.selected.length })}</button>}
+      </div>
+    </div>;
+  };
+  const sectionSelectionBlocks = [
+    photoDestination ? sectionSelectionActions("Photos in this scope", sections.photos) : null,
+    musicDestination ? sectionSelectionActions("Audio in this scope", sections.audio) : null,
+    sectionSelectionActions("Other content in this scope", sections.other),
+  ].filter((item): item is ReactElement => Boolean(item));
   const playableRows = musicDestination && onPlayTracks
     ? sections.audio.rows.flatMap(({ hit, index }) => {
-      const track = playableMusicTrack(hit, workspaceID);
+      const facts = hit.subject_ref ? metadata?.records.get(hit.subject_ref) : undefined;
+      const track = playableMusicTrack(hit, workspaceID, facts);
       return track ? [{ hit, index, track }] : [];
     })
     : [];
@@ -62,6 +96,10 @@ export function OverviewExperience(props: OverviewExperienceProps) {
       <div><p className="overview-eyebrow">{t("A cross-section of this library")}</p><h1>{t("Content overview")}</h1></div>
       <p className="overview-scope-note">{t("This overview uses the current content scope.")}</p>
     </header>
+    {sectionSelectionBlocks.length > 0 && props.onSelectSubjects && <details className="overview-selection-tools">
+      <summary>{t("Select displayed items")}</summary>
+      <div>{sectionSelectionBlocks}</div>
+    </details>}
 
     <section className="overview-photos" aria-label={t("Photos in this scope")} data-mounted-thumbnail-limit={OVERVIEW_SECTION_LIMIT}>
       {sectionHeading(<ImageIcon />, "Photos in this scope", sections.photos)}
@@ -95,7 +133,7 @@ export function OverviewExperience(props: OverviewExperienceProps) {
               {sections.audio.rows.map((row) => {
                 const name = row.hit.name?.trim() || t("Untitled subject");
                 const facts = row.hit.subject_ref ? metadata?.records.get(row.hit.subject_ref) : undefined;
-                const track = playableMusicTrack(row.hit, workspaceID);
+                const track = playableMusicTrack(row.hit, workspaceID, facts);
                 const factLine = [facts?.title, facts?.artist, facts?.album].filter(Boolean).join(" · ");
                 const fallbackLine = [!facts && metadata?.status === "ready" ? t("No recorded audio facts") : "", row.hit.logical_size != null ? formatBytes(row.hit.logical_size) : "", ...tagsFor(row.hit).slice(0, 1)].filter(Boolean).join(" · ");
                 return <article key={row.hit.subject_ref || row.hit.entry_id || `${row.index}`} className={`overview-audio-row ${selectedRef === row.hit.subject_ref ? "is-focused" : ""}`}>

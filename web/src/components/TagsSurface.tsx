@@ -3,6 +3,8 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AlertCircle, ExternalLink, RefreshCw, Tags as TagsIcon, Undo2 } from "lucide-react";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
+import { lexicalProtectionAxisAnswered, PROTECTION_OUTCOMES, projectProtectionAxis } from "../lib/protectionAxis";
+import { workspaceIDFromStatus } from "../lib/workspace";
 import type { Translator } from "../i18n";
 import type { AnnotationRecord, SearchHit } from "../lib/types";
 
@@ -53,20 +55,6 @@ import type { AnnotationRecord, SearchHit } from "../lib/types";
 // workspace from the same browser-local value the shell records, falling back
 // to the daemon's `status.get` projection (exactly like the duplicate review
 // surface). No durable state is created here.
-
-/** The protection outcomes the daemon's protection axis can answer. */
-const PROTECTION_OUTCOMES = [
-  "EXACT_PROTECTED",
-  "EXACT_FALLBACK",
-  "EXTERNAL_REPLAYABLE",
-  "LINK_ONLY_UNPROTECTED",
-  "EXPLICITLY_UNPROTECTED",
-  "BLOCKED",
-  "UNAVAILABLE",
-] as const;
-
-/** The lexical component of a fused search answer reports whether it answered. */
-const LEXICAL_DIMENSION = "lexical-metadata-fts";
 
 type SurfaceState = "IDLE" | "LOADING" | "READY" | "BLOCKED";
 
@@ -162,10 +150,7 @@ function applyReportFromResponse(request: { from: string; to: string; digest: st
 }
 
 /** True when the daemon's lexical projection actually answered this query. */
-function lexicalAnswered(data: any) {
-  const components = Array.isArray(data?.components) ? data.components : [];
-  return components.some((component: any) => component?.dimension === LEXICAL_DIMENSION && component?.status === "SUCCEEDED" && Boolean(component?.index_generation_ref));
-}
+const lexicalAnswered = lexicalProtectionAxisAnswered;
 
 /** The admitted protection outcomes, labeled by the keys the duplicate review already owns. */
 function protectionLabelKey(token: string) {
@@ -289,15 +274,7 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
     // the published workspace; this is a read.
     try {
       const response = await command(operations.status.get, {});
-      const candidates = [
-        response.data?.recent_plans?.[0]?.workspace_id,
-        response.data?.recent_jobs?.[0]?.workspace_id,
-        response.data?.index?.[0]?.workspace_id,
-      ];
-      for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) return { workspaceID: candidate.trim(), error: "" };
-      }
-      return { workspaceID: "", error: "" };
+      return { workspaceID: workspaceIDFromStatus(response.data), error: "" };
     } catch (error) {
       return { workspaceID: "", error: messageOf(error) };
     }
@@ -364,24 +341,8 @@ export function TagsSurface({ t, onOpenInLibrary }: TagsSurfaceProps) {
       filters: { protection_mode: outcome },
     })));
     if (protectionTokenRef.current !== token) return;
-    const bySubject: Record<string, string> = {};
-    let answered = false;
-    let reason = "";
-    PROTECTION_OUTCOMES.forEach((outcome, index) => {
-      const result = settled[index];
-      if (result.status !== "fulfilled") {
-        if (!reason) reason = messageOf(result.reason);
-        return;
-      }
-      if (lexicalAnswered(result.value.data)) answered = true;
-      else if (!reason) reason = String(result.value.reasons?.[0]?.message ?? "");
-      for (const hit of (Array.isArray(result.value.data?.hits) ? result.value.data.hits : [])) {
-        const subjectRef = String(hit?.subject_ref ?? "").trim();
-        if (subjectRef && !bySubject[subjectRef]) bySubject[subjectRef] = outcome;
-      }
-    });
-    if (!answered) reason ||= t("the daemon did not report a protection generation for the content here");
-    setProtection((current) => ({ ...current, [name]: { status: "READY", bySubject, reason: answered ? "" : reason } }));
+    const axis = projectProtectionAxis(settled, PROTECTION_OUTCOMES, messageOf, t("the daemon did not report a protection generation for the content here"));
+    setProtection((current) => ({ ...current, [name]: { status: "READY", bySubject: Object.fromEntries(axis.bySubject), reason: axis.answered ? "" : axis.reason } }));
   }
 
   useEffect(() => {

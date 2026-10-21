@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Eye, LoaderCircle, Maximize2, Minus, Plus, X } from "lucide-react";
+import { AlertCircle, Eye, LoaderCircle, Maximize2, Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
 import { createTranslator } from "../i18n";
 import type { Locale } from "../i18n";
 import { operations } from "../lib/operations";
+import { splitTextReferences } from "../lib/textReferences";
 import "./ContentPreview.css";
 
 export type PreviewLocale = Locale;
@@ -30,6 +31,8 @@ export type ContentPreviewProps = {
   className?: string;
   autoOpen?: boolean;
   variant?: "inspector" | "thumb";
+  /** Render the shared bounded image controls directly inside an existing host viewer. */
+  directImageControls?: boolean;
 };
 
 type OpenData = { handle?: string; entry_id?: string; subject_ref?: string; content_id?: string; logical_size?: number; max_read?: number };
@@ -37,12 +40,13 @@ type ReadData = { handle?: string; offset?: number; length?: number; bytes?: str
 type PreviewState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "ready-text"; text: string }
+  | { kind: "ready-text"; text: string; identity: string }
   | { kind: "ready-image"; url: string; mime: string }
   | { kind: "unavailable"; reason: "unsupported-format" | "size-limit" | "original-unavailable"; message: string }
   | { kind: "error"; message: string };
 type UnavailablePreviewState = Extract<PreviewState, { kind: "unavailable" }>;
 type NaturalSize = { width: number; height: number };
+type ImageRotation = 0 | 90 | 180 | 270;
 
 const FALLBACK_MAX_READ = 1 << 20;
 const TEXT_BUDGET = 64 << 10;
@@ -85,8 +89,59 @@ function writeThumbCache(key: string, entry: ThumbCacheEntry) {
   }
 }
 
-function clampZoom(value: number): number {
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+function clampZoom(value: number, minimum = ZOOM_MIN): number {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.min(ZOOM_MAX, Math.max(minimum, value));
+}
+
+function displayZoom(value: number): string {
+  if (value >= 10) return `${Math.round(value)}`;
+  if (value >= 1) return `${Number(value.toFixed(1))}`;
+  return `${Number(value.toPrecision(2))}`;
+}
+
+function findMatches(text: string, query: string): number[] {
+  const needle = query.trim();
+  if (!needle) return [];
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matches: number[] = [];
+  const expression = new RegExp(escaped, "giu");
+  let match: RegExpExecArray | null;
+  while ((match = expression.exec(text)) !== null) {
+    matches.push(match.index);
+    if (match[0].length === 0) expression.lastIndex += 1;
+  }
+  return matches;
+}
+
+function highlightedParts(value: string, start: number, matches: number[], queryLength: number, activeMatch: number) {
+  if (queryLength === 0 || matches.length === 0) return value;
+  const end = start + value.length;
+  const slices: Array<{ text: string; matchIndex?: number }> = [];
+  let cursor = start;
+  let low = 0;
+  let high = matches.length;
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2);
+    if (matches[middle] + queryLength <= start) low = middle + 1;
+    else high = middle;
+  }
+  for (let matchIndex = low; matchIndex < matches.length; matchIndex += 1) {
+    const matchStart = matches[matchIndex];
+    if (matchStart >= end) break;
+    const matchEnd = matchStart + queryLength;
+    const overlapStart = Math.max(matchStart, start);
+    const overlapEnd = Math.min(matchEnd, end);
+    if (overlapStart >= overlapEnd || overlapStart < cursor) continue;
+    if (overlapStart > cursor) slices.push({ text: value.slice(cursor - start, overlapStart - start) });
+    slices.push({ text: value.slice(overlapStart - start, overlapEnd - start), matchIndex });
+    cursor = overlapEnd;
+  }
+  if (cursor < end) slices.push({ text: value.slice(cursor - start) });
+  if (slices.length === 0) return value;
+  return slices.map((slice, index) => slice.matchIndex === undefined
+    ? <span key={`part-${index}`}>{slice.text}</span>
+    : <mark key={`match-${slice.matchIndex}`} data-match-index={slice.matchIndex} className={slice.matchIndex === activeMatch ? "cairn-content-preview__match cairn-content-preview__match--active" : "cairn-content-preview__match"}>{slice.text}</mark>);
 }
 
 function messageFor(result: PreviewCommandResult, fallback: string): string {
@@ -144,17 +199,53 @@ export function previewThumbBudget(): number {
   return IMAGE_BUDGET;
 }
 
-export function ContentPreview({ command, locale = "en", workspaceId, entryId, subjectRef, contentId, name, logicalSize, exactAvailable = true, className = "", autoOpen = false, variant = "inspector" }: ContentPreviewProps) {
+export function ContentPreview({ command, locale = "en", workspaceId, entryId, subjectRef, contentId, name, logicalSize, exactAvailable = true, className = "", autoOpen = false, variant = "inspector", directImageControls = false }: ContentPreviewProps) {
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const findInputId = useId();
+  const previewIdentity = `${workspaceId}\u0000${entryId ?? ""}\u0000${subjectRef ?? ""}\u0000${contentId ?? ""}\u0000${name}`;
   const [open, setOpen] = useState(Boolean(autoOpen) || variant === "thumb");
   const [state, setState] = useState<PreviewState>({ kind: "idle" });
+  const visibleText = state.kind === "ready-text" && state.identity === previewIdentity ? state.text : "";
+  const textReferences = useMemo(() => visibleText ? splitTextReferences(visibleText) : [], [visibleText]);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [activeMatch, setActiveMatch] = useState(0);
+  const [wrapLines, setWrapLines] = useState(true);
+  const [copyStatus, setCopyStatus] = useState("");
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const findTriggerRef = useRef<HTMLButtonElement>(null);
+  const textRef = useRef<HTMLPreElement>(null);
+  const searchMatches = useMemo(() => findMatches(visibleText, findQuery), [visibleText, findQuery]);
+  const searchLength = findQuery.trim().length;
   const [thumbNaturalSize, setThumbNaturalSize] = useState<NaturalSize>();
   const [naturalSize, setNaturalSize] = useState<NaturalSize>();
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerFailed, setViewerFailed] = useState("");
   const objectUrlRef = useRef<string | undefined>(undefined);
   const requestRef = useRef(0);
+  const identityRef = useRef(previewIdentity);
+  identityRef.current = previewIdentity;
   const viewerOpenerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setFindOpen(false);
+    setFindQuery("");
+    setActiveMatch(0);
+    setWrapLines(true);
+    setCopyStatus("");
+  }, [previewIdentity]);
+
+  useEffect(() => {
+    if (findOpen) findInputRef.current?.focus();
+  }, [findOpen]);
+
+  useEffect(() => {
+    if (!visibleText || searchMatches.length === 0) return;
+    const selected = searchMatches[Math.min(activeMatch, searchMatches.length - 1)];
+    const node = textRef.current?.querySelector(`[data-match-index="${Math.min(activeMatch, searchMatches.length - 1)}"]`);
+    if (node instanceof HTMLElement) node.scrollIntoView({ block: "nearest", inline: "nearest" });
+    else if (selected !== undefined) textRef.current?.scrollTo({ top: 0 });
+  }, [activeMatch, searchMatches, visibleText]);
 
   const releaseUrl = useCallback(() => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -166,7 +257,26 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     releaseUrl();
     setOpen(false);
     setState({ kind: "idle" });
+    setFindOpen(false);
+    setFindQuery("");
+    setActiveMatch(0);
+    setCopyStatus("");
   }, [releaseUrl]);
+
+  const copyLoadedText = useCallback(async () => {
+    if (state.kind !== "ready-text" || state.identity !== previewIdentity) return;
+    const identity = previewIdentity;
+    const requestId = requestRef.current;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(state.text);
+      if (requestRef.current !== requestId || identityRef.current !== identity) return;
+      setCopyStatus(t("Copied the full loaded text."));
+    } catch {
+      if (requestRef.current !== requestId || identityRef.current !== identity) return;
+      setCopyStatus(t("Could not copy text. Clipboard access is unavailable or was denied."));
+    }
+  }, [previewIdentity, state, t]);
 
   const openViewer = useCallback((trigger: HTMLElement | null) => {
     viewerOpenerRef.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -298,7 +408,7 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
         } else if (textCandidate && !mime) {
           const text = new TextDecoder("utf-8", { fatal: true }).decode(all);
           if (text.includes("\u0000")) throw new Error(t("The content could not be decoded safely."));
-          setState({ kind: "ready-text", text });
+          setState({ kind: "ready-text", text, identity: previewIdentity });
         } else {
           throw new Error(t("The content could not be decoded safely."));
         }
@@ -314,7 +424,7 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     };
     void run();
     return cleanup;
-  }, [command, contentId, entryId, exactAvailable, logicalSize, name, open, releaseUrl, subjectRef, t, variant, workspaceId]);
+  }, [command, contentId, entryId, exactAvailable, logicalSize, name, open, previewIdentity, releaseUrl, subjectRef, t, variant, workspaceId]);
 
   if (variant === "thumb") {
     // A tile preview is decorative: it adds no interactive element and it
@@ -353,12 +463,68 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
     {!open && <button type="button" className="cairn-content-preview__trigger" onClick={() => { releaseUrl(); setState({ kind: "idle" }); setOpen(true); }} disabled={!workspaceId || (!entryId && !subjectRef)}>
       <Eye size={16} aria-hidden="true" /> {t("Preview")}
     </button>}
-    {open && <section className="cairn-content-preview__panel" aria-live="polite" aria-label={t("Preview")}>
+    {open && <section className="cairn-content-preview__panel" aria-live="polite" aria-label={t("Preview")} onKeyDown={(event) => {
+      if (event.key === "Escape" && findOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        setFindOpen(false);
+        setFindQuery("");
+        setActiveMatch(0);
+        findTriggerRef.current?.focus();
+      } else if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "f" && variant === "inspector" && state.kind === "ready-text" && state.identity === previewIdentity) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (findOpen) findInputRef.current?.focus();
+        else setFindOpen(true);
+      }
+    }}>
       <div className="cairn-content-preview__header"><strong>{name}</strong><button type="button" className="cairn-content-preview__close" onClick={closePreview} aria-label={t("Close preview")}><X size={18} aria-hidden="true" /></button></div>
       {state.kind === "loading" && <div className="cairn-content-preview__status"><LoaderCircle className="cairn-content-preview__spin" size={18} aria-hidden="true" /> {t("Reading exact content...")}</div>}
       {(state.kind === "unavailable" || state.kind === "error") && <div className={`cairn-content-preview__status ${state.kind === "error" ? "cairn-content-preview__status--error" : `cairn-content-preview__status--unavailable ${state.reason === "original-unavailable" ? "cairn-content-preview__status--unavailable-critical" : ""}`}`} data-state={state.kind} data-reason={state.kind === "unavailable" ? state.reason : undefined}><strong>{state.kind === "error" ? t("Preview failed") : state.reason === "size-limit" ? t("Preview size limit reached") : state.reason === "original-unavailable" ? t("Original content unavailable") : t("Preview not provided for this format")}</strong><span>{state.message}</span>{state.kind === "error" && <button type="button" className="cairn-content-preview__retry" onClick={() => { closePreview(); setTimeout(() => setOpen(true), 0); }}>{t("Retry")}</button>}</div>}
-      {state.kind === "ready-text" && <pre className="cairn-content-preview__text">{state.text}</pre>}
-      {state.kind === "ready-image" && <div className="cairn-content-preview__image-wrap">
+      {state.kind === "ready-text" && state.identity === previewIdentity && <>
+        {variant === "inspector" && <div className="cairn-content-preview__text-tools">
+          <button ref={findTriggerRef} type="button" aria-expanded={findOpen} onClick={() => {
+            if (findOpen) { setFindOpen(false); setFindQuery(""); setActiveMatch(0); }
+            else setFindOpen(true);
+            setCopyStatus("");
+          }}>{findOpen ? t("Close find") : t("Find in text")}</button>
+          <button type="button" aria-pressed={wrapLines} onClick={() => setWrapLines((value) => !value)}>{wrapLines ? t("Disable line wrap") : t("Enable line wrap")}</button>
+          <button type="button" onClick={() => void copyLoadedText()}>{t("Copy full text")}</button>
+          {findOpen && <div className="cairn-content-preview__find" role="search">
+            <label htmlFor={findInputId}>{t("Find in loaded text")}</label>
+            <input id={findInputId} ref={findInputRef} type="search" value={findQuery} onChange={(event) => { setFindQuery(event.currentTarget.value); setActiveMatch(0); }} onKeyDown={(event) => {
+              if (event.key === "Enter" && searchMatches.length > 0) { event.preventDefault(); setActiveMatch((index) => (index + (event.shiftKey ? searchMatches.length - 1 : 1)) % searchMatches.length); }
+            }} />
+            <span className="cairn-content-preview__find-count" aria-live="polite">{findQuery.trim() ? searchMatches.length === 0 ? t("No matches") : t("Match {{current}} of {{total}}", { current: Math.min(activeMatch + 1, searchMatches.length), total: searchMatches.length }) : t("Enter text to find")}</span>
+            <button type="button" onClick={() => setActiveMatch((index) => (index + searchMatches.length - 1) % searchMatches.length)} disabled={searchMatches.length === 0}>{t("Previous match")}</button>
+            <button type="button" onClick={() => setActiveMatch((index) => (index + 1) % searchMatches.length)} disabled={searchMatches.length === 0}>{t("Next match")}</button>
+          </div>}
+          {copyStatus && <span className="cairn-content-preview__copy-status" role="status">{copyStatus}</span>}
+        </div>}
+        <pre ref={textRef} className={`cairn-content-preview__text${wrapLines ? "" : " cairn-content-preview__text--no-wrap"}`}>{(() => {
+          let offset = 0;
+          return textReferences.map((part, index) => {
+            const value = part.value;
+            const content = highlightedParts(value, offset, searchMatches, searchLength, activeMatch);
+            offset += value.length;
+            return part.kind === "link"
+              ? <a key={`link-${index}`} href={part.href} target="_blank" rel="noopener noreferrer">{content}</a>
+              : <span key={`text-${index}`}>{content}</span>;
+          });
+        })()}</pre>
+      </>}
+      {state.kind === "ready-image" && directImageControls && <ImageViewer
+        key={`${previewIdentity}\u0000${state.url}`}
+        embedded
+        name={name}
+        url={state.url}
+        message=""
+        t={t}
+        onClose={() => undefined}
+        onFail={setViewerFailed}
+        failed={viewerFailed}
+      />}
+      {state.kind === "ready-image" && !directImageControls && <div className="cairn-content-preview__image-wrap">
         <button type="button" className="cairn-content-preview__image-button" aria-label={t("View full size")} onClick={(event) => openViewer(event.currentTarget)}>
           <img className="cairn-content-preview__image" src={state.url} alt={t("Content preview")} onLoad={(event) => {
             const image = event.currentTarget;
@@ -369,13 +535,14 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
           <Maximize2 size={15} aria-hidden="true" /> {t("View full size")}
         </button>
       </div>}
-      {imageName && (state.kind === "unavailable" || state.kind === "error") && <div className="cairn-content-preview__image-wrap">
+      {!directImageControls && imageName && (state.kind === "unavailable" || state.kind === "error") && <div className="cairn-content-preview__image-wrap">
         <button type="button" className="cairn-content-preview__viewer-button" onClick={(event) => openViewer(event.currentTarget)}>
           <Maximize2 size={15} aria-hidden="true" /> {t("View full size")}
         </button>
       </div>}
     </section>}
     {viewerOpen && createPortal(<ImageViewer
+      key={`${previewIdentity}\u0000${state.kind === "ready-image" ? state.url : ""}`}
       name={name}
       url={state.kind === "ready-image" ? state.url : ""}
       message={viewerMessage}
@@ -389,9 +556,12 @@ export function ContentPreview({ command, locale = "en", workspaceId, entryId, s
 }
 
 type ImageViewerProps = {
+  embedded?: boolean;
   name: string;
   url: string;
   message: string;
+  // Kept on the call boundary, but the viewer measures its own image so a
+  // size from the previous URL can never leak into this inspection.
   naturalSize?: NaturalSize;
   failed: string;
   t: ReturnType<typeof createTranslator>;
@@ -401,30 +571,36 @@ type ImageViewerProps = {
 
 // The viewer is the actual reader for pictures. It never fabricates a stage:
 // without readable bytes it states the reason and shows no image area at all.
-function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFail }: ImageViewerProps) {
+function ImageViewer({ embedded = false, name, url, message, failed, t, onClose, onFail }: ImageViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
-  const [natural, setNatural] = useState<NaturalSize | undefined>(naturalSize);
+  const [natural, setNatural] = useState<{ url: string; size: NaturalSize }>();
   const [zoom, setZoom] = useState<number>();
+  const [rotation, setRotation] = useState<ImageRotation>(0);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  const measured = natural ?? naturalSize;
+  const measured = natural?.url === url ? natural.size : undefined;
 
-  const fitZoom = useCallback(() => {
+  const fitZoom = useCallback((angle: ImageRotation = rotation) => {
     const stage = stageRef.current;
-    const size = natural ?? naturalSize;
+    const size = natural?.url === url ? natural.size : undefined;
     if (!stage || !size?.width || !size.height) return 100;
     const rect = stage.getBoundingClientRect();
     if (!rect.width || !rect.height) return 100;
+    const quarterTurn = angle % 180 !== 0;
+    const width = quarterTurn ? size.height : size.width;
+    const height = quarterTurn ? size.width : size.height;
     // Fit shrinks a large picture to the window; it never invents pixels by
     // magnifying past the actual size.
-    return clampZoom(Math.round(Math.min(rect.width / size.width, rect.height / size.height, 1) * 100));
-  }, [natural, naturalSize]);
+    const ratio = Math.min(rect.width / width, rect.height / height, 1);
+    return Number.isFinite(ratio) && ratio > 0 ? ratio * 100 : 100;
+  }, [natural, rotation, url]);
 
   // Move focus into the dialog and keep Tab inside it. Escape closes and the
   // opener regains focus through the parent's unmount cleanup.
   useEffect(() => {
+    if (embedded) return undefined;
     const dialog = dialogRef.current;
     dialog?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
     const previousOverflow = document.body.classList.contains("drawer-open");
@@ -444,7 +620,7 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
       document.removeEventListener("keydown", handleKeyDown, true);
       if (!previousOverflow) document.body.classList.remove("drawer-open");
     };
-  }, [onClose]);
+  }, [embedded, onClose]);
 
   useEffect(() => { setZoom(fitZoom()); }, [fitZoom]);
 
@@ -456,28 +632,50 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
 
   const clampOffset = useCallback((next: { x: number; y: number }, zoomValue: number) => {
     const stage = stageRef.current;
-    const size = natural ?? naturalSize;
+    const size = natural?.url === url ? natural.size : undefined;
     if (!stage || !size) return { x: 0, y: 0 };
     const rect = stage.getBoundingClientRect();
-    const maxX = Math.max(0, (size.width * zoomValue / 100 - rect.width) / 2);
-    const maxY = Math.max(0, (size.height * zoomValue / 100 - rect.height) / 2);
+    const quarterTurn = rotation % 180 !== 0;
+    const width = Math.round((quarterTurn ? size.height : size.width) * zoomValue / 100);
+    const height = Math.round((quarterTurn ? size.width : size.height) * zoomValue / 100);
+    const maxX = Math.max(0, (width - rect.width) / 2);
+    const maxY = Math.max(0, (height - rect.height) / 2);
     return { x: Math.min(maxX, Math.max(-maxX, next.x)), y: Math.min(maxY, Math.max(-maxY, next.y)) };
-  }, [natural, naturalSize]);
+  }, [natural, rotation, url]);
 
   const changeZoom = useCallback((next: number) => {
-    const value = clampZoom(Math.round(next));
+    const value = clampZoom(next, Math.min(ZOOM_MIN, fitZoom()));
     setZoom(value);
     setOffset((current) => clampOffset(current, value));
-  }, [clampOffset]);
+  }, [clampOffset, fitZoom]);
 
   // One zoom step always moves the percentage: a bounded control that stops
   // responding at an arbitrary rounded value would be a dead control.
   const stepZoom = useCallback((factor: number) => {
     const base = zoom ?? 100;
-    const scaled = Math.round(base * factor);
-    const moved = factor > 1 ? Math.max(base + 1, scaled) : Math.min(base - 1, scaled);
+    const scaled = base * factor;
+    const moved = factor > 1 ? Math.max(base + Number.EPSILON * Math.abs(base), scaled) : Math.min(base - Number.EPSILON * Math.abs(base), scaled);
     changeZoom(moved);
   }, [changeZoom, zoom]);
+
+  const stopDrag = useCallback(() => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag) return;
+    try { stageRef.current?.releasePointerCapture?.(drag.pointerId); } catch { /* capture may already have ended */ }
+  }, []);
+
+  const setImageRotation = useCallback((next: ImageRotation) => {
+    stopDrag();
+    setRotation(next);
+    setOffset({ x: 0, y: 0 });
+    setZoom(fitZoom(next));
+  }, [fitZoom, stopDrag]);
+
+  const rotateBy = useCallback((delta: -90 | 90) => {
+    const next = ((rotation + delta + 360) % 360) as ImageRotation;
+    setImageRotation(next);
+  }, [rotation, setImageRotation]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -511,33 +709,40 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
   const ready = Boolean(url) && !failed;
   const tiny = Boolean(measured && (measured.width <= TINY_IMAGE_PX || measured.height <= TINY_IMAGE_PX));
   const currentZoom = zoom ?? 100;
+  const effectiveZoomMin = Math.min(ZOOM_MIN, fitZoom());
   const renderedWidth = measured ? Math.round(measured.width * currentZoom / 100) : undefined;
   const renderedHeight = measured ? Math.round(measured.height * currentZoom / 100) : undefined;
+  const fitScale = fitZoom();
 
   return <div
     ref={dialogRef}
-    className="cairn-image-viewer"
-    role="dialog"
-    aria-modal="true"
+    className={`cairn-image-viewer${embedded ? " cairn-image-viewer--embedded" : ""}`}
+    role={embedded ? "group" : "dialog"}
+    aria-modal={embedded ? undefined : true}
     aria-label={`${t("Image viewer")}: ${name}`}
-    data-zoom-min={ZOOM_MIN}
+    data-zoom-min={effectiveZoomMin}
     data-zoom-max={ZOOM_MAX}
     data-zoom-current={currentZoom}
-    onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    data-fit-zoom={fitScale}
+    onMouseDown={(event) => { if (!embedded && event.target === event.currentTarget) onClose(); }}
   >
     <div className="cairn-image-viewer__chrome">
-      <div className="cairn-image-viewer__identity">
+      {!embedded && <div className="cairn-image-viewer__identity">
         <strong className="cairn-image-viewer__name" title={name}>{name}</strong>
         <small className="cairn-image-viewer__size">{measured ? t("{{width}} × {{height}} px", { width: measured.width, height: measured.height }) : t("Natural size unavailable")}</small>
-      </div>
+      </div>}
       <div className="cairn-image-viewer__controls" role="group" aria-label={t("Image viewer")}>
-        <button type="button" className="cairn-image-viewer__control" aria-label={t("Zoom out")} title={t("Zoom out")} onClick={() => stepZoom(1 / ZOOM_STEP)} disabled={!ready || currentZoom <= ZOOM_MIN}><Minus size={16} aria-hidden="true" /></button>
-        <span className="cairn-image-viewer__zoom-value" role="status">{`${Math.round(currentZoom)}%`}</span>
+        <button type="button" className="cairn-image-viewer__control" aria-label={t("Zoom out")} title={t("Zoom out")} onClick={() => stepZoom(1 / ZOOM_STEP)} disabled={!ready || currentZoom <= effectiveZoomMin}><Minus size={16} aria-hidden="true" /></button>
+        <span className="cairn-image-viewer__zoom-value" role="status">{`${displayZoom(currentZoom)}%`}</span>
         <button type="button" className="cairn-image-viewer__control" aria-label={t("Zoom in")} title={t("Zoom in")} onClick={() => stepZoom(ZOOM_STEP)} disabled={!ready || currentZoom >= ZOOM_MAX}><Plus size={16} aria-hidden="true" /></button>
         <button type="button" className="cairn-image-viewer__control wide" onClick={() => changeZoom(fitZoom())} disabled={!ready}>{t("Fit to window")}</button>
         <button type="button" className="cairn-image-viewer__control wide" onClick={() => changeZoom(100)} disabled={!ready}>{t("Actual size")}</button>
+        <button type="button" className="cairn-image-viewer__control" aria-label={t("Rotate left")} title={t("Rotate left")} onClick={() => rotateBy(-90)} disabled={!ready}><RotateCcw size={16} aria-hidden="true" /></button>
+        <button type="button" className="cairn-image-viewer__control" aria-label={t("Rotate right")} title={t("Rotate right")} onClick={() => rotateBy(90)} disabled={!ready}><RotateCw size={16} aria-hidden="true" /></button>
+        <span className="cairn-image-viewer__rotation-value" role="status">{t("Rotation {{degrees}}°", { degrees: rotation })}</span>
+        <button type="button" className="cairn-image-viewer__control wide" onClick={() => setImageRotation(0)} disabled={!ready}>{t("Reset rotation")}</button>
       </div>
-      <button type="button" className="cairn-image-viewer__close" aria-label={t("Close viewer")} title={t("Close viewer")} onClick={onClose}><X size={18} aria-hidden="true" /></button>
+      {!embedded && <button type="button" className="cairn-image-viewer__close" aria-label={t("Close viewer")} title={t("Close viewer")} onClick={onClose}><X size={18} aria-hidden="true" /></button>}
     </div>
     {ready
       ? <div
@@ -549,16 +754,17 @@ function ImageViewer({ name, url, message, naturalSize, failed, t, onClose, onFa
           onPointerCancel={handlePointerUp}
         >
           <img
+            key={url}
             className={`cairn-image-viewer__image ${tiny ? "is-pixelated" : ""}`}
             src={url}
             alt={t("Content preview")}
             draggable={false}
             style={renderedWidth && renderedHeight
-              ? { width: `${renderedWidth}px`, height: `${renderedHeight}px`, transform: `translate(${offset.x}px, ${offset.y}px)` }
-              : { transform: `translate(${offset.x}px, ${offset.y}px)` }}
+              ? { width: `${renderedWidth}px`, height: `${renderedHeight}px`, transform: `translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg)` }
+              : { transform: `translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg)` }}
             onLoad={(event) => {
               const image = event.currentTarget;
-              if (image.naturalWidth > 0 && image.naturalHeight > 0) setNatural({ width: image.naturalWidth, height: image.naturalHeight });
+              if (image.naturalWidth > 0 && image.naturalHeight > 0) setNatural({ url, size: { width: image.naturalWidth, height: image.naturalHeight } });
             }}
             onError={() => onFail(t("The content could not be decoded safely."))}
           />

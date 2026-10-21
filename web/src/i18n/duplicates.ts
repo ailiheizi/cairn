@@ -55,12 +55,16 @@ export const duplicates: Record<string, string> = {
   "Representation": "表示",
   "Note for {{name}}": "{{name}} 的备注",
   "Note added to this member.": "已为此成员添加备注。",
+  "This member's note was saved, but follow-up work is incomplete: {{reason}}": "此成员的备注已保存，但后续处理尚未完成：{{reason}}",
+  "follow-up work is incomplete": "后续处理尚未完成",
   "No durable note is recorded for this member.": "此成员尚未记录持久备注。",
   "The note could not be saved: {{message}}": "无法保存备注：{{message}}",
   "Allow note text before the note can be added.": "请先填写备注内容再添加。",
   "Tag for the selected members": "为所选成员添加标签",
   "Tag added to every selected member.": "已为所有所选成员添加标签。",
   "Tag added to {{added}} of {{total}} selected members. The other writes failed: {{reason}}": "已为 {{total}} 个所选成员中的 {{added}} 个添加标签。其余写入失败：{{reason}}",
+  "Tag added to {{added}} of {{total}} selected members; follow-up work is incomplete for {{degraded}} saved writes: {{reason}}": "已为 {{total}} 个所选成员中的 {{added}} 个添加标签；{{degraded}} 个已保存写入的后续处理尚未完成：{{reason}}",
+  "Tag added to {{added}} of {{total}} selected members; {{degraded}} saved writes have incomplete follow-up ({{degradedReason}}), and {{failed}} writes failed ({{failureReason}}).": "已为 {{total}} 个所选成员中的 {{added}} 个添加标签；{{degraded}} 个已保存写入的后续处理未完成（{{degradedReason}}），另有 {{failed}} 个写入失败（{{failureReason}}）。",
   "Tagging applies to selected members only and changes no bytes.": "添加标签只作用于所选成员，不会改变任何字节。",
 
   // --- per-member facts -----------------------------------------------------

@@ -5,7 +5,7 @@ import { command } from "./command";
 import { operations } from "../lib/operations";
 import { formatBytes, looksLikeRemoteLocator } from "../lib/format";
 import type { LibraryFlow } from "./useLibrary";
-import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceChangeSummary, SourceProjection, SourceStaging, SourceSummary, SnapshotDiffItem, SnapshotSummary } from "../lib/types";
+import type { ActionBarState, Notice, PathSuggestion, PlanActionState, SourceChangeSummary, SourceProjection, SourceStaging, SourceSummary, SnapshotDiffItem, SnapshotSummary, UploadFileRow } from "../lib/types";
 
 // The configured sources surface and the add/recheck drawer.
 //
@@ -30,7 +30,14 @@ export type SourcesFlow = {
   sourceChanges: Record<string, SourceChangeSummary>;
   source: string;
   setSource: (value: string) => void;
+  pastedTextDraft: PastedTextDraft;
+  openTextComposerRequested: boolean;
+  editPastedTextDraft: (filename: string, text: string) => void;
+  beginPastedTextUpload: () => number;
+  recordPastedTextUpload: (outcome: { attemptID: number; stagingDir: string; rows: UploadFileRow[]; error: string; partial: boolean }) => void;
+  clearPastedTextDraft: () => void;
   changeSourceInput: (value: string) => void;
+  continueAfterSavedUpload: (planID: string, stagingDir: string) => boolean;
   recheckSourceRef: string;
   setRecheckSourceRef: (value: string) => void;
   plan: any;
@@ -47,16 +54,29 @@ export type SourcesFlow = {
   sourceSuggestionDisabled: boolean;
   loadSources: (activeWorkspaceID: string, refreshGeneration?: number, restorePoints?: SnapshotSummary[]) => Promise<void>;
   makePlan: (event?: FormEvent) => void;
-  runIngestPlan: (rootPath: string) => Promise<void>;
+  runIngestPlan: (rootPath: string, associatePastedText?: boolean) => Promise<any>;
   pickSuggestedPath: (suggestion: PathSuggestion) => void;
   checkPlanStatus: () => Promise<void>;
   applyPlan: () => Promise<void>;
   viewSource: (sourceItem: SourceSummary) => Promise<void>;
-  openAdd: (sourceItem?: SourceSummary, trigger?: EventTarget | null) => void;
+  openAdd: (sourceItem?: SourceSummary, trigger?: EventTarget | null, options?: { openTextComposer?: boolean; beforeOpen?: () => boolean }) => void;
   closeAdd: () => void;
   ingestStaged: () => void;
   cleanStaged: () => Promise<void>;
   resetSourceProjection: () => void;
+};
+
+export type PastedTextDraft = {
+  filename: string;
+  text: string;
+  locked: boolean;
+  stagingDir: string;
+  rows: UploadFileRow[];
+  error: string;
+  partial: boolean;
+  planID: string;
+  attemptID: number;
+  receiving: boolean;
 };
 
 export function useSources({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify, refresh, refreshGenerationRef, lastPlannedSource, rememberLastSourcePath, canLeaveSettings, rememberDrawerTrigger, closeDrawers, setAddOpen, library, rememberWorkspace }: {
@@ -86,6 +106,28 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
   const [sourceProjection, setSourceProjection] = useState<SourceProjection>({ state: "READY" });
   const [sourceChanges, setSourceChanges] = useState<Record<string, SourceChangeSummary>>({});
   const [source, setSource] = useState("");
+  // This transient draft points back to the existing staging directory/plan
+  // so the ordinary Add drawer can resume the same operation after remount.
+  const [pastedTextDraft, setPastedTextDraft] = useState<PastedTextDraft>({
+    filename: "reading-notes.txt", text: "", locked: false, stagingDir: "", rows: [], error: "", partial: false, planID: "", attemptID: 0, receiving: false,
+  });
+  const [openTextComposerRequested, setOpenTextComposerRequested] = useState(false);
+  const pastedTextAttemptRef = useRef(0);
+  const editPastedTextDraft = (filename: string, text: string) => {
+    setPastedTextDraft((draft) => draft.locked ? draft : { ...draft, filename, text });
+  };
+  const beginPastedTextUpload = () => {
+    const attemptID = ++pastedTextAttemptRef.current;
+    setPastedTextDraft((draft) => ({ ...draft, locked: true, receiving: true, attemptID, stagingDir: "", rows: [], error: "", partial: false, planID: "" }));
+    return attemptID;
+  };
+  const recordPastedTextUpload = (outcome: { attemptID: number; stagingDir: string; rows: UploadFileRow[]; error: string; partial: boolean }) => {
+    setPastedTextDraft((draft) => draft.attemptID !== outcome.attemptID ? draft : { ...draft, ...outcome, receiving: false });
+  };
+  const clearPastedTextDraft = () => {
+    const attemptID = ++pastedTextAttemptRef.current;
+    setPastedTextDraft({ filename: "reading-notes.txt", text: "", locked: false, stagingDir: "", rows: [], error: "", partial: false, planID: "", attemptID, receiving: false });
+  };
   const [recheckSourceRef, setRecheckSourceRef] = useState("");
   const [plan, setPlan] = useState<any>();
   const [planAction, setPlanAction] = useState<PlanActionState>("IDLE");
@@ -223,19 +265,30 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     event?.preventDefault();
     void runIngestPlan(source);
   }
-  async function runIngestPlan(rootPath: string) {
+  async function runIngestPlan(rootPath: string, associatePastedText = false) {
     const root = rootPath.trim();
-    if (!root) return;
-    if (!coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
+    if (!root) return undefined;
+    if (!coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return undefined; }
     if (looksLikeRemoteLocator(root)) {
       notify({ kind: "warning", text: t("Web addresses are not supported here. Mount remote storage on the Cairn host, then enter its server path.") });
-      return;
+      return undefined;
     }
-    if (planAction === "INSPECTING" || planAction === "PROTECTING") return;
+    if (planAction === "INSPECTING" || planAction === "PROTECTING") return undefined;
     const request = ++planRequestRef.current;
     setPlan(undefined); setPlanAction("INSPECTING"); setBusy(true); notify(undefined);
-    try { const response = await command(operations.plan.ingest, { root }); if (request !== planRequestRef.current) return; setPlan(response.data); rememberWorkspace(response.data?.workspace_id); rememberLastSourcePath(root); notify({ kind: response.data?.executable ? "success" : "warning", text: response.data?.executable ? t("Storage plan is ready to review.") : t("This source has blocked entries and cannot be saved yet.") }); }
-    catch (error) { setPlanAction("IDLE"); notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not create storage plan") }); }
+    try {
+      const response = await command(operations.plan.ingest, { root });
+      if (request !== planRequestRef.current) return undefined;
+      setPlan(response.data);
+      if ((associatePastedText || (pastedTextDraft.locked && root === pastedTextDraft.stagingDir)) && typeof response.data?.plan_id === "string") {
+        setPastedTextDraft((draft) => ({ ...draft, planID: response.data.plan_id }));
+      }
+      rememberWorkspace(response.data?.workspace_id);
+      rememberLastSourcePath(root);
+      notify({ kind: response.data?.executable ? "success" : "warning", text: response.data?.executable ? t("Storage plan is ready to review.") : t("This source has blocked entries and cannot be saved yet.") });
+      return response.data;
+    }
+    catch (error) { setPlanAction("IDLE"); notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not create storage plan") }); return undefined; }
     finally { setBusy(false); setPlanAction("IDLE"); }
   }
   // A suggestion that names a configured source is a recheck of that source,
@@ -262,6 +315,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       if (data.applied === true) {
         setPlan({ ...plan, ...data, state: "SUCCEEDED", executable: false, awaiting_confirmation: false });
         setPlanAction("SUCCEEDED");
+        if (pastedTextDraft.planID && targetPlanID === pastedTextDraft.planID) clearPastedTextDraft();
         notify({ kind: "success", text: t("Content saved. Exact bytes are now in the repository.") });
         try { await refresh(); } catch { notify({ kind: "warning", text: t("Content saved. Refresh the library to update its list.") }); }
       } else {
@@ -289,6 +343,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       rememberWorkspace(response.data?.workspace_id ?? plan.workspace_id);
       const degraded = response.status === "DEGRADED" || (response.data?.warnings?.length ?? 0) > 0;
       setPlanAction("SUCCEEDED");
+      if (pastedTextDraft.planID && plan.plan_id === pastedTextDraft.planID) clearPastedTextDraft();
       notify({ kind: degraded ? "warning" : "success", text: t(degraded ? "Exact bytes saved, but derived processing is unavailable." : "Content saved. Exact bytes are now in the repository.") });
       try { await refresh(); } catch { notify({ kind: "warning", text: t("Content saved. Refresh the library to update its list.") }); }
     } catch (error) {
@@ -310,13 +365,29 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       notify({ kind: "error", text: error instanceof Error ? error.message : t("Could not open source content") });
     } finally { setBusy(false); }
   }
-  function openAdd(sourceItem?: SourceSummary, trigger?: EventTarget | null) {
+  function openAdd(sourceItem?: SourceSummary, trigger?: EventTarget | null, options?: { openTextComposer?: boolean; beforeOpen?: () => boolean }) {
+    setOpenTextComposerRequested(false);
     if (!isConnected || !coreStorageReady) { notify({ kind: "error", text: coreStorageMessage }); return; }
     if (!canLeaveSettings()) return;
+    if (options?.beforeOpen && !options.beforeOpen()) return;
     rememberDrawerTrigger(trigger);
     closeDrawers();
-    planRequestRef.current += 1; setPlanCheckBusy(false); setSource(sourceItem?.locator?.trim() ?? ""); setPlan(undefined); setPlanAction("IDLE");
-    setRecheckSourceRef(sourceItem?.source_ref?.trim() ?? "");
+    if (pastedTextDraft.locked) {
+      const stagingDir = pastedTextDraft.stagingDir.trim();
+      setSource(stagingDir || "");
+      // Keep a matching plan so its existing check/apply path resumes.
+      if (!pastedTextDraft.planID || plan?.plan_id !== pastedTextDraft.planID) setPlan(undefined);
+      setPlanAction("IDLE");
+      setRecheckSourceRef("");
+    } else {
+      planRequestRef.current += 1;
+      setPlanCheckBusy(false);
+      setSource(sourceItem?.locator?.trim() ?? "");
+      setPlan(undefined);
+      setPlanAction("IDLE");
+      setRecheckSourceRef(sourceItem?.source_ref?.trim() ?? "");
+    }
+    if (options?.openTextComposer && !pastedTextDraft.locked) setOpenTextComposerRequested(true);
     setAddOpen(true); notify(undefined);
   }
   // Editing the path invalidates the plan being reviewed: a plan describes one
@@ -327,9 +398,24 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     setPlan(undefined);
     setPlanAction("IDLE");
   }
+  // Start a second upload only after the current upload's exact plan has a
+  // confirmed terminal success. This clears the transient association; it
+  // never removes staged files or starts another ingest/apply operation.
+  function continueAfterSavedUpload(planID: string, stagingDir: string): boolean {
+    if (!planID || !stagingDir || source.trim() !== stagingDir.trim()) return false;
+    if (plan?.plan_id !== planID || plan?.state !== "SUCCEEDED" || plan?.awaiting_confirmation === true) return false;
+    if (planAction !== "SUCCEEDED" || planCheckBusy || busy || pastedTextDraft.receiving) return false;
+    planRequestRef.current += 1;
+    setSource("");
+    setPlan(undefined);
+    setPlanAction("IDLE");
+    setRecheckSourceRef("");
+    clearPastedTextDraft();
+    return true;
+  }
   function closeAdd() {
     if (planAction === "INSPECTING" || planAction === "PROTECTING") { notify({ kind: "warning", text: t("This operation is still running. Keep this panel open until it finishes.") }); return; }
-    setAddOpen(false); setRecheckSourceRef("");
+    setAddOpen(false); setRecheckSourceRef(""); setOpenTextComposerRequested(false);
   }
   // The staging handoff: one action prefills the ordinary add-source drawer
   // with the staging directory as the root and starts the same reviewable
@@ -339,7 +425,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     const directory = staging?.path?.trim();
     if (!directory || planAction !== "IDLE") return;
     openAdd({ locator: directory });
-    void runIngestPlan(directory);
+    void runIngestPlan(directory, pastedTextDraft.locked && directory === pastedTextDraft.stagingDir);
   }
   // The staged-file cleanup deletes ONLY regular files inside the daemon's
   // own staging inbox, after an explicit window.confirm. The copy states the
@@ -412,6 +498,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
 
   return {
     sources,
+    openTextComposerRequested,
     setSources,
     staging,
     stagingBusy,
@@ -421,6 +508,12 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     source,
     setSource,
     changeSourceInput,
+    pastedTextDraft,
+    editPastedTextDraft,
+    beginPastedTextUpload,
+    recordPastedTextUpload,
+    clearPastedTextDraft,
+    continueAfterSavedUpload,
     recheckSourceRef,
     setRecheckSourceRef,
     plan,

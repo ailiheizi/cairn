@@ -24,6 +24,15 @@ export const queueExperience: Record<string, string> = {
   "Some loaded tracks were omitted because they could not be played here.": "部分已加载曲目因无法在此播放而被跳过。",
   "The queue limit is 1,000 entries; existing queue and playback were left unchanged.": "队列最多包含 1,000 项；原队列和当前播放均保持不变。",
   "Stop playback before removing the current track.": "请先停止播放，再移除当前曲目。",
+  "Batch actions ({{count}} selected)": "批量操作（已选 {{count}} 项）",
+  "Batch actions affect displayed occurrences only; the current occurrence stays in place.": "批量操作仅作用于当前显示的队列项；当前播放项保持原位。",
+  "{{count}} selected current occurrences are excluded from batch actions.": "已选项中有 {{count}} 个当前播放项，批量操作会将其排除。",
+  "Select displayed": "选择当前显示项",
+  "Clear displayed selection": "清除当前显示项选择",
+  "Remove selected inactive items ({{count}})": "移除已选的非当前项（{{count}}）",
+  "Move selected inactive items next ({{count}})": "将已选非当前项移到当前曲目之后（{{count}}）",
+  "Select queue occurrence {{position}}: {{name}}": "选择队列第 {{position}} 项：{{name}}",
+  "The current occurrence is excluded from batch actions.": "当前播放项不参与批量操作。",
   // Playback-eligibility failures. AudioPlayer.tsx maps these typed codes to the
   // English sentences before t(); keep them byte-identical to
   // PLAYBACK_ERROR_TEXTS in AudioPlayer.tsx.

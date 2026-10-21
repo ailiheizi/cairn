@@ -14,6 +14,8 @@ export const musicBrowseExperience: Record<string, string> = {
   "Use the arrow keys to move through visible tracks; Space selects and Enter opens the focused track.": "使用方向键在当前显示的曲目间移动；按空格选择，按回车打开焦点曲目的详情。",
   "{{count}} tracks in this view": "当前视图中的 {{count}} 首曲目",
   "Loading recorded audio facts": "正在读取已记录的音频信息",
+  "Recorded duration: {{duration}}": "记录时长：{{duration}}",
+  "Duration unknown": "时长未知",
   "Audio facts unavailable; showing filenames and tags": "音频信息不可用；显示文件名和标签",
   "Some tracks have no recorded audio facts; their filenames remain available": "部分曲目没有已记录的音频信息，仍显示文件名",
   "Unknown artist": "未知艺术家", "Unknown album": "未知专辑", "tracks": "首",

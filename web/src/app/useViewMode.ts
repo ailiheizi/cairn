@@ -35,7 +35,7 @@ export function useViewMode(): ViewModeFlow {
   // separate grid/list switch.
   const [sortField, setSortField] = useState<SortField>(() => {
     const stored = window.localStorage.getItem("cairn.library_sort_field");
-    return stored === "size" || stored === "type" || stored === "path" ? stored : "name";
+    return stored === "size" || stored === "type" || stored === "path" || stored === "modified" ? stored : "name";
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => (window.localStorage.getItem("cairn.library_sort_direction") === "desc" ? "desc" : "asc"));
 

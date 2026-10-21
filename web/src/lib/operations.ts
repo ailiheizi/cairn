@@ -90,7 +90,8 @@ export const operations = {
     generate: "description.generate",
     // The immutable revision write. The details panel uses it for exactly one
     // user decision: accepting a generated candidate as the accepted successor
-    // (same body, kind, and predecessor). It stores a caller-supplied body and
+    // (the selected candidate's kind and predecessor, with caller-supplied
+    // body text that may be edited before acceptance). It stores that body and
     // never runs a provider.
     create: "description.create",
   },
@@ -145,6 +146,10 @@ export const operations = {
     apply: "export.apply",
     verify: "export.verify",
     list: "export.list",
+  },
+  recovery: {
+    export: "recovery.export",
+    anchorExport: "recovery.anchor.export",
   },
   // The durable job rows and their retained run log. `job.list` and
   // `job.events` are bounded reads; `job.cancel` stays the only cancel path.
