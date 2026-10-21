@@ -13,6 +13,13 @@ clarifies the product experience; it does not change the immutable-content,
 single-owner trust, exact-save or phase contracts, nor advertise unimplemented
 folder mutation, sync, sharing or media functions.
 
+The owner-approved [ML-1 client successor](first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
+adds ordinary ordered-list snapshots, copied user Notes and an optional retained
+Skill text. Manual organization and explicit external-AI copy/paste share the
+same bounded result format. Saving still requires the ordinary capture review;
+reading does not invoke AI. This is not an automatic organizer, persistent
+current-list service or replacement for SavedView, LinkGroup or ExportManifest.
+
 Complete Photos and Music workflows are product targets, including photo
 albums and music artist/album navigation, queues and playlists. Their first
 bounded local client slice is explicitly admitted by

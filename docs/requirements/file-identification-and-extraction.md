@@ -1,5 +1,78 @@
 # File Identification and Extraction Requirements
 
+## CS document body-search admission (2026-10-19)
+
+The operator-approved CS-1/2/3 milestone admits compiled first-party PDF and
+DOCX body extraction for new captures and ordinary explicitly recaptured
+sources. It reuses the existing EXTRACT stage, UTF-8 extracted-text artifact,
+source-bound lexical/BGE indexing, matched-source display and exact takeout.
+It adds no durable schema, endpoint, index dimension or document-reader surface.
+An index rebuild alone MUST NOT claim to run new extraction on old captures.
+
+Each document source is limited to 16 MiB, complete extracted UTF-8 output to
+1 MiB, and extraction to 10 seconds under the existing host concurrency cap.
+The host MUST distinguish a truncated source handle from a complete source;
+document processors MUST refuse truncated input, rather than parse a prefix
+as a whole file. Source and output budgets are separate. Unknown/failed
+processing never changes a successful readable exact preservation outcome.
+
+DOCX admission covers the main WordprocessingML body, paragraphs, tabs/line
+breaks and table cell/row separators. The package is limited to 2,048 entries,
+32 MiB aggregate declared and actual expansion, and 16 MiB main XML. Duplicate
+members, unsafe member names, excessive nesting and malformed/encrypted
+packages MUST be refused. Do not unpack to host paths, execute macros, resolve
+external entities, follow relationships or fetch external content. Headers,
+footers, comments and embedded objects are outside this body-text profile.
+
+PDF admission covers text-bearing documents up to 256 pages. The parser must
+be pinned to a Go-compatible version with bounded decoded streams (8 MiB),
+content operators (250,000/page), glyphs (50,000/page) and Form depth (16),
+single-page extraction concurrency and cancellation checks. Disable OCR,
+images, external CMap/font resolution and remote content. A warning, budget
+limit, encrypted/unsupported structure, malformed file or empty text MUST NOT
+yield an apparently complete searchable artifact. Admit complete output only;
+otherwise retain an explicit terminal outcome and the exact original.
+
+Producer digests MUST bind parser version/module checksum, extraction rules
+and limits. Existing capability meanings and producer digests MUST remain
+unchanged. New route/capability identities and signed attempt/artifact links
+MUST be reviewed together; current recovery records remain the authority.
+
+The milestone exits only after body-only lexical retrieval, real local BGE
+Chinese-paraphrase retrieval with artifact/span provenance, ordinary browser
+inspection, saved retrieval after restart, and exact-original length/SHA-256
+takeout pass for representative PDF/DOCX documents. Parser-only fixtures do
+not establish the full product outcome or release qualification.
+
+## OCR image-text delivery admission (2026-10-20)
+
+The owner-approved OCR-1/2/3 milestone delivers the existing optional
+`ocr.image.text.v1` capability and `rapidocr-ppocr-mobile-v1` bundle profile.
+It MAY add an explicit operator-run asset preparation/install script and
+maintenance fixes for actual recognition, existing EXTRACT lexical/BGE feeds,
+and readable OCR text/quality on the existing Details surface. It MUST NOT add
+a processor, index dimension, public command, endpoint, durable schema, service
+or runtime loader. Models MUST NOT download during capture or first query.
+
+Pin upstream revisions and asset hashes, dictionary/class mapping, local
+runtime compatibility and language coverage. Verify the complete bounded
+bundle before activation; changed rules/assets MUST retain distinct producer
+and profile evidence. Installation, recognition and indexed coverage remain
+separate states. Existing records and served generations MUST NOT be silently
+reinterpreted by an installation or code change.
+
+Keep the existing 20,000-pixel side, 40,000,000-pixel decoded-image, 2,048-region,
+256 KiB recognized-text and 20-second OCR bounds. Partial, low-confidence,
+empty, failed and unavailable results MUST remain distinguishable. Exact
+preservation and original takeout MUST remain independent of OCR success.
+
+The initial profile covers new images and ordinary explicit recaptures only.
+Scanned-PDF OCR, CLIP/visual similarity and arbitrary historical reprocessing
+are excluded. Its exit is one neutral-named Chinese-text image captured through
+the client, actual local OCR and index preparation, body-only lexical and real
+BGE paraphrase retrieval, readable attributed OCR text/quality, and original
+SHA-256/length equality. Fixtures or bundle metadata alone do not pass it.
+
 ## 1. Purpose
 
 Cairn must understand heterogeneous data well enough to choose useful storage, extraction, validation, and discovery algorithms without making any one detector or media stack part of the trusted core.

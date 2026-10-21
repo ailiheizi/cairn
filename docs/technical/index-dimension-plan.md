@@ -170,6 +170,16 @@ Status (2026-08-15): **fixture-contract-complete**.
 | Installed, no generation | Real provider bound, no built generation | That dimension reports `NOT_BUILT` with its own reason; only a failed or unusable binding is `UNAVAILABLE` |
 | Contract | `fuse` plus `dimension`, or `fuse` plus one generation | Invalid input |
 
+The dated v1 contract above is historical. The admitted development successor
+[ADR-054](build-stack-and-architecture-selection.md#adr-054-rank-mixed-search-without-concatenating-entire-components)
+uses `query.broker.fuse.v2` and `reciprocal-rank-fusion-k60-v1` to rank the same
+bounded subject union. Component generation, status, source provenance and
+single-lane continuation remain unchanged; it adds no public numeric score.
+The [bounded implementation and real-corpus acceptance](mixed-search-ranking-acceptance-20261018.md)
+records concentrated Go checks and unchanged raw membership/provenance over
+twelve frozen queries and four controls. Two query orders change and the
+expected top-ten miss set remains unchanged; this is not quality qualification.
+
 ### I8 — Facade mapping for identify-by-sample
 
 Status (2026-08-15): **adapter-harness-complete**. There is no standard OpenSubsonic “identify this clip” method in the pinned client sequence.

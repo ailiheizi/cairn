@@ -1,16 +1,25 @@
 ---
-description: Cairn owns identity and recovery, not FUSE or foreign mounts
+description: Follow Cairn's current ownership and scope contracts
 alwaysApply: true
 ---
 
 # Owned surface
 
-Read `docs/technical/remaining-work-and-closed-decisions.md` before planning mount, FUSE, VM, or engine work.
+Before planning or changing product scope, follow `AGENTS.md`, the reading map in
+`docs/README.md`, and the sole implementation order in
+`docs/technical/core-mvp-execution-plan.md`. Resolve product and safety
+semantics through the authority order in those documents.
 
-- Occam: do not add a subsystem when restore, `FileAccess`, or an existing HTTP API already suffices. Clients speak OpenSubsonic, OPDS, or Inbox JSON — not the Unix-socket envelope.
-- Own: identity, catalog, annotations, daemon commands, Inbox page, OpenSubsonic/OPDS HTTP APIs, `FileAccess` / `content.*`, verify, restore.
-- Clients we keep: `cairn`, read-only MCP, one Inbox page. Everything else is a foreign app on those HTTP APIs. No native suite, no full WebUI.
-- Do not own: kernel FUSE, macFUSE, WebDAV/SMB servers, `allow_other`, or “make it mountable.” `gateway.mount` stays unimplemented. Operators restore, then use rclone, sshfs, or NAS SMB.
-- The in-tree `server/internal/gateway/fuse` adapter is leftover. Do not qualify it, adapt it for Darwin, or treat `/dev/fuse` as remaining product work.
-- Do not replace the fake CAS or name Kopia/Restic as the release engine. Do not expand requirement documents. Do not embed a player, reader, or media server in `cairnd`.
-- Darwin can run catalog and facades. Do not use `sandbox-exec` as bubblewrap. Processor failure must not block exact ingest/verify/restore.
+Cairn is a single-owner, self-hosted content, description, discovery, export,
+and recovery platform with one configured repository and one SQLite catalog.
+Its admitted first-party client experiences share that trusted kernel. Keep
+work inside the current convergence lock and explicitly admitted client or
+processor profiles. Treat deferred capabilities and non-goals according to the
+authoritative requirements; an older plan, prototype, adapter, or acceptance
+record does not re-admit them.
+
+Do not copy retired capability lists or former product boundaries into this
+rule. Do not start new MCP/CLI/AI integrations, runtime third-party code, a
+kernel ABI or plugin store, or other deferred surfaces without a direct owner
+request and the required contract review. Report conflicts instead of
+broadening scope.

@@ -116,3 +116,64 @@ host or release. Fault-injection results are labeled injected-only. Curated
 albums, durable playlists, new media facts, streaming/transcoding, video/anime
 and LinkGroup are not implemented by this client continuation. Their separate
 contracts and gates remain in the functional target map.
+
+## Recorded playback-label successor — 2026-10-15
+
+This implemented and tested client-only refinement advances RW-PERSONAL-UX-1
+UX-M1/M2/Q1: the Music list, global player and transient queue use the existing
+subject-bound recorded title and artist while retaining the selected original
+filename. Optional display labels are captured at the explicit play/queue
+action. They do not become file identity or another metadata cache. Facts from
+another subject are ignored; a different recorded source name does not reject
+facts for the same subject. Missing facts preserve immediate filename playback.
+No endpoint, schema, processor, index or recovery record changed.
+
+Music individual, selected/displayed batch and insert-next actions, and
+Overview individual/batch actions pass their already projected facts. The
+original filename still controls the existing download and MIME path; complete
+SHA-256 and logical-length verification still precede native playback. Queue
+occurrences retain their captured labels across presentation changes. Repeated
+files have position-specific accessible Play names.
+
+The focused real owner-preview journey uses the existing 20-item sample at
+port 4648. `Tagged-test-A.mp3` displays `Slow Morning` and its recorded artist
+in the list, player and A/A/B queue. Its HTTP original and player Blob both
+contain 20,820 bytes with SHA-256
+`b62bffa19699f63ee2b5d46e05e7d5935e9fb2beb74aaf6a2773a6cf734ffef3`.
+Native audio is unpaused and advances, with readyState 4 and a 20-second
+duration. Appending queue entries preserves that Blob and playback position
+without another download. Explicitly paused navigation to Photos preserves
+the labels, position and queue. The missing-title `Tone-Alpha.wav` falls back
+to its filename; its 48,044-byte HTTP original and Blob match SHA-256
+`2094357095772ca6165885bc74cd2c18493a7611f2d7c81e678f807785d14c12`.
+All 47 observed commands succeed and are reads; exactly two originals are
+downloaded. The receipt is under `dist/music-labels-20261015/browser/attempts/2026-10-15T13-46-55.860Z-58f6d351-ae95-4994-a730-f4eeaba40b4b/`.
+
+Parent screenshot review withheld visual acceptance despite earlier narrower
+runner passes: centered text cells and inherited circular button corners
+clipped labels, and queue-only tools overflowed the narrow panel. The final
+CSS left-aligns and stretches labels, uses 4px corners and wraps tools. The
+final A/A/B desktop/360px capture proves distinct order-bearing Play names,
+end ellipsis with visible leading glyphs and panel client/scroll widths of
+358/358 and 334/334. It performs no playback or original downloads; both
+screenshots and raw geometry are retained under
+`dist/music-labels-20261015/browser/layout-followup/attempts/2026-10-15T13-59-04.564Z-eb599a6f-bac0-4a9f-9120-112b1ad5327a/`.
+The parent independently reviewed source, downloaded/Blob bytes, native
+progress, final served asset hashes and the narrow screenshot. Earlier
+limited passes remain retained without the missing visual or accessibility
+credit.
+
+The final served JS `index-6D5CnK9T.js` is 999,746 bytes, SHA-256
+`bd0f363a1c9d49964830a1123b3433be3863a321bdf30e6093156d21c477b955`;
+CSS `index-CpuTBKnD.css` is 305,554 bytes, SHA-256
+`a558e8453c5436f1426ed587ffb9522655f39c30965c4afcdc5c0295cf1ec0db`.
+The final JS successor changes the Play accessible name; later changes are
+CSS-only. Original verification and playback code are unchanged from the
+functional receipt. Web build, focused metadata/occurrence checks,
+`env GOPROXY=off go test -tags=cairn_zvec_dynamic ./...` and diff checks pass;
+the exact broad-Go exit 0 is retained in
+`dist/music-labels-20261015/go/final-go-test-receipt.txt`. The Web build retains
+its existing large-chunk warning. No daemon restart or catalog write was
+required. Overview/batch wiring was source-reviewed rather than separately
+browser-exercised here; provider outage was not injected. This small sample
+does not qualify full Music, durable playlists, a core phase or release.

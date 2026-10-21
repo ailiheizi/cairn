@@ -59,3 +59,38 @@ empty/error/success states. Borrow complete interaction paths, not isolated
 decorative components. [ADR-035](../technical/build-stack-and-architecture-selection.md#adr-035-private-drive-positioning-and-file-oriented-intake)
 records why this is the current priority; the core execution plan remains the
 only implementation order.
+
+
+## Photos and Music interaction refinement — 2026-10-20
+
+The owner requested professional vertical experiences over the shared content
+plane. Current page inspection found a concrete narrow-layout failure: a search
+input retained its horizontal `flex-basis: 20rem` when its container switched to
+a vertical layout, consuming most of the first photo screen. Multiple search,
+filter, density and export rows also competed with the photos themselves.
+Music mixed its main browse modes and playback actions with secondary controls.
+These are observed/code-reviewed usability defects, not missing backend scope.
+
+The following primary documents were read on 2026-10-20. Their interaction
+patterns inform the design; they are not evidence of equivalent Cairn features.
+
+| Primary source | Borrowed interaction | Current Cairn boundary |
+| --- | --- | --- |
+| [Apple Photos search](https://support.apple.com/en-euro/guide/iphone/iph392d77d5f/ios) and [photo information](https://support.apple.com/guide/iphone/see-photo-and-video-information-iph0edb9c18f/ios) | Lead with pictures and a clear search path; reveal item information when requested | Distinguish scene search over indexed images from name/tag filters over loaded photos. Use available source modification time, not an invented capture date. Keep existing viewer, Notes and exact original actions |
+| [Immich search](https://docs.immich.app/features/searching/) | Make contextual search and explicit conditions understandable together | Reuse real CLIP, existing tags and filters; faces, location extraction and automatic albums are not admitted by this polish |
+| [Navidrome overview](https://navidrome.org/docs/overview/) and [getting started](https://www.navidrome.org/docs/getting-started/) | Songs, albums and artists form recognizable browsing destinations, with a player that stays available | Improve recorded groups and filename fallbacks; never invent cover art, duration, artist or album facts |
+| [Apple Music queue](https://support.apple.com/en-gb/guide/iphone/ipha4521ef7d/ios) | Keep Now Playing and queue coordinated; distinguish playing next from appending | Reuse the same verified player and transient queue. Cross-device persistence, AutoPlay and durable playlists remain separate proposed work |
+
+The resulting implementation batch puts media, search and playback first;
+keeps active filters and incomplete-query notices visible; and moves density,
+format, date, sort, bulk organization and original ZIP into labelled disclosures.
+A shared Favorite-tag shortcut remains a filter over existing facts. Clicking
+the current track opens the same immersive player, with no second audio element
+or download authority. This is a presentation refinement, not a new admission.
+
+One bounded headless consultation was attempted through the configured
+`openainext` / `claude-opus-5-5` Harness route. It returned `EMPTY_RESPONSE`, so
+no design conclusion is attributed to Opus. The retained local run is under
+`dist/vertical-experience-20261020/consult/`; product decisions instead rely on
+the inspected implementation and the official references above. No Harness
+integration was added to Cairn and no provider configuration was changed.

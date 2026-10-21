@@ -50,6 +50,44 @@ Documents use these status terms precisely:
 
 The words “complete”, “default”, and “available” MUST be qualified by one of those meanings. In particular, a fixture embedding, protocol handshake, or signed-foundation test cannot close the semantic, user-loop, or clean-recovery release gate.
 
+## Ordinary-list client admission (2026-10-21)
+
+The owner-approved [ML-1 client successor](first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
+may interpret `cairn.material-list.v1` JSON as ordinary exact-preserved content.
+Its order, frozen context and Skill text belong to that file's bytes. It adds
+no kernel list entity, durable membership record or current-head convention.
+Digest plus logical length remains exact identity; local IDs are only lookup
+hints, and unresolved loaded-scope members remain visible. Edits are new
+ordinary captures. Existing Notes, live LinkGroup, dynamic SavedView, frozen
+ExportManifest, authenticated recovery formats and phase gates retain their
+meanings. No processor, model call or new store is required to read the result.
+
+## Visual-search delivery admission (2026-10-20)
+
+The owner-approved VIS-1/2/3 successor admits local delivery of the existing
+optional `chinese-clip-vit-base-patch16` profile and `multimodal-clip` space on
+Darwin arm64. Pin actual model/export/runtime assets and license provenance
+before explicit operator bundle installation and restart. Capture and first
+query MUST NOT download models or send images to remote inference.
+
+An explicit image-index build MAY derive vectors from authorized saved
+PNG/JPEG originals through the existing provider. Its ceilings remain 64 MiB
+per image, 64 inputs and 256 MiB per provider batch, with the existing decode
+and index bounds unchanged. The generation MUST bind its model, preprocessing,
+space and source evidence; installation cannot reinterpret old generations or
+change original identity. This operation is a rebuildable index projection,
+not permission to rerun historical file processors. BGE vectors remain in a
+separate space; only the existing host broker may fuse result lists.
+
+The exit is actual Chinese scene-description retrieval of a no-text photo,
+image-query retrieval of a related photo through the ordinary Photos client,
+and complete SHA-256/length-matching original takeout with independent inputs
+and distractors. Missing/incompatible models and failed queries MUST remain
+visible while lexical discovery and exact-original access remain available.
+Manifest/fixture success alone is insufficient. No new processor, dimension
+type, schema, public command, endpoint, loader, service, face/video indexing,
+arbitrary backfill, cross-platform result or release gate is admitted.
+
 ## 2. Product model
 
 Cairn is a content, annotation, discovery, and recovery plane. Its canonical flow is:
@@ -630,6 +668,58 @@ A `SavedView` is a dynamic query. It MUST bind:
 
 Examples include `tag:novel AND language:zh`, `duplicate_count > 1`, or `note contains "grandmother"`. Re-running a saved view MAY return different subjects as annotations or index generations change. A saved view alone is not a reproducible export and is not a garbage-collection root.
 
+The admitted legacy SavedView maintenance profile MAY retain exact user TAG
+conditions in the existing `fields[]` as `tag=<JSON string literal>`. Each
+literal is one complete nonblank annotation value; its spaces, case, Unicode,
+quotes and punctuation MUST be preserved. Repeated tag conditions mean AND
+over current live `Annotation.TAG` facts in the saved workspace. They are not
+FTS `tag:` prefix expressions, filename text or persistent group membership.
+Tag-only views and combinations with the already supported keyword/structured
+conditions use the same `view.save`, `view.evaluate` and view-backed
+`export.plan` path. Unknown or malformed conditions MUST fail visibly without
+dropping them or broadening membership. Older builds may refuse these fields;
+they MUST NOT reinterpret them as unfiltered retrieval.
+
+TAG membership MUST be applied before the saved evaluation's existing result
+ceiling. An implementation using lexical pages MUST pin one admitted generation,
+walk its existing total-order continuation, apply ordinary hit authorization
+and the exact live-tag intersection, and stop only at the requested eligible
+result bound or proven exhaustion. A failed fact read, invalid continuation,
+missing generation or cancellation MUST NOT publish a successful partial set.
+The local bundled implementation may reuse its private bounded lexical
+enumeration for tag-only evaluation; ordinary empty `search.query` remains
+refused. No new schema, index, provider ABI, record shape or endpoint is admitted.
+This maintains existing SavedView ergonomics while the canonical-AST,
+portable-view, LinkGroup, manifest-successor and Phase 6 gates remain open.
+
+The existing `view.evaluate` operation MAY additionally expose explicit bounded
+continuation through the ordinary optional `page: {limit, token}` input. Its
+unpaged legacy result remains compatible. Paged evaluation MUST retain the
+same lexical, structured, exact live-TAG AND and ordinary authorization
+semantics; it MUST NOT substitute an ordinary text query that drops stored
+conditions. Each page contains at most 1,000 eligible canonical subjects, in
+the existing lexical evaluation order, with no duplicate subject across the
+same projection. The response identifies the stored view revision, resolved
+workspace, lexical generation and exact ordered eligible-result projection,
+and carries ordinary `PageData` counts/completeness/continuation.
+For a regular-file hit the paged projection MAY include its recorded logical
+length from the same authorized namespace entry and content identity. Unknown
+length stays absent; a filename, another workspace or a different file version
+MUST NOT supply it. This allows later-page bounded original use without first
+loading the entire Library and does not change exact identity or read budgets.
+
+An authenticated continuation binds the view definition/revision, resolved
+scope, query policy, lexical generation, relevant live TAG membership and
+ordered authorized projection. Changed inputs, malformed/tampered/expired
+tokens, failed reads and cancellation MUST refuse without appending a partial
+or different result set. Page-size changes MAY preserve the same projection.
+The host may stream existing private lexical enumeration to calculate the
+projection and one bounded returned window; it MUST NOT retain every result
+body merely to page an answer or introduce a durable cursor service. This
+read-only convenience adds no durable view meaning, query capability, index,
+endpoint, record format or Phase 6 admission. SavedView membership remains
+dynamic; an ExportManifest remains the separate frozen takeout unit.
+
 ### 7.3 ExportManifest
 
 An `ExportManifest` freezes one evaluation of a LinkGroup's current mapping, one view evaluation, or an explicit selection. It MUST include:
@@ -682,6 +772,16 @@ The complete description body MUST be retained in the content/recovery data plan
 
 Long documents MUST be split into ordered `SemanticSegment` records with stable segment IDs, source offsets or section labels, language, and parent document revision. Embeddings index segments, then the query broker aggregates hits to the parent `Subject`. Search results SHOULD expose the matched segment, document kind, producer, and acceptance state so a user can tell whether a result came from a filename, extracted text, user note, or model-generated plot/analysis.
 
+The one Notes surface MUST determine current description revisions against
+their authoritative chains, not infer leaves from a truncated historical
+window. It MAY continue bounded summary pages through the existing
+`description.list` current-only projection specified in the CLI contract.
+Additional pages add to the same host-owned read scope; they do not create
+another query, durable organization model or recovery authority. Stale or
+failed continuation is visible and requires a fresh read before its rows can
+be described as current. Full bodies remain explicit bounded per-document
+reads in the global Notes list.
+
 A description provider may produce summaries, plot/character/timeline facts, game observations, or other domain-specific text when the source material supports it. The system MUST label model-generated content, preserve the input and model provenance, and never claim that a generated description contains information unavailable in the retained source or supplied by the user.
 
 The reference description profile accepts valid UTF-8 bodies up to 16 MiB per revision. The retained body digest is over the submitted UTF-8 bytes; embedding-specific Unicode normalization, prefixes, truncation, or tokenization are preprocessing facts and never rewrite the durable document. Imported plain text and Markdown retain their declared media type and source reference. HTML or another active format is stored as untrusted source text and MUST be sanitized by a presentation adapter before rendering.
@@ -707,6 +807,27 @@ User-authored, imported, extracted, and model-generated revisions do not silentl
 The default product MUST remain recoverable with every model runtime and vector store disabled. The baseline lexical and structured generation remains usable during semantic degradation. Its target fields are original names and paths, detected type, complete captured metadata, exact checksum and length, duplicate group, protection/recovery status, external locator metadata, durable tags and notes, processing state, description documents, and admitted extracted text.
 
 An implementation MUST report field-level coverage. It MUST NOT claim the complete baseline when fields are absent from its index schema or feed.
+
+#### Captured modification-time projection
+
+`mtime_after` and `mtime_before` constrain the source modification time
+retained in the selected namespace entry's captured `mod_time` metadata,
+using the existing exclusive Unix-millisecond bounds. Scan observation time,
+ingest time, publication time, catalog creation time, and a live filesystem
+stat MUST NOT substitute for that fact. A missing, null, malformed, or zero
+Go timestamp has no modification-time facet; the entry remains available to
+ordinary text search. A valid Unix-epoch or pre-epoch timestamp MUST NOT be
+discarded merely because its Unix value is non-positive. The Library's
+`modified_at` projection and the index MUST use the same captured-time
+interpretation; retained precision stays in the original metadata.
+
+The corrected lexical profile is `fts5-metadata-v5`. It retains the V4
+text/CJK/pinyin feed and changes the modification-time projection only.
+Rebuilding creates a distinct generation with the V5 profile digest.
+Existing V4 generation records and files MUST NOT be rewritten or served as
+V5; current wiring refuses their profile mismatch until an ordinary rebuild.
+This is a disposable-index successor, not a catalog or portable-record
+migration, and unknown time MUST NOT block exact preservation or recovery.
 
 ### 9.2 Embedding lifecycle
 
@@ -869,7 +990,7 @@ This is the canonical checkout-status matrix. Other plans may add evidence, but 
 | `local-zstd-v1` | candidate | Embedded compression, whole-file dedup, corruption rejection, relocation, profile isolation, explicit repair, copy-forward migration with independently reopened source/target clean readers and rollback preservation, including a real pre-publication process-crash/retry boundary, mechanism-separated savings, and `NON_DESTRUCTIVE_ONLY` verified root/inventory candidate planning exist and are tested; encryption admission, broader crash/migration rollback and reader-closure qualification, representative corpus/host evidence, packaging, and a dated release-engine decision remain. Chunking is optional and unselected; destructive GC is disabled and is not an MVP gate. The separate `local-zstd-encrypted-v1` experimental profile has host-owned AES-256-GCM/key-provider, key-rotation copy-forward, and real pre-publication process-crash/retry evidence but is not available through the persisted config/daemon or a release default |
 | Protection records and digest-bound plan/apply | implemented and tested for the admitted development profile | Exact/link-only/metadata-only decisions and portable recovery references are authenticated; external acquisition remains a later profile |
 | Operator backup, restore, and in-place upgrade | implemented and tested for the candidate path | A dated candidate run backs up `config.toml`, `catalog.sqlite`, `repository/`, `recovery/`, `vectors/`, and `models/` with the daemon stopped plus an independently retained recovery reference and anchor, restores into a second fresh prefix with byte-identical output and a passing catalog-free `--recovery-reader` restore, and replaces the installed binaries in place on existing data with `schema_state=CURRENT`, the same entry count, full-byte verification, recovery import, and a byte-identical restore. Four negative controls fail closed, including a structurally valid anchor from a different identity. Two limits are measured, not assumed: a live `.sqlite`-only copy loses the WAL (1,137,152 bytes uncheckpointed on the test host), and `recovery.import` reconciles only against an existing namespace root, so a lost catalog is not currently rebuildable from the repository and the catalog must be backed up. Version-to-version migration, part-bound compatibility, performance bounds, and non-Darwin hosts remain open. See [operator-journey acceptance](../technical/operator-journey-acceptance-20261012.md) |
-| Signed recovery publication | implemented and tested for the admitted development profile | Prepared/commit records, signed processor-attempt and portable-fact successor children, content-addressed record parts for oversized prepared and portable-fact records (ADR-033), portable subject mapping and body attachments, catalog-free exact restore, independent-anchor clean-install import/reader, deterministic recovery-token sets, independently hashed attachment readback, cross-process fencing, and unknown-outcome reconciliation work. Sparse extent maps, broader per-field provenance, production repository qualification, and release acceptance remain open |
+| Signed recovery publication | implemented and tested for the admitted development profile | Existing signed closures, parts, subject mapping, attachments, clean readers, fencing and reconciliation remain covered. Bounded 2026-10-16 tests cover ordinary Note/TAG upsert/rename/delete, PROGRESS create/revise, annotation import policies, and Description publication with saved revision/body and retained-parent checks. Missing-auth/partial/unknown results retain the write as DEGRADED; missing-predecessor import is not full history recovery. A bounded actual-corpus drill joined seven saved facts under one retained authenticated parent and restored the exact 104-file manifest; the reference fit v2 at 16,466,616 bytes. Two-parent evidence remains focused-test-only. See [dated evidence](../technical/real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill). The 16 MiB writer guard refuses unreadable v2 output; the large-prepared/near-limit-fact fixture refused 30,734,625-byte v2 and emitted 3,014-byte v3. A separate-anchor/no-catalog/no-key reader restored 201 files / 3,847 bytes while source remained available; this differs from source/catalog/key-deletion process proof. Final combined Go passed; detailed receipts are in [dated evidence](../technical/real-project-corpus-acceptance-20261016.md#compact-recovery-reference-successor-bounded). History-scale performance, full catalog/history recovery, broader corpus-runtime write-family coverage, sparse extent maps, broader per-field provenance, production repository qualification and release acceptance remain open. |
 | User/imported description revisions and segments | implemented and tested for the admitted recovery profile | SQLite/CLI revisions, source-aligned segments, config/provider/segmentation bindings, and authenticated portable body bindings work; lifecycle and provider admission remain |
 | Lexical/structured discovery | implemented and tested for the stated field scope | Required fields, typed filters, segment provenance, coverage, and fused query are wired; semantic remains unavailable when no admitted real bundle is supplied |
 | Read-only capacity and per-item index status | implemented and tested for the current profile | `status.get` reports measured or explicit unknown capacity; `content.list`, `namespace.list`, and search results expose calculated tag/lexical/semantic coverage without creating a durable status table. Missing optional projections never make exact content unreadable |

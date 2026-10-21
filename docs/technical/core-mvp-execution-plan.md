@@ -33,6 +33,13 @@
 > one file-oriented review/explicit-save surface. This composes existing
 > operations, adds no endpoint or lifecycle, and changes no core phase gate.
 
+> **2026-10-21 ML-1 client admission:** The owner approved bounded ordinary-list
+> and Skill-text authoring/reading through existing capture, Notes and exact
+> takeout. [ML-1](../requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
+> permits explicit result snapshots and external-AI copy/paste, with no new
+> kernel record, provider, endpoint or current-list head. This client delivery
+> runs alongside the existing work and does not advance or reorder core gates.
+
 ## 1. What We Are Building
 
 The first useful Cairn core is one operator loop:
@@ -303,9 +310,32 @@ payload placements
 
 The operational SQLite catalog and all search stores remain projections. Orphan payloads, prepared-only closures, and invalid signatures are not published. In-process serialization is supplemented by a repository-scoped cross-process fence/lease with renewal and typed unknown-outcome reconciliation; the signed records remain the recovery authority.
 
-The current signed mode supports catalog-free discovery, verification, diff, restore planning, restore, and recovery export from the repository plus an independently supplied trust anchor. The catalog-free recovery-reader daemon validates the v2 reference at startup and imports the existing v1 export bundle without opening SQLite or signing material. The export bundle contains the commit and prepared closure and does not contain a private signing key; retaining it and the trust anchor separately is still an operator responsibility and does not establish a fully qualified independent failure domain.
+The current signed mode supports catalog-free discovery, verification, diff, restore planning, restore, and recovery export from the repository plus an independently supplied trust anchor. The catalog-free recovery-reader daemon validates a typed v2/v3 reference at startup and imports the existing v1 export bundle without opening SQLite or signing material. The artifact contains or references the authenticated commit and prepared closure and contains no private signing key; retaining it and the trust anchor separately is still an operator responsibility and does not establish a fully qualified independent failure domain.
 
 ### Current tests and admitted-profile gate
+
+The 2026-10-16 fresh-catalog continuation implements the existing projection
+promise under [Restore Manifest section 20.1](../requirements/restore-manifest.md#fresh-operational-catalog-reconstruction).
+Keep the Store-free reader and legacy incomplete-input behavior unchanged.
+An isolated empty Store-backed daemon/CLI import with the original
+source/catalog/index absent now reconstructs ordinary content browsing,
+Notes/history, lexical search, and exact takeout/restore. The journey also
+proves replay without new catalog creation or history changes, then revises a
+Note and republishes a COMPLETE reference for the existing Store-free reader.
+See the [dated acceptance](catalog-reconstruction-acceptance-20261016.md).
+This is implemented and tested for the bounded Phase 3 development scope; it
+does not qualify keyless ordinary-daemon recovery, an owner corpus, or release.
+
+The ADR-053 continuation supplies authenticated relation facts through one
+fixed kernel-only METADATA_FACT value profile. The tested publisher and
+importer retain actual immutable file-version, admitted logical-extent, and
+representation fields; they never guess ownership/access from an exact
+content digest or today's config. Old references keep Store-free exact
+recovery, and required ungrounded catalog relations fail visibly. This remains
+the same Phase 3 reconstruction slice, not a new schema, envelope, processor,
+command or implementation order. See the [dated acceptance](catalog-reconstruction-acceptance-20261016.md)
+for the bounded implementation and broad tagged Go run; no release or keyless
+daemon claim follows from it.
 
 Implemented tests cover:
 
@@ -326,7 +356,41 @@ The Phase 3 recovery-closure gate is implemented and tested for the admitted dev
 4. Every currently admitted reversible representation decodes with its pinned closure and matches the source identity; every link-only reference round-trips with its honest unprotected state, while any future acquisition remains explicit and never silently falls back to a mutable URL.
 5. Every published subject with a recovery reference can export a signed, independently retainable token set; metadata-only subjects export only their unprotected record.
 
+Bounded metadata-publication evidence (2026-10-16): focused tests now cover
+ordinary Note and TAG upserts/renames/deletes, PROGRESS create/revise,
+annotation import policies, and Description writes. They join each operation's
+captured saved revision/body to successors of retained authenticated parents
+and check catalog-free readers where applicable. Missing-auth or partial/unknown
+publication preserves the catalog write and reports DEGRADED; lexical refresh
+remains independent. Note revision 3 also has an actual catalog-free corpus
+reader fact proof described in the dated report. A separate bounded corpus
+drill now joins seven committed metadata facts under the single retained
+authenticated parent and verifies exact restoration of the 104 originals; see
+the [dated evidence](real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill).
+Two-parent evidence remains focused-test-only, and broader corpus coverage
+remains open.
+The matching writer/read-cap guard and ADR-051 compact-reference successor are
+implemented and tested for the bounded development slice. The Unix near-limit
+fixture exercises aggregate v2 refusal and bounded v3 fallback with a large
+prepared record and near-limit fact; its separate-anchor reader restores 201
+files / 3,847 bytes while its source remains available. This differs from the
+separate-process exact-restore test that removed source/catalog/keys. History-
+scale performance, full lost-catalog reconstruction and broader
+corpus-runtime metadata coverage remain open; the bounded corpus drill covers
+one retained parent and seven facts only. The final combined tagged Go run
+passed; details are in
+[the dated evidence](real-project-corpus-acceptance-20261016.md#compact-recovery-reference-successor-bounded).
+This changes no phase order or release status and closes no whole phase.
+
 ## 8. Phase 4: Descriptions and Complete Discovery
+
+The owner-approved 2026-10-19 CS-1/2/3 milestone fills the existing document
+content-feed gap with bounded PDF/DOCX extraction, existing lexical/BGE
+retrieval and exact-original takeout. The
+[normative admission](../requirements/file-identification-and-extraction.md#cs-document-body-search-admission-2026-10-19)
+and ADR-063 constrain its processor/route/budget changes. It does not change
+phase dependencies, admit an index dimension/reader, enable rerouted old-capture
+processing or close Phase 4 merely because extraction works.
 
 ### 8.1 Durable description model
 
@@ -341,7 +405,7 @@ labels within that surface.
 
 Long descriptions are split into ordered `SemanticSegment` records. Segment embeddings point back to the document revision and subject, and search results return the matched segment and provenance.
 
-Durable `Annotation.NOTE` revisions are also direct semantic sources. They remain annotations rather than being copied into `DescriptionDocument`; zvec stores their stable annotation ID, and query projection reopens the current durable revision and returns `source_type = ANNOTATION` plus its source ID.
+Durable `Annotation.NOTE` revisions are also direct semantic sources. They remain annotations rather than being copied into `DescriptionDocument`; legacy whole-body inputs retain their stable annotation ID, while the reviewed bounded text-source refinement derives version-bound segment IDs and exact source spans for long Notes and admitted text extracts without new durable rows. Under the reviewed [semantic input-lineage successor](../requirements/driver-and-processor-interfaces.md#semantic-input-lineage-successor-development-v2), query projection verifies the exact generation-bound immutable revision, body digest and selected segment, while the current annotation still controls lifecycle eligibility. It returns `source_type = ANNOTATION` plus its stable source ID. A later live revision must not replace the text that produced an older vector; legacy Note hits without revision evidence require an explicit unavailable/rebuild outcome. The bounded segmentation implementation passes focused and broad tagged Go tests and isolated actual local BGE suffix retrieval, historical revision, lexical tail and exact restore checks. The same tested binary passes owner-preview rollout and the existing search/Photos/Music/original journey; the [dated acceptance](semantic-source-lineage-acceptance-20261015.md#long-text-source-segmentation-successor) distinguishes private long-text proof from the owner's short-source corpus. This closes no Phase 4 or release gate.
 
 An embedding model is not automatically a description generator. The config therefore has a semantic embedding profile and an optional description provider profile. A local description model or online model is selected explicitly, with egress policy and credential reference. Generated descriptions are retained as labeled evidence and never overwrite user facts.
 
@@ -361,11 +425,69 @@ The query broker fuses lexical, structured, and semantic segment results. It agg
 
 ### Exit tests
 
+The bounded [CJK query refinement](lexical-cjk-query-acceptance-20261016.md)
+now passes focused/broad Go and ordinary browser lexical-fallback/source-span/
+exact-original checks. Its owner-preview deployment reopens the same lexical
+and real semantic generations without rebuilding. It closes only PC-07i;
+complete discovery and release qualification remain open.
+
 1. Search by filename, metadata, checksum, duplicate group, tag, note, extracted text, and description returns the same authorized subject.
 2. A semantic hit identifies its matched durable Note or description segment and source provenance.
 3. Deleting every index preserves descriptions, annotations, protection records, and recovery.
 4. Switching local/online embedding profiles creates a new generation and does not rewrite old descriptions or vectors.
 5. Semantic provider failure leaves lexical/structured search and exact recovery available with an explicit degraded state.
+
+The [2026-10-16 real-project corpus evidence](real-project-corpus-acceptance-20261016.md)
+repairs the observed native 1,024-document write limit and builds all 7,496 real
+BGE inputs over 104 protected files. Fixed-query top-ten misses remain. The
+initial clean-reader artifact predates later metadata writes; subsequent Note
+revision 3 is joined to a signed successor and verified by a catalog-free
+reader, but that Note run did not restore bytes. The earlier independent reader
+trial restored all 104 originals. Focused follow-up tests cover ordinary Note
+and TAG upsert/rename/delete, PROGRESS create/revise, annotation imports, and
+Description writes with saved revision/body joins across retained authenticated
+parents. Flat import with a missing predecessor keeps its exact write and
+returns DEGRADED; complete imported history is not proven. These fixture
+checks remain distinct from the bounded actual-corpus drill, which covers seven
+facts under one retained parent and restores the 104 originals; see the
+[dated evidence](real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill).
+Broader write-family coverage remains open. Ordinary writes no longer
+wait for full semantic rebuilding, and stale semantic results remain unavailable
+until an explicit on-demand generation matches the current durable source feed.
+
+Root-reviewed raw corpus evidence shows two complete 7,496-input generations
+and a 104-file catalog-free full-byte VERIFY; frozen query misses remain. These
+are concrete implementation/usability evidence, not Phase 4 completion or
+release qualification. Existing signed fact successors and admitted on-demand
+semantic processing remain the mechanisms; no new format, processor or
+background service is admitted. The matching writer/read-cap guard refuses
+unreadable v2 output before file creation. ADR-051 compact
+`recovery-reference.v3` has export/import, service migration and startup-reader
+wiring plus focused tests. Generic export preserves fitting v2 and selects v3
+only on typed size refusal; explicit v2 APIs remain v2-only. The Unix near-limit
+fixture used a 14,521,495-byte prepared v2 and 16,210,219-byte fact v2 record;
+it refused their 30,734,625-byte expanded reference and emitted a 3,014-byte v3
+reference. Its separate-anchor reader restored 201 files / 3,847 bytes while the
+source remained available. A distinct separate-process test removed source,
+catalog and private keys before exact restore. These tests do not rebuild a lost
+metadata catalog or settle cumulative history growth; history-scale performance
+remains open.
+Normative §3.2 and existing v3 parts still govern individual placed records;
+compact v3 changes the containing reference, not fitting v1/v2 record bytes.
+Phase 3 and release qualification remain open.
+
+[ADR-049](build-stack-and-architecture-selection.md#adr-049-publish-user-metadata-over-all-retained-authenticated-subject-parents)
+clarifies that ordinary metadata publication covers every retained
+authenticated parent containing the affected stable subject, joining the saved
+revision to each verified successor. Focused tests now cover ordinary Note/TAG,
+PROGRESS, import, and Description mutations with own-revision/body checks and
+all-parent publication. Missing-auth or partial/unknown publication preserves
+the committed write and reports its actual DEGRADED reason. Note has an actual
+catalog-free corpus-reader fact run. A later bounded metadata-corpus drill
+joined seven committed facts under one retained parent and restored the 104
+originals; two-parent evidence remains focused-test-only. Broader corpus write
+coverage, full import-history recovery and Phase 3/release closure remain open;
+see the [dated evidence](real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill).
 
 ## 9. Phase 5: Simple Qualified Storage Savings
 
@@ -500,6 +622,19 @@ Only after phases 0-6 pass:
 ## 12. Explicitly Deferred
 
 These are not blockers for the core plan and must not be pulled forward:
+
+The owner's 2026-10-20 VIS-1/2/3 successor additionally admits delivery of the
+existing optional Chinese-CLIP profile, explicit indexing of authorized saved
+originals and the existing Photos text/image-query workflow. Its separate
+normative visual-search admission fixes the bounds and exit. This changes no
+core-phase prerequisite and admits no new dimension type, processor, durable
+format or runtime extension.
+
+The owner's 2026-10-20 OCR-1/2/3 admission is one narrow exception for delivery
+of the already implemented optional image-text profile, its pinned local
+assets and existing search/Details integration. It admits no new processor or
+dimension, scanned-PDF OCR or CLIP delivery, and changes no core phase gate.
+See the [normative image-text admission](../requirements/file-identification-and-extraction.md#ocr-image-text-delivery-admission-2026-10-20).
 
 - FUSE or any Cairn mount service;
 - SMB/WebDAV/NFS/S3 gateways;

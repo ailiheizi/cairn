@@ -92,6 +92,13 @@ becomes C with an explicit scope change rather than a slice.
 
 ## 5. Proposed first slice (Option B)
 
+The 2026-10-18 [bounded client successor](daily-client-functions-acceptance-20261018.md#notes-to-library-associated-file-takeout)
+adds host-owned associated-file checkboxes and an explicit return to the same
+Library result scope. It does not add a Notes composer, direct record writes
+or another selection/query authority. Repeated Note rows refer to one shared
+file selection; Library retains its existing organization and exact takeout
+operations. The original first-slice description below remains historical.
+
 - **Active phase:** none of the numbered lock phases. This is the bounded
   browser client permitted by `AGENTS.md:167-169`, landed as a convenience view
   like `TagsSurface`; not Phase 6 qualification and not a new product surface.

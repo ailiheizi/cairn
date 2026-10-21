@@ -14,6 +14,13 @@ bounded downloaded-original playback and daily SavedView access. This does not
 add a media-server gateway to `RW-MVP-1`, make the browser a recovery dependency,
 change durable formats, or close any of this profile's qualification gates.
 
+The owner-approved ML-1 client successor in
+[First-Party Client Experiences](first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
+also permits bounded authoring/reading of ordinary list and Skill-text files.
+It reuses existing reviewed capture and verified takeout, changes no kernel
+record, phase order or release gate, and introduces no AI executor or mutable
+list-head authority.
+
 ## 2. One complete product job
 
 Cairn MVP performs one complete job:

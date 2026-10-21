@@ -1,10 +1,13 @@
 # Product Priority Reset — 2026-10-09
 
-> Decision and schedule, not implementation evidence. This records the
-> operator's request to prioritize missing daily capabilities over successive
-> polish/test rounds. ADR-023 adopts the scheduling rule within the current
-> lock. The admission proposals below are **proposed**, not unlocked features.
-> The core execution plan and normative release requirements remain in force.
+> Historical decision and schedule, not implementation evidence or a current
+> work queue. This records the operator's 2026-10-09 request to prioritize
+> missing daily capabilities over successive polish/test rounds. ADR-023
+> records the scheduling rule adopted at that time. The admission proposals
+> below were **proposed**, not unlocked features. Current direction is in
+> [Documentation Current Direction](../README.md#current-direction) and the
+> [current client ledger](product-experience-todo.md); implementation order
+> remains exclusively in the [Core MVP Execution Plan](core-mvp-execution-plan.md).
 
 ## Product center
 
@@ -52,15 +55,17 @@ client tag/type/month controls must not be blindly serialized into ignored
 fields. A semantic hit set cannot be silently saved as an equivalent lexical
 query. No rename/delete operation is promised by the current view API.
 
-## Ordered work
+<a id="ordered-work"></a>
 
-The operator's follow-up on this date explicitly requires distinct, comfortable
-photo/music page experiences. The concrete task queue is now in
-[Product Experience Todo](product-experience-todo.md#active-product-todo--2026-10-09),
-with the [photo/audio checklist](photo-audio-experience-todo.md). The existing
-type lenses do not satisfy that outcome. Design/admission work happens during
-Order 1; implementation remains bounded by the current lock and the reviewed
-scope of each slice.
+## Ordered work — historical schedule as of 2026-10-09
+
+The operator's follow-up on this date explicitly required distinct,
+comfortable photo/music page experiences. The dated
+[task queue](product-experience-todo.md#active-product-todo--2026-10-09) and
+[photo/audio checklist](photo-audio-experience-todo.md)
+are preserved as evidence of that decision, not as a current
+schedule. See the current client ledger and current direction for present
+maintenance priorities; the core plan remains the sole implementation order.
 
 | Order | Result and owner | Entry boundary | Executable completion criterion |
 | --- | --- | --- | --- |

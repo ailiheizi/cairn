@@ -1,7 +1,7 @@
 # Product Experience Plan
 
-> Status: informative planning record (documentation authority rank 7). This is
-> the operator-facing roadmap for everything **above** the core. It cannot
+> Status: informative planning record (documentation authority rank 7), retained
+> as a historical product breakdown. It is not a current roadmap or queue. It cannot
 > reorder [Core MVP Execution Plan](core-mvp-execution-plan.md), which remains
 > the only dependency-ordered implementation path. It adds no MVP scope, closes
 > no gate, and awards no completion credit. Requirement status is owned by the
@@ -11,24 +11,21 @@
 > [Product Experience Backlog](product-experience-backlog.md).
 
 Created 2026-09-28 because the operator could not tell where the product stood
-or what remained. Read this file together with the two above; do not treat it
-as a third source of truth. The current experience queue is the
-[Content-First Product Decision](content-first-product-decision.md), recorded
-2026-10-05 and aligned on 2026-10-06; it prioritizes task flow and presentation only. It does not remove
-normative MVP scope, the real local BGE semantic default, or Phase 4–7 gates.
-
-The [2026-10-09 priority reset](product-priority-reset-20261009.md) controls
-immediate work: named retrieval, batch original takeout, then reviewed narrow
-photo/audio use. Its source-grounded gaps and admission decisions take priority
-over the older broad sub-plan scheduling below; no phase status changes here.
+or what remained. The boards, sub-plans and queue below preserve that dated
+planning snapshot; their statuses and schedules are not current. For current
+direction use [Documentation Current Direction](../README.md#current-direction),
+the [current client ledger](product-experience-todo.md), and the canonical
+requirements. The only dependency-ordered implementation path is the
+[Core MVP Execution Plan](core-mvp-execution-plan.md); this record cannot
+change its order, authorize scope, or change phase status. Normative MVP scope,
+the real local BGE semantic default, and Phase 4–7 gates remain defined by
+their authoritative sources.
 
 ## How to read this
 
 The [whole-product delivery target](whole-product-delivery-target.md), recorded
-2026-10-06, keeps the complete single-person product outcome visible across
-these sub-plans. It supplies a gap map and ordinary-task acceptance outline;
-implementation still follows the core plan, and partial preview evidence does
-not close the overall product objective.
+2026-10-06, is another historical outcome and evidence record. It is not a
+current status source.
 
 | Status | Meaning |
 | --- | --- |
@@ -84,10 +81,13 @@ Matrix lines: `../requirements/content-store-views-and-exports.md:800-817`.
 | SP-7 | Photo and album experience pack | G4, G6 | `not started` |
 | SP-8 | Listen and watch together | none; external service | `not started` |
 
-## Now / Next / Later
+<a id="now--next--later"></a>
+<a id="now-next-later"></a>
 
-This is the experience queue above the core. Normative requirements and their
-phase gates remain in force.
+## Now / Next / Later — historical queue
+
+The following queue is retained as historical planning context. It does not
+describe current work or authorize implementation.
 
 ```text
 NOW      Shared intake -> find -> original export core

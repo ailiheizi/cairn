@@ -1735,6 +1735,547 @@ This table maps every meaningful upstream into the seam it serves and the exact 
   preserving unrelated annotations. Verify incomplete reads cause no writes
   for the affected item and report partial/unknown results truthfully.
 
+### ADR-042: Separate capability, application and presentation installation
+
+- **Date:** 2026-10-14
+- **Status:** Informative architecture and product decomposition decision.
+  Existing kernel and presentation boundaries are reaffirmed; broader package
+  delivery and household applications remain proposals. This record adds no
+  implementation admission, public ABI, schema, endpoint or completion credit.
+- **Context:** The operator wants concrete personal and household scenarios,
+  useful borrowing from specialist products, image/OCR retrieval, and a way
+  to assemble a tool around personal habits. Current Chinese-CLIP and PP-OCR
+  code must not be mistaken for absent capabilities or an enabled default.
+  Calling every extension a plugin would obscure the different data,
+  processing, application and presentation responsibilities.
+- **Decision:** Keep capture, trusted content/subject records, processors and
+  index profiles, query fusion, first-party applications and client
+  presentations as logical boundaries over the existing small physical core.
+  Distinguish reviewed capability/model bundles, compiled first-party app
+  distributions or enablement, and ADR-032 data-only presentation packs.
+  No module introduces its own content identity, catalog, policy or recovery
+  authority. User-facing choices describe tasks and results rather than
+  internal IDs or one service per module.
+- **Discovery:** BGE text vectors and Chinese-CLIP image-space vectors retain
+  independent pinned profiles and generations. OCR is text extraction that
+  can supply existing lexical and semantic segments, not another visual
+  embedding space. Fuse authorized subject candidates under declared ranking
+  rules; never compare unrelated raw vectors or use similarity as exact
+  identity. Installing assets, running a processor, building an index and
+  qualifying useful retrieval are separate states.
+- **Installation direction:** Stage and verify compatible bundles with
+  dependency and license evidence, update explicit configuration or build
+  composition, and expose actual availability. Model changes produce new
+  derived generations; they do not reinterpret old facts or authorize general
+  processor reprocessing outside its reviewed successor contract. Disabling
+  an app, model or presentation must preserve original content and durable
+  user information. A general installer and installable whole-page packs are
+  not claimed as shipped.
+- **Household direction:** Record item-location, appliance-paperwork,
+  user-confirmed dates/reminders, bounded observations and TV consumption as
+  optional future user jobs. Their entity, observation, read, device-access
+  and recovery semantics need separate review after admitted convergence
+  work. Saving arbitrary JSON bytes does not implement those jobs. The
+  selected direction remains information storage and retrieval for one owner.
+- **Why:** Separate responsibilities let an owner add a useful capability
+  without another database or a fragmented workflow, and choose a different
+  interface without losing search, selection, Notes or original takeout.
+  Concrete end-to-end jobs are a better completion boundary than feature
+  breadth or a generic plugin framework.
+- **Evidence and next decision:** The [scenario catalog](../research/personal-information-scenarios-and-reference-products-20261014.md)
+  links realistic jobs and official reference patterns. The [module and
+  installation design](personal-information-modules-and-installation-design.md)
+  links current source and distinguishes code presence from deployment and
+  release qualification. No competitor UI trial, customer case, or new model
+  execution is claimed. Subsequent implementation still follows the
+  normative execution plan and its own admitted contract.
+
+### ADR-043: Reuse capabilities before turning scenarios into features
+
+- **Date:** 2026-10-14
+- **Status:** Informative operator-priority decision. It supersedes the
+  same-day seven-milestone/21-task expansion as a delivery commitment, not
+  normative requirements or historical implementation evidence.
+- **Context:** The operator wants useful scenarios that reuse the common
+  platform without a feature/application for every example. Calling every
+  proposal future or gated still creates an implicit promise to build it.
+- **Decision:** Start with existing exact files, multiple tags, one Notes
+  surface, supported search/SavedView and selection/export. Photos/Music and
+  current shells present that same authority. Document capability recipes;
+  compose them to meet the chosen user goal and schedule necessary admitted
+  gaps. New semantics or integration triggers bounded scope review, not
+  removal of the goal or automatic expansion to a domain suite.
+- **Operator clarification:** The purpose is to achieve the goals simply and
+  elegantly by composition, adding what is needed. Keep user outcomes,
+  capability gaps and active implementation separate. A manual recipe proves
+  its own steps; it does not close a requested comfortable experience that
+  still requires awkward reconstruction. Necessary new behavior may be
+  admitted after its real scope/authority/recovery review.
+- **Boundary:** Human-written order, dates, location or progress inside content
+  remain ordinary information. Native parsing/validation, business sorting,
+  calculation, notification, membership or automatic updates are new behavior.
+  Common applicability does not admit a universal record schema, task engine,
+  generic group or external capture interface. Daily manual use is not itself
+  a reason to exclude a recipe or build a domain app.
+- **Work:** Four packages replace the feature pipeline: A ordinary reuse
+  journey; B common friction repair only where demonstrated; C existing
+  admitted experience/discovery residuals; D required core gates in their
+  existing order. B may have no implementation task. PC-09/10 and PC-13–19
+  retain goals and candidate gaps without assuming independent full suites.
+  Select shared pieces, minimum missing behavior and a user exit before
+  scheduling the next admitted slice. Existing core gates remain unchanged.
+- **Examples:** A reading list is a saved text file plus tag/Notes and manual
+  browser return; a household location is a searchable owner statement; a food
+  list can be manually maintained. These do not claim archived webpages,
+  browser sessions, native inventory/date calculations or reminders.
+- **Completion:** A representative existing-operation journey records manual
+  steps, lookup effort, actual mistakes and changed-record behavior, then
+  takes out the selected exact bytes. New-content identity, supported dynamic
+  query conditions and preview limits remain explicit. A recipe or model
+  opinion awards no feature/core/release credit.
+- **Why and evidence:** This keeps broad usefulness in combinations of a
+  small coherent tool, rather than many new pages/state models. The
+  [corrected closure plan](personal-information-product-closure-plan.md) and
+  [single ledger](product-experience-todo.md#product-closure-work-breakdown--2026-10-14)
+  record the change. Two configured read-only Opus 5.5 CLI consultations
+  returned final responses with exit 0 and zero tool events; their advice
+  was checked against repository contracts, including corrected field,
+  frequency, SavedView and update assumptions. No product implementation,
+  runtime/model readiness or release qualification changed this round.
+
+### ADR-044: AI clients over the existing content authority
+
+- **Date:** 2026-10-15; reaffirmed 2026-10-16
+- **Status:** Informative product direction and preferred architecture for
+  later review. The operator requested recording voice capture, AI-assisted
+  file finding/takeout and remote personal-file management. No implementation,
+  new command, schema, processor, remote profile or phase admission is granted.
+- **Context:** Requiring the owner to translate a short spoken intent into
+  searches and file operations would miss the intended low-effort experience.
+  Client versus server is a responsibility split: interaction and planning
+  need not become a second content authority or mandatory model service.
+- **Decision:** Prefer an external AI client as the initial integration
+  candidate. It accepts speech/text, interprets intent and coordinates scoped
+  requests. The existing Cairn service owns authorization, retrieval, plans,
+  exact storage/output and verification. A later built-in assistant uses the
+  same client boundary; optional local/online speech or model providers do not
+  receive kernel authority. Preserve one owner, one catalog/repository and
+  recovery independent of the AI client or model.
+- **Integration choice:** Client integration and an optional service-hosted
+  assistant may coexist, but the first useful slice needs only one. Evaluate
+  completed capture or verified takeout, not the presence of chat or a model
+  endpoint; no service-hosted agent is selected by this direction record.
+  The 2026-10-16 reaffirmation keeps the existing AI client as the preferred
+  starting point and a service-hosted assistant optional; transport and vendor
+  remain undecided.
+- **Alternatives:** A mandatory server-side agent/model platform adds an
+  independent lifecycle and unnecessary default resource/credential exposure.
+  A client that directly reads the catalog, repository or unrestricted source
+  filesystem bypasses the existing trust and recovery contracts. Neither is
+  selected. A future built-in client remains possible without either design.
+- **Interaction:** Complete bounded reads and accepted quick-capture presets
+  without repeated intermediate prompts. Ask only for material ambiguity or
+  authority not already granted. Show progress, cancellation and the actual
+  saved/prepared/verified or unavailable outcome. Transcription and AI-inferred
+  facts keep their provenance; a new text record and a Note on an existing
+  subject reuse their respective existing mechanisms.
+- **Remote and privacy boundary:** Reading retained content remotely, pairing
+  a bounded source, and modifying live remote files require separate review.
+  Search permission grants no shell, source deletion, signing keys or general
+  filesystem access. Microphone capture/retention, model egress, source scope,
+  output destination and revocation are explicit. No automatic cloud fallback
+  or whole-library upload is implied. Existing AI nonprivilege and qualified
+  remote-profile requirements remain authoritative.
+- **Why:** This directly improves the product's find/use/takeout advantage
+  while reusing the trusted content plane. Voice is another capture method;
+  conversational retrieval is another client interaction. Neither needs an
+  independent inventory, universal record, file manager or recovery service.
+- **Next reviewed slice and exits:** PC-21 first chooses the smallest useful
+  end-to-end job and its permitted operations. Later evidence must show spoken
+  capture -> saved/searchable/correctable record, or natural-language request
+  -> authorized candidates -> intended exact output; include ambiguity,
+  provider/remote unavailability, cancellation and unknown-outcome handling.
+  The [product direction](content-first-product-decision.md#ai-assisted-capture-and-retrieval-direction-2026-10-15)
+  records the concrete examples. This record does not claim ASR, an AI/MCP
+  integration, remote capture or file control is shipped, and does not reorder
+  the core execution plan.
+
+### ADR-045: Bind semantic matches to their selected source revisions
+
+- **Date:** 2026-10-15
+- **Status:** Implemented and tested for the bounded development profile in
+  [the dated acceptance](semantic-source-lineage-acceptance-20261015.md).
+  The same tested binary has a reviewed local owner-preview rollout. Full
+  Phase 4 and release completion remain open.
+- **Context:** Semantic receipt v1 proves subject/segment membership but cannot
+  distinguish successive bodies under one stable Note ID. Querying that old
+  vector and reopening the current Note can attribute new text to an old
+  embedding. The ONNX worker also already reports truncation and token counts,
+  which the search adapter currently drops.
+- **Decision:** Use the separately versioned v2 successor in
+  [Driver and Processor Interfaces §10](../requirements/driver-and-processor-interfaces.md#semantic-input-lineage-successor-development-v2).
+  Keep one existing receipt path and commit a generation-local candidate
+  inventory before filtering, exact source revisions/digests, input identities
+  and validated optional tokenizer coverage evidence. Preserve immutable Note
+  history for matched text; the live record still controls tombstones and
+  lifecycle. Truncated or unknown token consumption cannot claim full source
+  coverage, even when all submitted input identities exist in zvec.
+- **Alternatives:** Reopening the current Note silently changes a hit's
+  provenance. Timestamps or a different lexical generation cannot establish
+  which bytes an old vector used. A second text catalog or copying Note bodies
+  into a new durable record would duplicate authority. None is needed because
+  immutable annotation revisions already exist.
+- **Compatibility:** Read v1 under its original pair-only meaning. An old Note
+  hit without revision proof reports semantic unavailability and a rebuild
+  reason; lexical/structured discovery and exact preservation remain usable.
+  New builds do not rewrite old receipts, model spaces, catalog schemas or
+  recovery formats. The worker ABI remains unchanged; its validated result
+  facts cross an optional host-side search field.
+- **Why:** A found result must explain the content that actually produced it.
+  This closes an admitted discovery/provenance gap without adding a domain
+  application, AI integration or recovery dependency. Missing evidence remains
+  explicit rather than receiving an inferred completeness claim.
+
+### ADR-046: Segment long text sources without another durable document model
+
+- **Date:** 2026-10-15
+- **Status:** Implemented and tested for the bounded development profile in
+  focused and broad tagged Go cohorts and an isolated actual BGE/zvec run.
+  The same tested candidate also passes owner-preview deployment and the
+  existing search/Photos/Music/exact-original journey. No core or release
+  gate is closed by this record; see the
+  [native acceptance](semantic-source-lineage-acceptance-20261015.md#long-text-source-segmentation-successor).
+- **Context:** A Note or admitted text extract currently becomes one semantic
+  input. Honest 512-token truncation reporting preserves trust but leaves its
+  later text outside semantic retrieval. Durable description segments already
+  have a separate, revision-bound model; copying Notes into descriptions or
+  adding segment rows for every rebuild would create unnecessary authority
+  and recovery changes.
+- **Decision:** Derive deterministic, contiguous UTF-8 source-span inputs for
+  long Notes and already selected textual extracts at rebuild time under the closed
+  `cairn.semantic-text-source-segmentation.v1` profile. Its conservative
+  384-source-byte target prefers sentence/whitespace boundaries and retains
+  every source byte. Whitespace attachment can exceed the target; tokenizer
+  FULL/TRUNCATED/UNKNOWN still comes from actual provider evidence. This is
+  not a claim that a byte limit guarantees a tokenizer limit.
+- **Identity and provenance:** Keep the complete immutable source body and
+  revision authoritative. Bind profile, source, subject, revision, body,
+  ordinal, exact span and text digest in derived IDs and the existing v2
+  receipt inventory. Query reopens that immutable source and reproduces the
+  segment set before returning matched text. Optional provenance on the
+  existing search result exposes the source revision and byte span. Current
+  Note lifecycle, artifact admission and root authorization remain gates.
+- **Backend encoding:** The first actual-native attempt rejected a draft
+  68-character `txt_` plus full-hash ID. The retained native zvec library's
+  validation patterns cap document keys at 64 characters. Encode the full
+  SHA-256 as 64 hexadecimal characters without a prefix and bind that encoding
+  into the segmentation profile; do not shorten the digest or change content
+  identity. The draft failed before owner deployment and receives no native
+  acceptance credit.
+- **Compatibility:** Preserve short and legacy whole-body v2 inputs. Unknown
+  segmentation profiles fail closed. Old readers may refuse newly segmented
+  receipts, so retain the prior binary/generations and use an explicit rebuild;
+  never rewrite old receipts. Lexical full text, durable description segments,
+  the model/semantic space, worker ABI and recovery records remain unchanged.
+- **Why:** This makes more retained text findable through the shared discovery
+  plane without another user concept, durable schema, processor or service.
+  The [v2 contract refinement](../requirements/driver-and-processor-interfaces.md#semantic-input-lineage-successor-development-v2)
+  defines the bounds; the existing core plan remains the implementation order.
+- **Exit:** Demonstrate suffix-only semantic matches beyond the former model
+  prefix with actual local BGE inputs and verified revision/span digests;
+  retain old-generation historical Note text after edits, honor tombstones and
+  reject malformed/gapped/profile-mismatched evidence. Prove lexical and exact
+  original access remain available. A controlled sample is implementation
+  evidence, not representative recall or release qualification.
+
+### ADR-047: Prove continuous CJK phrases after bounded lexical candidate expansion
+
+- **Date:** 2026-10-16
+- **Status:** Implemented and tested for the bounded development slice,
+  including the owner-preview rollout; full phase/release gates remain open.
+  This advances Phase 4 discovery without changing its gate or phase order.
+- **Problem:** The retained long-text native attempt 002 cannot find the
+  interior phrase `萤火浮标` lexically, although its full source sentence is
+  indexed and a complete-token query succeeds. The existing V4 appendix has
+  single-character and adjacent-bigram tokens; it has no arbitrary-length
+  interior token for the original four-character query.
+- **Decision:** Keep original query tokens. For a pure Han token of at least
+  three characters, preserve the original prefix branch and add a candidate
+  conjunction using at most its first sixteen distinct adjacent bigrams from
+  the current enriched axes. Require continuous original-text proof before
+  counting a returned hit or `has_more`. Multiple ordinary query tokens retain
+  their existing AND and axis semantics. Continue scanning candidate pages
+  through rejected fragments until there is a full page plus one proven hit
+  or the stream ends.
+- **Provenance and paging:** Explain actual source text and UTF-8 byte spans;
+  fragment co-occurrence is not a phrase match. Existing verified
+  description-field mapping may explain an actual same-body segment boundary.
+  Bind `cairn.lexical-query.cjk-contiguous.v1` into continuation query identity
+  so an old BM25 position cannot cross query-policy changes. The tokenizer,
+  index feed/profile, stored source records and recovery formats do not change.
+- **Why:** Splitting into unordered bigrams alone produces false positives.
+  Filtering a finished limited page loses real later matches. Replacing the
+  lexical feed or adding another search store is unnecessary for this observed
+  gap. Candidate expansion plus source proof reuses existing generation and
+  paging machinery and keeps Latin/pinyin behavior and original access intact.
+- **Limits and exits:** Existing appendix vocabulary and extracted-prefix
+  bounds remain visible; no unindexed universal substring coverage is claimed.
+  Prove interior matches, fragmented/reordered negatives, source attribution,
+  same-body boundary spans, over-1,000 rejected candidates before real hits,
+  stable multi-page exhaustion, typed filters and old-policy token refusal.
+  The [query contract](../requirements/driver-and-processor-interfaces.md#compiled-lexical-cjk-query-refinement)
+  governs the implementation. The [dated acceptance](lexical-cjk-query-acceptance-20261016.md)
+  records reviewed focused/broad Go tests, ordinary private browser fallback,
+  precise source spans and exact originals, followed by owner deployment on
+  unchanged lexical/semantic generations. This closes PC-07i only and grants
+  no full Phase 4/5 or release qualification.
+
+### ADR-048: Continue budget-refused takeout with the attempted selection
+
+- **Date:** 2026-10-16
+- **Status:** Implemented and tested for bounded UX-T1/PC-02a; no core-phase or
+  release qualification.
+- **Problem:** ZIP budget or unknown-size refusal leaves only an error and
+  Dismiss, interrupting takeout despite existing alternative output paths.
+- **Decision:** Validate the complete explicit identity set, retain only its
+  minimal immutable workspace-bound client projection on preflight budget
+  refusal, and expose the existing original download/server export drawer.
+  A changed visible selection cannot silently replace the attempted set.
+  Invalidate on reset/new attempt/workspace change and preserve ordinary
+  readiness, review and verification. Invalid identities or post-plan failures
+  acquire no bypass. The retained set is not an ExportManifest.
+- **Why:** Raising browser limits would increase memory exposure without
+  solving the task. Recapturing current selection can export unintended files.
+  Reusing the existing explicit plan/apply/verify path gives large-file users a
+  practical exit without another backend, lifecycle, durable state or authority.
+- **Evidence:** [The dated acceptance](zip-refusal-continuation-acceptance-20261016.md)
+  records a real oversized original, changed-selection two-file export, exact
+  byte verification, focus/dismissal, focused/build/broad checks and the limits
+  of workspace/runtime evidence.
+
+### ADR-049: Publish user metadata over all retained authenticated subject parents
+
+- **Date:** 2026-10-16
+- **Status:** Contract clarification; focused tests cover ordinary Note/TAG
+  upsert and rename/delete, PROGRESS create/revise, annotation imports, and
+  Description publication for the bounded development slice. A bounded actual
+  corpus drill now joins seven saved facts under one retained authenticated
+  parent and restores the 104 originals; this is not broad corpus coverage or
+  full Phase 3/release closure. See the
+  [dated evidence](real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill).
+- **Problem:** The initial 104-file reference predates later Note, TAG and
+  description writes, so its authenticated child does not cover those catalog
+  facts. That is a historical artifact gap; later bounded tests now exercise
+  the ordinary publication hooks described in the dated evidence.
+- **Decision:** Reuse that publisher after admitted metadata mutations. Cover
+  every retained authenticated committed parent whose signed subject mapping
+  contains an affected stable subject. Resolve fixed parents from authenticated
+  records, not latest roots or an index. Join the operation's own committed
+  revision/digest/tombstone to each verified successor before claiming coverage.
+  The normative rule is in Restore Manifest section 20.1; old record formats and
+  exact publication meaning are unchanged.
+- **Why:** Latest-only selection would leave a subject's other retained recovery
+  paths without its later user facts. A separate metadata service or store would
+  duplicate authority. Existing signed complete-state successors already carry
+  revision history, attachments, parent bindings, fencing and reconciliation.
+- **Failure and concurrency:** Keep the committed user write and return its
+  identity with an explicit degraded result if any required publication is
+  missing, failed or uncertain. Do not retry a Note/description mutation to
+  recover publication. A later concurrent revision does not substitute for
+  evidence of this operation's own saved revision. Process loss between stores
+  leaves coverage unproven; no queue, new state machine or silent recovery claim
+  follows from this decision.
+- **Exits:** Focused multi-parent/missing-mapping/idempotency and mutation-failure
+  tests, then ordinary Note/TAG/description writes exported and imported by a
+  clean catalog-free reader with exact revision/body joins. Preserve full-byte
+  restore and explicit partial/unknown outcomes. Bounded tests now cover the
+  listed Note/TAG/PROGRESS/import/Description hooks, including saved-write
+  behavior on publication failure; Note additionally has an actual corpus-reader
+  fact check. The separate seven-fact corpus drill is bounded to one retained
+  parent. Missing-predecessor import
+  is saved + DEGRADED and does not prove complete history recovery. Existing
+  Phase 3/4/5/6/7 gates remain in force.
+- **Evidence (2026-10-16):** Root-reviewed run
+  `trial/recovery/note-upsert/runtime/attempts/20261015T202737Z-6794ce5aa2ac40489ba12935dfd885a3/run.json`
+  saved Note revision 3 under its exact ID/body digest, published one actual
+  retained parent, and passed a separate reader against an independently
+  retained anchor/repository copy. The reader was instantiated with no catalog
+  (`Store=nil`) and no signing identity; it verified 104 files / 2,486,895
+  bytes; this Note run verified the fact and original-file hashes but did not
+  restore bytes. A separate bounded corpus drill covers seven own facts under
+  one retained parent and restores 104 originals; the reference fit v2 at
+  16,466,616 bytes. Two-parent publication remains focused-test evidence. See
+  the [dated evidence](real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill).
+  Focused tests exercise multi-parent publication,
+  partial/unknown failure, missing auth and revision concurrency; focused
+  reader tests verify exact facts across retained parents without catalog or
+  signing key. The bounded 2026-10-16 follow-up adds PROGRESS, imports, TAG
+  rename and Description coverage, including saved writes on publication
+  failure. Missing-predecessor import is saved + DEGRADED, not a full
+  history-recovery proof. The final combined tagged Go run passed; its command,
+  timing and cache limits are recorded in the dated evidence. This is bounded
+  test evidence, not a phase or release completion claim.
+
+### ADR-050: Preserve description creation configuration across retained parents
+
+- **Date:** 2026-10-16
+- **Status:** Contract clarification; the focused signed A/B-parent regression
+  is implemented and green for the bounded development reader. Older-reader
+  interoperability and release qualification remain open.
+- **Problem:** A description created under configuration B cannot be published
+  unchanged to a retained configuration-A parent because the current reader
+  equates its creation digest with the parent's manifest digest. This conflicts
+  with immutable revision provenance and ADR-049's all-parent coverage.
+- **Decision:** Validate the description's own nonempty SHA-256 creation digest
+  independently of each parent's manifest configuration. Duplicated provenance
+  must agree with the payload. Keep authenticated membership, signatures,
+  revision lineage, producer bindings, body digests and attachments unchanged.
+  Restore Manifest section 20.1 defines the clarified rule.
+- **Why:** Rewriting either digest would falsify history. Configuration changes
+  affect new work; a later fact about an existing subject can legitimately have
+  been created under another configuration. No new format, schema, store or
+  migration is needed to preserve those existing fields.
+- **Compatibility:** Existing bytes and field meanings remain unchanged, but
+  older readers with the stricter equality check can reject the newly usable
+  metadata combination or its exported reference. Use the tested reader binary;
+  do not claim old-reader interoperability or release qualification.
+- **Exits:** The same exact description revision is authenticated under signed
+  A/B parents with distinct configuration digests by a reader without a catalog
+  or signing key. Missing/malformed creation digests, conflicting duplicated
+  provenance, changed signatures, body/attachment corruption and cross-subject
+  facts remain rejected. Preserve both exact parents and their original bytes.
+- **Evidence:** The focused signed A/B configuration-digest test passes; malformed
+  and missing digests, duplicated-provenance mismatch, signature/body damage,
+  and cross-subject facts are rejected. Existing field meanings and bytes remain
+  unchanged. Focused Description publication tests also verify USER, imported,
+  and manually supplied AI_SUMMARY candidate/accepted-successor facts with
+  body/segment coverage under retained parents and creation config B while the
+  parent retains config A. The candidate was supplied directly in a test; this
+  is not model integration. Older readers with the former strict equality
+  check may reject this valid combination; use the tested reader binary. This
+  is not release evidence.
+
+### ADR-051: Compact recovery selectors over unchanged authenticated records
+
+- **Date:** 2026-10-16
+- **Status:** Implemented and tested for the bounded Phase 3 development
+  slice, with focused cases, combined tagged Go evidence and a separate-process
+  restore regression. Not release-qualified; history-scale performance, old
+  reader interoperability and full catalog reconstruction remain open. Restore
+  Manifest section 20.1 defines the exact successor.
+- **Problem:** The actual two-child Note reference is 4,671,340 bytes. A signed
+  regression has individually bounded children of 17,064, 5,618,107 and
+  11,219,046 bytes, but its 16,867,660-byte v2 reference exceeds the 16 MiB
+  reader cap. The writer guard prevents unreadable success; repeated ordinary
+  metadata writes still need a usable independently retained reference.
+- **Decision:** Admit explicit `org.cairn.recovery-reference.v3` descriptors for
+  the existing prepared record and every selected fact successor. Pin the full
+  exported prefix, independently read/hash/authenticate each selected record,
+  and keep existing strict repository fork handling. Validate sequentially
+  without retaining every historical body. Preserve all existing signed records
+  and individually bounded v1/v2 placement; this is no history compaction.
+- **Compatibility:** Explicit v2 APIs remain v2-only. Generic export chooses v2
+  when it fits and v3 only for a typed v2 size refusal; other errors propagate.
+  Import reports the actual schema; startup accepts typed v2/v3 with an
+  independent anchor. Service migration validates/copies a v3 input as v3;
+  existing small v1/v2 outcomes remain unchanged. No CLI migration operation is
+  added. Old readers reject v3; their interoperability is not claimed.
+- **Why:** Raising the cap just moves the same failure. Rewriting small signed
+  children into parts would change existing placement/digests, and dropping
+  predecessors would weaken history. Repository-only discovery would remove
+  the explicit independently retained selector. Digest descriptors reuse the
+  existing authority without adding a store, service or signed record format.
+- **Exits:** A generic export of the measured over-bound aggregate becomes a
+  bounded v3 artifact; a catalog/key-free reader verifies the frozen exact
+  metadata prefix and exact originals with the separate anchor. Test near-limit
+  prepared records, valid suffix exclusion, post-head forks, missing/corrupt
+  records/parts/attachments, unknown roles/schema/extensions, cancellation,
+  typed-only fallback, destination preservation and v1/v2 compatibility. All
+  checks and totals precede output creation. The bounded evidence now covers
+  aggregate fallback, frozen prefix/suffix/fork behavior, corruption, parts,
+  cancellation, compatibility and real daemon/CLI exact restore after deleting
+  source/catalog/keys. The Unix near-limit fixture measured a 14,521,495-byte
+  prepared v2 record and a 16,210,219-byte fact v2 record; the expanded
+  30,734,625-byte v2 reference was refused and generic export emitted a
+  3,014-byte v3 reference. A separate-anchor, catalog/key-free reader restored
+  201 files / 3,847 bytes while the source remained available. This is the
+  bounded large-prepared/near-limit-fact aggregate case; no exact prepared-size
+  sweep was run. [Dated acceptance](real-project-corpus-acceptance-20261016.md#compact-recovery-reference-successor-bounded)
+  records the combined Go pass and remaining limits. This is separate from packaging, metadata/catalog
+  reconstruction, history-scale performance and release qualification.
+
+### ADR-052: Reconstruct the operational catalog without inventing capture history
+
+- **Date:** 2026-10-16
+- **Status:** Implemented and tested for the bounded Phase 3 development
+  scope; not release-qualified. The lost-catalog daemon/CLI journey and
+  rev3 re-publication are recorded in the
+  [dated acceptance](catalog-reconstruction-acceptance-20261016.md). The
+  normative policy is in [Restore Manifest section 20.1](../requirements/restore-manifest.md#fresh-operational-catalog-reconstruction).
+- **Problem:** Current import authenticates portable records and can repair a
+  missing publication row against a staged root, but an empty catalog stays
+  empty. Exact-reader restore alone does not recover the ordinary Library,
+  Notes and search experience. Portable content/fact records also do not
+  contain every original scan, observation or physical descriptor field.
+- **Decision:** Reuse the existing Store-backed import and existing tables for
+  one atomic authenticated reconstruction. Preserve stable content/fact IDs
+  and exact revision/body/lifecycle records. Mark necessary new local FK rows
+  as reconstruction provenance; leave sources LOST with opaque locators and
+  scans incomplete. Preserve unknown facts honestly and refuse ungrounded
+  required relations. Rebuild disposable search through existing index code.
+- **Currentness:** A writable reconstruction requires the selected fact head
+  to remain current for its parent under existing publication coordination.
+  A later valid suffix is not silently selected. A retained root need not be
+  the newest root publication; independent source snapshots still matter.
+  Store-free historical read/restore is unchanged.
+- **Historical captures:** Protection is already one current row per stable
+  subject. Preserve the distinct signed manifests and recovery routes, and
+  select that current row by authenticated publication order. Reversed import
+  order must not turn a valid older capture into a conflict or replace the
+  newer current content. Reuse identical shared immutable descriptions and
+  other rows by exact comparison. This adds no protection-history schema.
+- **Why:** Fabricating completed scans or live source locations would turn a
+  recovery projection into unsupported evidence. A second recovery database
+  or rewritten signed format is unnecessary for the grounded existing rows.
+  A chat, fixture or publication-row-only import is not the missing outcome.
+- **Exit:** With source and original catalog absent, use the existing CLI to
+  populate a fresh catalog, browse retained names/subjects, read exact Notes
+  and description history, search the rebuilt lexical fields, and verify
+  exact takeout/restore. Prove replay, atomic conflict/corruption refusal,
+  current-head fencing, historical-reader preservation and unavailable facts.
+  No phase/release credit precedes that evidence.
+
+### ADR-053: Authenticate catalog relations instead of guessing them during recovery
+
+- **Date:** 2026-10-16
+- **Status:** Implemented and tested for the bounded Phase 3 development
+  scope; not release-qualified. Authenticated relation projection, refusal,
+  replay and post-recovery publication evidence are in the
+  [dated acceptance](catalog-reconstruction-acceptance-20261016.md).
+- **Problem:** The reconstruction draft guessed representation ownership and
+  access fields because signed subject mappings contain IDs, not the original
+  catalog relation rows. Exact bytes do not prove these missing historical facts.
+- **Decision:** Use one fixed, reserved, kernel-only typed-value profile of the
+  existing METADATA_FACT contract. Sign the actual immutable FileVersion,
+  admitted logical extents and required Representation rows, bound to the
+  existing snapshot/root/subject mapping. Strictly validate these relations
+  before the existing atomic catalog transaction. Keep them snapshot scoped,
+  outside ordinary current metadata and cross-parent current-head comparison.
+- **Compatibility:** This adds payload semantics while retaining the existing
+  signed envelope, record kinds and catalog schema. Store-free exact recovery
+  continues for old references; an old reference without grounded required rows
+  cannot claim fresh-catalog reconstruction. No original record is rewritten,
+  no provider is installed and no physical ownership is inferred from config.
+- **Why:** Refusing every positive reconstruction would leave the requested
+  Library/Notes recovery unfinished. Guessing ownership would make it unsafe.
+  A namespaced authenticated fact reuses the existing authority and avoids a
+  second operational store or general extension system.
+- **Exit:** New publications reconstruct the lost catalog from authenticated
+  relation facts and pass the ADR-052 ordinary CLI journey. Missing/mismatched
+  witnesses refuse catalog writes; legacy Store-free exact reading remains
+  available. The profile and replay/conflict/byte results require executable
+  evidence before any completion claim.
+
 ## 9. Open gates before the release binary
 
 | Gate | Blocks | Owner of the evidence |
@@ -1755,3 +2296,562 @@ This table maps every meaningful upstream into the seam it serves and the exact 
 - [NAS Vertical Slice Implementation Plan](nas-vertical-slice-implementation-plan.md)
 - [Open-Source Adoption and Code Borrowing](../references/open-source-adoption-and-code-borrowing.md)
 - [Documentation index](../README.md)
+
+
+### ADR-054: Rank mixed search without concatenating entire components
+
+Decision date: 2026-10-18. Status: implemented and locally accepted for the bounded development slice; not retrieval-quality or release qualification.
+
+The existing fusion broker preserved membership and provenance but placed the
+whole first component before later-only subjects. A high-ranked semantic hit
+could consequently appear after hundreds of lexical matches. This obstructs
+ordinary find-and-use even when both providers return valid candidates.
+
+Use the versioned host rank-only policy in the QueryProvider contract:
+`query.broker.fuse.v2`, `reciprocal-rank-fusion-k60-v1`. Reciprocal rank fusion
+uses provider order instead of calibrating unlike scores; k=60 is fixed rather
+than tuned to this corpus. The primary reference is
+[Cormack, Clarke and Buettcher, SIGIR 2009](https://cormack.uwaterloo.ca/cormack/cormacksigir09-rrf.pdf).
+The paper motivates the mechanism; it is not evidence for Cairn's recall.
+
+Keep all authorized union members and original component/source provenance.
+Use one contribution per subject per dimension, deterministic tie handling,
+unchanged per-lane ceilings, and unchanged single-lane/fallback order. Apply the
+existing current-subject authorization projection exactly once before the final
+rank order; compact the surviving component ranks so stale/unresolvable hits
+cannot cast a vote or shift visible relative ranks. Only original candidates
+can survive this intersection; the ranking helper never grants access. Retain
+the resolver's proven original-ID to canonical-SubjectRef mapping so supported
+legacy index hits survive, while alias/stable duplicates cast only one vote
+per component. Existing generations require no rewrite for this compatibility. No model,
+reranker, raw-score blending, new dimension, schema, endpoint, durable ranking
+state or automatic rebuild is admitted. Existing index generations and frozen
+exports are not rewritten. Single-dimension search and lexical continuation
+keep their existing order and policy.
+
+Rejected alternatives: increasing semantic K leaves concatenation intact;
+interleaving gives repeated cross-component matches no shared evidence;
+blending FTS/cosine values assumes an unqualified calibration; a learned
+reranker adds a provider/model and corpus-tuning work outside this slice.
+
+Active phase: Phase 4 complete discovery. Normative requirement: content-store
+§9.2 default host fusion and QueryProvider host ranking/provenance boundaries.
+Executable exit: many lexical candidates plus a distinct semantic rank-one
+subject no longer bury that subject behind the whole first lane, while bounded
+membership, exact source/authorization facts and fallback order are retained.
+Compare the unchanged retained real corpus and frozen queries before/after;
+do not change labels, raise candidate limits or count fixture vectors as a
+real semantic capability. This decision closes no core or release phase.
+
+The [dated acceptance](mixed-search-ranking-acceptance-20261018.md) records
+focused/broad checks and the unchanged actual BGE corpus comparison. Full raw
+membership, identity and source evidence match; two queries change order,
+including both upward and downward movements. The expected top-ten miss set
+does not improve, so the result establishes the mechanism and compatibility,
+not a general retrieval-quality gain.
+
+### ADR-055: Refuse silently truncated semantic queries per request
+
+Decision date: 2026-10-18. Status: implemented and tested for the bounded local
+profile, including the real default-broker long/short continuation below.
+This decision awards no discovery or release completion credit.
+
+A long query can be accepted by the embedding worker while only its tokenizer
+prefix influences the vector. Document truncation already has source-coverage
+evidence; silently treating a partial query as the complete user's intent has
+no equivalent user-visible qualification.
+
+Discard a query vector explicitly reported as tokenizer-truncated before zvec
+querying. Use an input-specific error that retains the existing invalid-query
+classification and maps to `QUERY_INPUT_TRUNCATED` in the existing component
+reason field. Explain the shorter-query action through the existing degraded
+response and client message path. Egress refusals retain their higher-priority
+message. Other available lanes continue, and this request-level refusal does
+not revoke a verified generation or require restart.
+
+This follows Phase 4's truthful discovery fallback and the QueryProvider
+contract. It adds no model, index dimension, command, schema, provider method
+or signed field; document truncation retains its separate coverage meaning.
+Worker inference may already have run before coverage is returned; this is
+refusal of the partial result, not a claim of pre-inference token checking.
+
+Rejected alternatives are silent prefix ranking, guessing tokens from a browser
+character count, and marking a healthy provider globally unavailable. The
+executable exit is an explicitly truncated query with no zvec query, a visible
+reason and available ordinary-search fallback, followed by a successful short
+query without restart. Controlled provider cases must be identified as fixtures
+and cannot qualify actual BGE tokenizer behavior or retrieval quality.
+
+The first real-model continuation exposed another boundary: the ONNX factory
+treated the typed query refusal as a fatal worker error even though the indexer
+retained the generation. The factory now retains that one query-only refusal
+only after its ordinary post-call admission, fence and live-context checks
+pass. Changed assets/fences and other failures still invalidate the session.
+Existing lifecycle tests cover both outcomes; the focused and tagged broad Go
+suites pass. On the final native candidate, ordinary default-broker searches
+run short → tokenizer-truncated long → short without restarting the daemon:
+the long request has actionable DEGRADED guidance and available lexical output,
+and both short requests succeed on the same real BGE/zvec generation. See the
+[dated acceptance](daily-client-functions-acceptance-20261018.md#native-successor-and-real-local-semantic-continuation).
+This qualifies only the stated request-isolation behavior, not retrieval quality
+or the complete default/release profile.
+
+### ADR-056: Compose Notes finding with Library search and returned evidence
+
+Decision date: 2026-10-18. Status: accepted; source/build review and local
+delivery complete, consolidated client interaction acceptance pending.
+This is existing client/description maintenance,
+not new scope or a phase/release completion award.
+
+Notes filters the rows and bodies already loaded in that view. Raising its
+list ceiling or hydrating every body would add cost without making it the
+full-corpus query authority. When nonempty Notes text has no loaded match or
+the list is partial, offer one explicit action into the ordinary Library search
+in the same workspace. Disclose that Notes source/tag filters do not carry
+over. Literal text must not silently become search operators; reuse the current
+parser and refuse a conversion it cannot represent safely. Keep existing
+workspace, navigation, busy and unsaved-draft guards.
+
+The result's already returned source segments belong beside inspection, so
+Details gains a default-closed, six-at-a-time view of those excerpts and their
+present provenance fields. Page through returned segments without another
+query or body hydration. Absent evidence creates no explanation, and semantic
+similarity does not imply a literal highlighted match. Structured image
+metadata retains its existing presentation. This adds neither a second Notes
+concept nor another description record or search index.
+
+The same review found two truthfulness defects in existing actions. Restore
+preview must describe planned output rather than verified restored bytes;
+missing counts remain unknown. Description confirmation must warn for actual
+regular JPEG/PNG subjects, and the host must independently admit image input
+before egress: eligible names, identity-checked bytes and the existing shared
+image decode limits. A broad `image.bytes` grant never makes arbitrary file
+bytes an image. Non-image extracted-text description remains available; corrupt
+image input fails before the provider. Exact preservation and old records are
+unaffected. No provider is installed or enabled by these repairs.
+
+Rejected alternatives are another Notes search engine, automatic searches on
+filter typing, copying matched/generated text into a second Note, mounting all
+returned excerpts, broadening disclosure wording to excuse arbitrary-byte
+egress, and treating a restore plan as completed verification. The executable
+exits are a Notes miss followed by the existing Library query and exact takeout,
+bounded returned-source inspection, truthful restore preview, and image/text
+payload separation through the existing describe dispatcher.
+
+### ADR-057: Retain exact user tags in existing saved retrieval
+
+Decision date: 2026-10-18. Status: bounded legacy SavedView maintenance is
+implemented and locally delivered, with the stated current-build fixture
+browser checkpoints exercised. Owner data was not mutated. No core/release
+gate is awarded.
+
+A reusable retrieval should retain the Library's actual tag constraints.
+Refusing them is safe but leaves a central daily operation incomplete. Store
+one complete tag value as a JSON string after `tag=` in the existing `fields[]`;
+repeated fields mean exact AND over current live annotation values. Preserve
+case, whitespace and Unicode. Keep the existing record, save/update/evaluate
+commands, workspace authorization and export freeze authority.
+
+Intersect authorized lexical pages with one live workspace tag read before
+applying the existing result limit. Pin the first admitted generation for the
+whole evaluation. Reuse a private bounded lexical enumeration for tag-only
+views; ordinary empty searches remain refused. No new index/table, provider
+ABI, backend route, grouping primitive or query AST is introduced. Failed
+reads or continuations return failure rather than a successful partial set.
+
+Rejected alternatives are FTS prefix substitution, filtering only the first
+bounded candidate set, silently dropping tags on save, pretending tags are a
+durable album/playlist, and changing a live saved query's membership inside an
+already frozen export. Older builds continue to refuse unknown conditions.
+The exit is tag-only and keyword/structured/tag retrieval through save,
+recall/update and the same view-backed frozen export, including exact values,
+multiple tags, a match beyond the first candidate page and live tag changes.
+Full canonical AST, portable SavedViews, LinkGroup and release gates stay open.
+The frozen 15-source successor passes its focused and broad tagged Go checks,
+native build and five client checks; receipts are under
+`dist/product-saved-tag-retrieval-20261018/checks/`. Native SHA-256
+`543f8a529f3982c273d3f5103acda1c644c4069e0ac646236545962817571ff1` runs as
+PID 66200 (managed session 98478), with both owner index projections READY.
+The client candidate is delivered locally with nine matching HTTP asset hashes
+and index SHA-256
+`90474066dd8601a5a7eaf76351e9de8728b8689b12346c5d9c97ed3669e981ad`; the
+persisted configuration and twenty owner content identity tuples are unchanged.
+See `promotion/native-runtime.json` and `promotion/web-delivery-result.json`
+for the final runtime identity and unchanged before/after projections.
+The preceding native binary and complete old Web tree are backed up. The first
+native replacement attempt stopped on a transient process-exit observation;
+the managed old session exited 0 and its PID and listener were confirmed absent
+before replacement continued, with no extra signal or socket removal. These
+delivery checks alone do not establish browser acceptance or close a
+core/release gate. The later
+[consolidated client continuation](daily-client-functions-acceptance-20261018.md#consolidated-current-build-client-journeys)
+records the actual bounded save/update/recall/materialization and new-source
+handoff checks, preserved driver failures and unrun limits.
+
+### ADR-058: Bind modification-time discovery to the captured source fact
+
+**Status:** Accepted, 2026-10-19; implementation and release evidence are
+separate from this decision.
+
+The lexical index used an observation's `ObservedAt` as its modification-time
+facet, while Library rows read `mod_time` from captured namespace metadata.
+A document last modified in 2020 and imported in 2026 could therefore appear
+old in the Library but fail a search for files modified before 2021. A fresh
+catalog reconstruction would introduce yet another observation timestamp.
+Those timestamps are useful capture provenance, but cannot answer a source
+modification-time question.
+
+Read the existing captured namespace `mod_time` through one shared, pure
+decoder for the lexical facet and Library projection. Missing or invalid time
+stays absent without hiding the file from text search. Valid epoch and
+pre-epoch times remain valid; fractional precision remains in the captured
+metadata. The index uses its existing exclusive millisecond comparisons.
+This needs no live stat, observation lookup, schema, endpoint, new date field,
+processor, or recovery record.
+
+Use the distinct `fts5-metadata-v5` lexical profile for the corrected feed,
+retaining V4 text enrichment. Existing generations keep their recorded bytes
+and digest and fail closed under current wiring until the ordinary rebuild
+creates a new generation. Rewriting old index cells or retaining V4's digest
+would obscure which timestamp produced a result. Substituting ingest time or
+adding another operational metadata store would preserve the original error
+or duplicate authority. Exact saving and recovery remain independent of a
+searchable timestamp.
+
+The bounded exit is ordinary daemon/CLI ingest of files whose captured
+modification dates differ from today's observation time, correct existing
+time-filter results and Library dates, and refusal of an old-profile generation
+without modifying it. Missing/invalid time remains text-findable. This decision
+does not close Phase 4, select a production repository, or qualify a release.
+
+### ADR-059: Page authoritative current Notes and reproduce frozen takeout
+
+**Status:** Accepted, 2026-10-19; implementation evidence remains separate.
+
+A bounded description-history prefix cannot establish which revisions are
+current: its next page may contain the successor that hides its final row.
+Keep the legacy history read intact and add an explicit current-only, pageable
+summary projection to the existing `description.list`. Determine leaves in
+SQLite against the full chain, return no bodies, and bind continuation to one
+read-consistent summary projection using the existing token authority. Catalog
+changes invalidate continuation instead of silently splicing different states.
+The global Notes list loads further pages explicitly; subject Details use the
+same currentness authority. This needs no schema, durable cursor, processor,
+index dimension or new surface. Increasing a history ceiling alone would retain
+the error; fetching every long body would make ordinary browsing unnecessarily
+expensive. Older services may visibly refuse the new fields; the client must
+not fall back to calling a truncated revision a current Note.
+
+A previously frozen export is also a useful unit of reuse. Keep history's
+default action as verification, and offer a separate explicit action to write
+those same frozen files into a newly specified empty destination. Reuse the
+existing `export.apply` and automatic verification with the same manifest ID,
+digest, members, names and sidecar policy; never reevaluate its SavedView or
+rewrite its recorded target. The server retains no-follow, collision and
+empty-destination enforcement. An uncertain write stays bound to its attempted
+manifest and destination until verified; a new action cannot silently clear
+that uncertainty. This is legacy flat-manifest client maintenance, not the
+Phase 6 LinkGroup or manifest-successor admission.
+
+The bounded exits are more than 1,000 descriptions with a chain crossing the
+old ceiling, truthful continuation/currentness and source-bound body reads;
+and history -> explicit new destination -> same frozen bytes -> verification,
+with changed live view membership, occupied/symlink destinations and lost
+responses handled without inventing success or a second write. No core phase
+or release qualification follows from this decision.
+
+### ADR-060: Continue saved retrieval and retain uncertain restore attempts
+
+**Status:** Accepted, 2026-10-19; implementation and acceptance are separate.
+
+A saved search that cannot continue beyond its first 200 matches stops the
+ordinary find/select/use loop. Add optional read-only paging to the existing
+`view.evaluate`, preserving the old unpaged input/result. Reuse the existing
+lexical and exact live-TAG evaluation; do not translate stored conditions into
+a different text search. Authenticate one ordered authorized-result projection,
+view revision/definition, resolved workspace, lexical generation and relevant
+TAG facts with the existing process-local continuation authority. Stream the
+private bounded lexical pages, retain canonical identities plus one requested
+window rather than all result bodies, and calculate exact counts/fingerprint.
+An authenticated ordinal within that fingerprint is a disposable cursor, not a
+durable view version or a second metadata service. Changed projections require
+fresh evaluation. The first-party client appends only matching scope/revision/
+projection pages and exposes restart after staleness; newer searches/navigation
+retain their existing host-intent priority. Frozen exports remain separate.
+The per-page full projection scan is an explicit development tradeoff; this
+admission does not establish history-scale latency or release performance.
+
+Closing the Restore drawer must not erase an unconfirmed write and silently
+allow another destination. Keep that captured plan/workspace/digest/snapshot/
+destination across close/reopen in transient client state. Offer status and
+explicit continuation of that same original plan through existing `plan.get`
+and idempotent `plan.apply`; never replan, reroute or infer fresh byte
+verification from a stored completion flag. If status says no execution was
+recorded, label an explicit same-plan retry as a possible write; if it names an
+existing execution, the kernel remains the sole reconciliation authority.
+Failed or mismatched status leaves the attempt unresolved. This neither adds a
+persistent attempt log nor enables general reprocessing.
+
+Exits are >1,000 eligible saved matches with exact TAG/structured conditions,
+no duplicates, stale/tampered/expired refusal and current host selection/use;
+and lost restore response -> close/reopen -> original-plan confirmation with
+no second destination plan/write. These are existing Phase 4 discovery and
+legacy SavedView/restore maintenance, with no durable schema, provider ABI,
+endpoint, processor, index dimension or recovery-record change. LinkGroup,
+canonical-AST/portable SavedView, full media and release gates remain open.
+
+
+## ADR-061: Close existing describe-authorization and recovery-artifact entry gaps
+
+Status: Accepted, 2026-10-19. Implementation evidence is recorded separately.
+
+The Details Notes flow already confirms and stores on-demand describe candidates,
+and the daemon already binds installed describe providers. Settings lists only
+embedding profiles and creates only DOCUMENT/QUERY grants, so the ordinary owner
+cannot issue the DESCRIBE grant that Details needs. Add an opt-in, read-only
+separate describe-profile projection to the existing provider list. Keep legacy
+embedding rows unchanged; unreadable optional metadata is explicit. Settings
+issues a separately disclosed DESCRIBE grant bounded by the installed profile,
+and Details selects the grant matching its configured profile tuple. Listing,
+configuration, permission and per-request confirmation remain separate actions.
+This completes access to the existing operation without installing a model,
+inferring generation from BGE, or adding an AI-client integration.
+
+The required portable recovery record and independently retained public anchor
+also exist only as headless operations. Compose their two explicit file exports
+inside the existing Restore review, with saved-copy time/source labels and new
+server file paths. Keep results independent: neither contains the repository
+bytes, proves a separate failure domain, attests a valid pair, or changes the
+health headline. Do not add a browser artifact-read endpoint, automatic import,
+backup service or export ledger. This makes existing recovery evidence retainable
+without asking an ordinary browser user to enter internal IDs.
+
+The batch is Phase 4 description/local-client maintenance plus existing Phase 3
+adapter composition. No durable schema, signed format, provider ABI, endpoint,
+processor, index dimension or runtime loader changes. Full provider use needs an
+explicitly installed configured healthy profile; the default stays unavailable.
+LinkGroup, persistent media, full clean-reader porcelain and release gates keep
+their existing contracts and implementation order.
+
+## ADR-062: Complete folder intake and existing discovery setup affordances
+
+Status: Accepted, 2026-10-19. Implementation evidence is recorded separately.
+
+An ordinary owner should be able to choose a folder without losing the names
+that distinguish its files. Extend the existing bounded multipart upload with
+explicit `relative_files` parts; keep legacy `files` rewriting unchanged.
+Strict relative paths are retained in one private request-scoped staging
+directory. Conflicts and unsafe paths are refusals, never implicit renames or
+flattening. Existing count/byte limits, receipts, partial-result review and
+digest-bound apply remain the only intake lifecycle. Empty directories and
+filesystem metadata are outside browser transfer. This adds input support to
+an existing adapter, not a filesystem service, durable group or endpoint.
+
+Image-query dispatch and installed description-profile discovery already
+exist. Compose them where needed: a Photos action passes an existing image
+subject to the host search path, and Settings lets the owner select a validated
+installed description profile into the existing configuration draft. A failed
+or unavailable image query retains the preceding result scope. Choosing a
+profile does not save configuration, restart, grant network permission or
+generate text; those remain distinct explicit actions. No optional image or
+description provider becomes available merely because an entry is exposed.
+
+These are existing Phase 2 intake, Phase 4 discovery/description and admitted
+client maintenance slices. They introduce no durable schema, signed format,
+processor, index dimension, runtime extension or AI-client integration. They
+do not qualify a core phase or admit persistent albums, playlists or video.
+
+## ADR-063: Make document body search the next substantial product milestone
+
+Status: Accepted by the owner, 2026-10-19. Narrow CS-1/2/3 implementation
+admission; the bounded implementation and local product acceptance are now
+recorded in the linked milestone/task ledger. Core/release gates remain open.
+
+The operator requests larger improvements to product capability. Prioritize
+finding PDF/DOCX files from their body content, with a matched paragraph and
+exact-original takeout. The current pack recognizes these formats but does not
+extract their body text; plain-text search and existing optional CLIP wiring
+must not be relabelled as new capabilities.
+
+The [concrete milestone proposal](product-power-content-search-proposal.md)
+defines extraction, real lexical/BGE retrieval, ordinary browser use and exact
+takeout as one outcome. Reuse the existing extracted-text, source-span, index,
+Notes and export authorities. Do not add a chat surface, second catalog/index
+service, document reader or mandatory online model. New captures and ordinary
+explicit recaptures come first; rerouted old-capture processing stays excluded
+until separately admitted.
+
+The owner approved the narrow PDF/DOCX exception to the new-processor
+delegation boundary. The corresponding agent and normative extraction scopes
+are updated. Review parser budgets, producer/profile bindings, route
+selection and artifact/recovery compatibility before delegating implementation.
+The decision changes no phase order and awards no completion credit.
+Visual discovery and coherent reusable sets follow under their existing
+separate gates; persistent media goals remain open.
+
+## ADR-064: Deliver the existing optional image OCR as a complete retrieval workflow
+
+Status: Implemented and locally delivered on Darwin arm64, 2026-10-20. The
+owner-approved OCR-1/2/3 admission passed its real-model browser journey;
+Phase 4 and release qualification remain open.
+
+The delivered local outcome finds an image by text inside it, reads the
+recognized text and takes out the exact original. The existing
+`ocr.image.text.v1` and `rapidocr-ppocr-mobile-v1` capability is locally
+available after explicit operator bundle preparation and daemon restart.
+
+The owner approved the [bounded image-text proposal](product-power-image-text-proposal.md).
+Deliver an explicit operator-run preparation/install script for pinned assets,
+maintain the existing recognition and EXTRACT lexical/BGE path where real
+execution reveals gaps, and show readable attributed OCR text and quality in
+existing Details. Reuse the configured models root and compatible local
+runtime. Installation, successful recognition and index readiness remain
+separate facts; changed assets/rules retain distinct bound digests.
+
+This is a narrow exception to the execution plan's deferred OCR packs. It adds
+no processor, index dimension, public command, endpoint, schema, service or
+runtime loader. It covers new image captures or ordinary explicit recaptures;
+scanned-PDF OCR, CLIP and arbitrary old-capture processing remain excluded.
+Exact saving and takeout stay independent of OCR, with honest unavailable,
+empty, partial and low-confidence outcomes. Existing bounds remain unchanged.
+
+The local exit passed once: ordinary image capture -> local recognition ->
+explicit search preparation -> image-text lexical and real BGE paraphrase
+retrieval -> readable OCR result -> length/SHA-256-matching original. Evidence
+is `dist/product-image-text-20261019/client/attempt-02/result.json`; the local
+postcheck is `dist/product-image-text-20261019/promotion/postcheck.json`. Mean OCR
+confidence was 0.998004 (99.8% in Details); the exact original was 74,634 bytes
+with SHA-256 `8a2fd4cc149d98b6cca5c6b2a6f2092ac664e57f58935a4849ce4b4b2d06bcfa`. Search preparation visibly returned `DEGRADED` because field coverage
+for locators, tags, notes, descriptions and language remains incomplete, even
+though all 21 selected text sources were indexed and both queries succeeded.
+The corrected probability decoder and changed OCR profile/output digests do not
+reinterpret prior records; older images need ordinary explicit recapture. This
+decision changes no core phase gate or release qualification and keeps scanned-
+PDF OCR, CLIP and automatic historical backfill outside the queue.
+
+## ADR-065: Deliver visible photo-show and listening workflows over existing clients
+
+Status: Accepted, 2026-10-20. Implemented and locally delivered with the
+shared browser evidence in the product-experience ledger; no core-phase or
+release qualification claim.
+
+The owner requests substantial features that are immediately visible and useful
+in a product demonstration. Complete two cohesive client workflows: explicit
+timed photo slideshows with immersive presentation, and an immersive music
+player with the existing transport and transient queue. Both remain inside
+the current Photos/Music destinations and share host content, original access
+and one audio player. The normative client refinement specifies their bounds.
+
+This choice can deliver a visible result without inventing collection
+membership, disguising a saved query as an ordered playlist, or bypassing
+LinkGroup's prerequisites. Curated albums and persistent playlists retain
+their separate proposed contracts. The existing CLIP delivery is separately admitted by the owner-approved
+VIS-1/2/3 proposal. Its model and discovery evidence remain independent of
+these presentation changes.
+
+Keep preview budgets, verified-original audio, scope/focus continuity and
+unavailable outcomes. Opening and closing the music layout must retain the
+same audio element and Blob. Neither workflow creates a schema, processor,
+endpoint, runtime loader, durable media fact or recovery authority. One shared
+browser journey checks both complete workflows before local delivery.
+
+
+## ADR-066: deliver visual retrieval through the existing local image space
+
+Status: Accepted by the owner, 2026-10-20; implemented and locally delivered.
+Real-model browser and owner-instance readback evidence is recorded in the
+[visual-search proposal](product-power-visual-search-proposal.md#local-delivery-evidence-2026-10-20).
+This does not qualify a core phase or release.
+
+Users often remember what a photo shows rather than its filename or visible
+words. OCR and BGE text retrieval cannot honestly substitute for visual image
+matching. Deliver the existing Chinese-CLIP profile and its separate image
+space, with a scene-description field in Photos and the existing image-query
+action. The host owns both operations, authorization and returned results.
+
+Prepare and install pinned local assets explicitly, restart, then explicitly
+build a fingerprint-bound image generation from authorized saved PNG/JPEG
+originals. Rebuilding this derived index is distinct from historical processor
+reprocessing; source bytes, processor facts and earlier generations keep their
+identities. Missing visual models leave lexical search and exact takeout usable
+and produce a visible unavailable result, without pretending text-only results
+are visual matches. No implicit downloads or remote image inference are added.
+
+This reuses the present provider, index, dispatcher and original-download
+contracts rather than adding another search authority, service or schema.
+Darwin arm64 local delivery is the admitted initial scope. The selected
+community ONNX conversion has no separate license declaration; retain its
+provenance and uncertainty alongside the pinned base-model declaration. Local
+use evidence is not redistribution or cross-platform release qualification.
+
+Acceptance uses independent neutral-named real photos and distractors: Chinese
+scene retrieval, image-to-image ranking, then exact SHA-256/length original
+takeout through the ordinary browser, alongside the admitted media client
+journey. The proposal and normative discovery admission govern the bounds.
+
+
+## ADR-067: Give Photos and Music their own interaction hierarchy
+
+Status: Accepted, 2026-10-20; implementation in integrated browser acceptance.
+
+The operator wants a comfortable professional photo/music product over one
+trusted personal-content plane. Adding separate rows for every admitted
+capability made content harder to reach. A narrow-layout search input also
+expanded vertically because a desktop flex basis became a column height.
+
+Keep the current destinations, host query scope, content/fact authority and
+verified player. Photos leads with pictures and a compact search location;
+scene retrieval and local name/tag filtering remain distinct, with their own
+inputs and visible active conditions. Music leads with Songs/Albums/Artists
+and play/shuffle actions, while the current track opens the existing full
+player. Existing density, filters, recorded source dates, ordering, selection
+and original takeout remain reachable through labelled disclosures. Loading,
+unavailable states, active scope and incomplete result notices stay visible.
+
+Borrow interaction patterns from the official Photos, Immich, Navidrome and
+Music references in the [interface review](../research/private-drive-interface-reference-20261012.md#photos-and-music-interaction-refinement--2026-10-20).
+Do not import their full feature lists as obligations: persistent albums or
+playlists, recommendations, faces and extra metadata extraction require their
+own contracts. Layout specialization cannot create another query authority,
+media service, schema, processor, plugin runtime or recovery plane. Unknown
+music facts and photo dates retain honest fallbacks instead of decorative facts.
+
+This makes existing capabilities easier to use without duplicating backend
+policy or weakening exact-original verification. The exit is one shared
+browser journey across photo search/filter/view/return and music browse/play/
+queue/immersive return at wide and narrow widths. The Cairn testing skill
+applies; no unrelated backend regression or core/release completion is implied.
+
+## ADR-068: Reuse ordinary files for bounded organized-result snapshots
+
+Status: Accepted for ML-1 implementation, 2026-10-21, following the owner's
+explicit instruction to implement the material/Notes/Skill/list loop.
+
+The product direction is to organize existing material once and let people or
+programs reuse that result without another AI call. The current kernel has
+exact capture, Notes, discovery and takeout, but no generic current-document
+replacement transaction or guide-aware organizer. A service container such as
+Cordis would not supply those missing data semantics.
+
+Adopt the [ML-1 ordinary-file client contract](material-list-client-contract.md):
+one bounded JSON result with ordered exact references and contextual text,
+optionally retaining the exact Skill text used. Keep Note/TAG context copying,
+manual arrangement and explicit external-AI copy/paste in one focused editor.
+Save generated JSON and Skill text through ordinary reviewed capture; reopen
+through a bounded, identity-checked reader. An ordinary program can read the
+same JSON without any model invocation.
+
+Choose explicit result snapshots for the first delivery. A revised result is a
+new ordinary capture, preserving previous inputs/results. Do not invent a
+current-list head, overload DescriptionDocument/Annotation with hidden
+membership, reinterpret LinkGroup/SavedView/ExportManifest, or mutate source
+Notes and Tags. Digest plus length pins original bytes; local handles are
+lookup hints, and unresolved members remain visible within the stated loaded
+scope. The reader's takeout uses existing original verification.
+
+This narrower decision ships useful composition without adding a database,
+endpoint, processor, runtime loader, scheduler or AI execution engine. It does
+not reject the broader guide/refresh design: persistent heads, concurrent
+replacement and automatic organization need their own reviewed successor.
+The [normative client admission](../requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots)
+defines limits and one integrated user journey; no phase or release gate closes.

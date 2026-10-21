@@ -50,9 +50,15 @@ From the repository root, start the daemon and its built WebUI with one command:
 
 The launcher creates a persisted profile on first use, keeps its catalog,
 repository, models, vectors, and recovery records below the data root, rebuilds
-the pure-Go daemon and CLI plus the current WebUI, and serves the result at
+the daemon and CLI with the `cairn_zvec_dynamic` build tag plus the current
+WebUI in a private build directory below the data root, and serves the result at
 `http://127.0.0.1:4538/`. Use `--listen 127.0.0.1:PORT` for another unused
 loopback port. It refuses a relative data path, a non-loopback listener, or an
 occupied port, and runs in the foreground so `Ctrl-C` stops only that daemon.
 It requires Go, npm, and curl; when Web dependencies are absent, it runs the
 repository-locked `npm ci` automatically before the first build.
+On first use it creates the configuration; for an existing profile, its saved
+configuration and paths remain authoritative. Choose an absolute data directory
+for one instance. The helper builds and starts Cairn but does not download or
+install the semantic model bundle; semantic search availability depends on the
+existing configuration and supplied bundle. The API remains loopback-only.

@@ -95,6 +95,32 @@ and MUST NOT offer another save. A late upload response after the panel closes
 MUST NOT start an invisible review or save. This is presentation/composition
 maintenance of existing operations, not a new intake endpoint or lifecycle.
 
+The same Add surface MAY assemble owner-pasted literal text into one ordinary
+UTF-8 `.txt` file in the browser, bounded to 64 KiB so it remains within the
+existing verified text-preview budget. It MUST show the output filename and
+UTF-8 byte size and use the same upload, review and explicit confirmation path;
+preparing text is not saving it. The draft is transient client state. This
+affordance adds no standalone Notes record, editor lifecycle, URL fetching,
+browser-tab capture, overwrite semantics or durable record kind.
+
+The same upload endpoint MAY accept a browser-selected folder through explicit
+multipart `relative_files` parts. Their filenames are safe slash-separated
+paths relative to the selection, including its top folder. Legacy `files`
+parts retain their existing basename rewriting. Folder mode MUST NOT flatten
+or silently rewrite paths: it rejects absolute, drive, backslash, colon,
+control, invalid UTF-8, empty, dot and dot-dot components, trailing dots/spaces,
+reserved device names, components over 240 bytes, paths over 2,048 bytes, and
+paths deeper than 16 components. Duplicate paths, file/directory conflicts
+and symlink parents MUST be refused without overwriting anything. Placement
+is confined to the fresh daemon-owned staging directory; new directories
+are private. Unsupported folder staging MUST fail explicitly and roll back.
+Both multipart fields share the existing request count, byte bounds and
+per-file receipts. Partial batches retain the explicit accepted-subset review.
+Empty directories and original filesystem metadata are not transferred by
+browser upload and MUST NOT be presented as preserved. Folder selection adds
+no source ownership, catalog schema, endpoint, persistent grouping or saving
+lifecycle; protection still requires the ordinary reviewed plan and apply.
+
 ## 3. Canonical-operation mapping
 
 Every adapter operation MUST map to one registered typed core operation. The REST adapter MUST NOT expose:
@@ -197,6 +223,24 @@ The UI SHOULD organize the product around these tasks:
 - Show repository health, placement count, verification evidence, decoder dependencies, and last successful readback.
 - Browse the original directory tree independent of physical packs or chunks.
 - Restore a file, subtree, or snapshot through a reviewable destination plan.
+- The existing restore review MAY offer explicit portable recovery-record
+  export for the selected saved copy and separate public trust-anchor export,
+  using the existing typed operations and operator-chosen new server file paths.
+  Saved-copy time/source labels select the internal reference. Keep the two
+  results independent and show their actual paths and refusal/unknown outcomes.
+  A record references required repository data; creating either artifact does
+  not itself back up file bytes, establish independent retention, verify their
+  pair, or upgrade recovery health. No automatic import, arbitrary artifact
+  download route, combined atomic-backup claim or new durable export ledger is
+  admitted by this client composition.
+
+- Closing and reopening the restore review MUST retain an unconfirmed apply's
+  captured workspace, plan identity/digest, snapshot and destination within the
+  client session. Status/reconciliation uses that same plan through existing
+  commands; it MUST NOT silently create a new plan or redirect the attempt.
+  A stored completion flag is evidence of earlier completion, not a fresh byte
+  readback. If no execution was recorded, any explicit same-plan retry MUST be
+  labelled as a possible write. Failed or mismatched status stays unresolved.
 
 ### 5.3 Search and catalog
 

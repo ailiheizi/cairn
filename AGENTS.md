@@ -63,6 +63,70 @@ MCP/CLI/AI-harness integration is a real future direction but is deferred
 until after this convergence phase; do not start that work without a direct
 request.
 
+### ML-1 ordinary material-list client admission (2026-10-21)
+
+The owner explicitly requested implementation of the material/Notes/Skill/list
+loop. The bounded first-party client may author and read ordinary
+`cairn.material-list.v1` JSON snapshots, copy live user NOTE/TAG context, retain
+one exact Skill-text snapshot, hand material to an external AI by explicit
+copy/paste, and save through existing reviewed intake. See the normative ML-1
+section in `docs/requirements/first-party-client-experiences.md` and its
+incorporated `docs/technical/material-list-client-contract.md`.
+This admits a client content convention, not a new kernel durable schema,
+record, processor, endpoint, list head, membership authority or runtime loader.
+Revisions are new ordinary captures; no automatic refresh or integrated AI
+execution is claimed. Loaded-scope unresolved rows remain visible and exact
+takeout retains existing identity verification. Other phase gates and the
+broader list/guide draft remain unchanged.
+
+### CS-1/2/3 document-search admission (2026-10-19)
+
+The owner explicitly approved the narrow PDF/DOCX body-search milestone in
+ADR-063. Compiled first-party PDF/DOCX text extraction, its host route/budget/
+producer bindings and existing search/client integration are admitted Phase 4
+work. This is the sole exception to the no-new-processor delegation rule below.
+Use the existing extracted-text artifact, lexical/BGE dimensions, matched-source
+display and exact takeout; add no durable schema, endpoint, reader, background
+service or index dimension. Initial execution covers new captures and ordinary
+explicit recaptures only. It does not admit arbitrary rerouted old-capture
+processing. Limits and exits are in the document-search admission section of
+`docs/requirements/file-identification-and-extraction.md`.
+
+### OCR-1/2/3 image-text delivery admission (2026-10-20)
+
+The owner explicitly approved the bounded image-text proposal. Phase 4 may
+deliver the existing `ocr.image.text.v1` / `rapidocr-ppocr-mobile-v1` capability:
+an explicit operator-run, pinned local bundle preparation/install script;
+maintenance fixes needed for real recognition and existing EXTRACT lexical/BGE
+integration; and readable OCR text/quality in existing client Details.
+This admits no new processor, index dimension, public command, endpoint,
+durable schema, service or runtime loader. Exact preservation remains
+independent. Use new captures or ordinary explicit recaptures only, with the
+existing image/region/text/time bounds. No first-query downloads, scanned-PDF
+OCR, CLIP delivery or arbitrary historical reprocessing is admitted. Changes
+to model/dictionary/processing rules must retain distinct bound digests; old
+facts and generations must never be silently reinterpreted. See the normative
+image-text admission and `docs/technical/product-power-image-text-proposal.md`.
+
+### VIS-1/2/3 visual-search delivery admission (2026-10-20)
+
+The owner explicitly approved the concrete visual-search proposal in
+`docs/technical/product-power-visual-search-proposal.md`. Phase 4 MAY deliver
+the existing optional `chinese-clip-vit-base-patch16` / `multimodal-clip`
+implementation on the current Darwin arm64 host: review and pin real model,
+export-tool, runtime and license inputs; explicitly prepare/install a bundle;
+build a separate image generation on operator request; and complete existing
+Photos text/image-query and exact-original takeout. Maintenance fixes needed
+for this real profile are admitted. This adds no dimension type, processor,
+public command, endpoint, durable schema, recovery format, runtime loader or
+external service. BGE remains a separate space. An explicit index build may
+derive vectors from authorized saved originals through the existing bounded
+provider; it does not rerun historical file processors or reinterpret existing
+facts/generations. No implicit downloads, remote image inference, face/video
+indexing, arbitrary historical reprocessing or release qualification is admitted.
+This narrow successor overrides the earlier OCR admission's exclusion of CLIP
+delivery only for this stated profile and workflow. Other exclusions remain.
+
 ## Frozen Decisions
 
 - Exact identity is the SHA-256 digest of the complete logical byte stream plus
@@ -258,14 +322,57 @@ document-head convention, schema, endpoint or signed format.
 
 ## Mandatory Work Checkpoints
 
-Before every implementation slice:
+### Product delivery and testing order (owner decision, 2026-10-19)
+
+Use [Cairn testing](.agents/skills/cairn-testing/SKILL.md) when selecting,
+writing, or running tests. The delivery unit is a complete user-visible
+feature, not an individual button, handler, file, or test case.
+This owner decision replaces older routine-development instructions that
+prescribe focused-then-broad testing for every slice. Explicit release
+qualification gates remain applicable when actually qualifying a release.
+
+Implement and integrate the whole admitted feature first. Then run one
+explicitly selected end-to-end or integration journey against its user-facing
+acceptance criteria. Use local tests afterward only to diagnose an observed
+failure or cover a concrete, changed invariant that the journey cannot prove.
+If the journey passes and no such gap remains, continue delivery rather than
+expanding the test set. Compilation needed to run the feature is a prerequisite,
+not a reason to start a separate validation campaign.
+
+Do not turn mutable business rules, UI wording/layout, internal call sequences,
+or third-party library internals into numerous local tests. Verify the useful
+outcome and actual side effects of the whole feature. Exact-byte preservation,
+recovery, and other applicable trust boundaries still require evidence when
+affected; demonstrate them in the same journey where practical, without
+duplicating already-covered assertions.
+
+Run only affected checks. Do not automatically run `go test ./...` or a full
+E2E suite for every slice. A broader regression run needs a stated concrete
+cross-cutting impact, an applicable release gate, or an explicit user request.
+E2E journeys remain opt-in and individually named. Documentation, translation,
+layout, test-driver, or report-only changes do not justify rerunning unrelated
+backend tests. Reuse still-applicable results; changing an evidence filename,
+source-list hash, or status document alone does not invalidate tested code.
+
+Keep validation lightweight: reuse the existing journey, environment, and
+helpers; combine related inputs and assertions in one run. A failing test
+driver should be repaired narrowly, then resume or repeat only the affected
+journey. Do not restart successful ingest/export mutations blindly, weaken
+assertions, or launch a new full regression campaign to repair a selector.
+Do not create a new harness, matrix, freeze/receipt pipeline, or acceptance
+document per minor change merely to demonstrate activity. Report the usable
+capability, its remaining gap, and relevant evidence; test counts are not
+product progress.
+
+Before every complete feature batch (not every internal edit):
 
 1. Read `docs/README.md`,
    `docs/requirements/content-store-views-and-exports.md`, and
    `docs/technical/core-mvp-execution-plan.md`.
 2. Inspect the worktree and preserve changes not owned by the slice.
-3. State one active phase, one normative requirement, and one executable exit
-   test that the slice advances.
+3. State one active phase, one normative requirement, and one executable
+   whole-feature acceptance journey that the batch advances. Subtasks share
+   this journey rather than each inventing a separate test campaign.
 4. Confirm that the slice is inside the current lock or the explicitly
    admitted `RW-PERSONAL-UX-1` client profile, and creates no other new surface.
 
@@ -273,20 +380,25 @@ Re-read the core execution plan at these boundaries:
 
 - before changing a durable schema, public command, provider interface, or
   signed format;
-- before starting the next implementation slice;
+- before starting the next complete feature batch;
 - after a test reveals that the planned contract is incomplete;
 - before changing any status matrix or calling work complete.
 
-Before finishing a slice:
+Before finishing a feature batch:
 
-1. Run focused tests proportional to the change, then the broadest practical
-   Go test set.
-2. Run `git diff --check`.
-3. Verify config, paths, enums, signed fields, and profile digests against the
-   normative documents.
-4. Check that failures and unavailable providers remain visible and fail
-   closed where recovery meaning is affected.
-5. Check that no fixture or harness is reported as a real default capability.
+1. Run the selected whole-feature journey after implementation and integration.
+   Check observable results and actual side effects against independent expected
+   outcomes. A real provider is required where the capability depends on one.
+2. Investigate failing steps locally. Add or run a focused test only for that
+   failure or a specific uncovered invariant; state what it proves. Do not
+   duplicate coverage merely because another file or branch changed.
+3. Run `git diff --check`. For documentation-only work, review the changed
+   instructions and links; do not run application tests or builds.
+4. Review affected config, paths, enums, signed fields, and profile digests
+   against the normative documents. Check applicable failure/unavailable
+   outcomes in the same journey where possible.
+5. Do not report fixture/harness success as a real default capability, or a
+   passing backend check as proof that the user-facing workflow works.
 6. Update status prose only when executable evidence changed. Use
    `implemented` for tested implementation and `qualified` only after the
    stated release gate passes.
@@ -294,6 +406,11 @@ Before finishing a slice:
 Every delegated task must include these guardrails, its allowed file/scope
 boundary, and its phase/requirement/exit-test triple. Agents must report
 conflicts instead of silently broadening scope.
+Delegate implementation first and share one batch acceptance owner. Delegates
+must not independently create overlapping local suites or run broad regression
+sets. Routine read-only diagnosis and test-driver corrections within the
+assigned scope do not require a new permission round; report actual product
+failures and unresolved mutation outcomes promptly.
 
 ## Subagent and Model-Drift Guardrails
 
@@ -302,7 +419,8 @@ prompt must restate: this file's North Star and Convergence Phase section,
 the exact file/scope boundary, the phase/requirement/exit-test triple, and
 "report conflicts instead of broadening scope; do not commit". The delegate
 must not introduce a new durable schema, endpoint, processor, runtime loader,
-or test framework, and must not mark a todo-ledger row `[x]` without stating
+or test framework (except the explicitly admitted CS PDF/DOCX processors above),
+and must not mark a todo-ledger row `[x]` without stating
 the executable evidence. The reviewer (the delegating agent or the human)
 reads the diff before accepting it; an unreviewed subagent diff is not
 finished work. MCP/CLI/AI-harness integration work must not be started by a

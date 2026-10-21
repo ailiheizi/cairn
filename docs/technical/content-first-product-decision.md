@@ -1,12 +1,120 @@
 # Content-First Product Decision
 
-> Status: informative product decision, recorded 2026-10-05 and updated 2026-10-12. It clarifies the
+> Status: informative product decision, recorded 2026-10-05 and updated 2026-10-20. It clarifies the
 > presentation and prioritization of the existing product contract. It does not
 > add requirements, alter phase order, close a gate, or award completion credit.
 > Normative requirements and the [Core MVP Execution Plan](core-mvp-execution-plan.md)
 > remain authoritative.
 >
-> Decision records: the dated ADRs below, including the current ADR-035 public positioning and intake decision.
+> Decision records: the dated updates and ADRs below. Later owner decisions
+> supersede earlier product preferences; they do not silently change normative
+> contracts or turn proposals into implemented capabilities.
+
+## Current decision summary
+
+The owner wants the smallest reusable foundation for **keeping information,
+finding it, and taking it out for use**. The latest direction is:
+
+- Keep originals and their information together through the existing material
+  and Notes mechanisms; preserve sources and context, not only derived Tags.
+- Treat an organized list as ordinary program-readable material. People,
+  Skills, AI clients and scripts may produce or refresh the same kind of result.
+- Let applications consume the saved result without invoking AI on every read.
+- Correct AI understanding through conversation, then retain the agreed
+  instructions in an ordinary document that later organization reads.
+- Authorized regeneration may replace manual edits to the result list.
+  Original material and the instruction document remain separate. Changes to
+  human Tags still require confirmation.
+
+These product choices are settled enough to continue design and engineering;
+another product questionnaire is not a prerequisite. The
+[format and compatibility draft](material-list-and-guidance-draft.md) still
+needs an implementation mapping before changes to persistent contracts.
+It does not yet provide an implemented list-authoring or AI execution service.
+
+The immediate owner-requested work is to organize the existing code and
+documentation before extending that foundation: separate mixed responsibilities,
+remove proven duplication, and distinguish current work from historical records.
+The prior Photos/Music refinement remains paused with its unfinished acceptance
+and delivery visible in the [task ledger](product-experience-todo.md).
+Do not restart vertical expansion merely because an older section calls it
+an active batch.
+
+Read the sections below as dated reasoning. For implementation order use the
+[Core MVP Execution Plan](core-mvp-execution-plan.md), and for current navigation
+use the [documentation map](../README.md).
+
+## Product-shape investigation (2026-10-20)
+
+The owner paused further vertical-client expansion to reconsider the shared
+product form. The intended term is **Skill**, not the dictated “SQL”: simple
+originals-and-Notes intake, reusable AI organizing methods, and results that
+ordinary applications can use without inference on every read. The owner
+asked for careful underlying design and a Q&A before implementation.
+
+The [research and Q&A](../research/skill-driven-content-substrate-and-qa-20261020.md)
+records current code, three actual Opus consultations, alternatives and remaining
+questions. It recommends preserving existing Tags while distinguishing
+attribute values/strength, evidence quality and view preferences. The owner
+selected per-method automation for designated lists, with confirmation still
+required for changes to human Tags. That is a future product behavior, not
+permission for a new schema, public API, runtime loader or agent executor.
+
+The owner then clarified that original information must be retained, existing
+LLMs are sufficient, and a “dedicated index” is simply an organized list for
+programs, regardless of how it is generated or updated. The current
+recommendation reduces the user vocabulary to **material and lists**:
+descriptions accompany material; list entries reference it and carry context
+for the particular use. A Skill is an organizing method, not a required third
+storage system. Prefer composing these concepts and existing operations
+before adding another core concept.
+
+In the next clarification, the owner selected a list as ordinary
+system-readable material of a distinct record type, reusing existing storage.
+Authorized regeneration may replace manually edited list results. Corrections
+to AI understanding should come from discussion, then be retained as an
+ordinary document that later organization reads. This supersedes proposals
+for permanent per-entry pins, exclusions or locks as a prerequisite.
+Replacing a list does not replace its source originals or correction document.
+“Shared information” in this design means reuse across the owner's lists,
+not public links or multi-user sharing. The concrete format, current-document
+selection and reconciliation with the unimplemented LinkGroup plan still
+need implementation mapping; these product choices do not claim implemented integration.
+
+The [ordinary-list and guide draft](material-list-and-guidance-draft.md)
+narrows the proposed implementation to a format marker, one optional guide reference
+and ordered entries containing material references plus context. It proposes
+explicit guide selection and reading its current revision on refresh, with
+shared music/project examples. The format notation and update behavior are
+proposals; stable-reference mapping, authoring and the normative LinkGroup
+boundary still require reconciliation before implementation.
+
+This investigation preserves the current content/recovery authority and all
+existing work. It does not mark unfinished client work complete, replace the
+normative North Star, or open a parallel implementation queue. The next
+engineering step is to map the concrete semantic examples and consumer-delivery
+requirements onto existing storage and reference contracts, after the current
+structure cleanup. This does not require reopening the settled product choices.
+
+## Delivery cadence update (2026-10-19)
+
+The operator asks for useful functions to be implemented as a coherent batch
+before concentrated validation. Keep one explicit user outcome and a bounded
+file list per batch; Luna implements disjoint parts while the primary agent
+makes scope decisions and reviews their combined diff. Complete the selected
+operations and their integration before running one proportionate build and
+user journey. Reuse evidence for unchanged backend sources instead of repeating
+unrelated native, Linux, Docker or model-installation checks after each client
+edit. A real failure may justify a focused repair and continuation.
+
+This delivery preference does not mean adding code for its own sake or calling
+unbuilt work usable. The current batch composes existing Photos, Notes and
+shared-selection operations: filter directly from a displayed photo tag, take
+out a photo from its card, reuse the existing copy action for already-read
+Notes text, and copy selected names or recorded source paths. Advanced actions
+stay disclosed on demand.
+It adds no domain, storage authority, persistent organization or phase credit;
+ADR-041 and the normative admission boundaries continue to apply.
 
 ## Operator priority update (2026-10-14)
 
@@ -33,6 +141,103 @@ dedicated retained-video experience, and give the operator more ways to shape
 the whole client through presentation-only packages. These are future product
 directions, not shipped capabilities or new implementation admission; any work
 continues to require its existing contract and phase gates.
+
+## AI assisted capture and retrieval direction (2026-10-15)
+
+The operator wants to speak a short thought and have it recorded quickly, ask
+an AI to find and prepare the right files, and manage authorized information
+on a remote personal computer. The experience should carry the request through
+to a usable result rather than make the owner manually translate each step
+into filters, internal identifiers and export commands. These are retained
+product goals, not currently implemented voice or remote-control capabilities.
+
+The preferred direction for later review combines an **AI client** with the
+**existing Cairn service**. The client accepts speech/text, clarifies ambiguous
+intent and coordinates permitted operations. Cairn remains responsible for
+authorization, content identity, search, plans, execution, verification and
+recovery. An external AI client is the first integration candidate; a built-in
+assistant can later be another client of the same operations. Local or remote
+speech/model providers are optional choices with separate privacy and resource
+decisions. This does not select a model vendor, transport or SDK, or turn
+Cairn into a model-serving platform or privileged autonomous agent.
+
+Client integration and service-side assistance are complementary choices,
+not a requirement to build both at once. An existing AI client is the smaller
+first candidate; any later assistant hosted with Cairn must call the same
+authorized operations. The product acceptance unit is one completed user
+request: speak and save a correctable record, or ask and receive the intended
+files. Merely adding a chat box, model connection or tool endpoint does not
+satisfy either outcome.
+
+For the first future end-to-end candidate, prefer a natural-language request
+to find and take out content Cairn already retains. It exercises the existing
+retrieval advantage through a usable delivered result. Speech input, quick
+capture and separately paired remote sources remain retained goals with their
+own necessary gaps; this prioritization does not admit their implementation.
+
+| User request | Desired result and shared composition | Necessary gap to review |
+| --- | --- | --- |
+| “Remember that the camera charger is in the study drawer.” | Speech becomes an ordinary searchable text record, or an explicit Note on an existing subject; return a saved-record reference and allow correction. Reuse exact intake, Notes and discovery. | Speech input/transcription and the bounded capture interaction; a transcript does not prove the charger's current physical location. |
+| “Find last month's invoice for the air conditioner and bring it here.” | Search authorized filenames, facts and Notes; clarify material ambiguity, select the intended originals, freeze output where required and deliver verified files. | AI-client orchestration and a scoped output handoff; candidate matches are not verified delivery. |
+| “Find that project document on my home computer while I am away.” | Distinguish content already retained by Cairn from an explicitly paired remote source. Show device availability and source freshness; capture any new bytes through the normal protection path. | Qualified remote access, device/source authorization and bounded capture. A server-side library does not provide ambient access to a computer. |
+
+### Keep the interaction short and the result accountable
+
+Routine reads and a quick capture may complete under an explicit bounded grant
+or accepted preset without confirmation at every intermediate step. Uncertain
+transcription, competing candidate files, changed targets and consequential
+writes need a review that names the affected content and action. Preserve the
+owner's words separately from any optional AI interpretation; inferred tags,
+dates or household facts are proposals until accepted. Recording text does
+not add a new standalone Notes application or native household schema.
+
+The owner should receive one clear outcome: saved record, sourced matches,
+prepared/verified takeout, or a concrete unavailable/failed result. Longer work
+needs reachable progress and cancellation. The assistant must distinguish a
+verified prepared output or requested browser download from a confirmed save
+on a remote device. Unknown write outcomes require reconciliation, not blind
+automatic retries. Results retain ordinary source references and exact-byte
+evidence; an AI assertion cannot establish identity or recovery success.
+
+Audio recording, retention and transmission are separate choices. Do not send
+the entire library, private source bytes or microphone audio to a model merely
+because an AI client is connected. Existing local semantic search remains
+useful when an external assistant/model is unavailable; original preservation
+and recovery retain their independent paths.
+
+Remote access to already retained content, pairing a read-only computer source,
+and changing that computer's live files are separate outcomes. Keep the last
+goal recorded, but review rename/move/delete, writable synchronization and
+system-control semantics independently; they are not granted by a search or
+takeout request. No general shell, database access, signing keys or unrestricted
+filesystem access follows from AI integration. Multiple personal devices still
+belong to one owner's trust domain and do not introduce tenancy.
+
+### Admission and future exits
+
+This request authorizes recording and considering the direction. It does not
+start ASR, MCP, an agent service, remote exposure, device pairing or new writes.
+The core execution order and current convergence queue remain unchanged.
+
+**Owner confirmation (2026-10-16):** the intended interaction is to state a
+goal and wait for the result: either a saved quick-capture record or the
+requested files returned and verified. An AI client or optional service-hosted
+assistant is an interaction/execution placement choice over the same single
+content authority, not a second catalog or recovery plane.
+
+[ADR-044](build-stack-and-architecture-selection.md#adr-044-ai-clients-over-the-existing-content-authority)
+records the rationale; PC-21 in the [single ledger](product-experience-todo.md#goal-backlog-compose-first-admit-necessary-gaps)
+retains the outcome for a separately admitted slice.
+
+Future acceptance should demonstrate a spoken record that is searchable and
+correctable; an authorized natural-language file request that returns the
+intended exact originals; and an explicit remote-source request that reports
+offline/stale/revoked access honestly. For a paired source that is authorized
+and available, also demonstrate bounded read and capture through the ordinary
+exact-protection path, followed by verified takeout; live-file changes remain
+separately reviewed. Check cancellation, ambiguous matches, model outage,
+denied egress and lost write responses without fabricated success. These are
+proposed exits, not tests executed or completion claims.
 
 ## Product promise
 
@@ -177,6 +382,22 @@ gate or implemented status.
 - [Experience design](single-operator-experience-pack-design.md), [interface acceptance](client-interface-experiences-acceptance-20261006.md), [WebUI adapter architecture §2](../requirements/api-and-webui.md#2-adapter-architecture), and [interaction principles §6](../requirements/api-and-webui.md#6-interaction-principles) define the boundary and current evidence. The acceptance record applies to the bounded workspace/showcase implementation only. No multi-user or tenancy model is introduced; UI modules do not solve authentication.
 
 ## Ordered next work
+
+The 2026-10-14 [closure plan](personal-information-product-closure-plan.md)
+and single [PC task breakdown](product-experience-todo.md#product-closure-work-breakdown--2026-10-14)
+apply the operator's later **reuse-first** correction: scenarios become ways
+to combine existing files, tags, Notes, supported search and original export,
+not default feature commitments. PC-01/12 are one ordinary reuse journey;
+only demonstrated common friction and admitted experience gaps enter the
+client queue. Dedicated task apps, browser capture, household entities,
+reminders, device/TV access and durable media successors are possible means
+to retained goals, not predetermined full suites. Necessary gaps can enter
+the queue after admission; goals are not dropped because new behavior is
+required. Manual demonstrations do not substitute for their agreed exits.
+Human-written dates,
+order or location in content do not require native domain fields.
+[ADR-043](build-stack-and-architecture-selection.md#adr-043-reuse-capabilities-before-turning-scenarios-into-features)
+records this priority correction without changing core order or admission.
 
 1. **Immediate client functionality:** complete the admitted operations in the 2026-10-13 functional target map below. Local Luna agents own bounded implementation and proportional verification; the primary agent reviews decisions, diffs and evidence. Run checks for the changed journey and concrete residual defects. Earlier passing matrices retain their dated evidence.
 2. **Core gates in parallel where permitted:** preserve the implemented and tested Phase 3 admitted development profile and continue from the current execution-plan checkpoint. Only after its portable record shapes are frozen may Phase 4 discovery packaging and supported-host/search qualification proceed alongside Phase 5 representative recoverable storage qualification. Existing implementation and candidate artifacts are inputs to that qualification, not permission to repeat completed work or claim release completion. Phase 6 LinkGroup work remains behind both Phase 4 and 5.

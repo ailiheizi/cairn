@@ -14,87 +14,76 @@ membership, protection, recovery evidence, or a saved view.
 
 ## 1. Module map
 
-```
-web/src/
-  main.tsx                     the application shell (root wiring only)
-  identity.ts                  SHA-256 identity rendering helpers (unchanged)
-  i18n.ts                      merges the per-surface catalogs; keeps t()/Locale/Translator
-  i18n/                        one catalog partial per surface, owned by that surface
-    common.ts                  shared chrome vocabulary
-    status.ts                  the trusted status surface
-    library.ts                 library, result list, inspector, selection
-    sources.ts                 sources surface and the add/recheck source drawer
-    drawers.ts                 drawer shell, plan cards, restore and export drawers
-    settings.ts                settings dialog
-    viewer.ts                  content viewer
-    activity.ts                activity surface (empty until that surface lands)
-    verification.ts            verification report drawer (empty until it lands)
-  app/                         hooks, one concern per file
-    command.ts                 the command envelope + its Result type
-    useSearch.ts               the one query surface (field, recents, submit)
-    useLibrary.ts              the content-library projection and its filters
-    useDetails.ts              the inspected subject's reads and note/tag writes
-    useSelection.ts            the batch selection over the rendered listing
-    useSources.ts              configured sources + the reviewable ingest plan
-    useLibraryDrafts.ts        unsaved note/tag drafts and their guard
-    useExport.ts               ExportManifest freezing, materializing, verifying
-    useRestore.ts              restore planning, applying, and its review card
-    useSettings.ts             the persisted configuration dialog
-    useRecents.ts              browser-local recent searches/destinations
-    useViewMode.ts             view mode, layout, and sort preferences
-    useCompactLayout.ts        the one `max-width: 640px` boundary the shell and CSS share
-  components/                  one surface per file
-    TopBar.tsx                 header, search field, actions
-    StatusPanel.tsx            the trusted status surface (rail disclosure + fact rows)
-    WorkspaceRail.tsx          the workspace navigation rail and its phone panel host
-    LibrarySurface.tsx         library column: heading, controls, notices, views
-    ResultList.tsx             the tile grid / dense list and its rows
-    SourcesSurface.tsx         the configured-sources view and its cards
-    DetailsPanel.tsx           the inspector column (one subject)
-    SelectionBar.tsx           the one batch surface
-    DrawerActionBar.tsx        the drawer's sticky single next step
-    PlanCard.tsx               the ingest plan's review evidence
-    SourceDrawer.tsx           the add/recheck source drawer
-    RestoreDrawer.tsx          the restore drawer and its review card
-    ExportDrawer.tsx           the export drawer
-    VerificationDrawer.tsx     the verification report drawer (body owned by that surface)
-    SettingsDialog.tsx         the settings dialog and config controls
-    ContentPreview.tsx         the one content viewer (keeps its own CSS)
-  lib/                         pure helpers, no React, no daemon call
-    types.ts                   browser-side domain shapes
-    operations.ts              typed daemon operation names + endpoints
-    format.ts                  formatting, listing, and label helpers
-  styles/
-    index.css                  aggregates the files below (the only CSS import)
-    tokens.css                 palettes: dark, maintenance neutral, light theme
-    base.css                   element defaults, keyframes, shared utilities
-    topbar.css                 top bar
-    library.css                rail, library column, tiles, inspector, sources
-    drawer.css                 drawer shell, action bar, plan cards, drawers
-    settings.css               settings dialog and configuration controls
-    viewer.css                 viewer/thumbnail integration rules
-    status.css                 the trusted status surface
-    verification.css           verification report drawer (empty until it lands)
-    activity.css               activity surface (empty until it lands)
+This is a responsibility map, not an exhaustive file inventory. Follow the
+owning flow before adding a new component or another copy of its state.
 
-scripts/
-  web-e2e.mjs                  phase dispatch + the order of the assertion phases
-  web-e2e.sh                   the harness that owns the temporary daemon/config
-  web-plan-e2e.mjs             plan review/apply unknown-response reconciliation
-  web-i18n-check.mjs           proves the catalog split lost and duplicated nothing
-  e2e/
-    harness.mjs                Playwright plumbing + captured daemon traffic
-    support.mjs                shared assertion helpers (sticky bar, overflow, focus)
-    session.mjs                the offline and recovered phase checkpoints
-    status.mjs                 the trusted status surface
-    library.mjs                library, inspector, viewer, sort/selection
-    sources.mjs                sources surface and the add/recheck drawer
-    drawers.mjs                restore and export drawers
-    search.mjs                 the one search surface and its local recents
-    settings.mjs               settings dialog and responsive boundaries
-    activity.mjs               activity surface (empty until that surface lands)
-    verification.mjs           verification report drawer (empty until it lands)
-```
+| Responsibility | Current code entry |
+| --- | --- |
+| Shell and flow composition | `web/src/main.tsx` |
+| Command transport and operation names | `app/command.ts`, `lib/operations.ts` |
+| Content projection and shared browse scope | `app/useLibrary.ts`, `app/useLibraryViews.ts`, `app/ClientBrowseSession.tsx` |
+| Query and submitted-result state | `app/useSearch.ts`; `lib/searchops.ts`, `lib/resultScope.ts` |
+| Selection, detail drafts, Notes and Tags | `app/useSelection.ts`, `app/useDetails.ts`, `app/useLibraryDrafts.ts` |
+| Saved query records, editing and paged recall | `app/useSavedViews.ts`; `lib/savedRetrievalCandidate.ts`, `lib/savedRetrievalEdit.ts`, `lib/savedRetrievalConditions.ts`, `lib/savedViewPages.ts` |
+| Frozen takeout, write/verify state and history | `app/useExport.ts`; `components/ExportDrawer.tsx` |
+| Browser original takeout and restore | `app/useOriginalTakeout.ts`, `app/useRestore.ts` |
+| Intake and configured sources | `app/useSources.ts`; `components/SourceDrawer.tsx` |
+| Ordinary list snapshots and Skill context | `components/material/MaterialListComposer.tsx`, `MaterialListReader.tsx`; `lib/materialList.ts`, `lib/materialListIO.ts`; shell-owned draft session and existing intake |
+| Shared player and recorded music metadata | `app/useAudioPlayback.ts`, `app/useMusicMetadata.ts`; `lib/playbackQueue.ts` |
+| Registered presentation and appearance | `lib/interfaceCatalog.ts`, `lib/presentationPackages.ts`, `app/useAppearance.ts` |
+| Rendering and surface interaction | `components/`; domain pages consume host-owned scope and actions |
+| Data shapes and reusable helpers | `lib/`; byte-access helpers use the existing host contracts, never a second content authority |
+| Localized strings | `i18n.ts` aggregates `i18n/` surface catalogs |
+| Styles and cascade | `styles/index.css` is the ordered import entry; surface styles remain with their owners |
+| Browser journey helpers | `scripts/e2e/harness.mjs`, `scripts/e2e/support.mjs`, `scripts/e2e/<surface>.mjs` |
+
+`SavedView` and `ExportManifest` are separate responsibilities: the first saves
+conditions evaluated against current content; the second freezes one takeout.
+They share a drawer and some navigation, so `useExport` exposes a compatibility
+facade to existing consumers. `main.tsx` creates both hooks and supplies the
+saved-view flow to the export coordinator. No second copy of the saved-view
+state lives in the export hook.
+
+This split is browser organization only. It introduces no command, persistent
+record, list format, or backend state machine.
+
+### Feature-local media components
+
+Photos keeps browse state, result-windowing, selection anchors, viewer focus,
+keyboard/swipe handling and slideshow effects in `PhotoLibraryExperience`.
+`components/photo/PhotoCard.tsx` and `PhotoViewer.tsx` render the existing card
+and dialog using those controlled values and callbacks. They do not acquire
+an independent content scope or read budget. Their shared types live in
+`components/photo/photoTypes.ts`, so children do not import the parent flow.
+
+Music keeps browse state and host-player coordination in
+`MusicLibraryExperience`. `components/music/MusicRows.tsx` renders recorded
+track/group actions; `musicHelpers.ts` holds its local types and calculations.
+The shared player and metadata flows remain the owners of playback and facts.
+
+Both domains use `lib/subjectHits.ts` to retain the first hit per nonblank,
+trimmed stable subject reference. This deduplicates action targets, not content
+bytes or distinct subjects that happen to contain identical bytes.
+`useSelection` prepares single-tag and queued-tag mutations through one private
+helper; each operation retains its own writes, progress and reconciliation.
+
+`lib/protectionAxis.ts` owns the existing protection-outcome order and pure
+response interpretation shared by Tags, duplicate review and selection
+reports. Each consumer retains its own request scope, pending/stale guards and
+error presentation. `lib/workspace.ts` shares only the Tags/Duplicates status
+fallback order; it does not select a workspace or hold another copy of it.
+
+The purpose is to make ownership visible without a general component framework
+or a second copy of state. Feature-local rendering can change independently
+while host scope, read limits and mutation guards remain in their existing flows.
+
+The ML-1 list editor owns only a transient ordered draft and copied user Notes
+and Skill text. Its generated Files pass back to the existing Add flow for
+review and capture. The Details reader validates a bounded ordinary file and
+resolves exact identities against the loaded library. It owns no list head,
+membership store, AI runtime or independent takeout policy. See the
+[client contract](material-list-client-contract.md).
+
 
 The shell owns only: the locale and translator, the one notice, the busy flag,
 the query text and last submitted query, the service projection
@@ -112,49 +101,36 @@ handler the desktop rail runs, and all three drawers' behaviours (focus into
 the panel, Tab trap, Escape, backdrop dismissal, `drawer-open`, focus return)
 come from the shell's existing drawer effect rather than a second copy.
 
-Markup was moved verbatim. The shell's original JSX was written with one dense
-line per surface element, and that formatting was preserved so the split is
-provably text-identical rather than a rewritten rendering path.
+The shell composes existing flows. Refactoring that wiring should preserve
+visible behavior and each flow's ownership of pending work and stale responses.
 
 ## 2. Ownership rules
 
 1. **One surface per component file.** A surface owns its markup, its local
-   state (or the flow that holds it), and the CSS file that styles it. Surfaces
-   are `TopBar`, `StatusPanel`, `WorkspaceRail`, `LibrarySurface`, `ResultList`,
-   `SourcesSurface`, `DetailsPanel`, `SelectionBar`, `DrawerActionBar`,
-   `PlanCard`, `SourceDrawer`, `RestoreDrawer`, `ExportDrawer`,
-   `VerificationDrawer`, and `SettingsDialog`. `StatusPanel` is the one surface
-   besides the viewer that dispatches its own read-only operations
-   (`snapshot.list`, `export.list`, `doctor.check`): its facts are its own job,
-   it writes nothing, and it never reads another surface's state.
+   state (or the flow that holds it), and its styling. Current examples include
+   `StatusPanel`, `TagsSurface`, `DuplicatesSurface`, `NotesSurface`, the
+   library and source surfaces, drawers, viewer, and settings. Follow the
+   current shell composition rather than treating this list as exhaustive.
+   `StatusPanel` directly issues its narrow read-only operations
+   (`snapshot.list`, `export.list`, `doctor.check`). Other focused surfaces also
+   issue scoped reads through `app/command.ts`: Tags reads annotations, content,
+   and protection facts; Duplicates reads the content listing and member facts.
+   The viewer owns bounded content-byte reads. These surfaces do not own a
+   second query policy or read another surface's state.
 2. **Cross-surface state lives in an `app/` flow with a typed interface.**
    Components never reach into another component's state. When two surfaces
    share a fact (the selected subject, the current hits, the export selection),
    the shell passes the owning flow down as a prop.
 3. **Every daemon call goes through `app/command.ts`.** Operation names come
    from `lib/operations.ts`; a surface never builds an operation string inline.
-4. **One CSS file per surface area, plus `tokens`/`base`.** Rule order and
-   cascade are preserved by `styles/index.css`, which imports the files in a
-   fixed order: `tokens -> base -> topbar -> library -> drawer -> settings ->
-   viewer -> status -> verification -> activity`. The owner of each file is:
-   - `topbar.css` -> `TopBar`;
-   - `library.css` -> `WorkspaceRail`, `LibrarySurface`, `ResultList`,
-     `SourcesSurface`, `SelectionBar`, `DetailsPanel`;
-   - `drawer.css` -> `DrawerActionBar`, `PlanCard`, `SourceDrawer`,
-     `RestoreDrawer`, `ExportDrawer`;
-   - `settings.css` -> `SettingsDialog`;
-   - `viewer.css` -> the viewer/thumbnail integration for `ContentPreview`,
-     which keeps its own component stylesheet;
-   - `status.css` -> `StatusPanel`;
-   - `verification.css` -> `VerificationDrawer`;
-   - `activity.css` -> the activity surface.
-   The library column and the inspector share one file because the original
-   stylesheet interleaves their rules inside the same light-theme and
-   responsive override blocks; extracting them would have reordered the
-   cascade. The export drawer, like every other drawer, is entirely in
-   `drawer.css`. A new surface's stylesheet is appended to the `@import` list
-   (and its file created, with a header comment, by the seam that adds the
-   surface), so the surface never edits `index.css`.
+4. **Styles follow surface or shared presentation ownership.** The ordered CSS
+   import entry is `web/src/styles/index.css`; its current imports cover the
+   shared shell, library, drawers, status, verification, activity, duplicate
+   and tag surfaces, search/report, appearance, library views, and interface
+   frame. Treat that file as the source of truth for import order and coverage;
+   this document does not maintain a second fixed import list. Some components
+   also keep a colocated stylesheet. Preserve the established cascade when a
+   style file is added or its owner changes.
 5. **A surface change stays inside that surface.** Changing the export drawer
    touches `components/ExportDrawer.tsx`, `styles/drawer.css`, `app/useExport.ts`
    (if its data flow changes), `i18n/drawers.ts` (if its strings change), and
@@ -188,8 +164,13 @@ needs as an argument, and the shell performs the wiring in one place:
 
 - `useSearch` invalidates a frozen export through `exportFlow.invalidateForSearch()`
   (the export flow owns the drawer state; the search flow owns the query).
-- `useExport` applies a recalled saved view through the library, selection, and
-  view-mode flows it is given.
+- `useSavedViews` owns saved-query reads, writes and paged recall through its
+  narrow library/selection collaborators. It reports recall outcomes rather
+  than setting export state. `useExport` coordinates drawer feedback and closes
+  the drawer after a successful recall, including an explicit refresh.
+- Ordinary search invalidates both recall provenance and a replaceable export
+  projection; an unresolved export write stays pinned. Reset ordering remains
+  explicit in the coordinator.
 - `useSources`, `useRestore`, and `useExport` close the other drawers through a
   shell-provided `closeDrawers`/`closeOtherDrawers` callback, because "only one
   drawer is open" is a shell-level invariant.

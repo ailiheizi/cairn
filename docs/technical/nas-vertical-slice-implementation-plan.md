@@ -1,5 +1,14 @@
 # NAS Vertical Slice Implementation Plan
 
+> Historical architecture and implementation proposal. Its milestones,
+> implementation reality, and coding order describe the plan recorded in
+> August 2026 and are retained for design context, not as current instructions
+> or evidence of current implementation. Follow
+> [Documentation Current Direction](../README.md#current-direction), current
+> requirements, and the sole [Core MVP Execution Plan](core-mvp-execution-plan.md)
+> for present scope and ordering. This proposal cannot add scope or reopen
+> deferred integrations.
+
 ## 1. Objective
 
 This plan turns Cairn from a broad research design into one implementable self-hosted NAS data-layer slice.
@@ -13,7 +22,9 @@ The slice must prove four product outcomes together:
 
 The reference deployment is a single Linux-based NAS or server. A platform-specific snapshot driver is optional. The exact-storage and recovery slice remains independently testable without embeddings, but a conforming `RW-MVP-1` reference distribution must bundle the local ONNX/BGE embedding profile and in-process zvec generation for its default discovery experience. CLIP, neural codecs, P2P, writable NAS gateways, HA, and multitenancy are not required for this slice. Component choices and qualification gates are tracked in [Open-Source Adoption and Code Borrowing](../references/open-source-adoption-and-code-borrowing.md).
 
-## 2. Current implementation reality
+<a id="2-current-implementation-reality"></a>
+
+## 2. Implementation snapshot — historical
 
 The repository currently contains:
 
@@ -27,7 +38,7 @@ The legacy plugin prototype is not the implementation target. It exposes many hi
 
 ## 3. Product boundary to implement
 
-The active extension seams are:
+The extension seams proposed in this historical design were:
 
 ```text
 CaptureDriver
@@ -146,7 +157,9 @@ Capability matching uses declarative host-evaluated selectors. Precedence is:
 
 An equal-precedence match is a visible route conflict. Schema compatibility uses exact schema digests or a qualified compatibility rule, not names alone.
 
-## 6. Implementation milestones
+<a id="6-implementation-milestones"></a>
+
+## 6. Implementation milestones — historical proposal
 
 ### Milestone 0: retire the legacy extension direction
 
@@ -253,7 +266,9 @@ Measure on representative low-power and mid-range NAS hardware:
 
 Storage reports separate logical bytes, unique exact bytes, repository growth, catalog and index growth, processor dependencies, retained source bytes, potentially reclaimable capacity, and actually released capacity.
 
-## 9. Immediate coding order
+<a id="9-immediate-coding-order"></a>
+
+## 9. Immediate coding order — historical sequence
 
 Remaining host-split work is recorded in [Implementation Completion Plan](implementation-completion-plan.md). The original sequence below is retained as the historical coding order for this slice.
 

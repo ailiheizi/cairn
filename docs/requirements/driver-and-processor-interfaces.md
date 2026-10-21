@@ -2,6 +2,16 @@
 
 ## 1. Purpose
 
+The owner-admitted CS PDF/DOCX refinement in
+[File Identification and Extraction Requirements](file-identification-and-extraction.md#cs-document-body-search-admission-2026-10-19)
+permits distinct bounded source and output budgets for those compiled
+capabilities. A source handle reports whether it contains only a bounded
+prefix; new document extractors refuse such a prefix as incomplete. This
+additive host API changes no durable artifact/envelope, exact identity,
+legacy capability meaning or existing source-consumer behavior. Its producer
+digests bind the pinned parser/module checksum, extraction rules and limits;
+existing recorded producer digests are retained unchanged.
+
 Cairn is a self-hosted, NAS-first content-aware managed data layer. Its extension contracts let operators replace or upgrade content algorithms without changing namespace identity, recovery meaning, policy authority, or durable storage records. `RW-MVP-1` exercises those contracts through a read-only managed-archive and search profile.
 
 The product has five current extension seams and one reserved later seam:
@@ -488,6 +498,247 @@ Query results MUST contain immutable SubjectRef values, optional segment selecto
 The minimum query operations are `DescribeCapabilities`, `ValidateQuery`, `Query`, `Continue`, `Cancel`, and `InspectHealth`. A request binds one immutable generation, query/filter/projection schema digests, normalized query digest, principal/workspace, result and resource bounds, deadline, and continuation when present. A response binds that same generation and includes per-candidate field/segment provenance, provider score components, coverage/high-water state, and a stable continuation. Providers never compare incompatible generations or perform final cross-provider fusion; the host broker owns those actions and records their policy.
 
 Loss of an index MUST degrade discovery, not namespace browsing, exact reads, verification, or restoration.
+
+#### Host fusion ranking successor (development v2)
+
+The host broker `query.broker.fuse.v2` declares
+`reciprocal-rank-fusion-k60-v1` in the existing score-semantics field. It combines
+only the separately generation-pinned, authorized subject orders returned by
+successful components. Each distinct subject contributes once per component:
+`1 / (60 + rank)`, with rank starting at one after within-component subject
+deduplication. It never adds cosine, FTS or incompatible-space raw scores.
+
+The bounded union membership, component statuses, generations, source spans,
+first authorized display projection and per-component continuation remain
+unchanged. Before presentation, the existing current-subject authorization
+projection runs once. The broker intersects its original candidates with that
+confirmed subject set and compacts each retained lane's ranks before final
+ordering. A stale/unresolvable candidate casts no vote and consumes no visible
+rank; an arbitrary allowed ID cannot introduce a subject absent from the original
+union. The same resolver pass retains its original-hit-ID to canonical SubjectRef
+mapping for supported legacy namespace-entry aliases; those hits must not be
+silently discarded. Alias and stable forms of one canonical subject contribute
+only once per component, with source selectors unchanged and final results
+using canonical SubjectRefs. This is filtering/reordering, not a new
+authorization authority. A failed or skipped component contributes no ranks. With one usable
+component the order stays that component's order. Successful components are
+accumulated in canonical dimension-id order; score ties prefer the best
+component rank, then lexical rank (absence sorts last), then stable SubjectRef.
+The broker exposes no new numeric score field, command, schema, continuation
+or public ranking ABI. Its policy/version changes the live result order, not
+any old index, durable fact, SavedView definition or frozen ExportManifest.
+
+This successor removes component-concatenation starvation; it does not qualify
+semantic recall or promise that a relevant source is present in a bounded lane.
+Unchanged real-corpus queries and expected labels must retain all misses and
+regressions. Phase 4 and release qualification remain open.
+
+#### Compiled lexical CJK query refinement
+
+The development query policy `cairn.lexical-query.cjk-contiguous.v1` reads the
+existing V4 lexical feed without changing its tokenizer, columns or source
+inventory. A query token consisting entirely of at least three Han characters
+may recall an interior phrase through the already indexed adjacency appendix
+on name, path, Notes, descriptions and extracted-text axes. Preserve the
+original token-prefix candidate branch; add an alternative conjunction of at
+most the first sixteen distinct adjacent character bigrams. This finite
+expansion bounds query growth and is candidate retrieval only. The existing
+appendix vocabulary and extracted-prefix coverage limits still apply; this
+refinement does not claim unindexed arbitrary-substring coverage. Other query
+tokens, original one/two-character handling, Latin prefixes and pinyin retain
+their current matching semantics. Query-token groups remain ANDed and honor
+the requested axes.
+
+Every expanded token MUST have continuous original-text proof in one eligible
+raw field, or satisfy its original token-prefix branch. Fragments in separate
+fields, Notes, documents or reordered text cannot establish that proof. A
+candidate failing proof MUST NOT consume a returned-result slot or establish
+`has_more`. Continue the existing candidate scan until the requested number
+of proven matches plus one is found, or the candidate stream is exhausted;
+do not filter a finished limited page and then claim completeness. Preserve
+the current candidate BM25-rank/rowid total order and typed filters.
+
+Construct-axis and segment explanations MUST use the same original query
+tokens and original-text proof. Exact CJK spans use retained UTF-8 byte
+offsets, never adjacency-token positions. Existing verified description-field
+mapping may project an actual contiguous phrase across adjacent segments of
+the same source body; it cannot concatenate separate sources or claim that
+one fragment contains the entire phrase. Missing legacy mappings retain an
+honest omitted explanation. Other matched-token provenance stays unchanged.
+
+Bind this compiled query policy to the normalized query digest used for
+continuations. A token issued under a different query policy MUST fail closed
+through the existing stale/invalid-continuation outcome; it cannot resume at
+a BM25 position produced by another expression. No new endpoint, schema,
+generation format, processor, source authority or recovery dependency follows.
+
+#### Generation-local lexical source coverage
+
+The development `LEXICAL_SELECTED_TEXT_V1` coverage profile implements the
+source-kind, field, revision and generation reporting required by the content
+contract. It measures the selected lexical feed, separately from aggregate
+field presence and from semantic-vector coverage. Its selected candidates are
+the generation's display filenames, current non-tombstoned TAG/NOTE revisions,
+all in-scope description revisions, and in-scope policy-admitted EXTRACT
+artifacts. It does not claim coverage of rejected artifacts or annotation
+history outside that selection profile.
+
+The host records the complete selected candidate inventory before projecting
+it into indexed fields. A versioned optional `source_coverage` extension in
+the existing lexical generation's UNINDEXED segment JSON binds that inventory
+to the workspace, generation, config and provider profile. It records source
+kind/subtype, source reference, revision reference, complete selected-value
+digest, and field evidence sufficient to check the actual built field bytes.
+Annotation and description revisions use canonical positive decimal revision
+strings, with no sign or leading zero;
+filename and artifact revisions use their immutable entry/artifact references.
+Empty text may have a verified zero-length field span; this is not evidence
+of a keyword hit.
+
+Inspection MUST read the exact supplied generation. It MUST NOT substitute
+the current catalog as the denominator for an older generation. Removing a
+built document MUST NOT also remove its expected sources from the denominator.
+A generation-wide inventory may be retained once with bound per-document
+markers; loss or disagreement of that inventory is unavailable evidence,
+never an empty complete feed. Missing,
+changed, invalid or unsupported proof MUST produce an explicit typed
+incomplete/unavailable outcome. Legacy segment projections remain readable for
+ordinary queries, but absent source inventory MUST report source coverage as
+unavailable rather than treating an empty list as complete. This profile has
+no lexical exclusions within its selected candidate set: complete means every
+selected source has verified indexed-field evidence. Aggregate field presence
+retains its existing meaning; a corpus with no value for an optional field
+does not prove a selected source was lost.
+
+The existing `search.rebuild` response MAY add the optional
+`lexical_coverage.source_coverage` report. It binds the measured generation and
+profile, reports full expected/indexed/missing/unavailable counts, and returns
+at most 256 deterministic detail rows with explicit truncation. Bad outcomes
+take precedence in that bounded detail. Missing source coverage degrades that
+report; it does not block exact preservation or make the lexical reader
+unavailable. An absent property from an older daemon means detail unavailable.
+
+This is disposable index evidence, not a new catalog, recovery record or trust
+anchor. Its self-digest checks internal projection consistency, not source
+authenticity or byte recovery. It changes neither lexical tokenization nor
+the semantic space/profile. In particular, semantic receipt v1 is unchanged;
+its subject/segment pairs MUST NOT be presented as source-revision coverage.
+Semantic source-level coverage requires its separately reviewed successor.
+
+#### Semantic input-lineage successor (development v2)
+
+The reviewed `cairn.semantic-generation-receipt.v2` successor uses the existing
+generation receipt path and atomic no-replace publication. It is a disposable
+index projection, not a catalog schema, processor protocol, signed recovery
+record or new storage service. New text-semantic builds use v2; v1 and legacy
+backend identity metadata retain their original pair-membership meaning and
+MUST NOT acquire source-revision claims by reading the current catalog.
+
+The admitted Phase 4 text-source segmentation refinement MAY derive bounded
+inputs from a long immutable NOTE revision or an admitted textual EXTRACT
+artifact already selected by the existing eligibility policy during rebuild.
+It adds no MIME or JSON exclusion. It creates no durable SemanticSegment rows and does
+not modify the annotation, artifact, description or recovery records. Legacy
+v2 whole-body rows retain their existing identity and reader behavior. A new
+segmented row declares the closed `cairn.semantic-text-source-segmentation.v1`
+profile digest; unknown profiles MUST fail source evidence closed. The profile
+uses a 384-source-byte target, UTF-8 boundaries, the last sentence/whitespace
+boundary in the latter half of that window when available, and no overlap.
+Whitespace-only spans attach to an adjacent meaningful span without discarding
+source bytes; this may exceed the byte target and never implies FULL tokenizer
+consumption. Invalid UTF-8 is unavailable, not silently repaired.
+
+Segmented rows bind their complete original body digest/length and an ordered,
+contiguous, gap-free source-span set. Each input identity binds source kind,
+canonical subject, immutable source reference/revision, body digest, explicit
+segmentation-profile digest, ordinal, byte span and exact segment-text digest.
+Coverage MUST validate that set and the actual input/vector membership, while
+FULL/TRUNCATED/UNKNOWN remains governed by native input evidence below. The
+embedding model/space and worker ABI do not change. Durable description segment
+sets retain their own existing profiles and are not resegmented by this rule.
+
+On query, the host MUST reopen the pinned immutable Note revision or admitted
+artifact, verify the complete body, reproduce the declared segment set and
+validate the selected span/text before projecting a hit. Existing Note
+lifecycle, artifact admission and source-root authorization still apply.
+The existing search-segment projection MAY include optional
+`text_source_provenance` with `source_revision`, `body_digest`,
+`segmentation_profile_digest`, `source_start_byte`, `source_end_byte` and
+`text_digest`; offsets address the retained source body, not a rendered excerpt.
+This is evidence on an existing result, not a new command or recovery record.
+Older readers may refuse newly segmented rows; no existing receipt is rewritten
+and an explicit rebuild is required to create new input coverage.
+
+V2 retains the existing generation/workspace/snapshot/root/config/profile,
+semantic-space, library and subject/segment identity bindings. It additionally
+commits a deterministic selected-source inventory and digest. The inventory
+is selected before whitespace and semantic-eligibility filtering: the same
+in-scope filenames, current TAG/NOTE revisions, description revisions and
+policy-admitted EXTRACT artifacts as the lexical selected-text profile. Each
+row binds the canonical subject, source kind/subtype/reference, canonical
+revision or immutable entry/artifact reference, complete body digest and its
+selected semantic input identities/digests. Description input evidence binds
+the immutable document revision, durable segment identity/text digest and
+available source spans; body/segment inconsistencies cannot be counted as
+complete coverage.
+
+Only closed profile exclusions are ordinary omissions: TAG values are lexical
+facts, empty/whitespace text has no embedding input, and rejected or superseded
+descriptions are excluded from the active semantic feed. Missing or invalid
+segments for an otherwise eligible nonempty description, missing source
+digests, duplicate/conflicting identities, or input/vector set disagreement
+are incomplete/unavailable evidence, never new discretionary exclusions.
+They MUST NOT produce a newly ready generation with a complete coverage
+claim. The selected inventory cannot be reconstructed from provider results
+or a later catalog state. Inspection retains full counters with at most 256
+deterministic bad-outcome-first source details.
+
+The existing `search.rebuild` response MAY add an optional
+`semantic_source_coverage` report for that exact rebuilt semantic generation.
+It keeps source/input completeness separate from pair-membership coverage and
+runtime capability. Incomplete or unavailable source detail degrades the
+operation report; usable vectors may still have `semantic_state = AVAILABLE`.
+Absent detail in an older response means unknown, never complete.
+
+Provider-input admission and tokenizer consumption are separate evidence.
+An optional host-side `SemanticInputEvidence` may retain the worker's already
+validated selected-text digest, source mapping, preprocessing digest,
+FULL/TRUNCATED outcome and input/embedded token counts. This does not change
+EMBED_TEXT or its worker ABI. Present evidence MUST match the exact submitted
+input and generation profile; contradictory evidence is rejected. Missing
+evidence from an old, fixture or online provider is UNKNOWN, never invented
+FULL. TRUNCATED document inputs remain usable for retrieval, but full source coverage
+is incomplete. Token counts do not establish source byte spans, and complete
+input membership alone does not prove all body text influenced a vector.
+
+Query input has a different boundary: when the selected worker reports that
+the query was tokenizer-truncated, the host MUST refuse that partial query
+vector before vector-index querying. It MUST NOT silently rank against a
+prefix of the user's request. The existing fused component reason is
+`QUERY_INPUT_TRUNCATED`; the client MUST explain that a shorter query is needed
+for semantic search while retaining available lexical/structured results.
+This is a request-input refusal, not loss of the installed provider or verified
+generation. It MUST NOT revoke generation readiness or require a restart, and
+a subsequent admissible query MUST remain usable. This changes no embedding
+space, worker ABI, durable input-evidence format or document coverage rule.
+
+Queries of v2 generations MUST validate selected source/revision/input digests
+before rendering a hit's matched text. A Note uses its recorded immutable
+annotation revision and verifies that history's body digest and subject/kind;
+the current annotation still controls tombstone/lifecycle eligibility. A live
+later revision may not replace the body that produced an older vector.
+Missing history, body mismatches or lifecycle refusal are explicit semantic
+unavailability with lexical/structured and exact fallback. V1 Note hits lack
+this evidence and must likewise be refused with a rebuild reason; current
+revision data, timestamps or an unrelated lexical generation cannot fill the
+gap. Legacy immutable-source queries may remain readable within their
+existing contract; source-level coverage stays unavailable for all v1 data.
+
+The existing receipt byte limit applies to reads and new writes. Unsupported
+versions, malformed inventories, digest changes or generation/profile binding
+mismatches fail source evidence closed. No old receipt, vector space, model
+profile, durable source or recovery object is rewritten by this successor.
+This profile adds no new query dimension, endpoint, UI surface or phase credit.
 
 ### 10.1 Later RetrieverDriver contract
 

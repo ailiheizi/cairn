@@ -6,6 +6,13 @@
 > acceptance log produced by `scripts/accept-offline-journey.sh`. This document
 > is informative operator guidance. It does not qualify a release, does not
 > select a production repository engine, and does not close any phase gate.
+>
+> **Current build-tag guidance:** the transcript below is historical evidence
+> for the source and package that were run on 2026-10-12. Current source builds
+> and `scripts/package-offline.sh` require exactly `-tags=cairn_zvec_dynamic`
+> for the daemon so the custom zvec loader is selected without disabling Go's
+> SHA assembly. Do not reinterpret or rewrite the historical command record as
+> evidence that the current source was rebuilt.
 
 ## 1. What this procedure is, and what it is not
 
@@ -55,7 +62,7 @@ The package is a gzipped tar whose top directory is
 
 | Member | What it is |
 | --- | --- |
-| `bin/cairnd` | The daemon. Built with `-tags purego` so in-process zvec is present; `package-offline.sh` re-verifies that tag and the pinned `zvec-go` digest from BuildInfo. |
+| `bin/cairnd` | The daemon in the executed 2026-10-12 package. Current source packaging requires exactly `-tags=cairn_zvec_dynamic`; `package-offline.sh` verifies that tag and the pinned `zvec-go` digest from BuildInfo. |
 | `bin/cairn` | The CLI. |
 | `web/dist/**` | The pre-built WebUI. Pass it to the daemon with `--web-root`. |
 | `semantic/semantic-bundle.tar.gz` | The offline embedding bundle. The daemon never downloads one. |

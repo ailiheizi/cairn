@@ -1254,6 +1254,261 @@ authenticated exact snapshot discovery or exact-byte restore. A newer valid
 sequence supersedes the active fact projection but never erases authenticated
 history.
 
+#### Fresh operational catalog reconstruction
+
+The Store-free recovery reader remains catalog-free. A Store-backed
+`recovery.import` MAY reconstruct a missing operational namespace from a
+fully authenticated v2/v3 reference with complete stable-subject mappings.
+Legacy v1 and explicit `INCOMPLETE` inputs retain exact-reader admission and
+MUST NOT manufacture complete metadata or a namespace projection.
+
+Reconstruction MUST validate the exact parent, selected fact history, attached
+bodies, required processor-attempt children and strict repository conflict
+discovery before inserting catalog content. It MUST retain the selected
+prefix. For a writable current catalog, that prefix MUST also equal the
+repository's authenticated current fact head for that parent; a later valid
+suffix causes a visible projection refusal, not implicit advancement. This
+does not require the selected root publication to be the newest publication:
+older committed sources remain recoverable. The check and projection MUST
+share the existing publication coordination boundary and recheck currentness
+before commit. Historical Store-free restore remains available.
+
+The target MUST be empty of ordinary content state or already belong to the
+same explicitly marked reconstruction. Existing staged-root reconciliation
+retains its existing contract. One SQLite transaction MUST install the required
+namespace/content/protection relations and every selected reconstructable
+fact, including exact annotation history, description bodies and segments,
+and admitted artifacts with their authenticated terminal attempts. Exact
+replay is idempotent. A conflicting identity, revision, body, lifecycle or
+cross-parent fact MUST reject the transaction without partial content rows;
+an existing current fact MUST NOT be overwritten to make an import fit.
+
+The existing singleton `ProtectionRecord` is a current projection, not a
+portable history table. Different authenticated snapshots of the same stable
+subject may legitimately retain the same protection ID with different content
+identities or routes. Reconstruction MUST select the current protection from
+the greatest authenticated publication order among the roots admitted into
+that reconstruction, independent of import order. A newer admitted capture
+may advance this current projection through the existing revision mechanism;
+an older import MUST NOT downgrade it. Preserve each snapshot's signed
+`ManifestProtection` and its distinct recovery-reference rows. This exception
+does not permit rewriting immutable annotation/description history or accepting
+different bodies at the same authenticated order. Before reusing an already
+projected current protection, the exact importer MUST ground it in its named
+authenticated publication and subject mapping. Local protection counters and
+header creation times are not recovered original history and remain explicitly
+attributed to reconstruction. Exact shared immutable rows are reused only
+after field-level equality checks, not rejected merely because they exist.
+
+Original stable subject, entry, root, file-version and fact identifiers MUST
+be preserved. Missing operational history MUST NOT be fabricated. Necessary
+local FK-support rows MUST carry `SIGNED_RECOVERY_PROJECTION` provenance with
+their authenticated source digests. New local scan, observation and binding
+row IDs are reconstruction handles, not recovered execution IDs. A projected
+scan ends `INCOMPLETE` with `full_traversal=false`; its ordering may use the
+authenticated publication order but MUST NOT claim the original scan number.
+An unpaired historical source is `LOST`, uses an opaque recovery locator, and
+retains its old path only as provenance. Unknown workspace display names may
+use an explicit recovered-content label.
+
+Only authenticated facts or independently verified current repository
+capabilities may populate representation and file-version projections. Do not
+invent original physical locators, ownership, sparse extents, verification
+events or original execution timestamps. Nonportable attributes remain
+explicitly unknown; if a required relation cannot be grounded, reconstruction
+fails visibly while exact-reader recovery remains available. Captured typed
+fact payloads retain their full state and provenance rather than becoming
+unqualified scalar values. Search generations are rebuilt separately from
+the committed projection; no model installation or semantic capability claim
+follows from catalog import. Index failure cannot erase an otherwise committed
+catalog reconstruction and MUST be reported separately.
+
+This is the reconstruction policy for the existing recovery/catalog loop,
+not a new schema, signed format, command, source capture or recovery authority.
+Its implementation and complete empty-catalog user journey require separate
+executable evidence; this policy alone awards no completion credit.
+
+#### Authenticated catalog-relation witness profile
+
+Fresh-catalog reconstruction requires a grounded representation relation.
+Subject mappings and exact readback alone do not establish historical
+ownership, access modes, hashing profiles or file-version fields. The fixed
+kernel-only `cairn.recovery.catalog-relation.v1` namespace uses the existing
+`METADATA_FACT` record and JSON value contract to retain those facts. This is
+an additional typed payload profile, not another record kind, envelope,
+SQLite schema, processor, public command or recovery authority.
+
+Each witness has schema `org.cairn.catalog-relation-witness.v1`, its fixed
+profile digest, snapshot/root/stable-subject identity, the actual immutable
+FileVersion row, its complete admitted whole-logical-stream ContentExtent
+rows, and exactly the required Representation rows. Required representations
+are the union of the signed selected references, the file version's
+authoritative representation and its extent references. The publisher MUST
+read the actual immutable rows under existing publication coordination; it
+MUST NOT infer ownership from current configuration. The namespace is reserved
+for this compiled publisher and cannot be supplied by ordinary metadata rows.
+The FileVersion's scan-generation and observation FK fields are excluded from
+the portable profile and MUST be empty in its payload; every other admitted
+field remains the captured value. This also prevents republishing a recovered
+catalog from changing a revision-1 witness merely because its local FK handles
+were reconstructed.
+
+The outer metadata record uses revision 1, OBJECT value type and
+`SYSTEM_CATALOG_EXPORT` authority. Its deterministic ID and source/key bind
+snapshot, stable subject and file-version identity. Import MUST strictly bind
+all outer/value/mapping identities, content digests and lengths, require
+exactly one witness per mapped file version when reconstructing, and reject
+missing, duplicate, surplus or inconsistent relations. The admitted v1 extent
+profile is empty for an empty file, otherwise one complete logical DATA
+stream; it does not admit a new physical/sparse profile. Authenticated original
+field values remain original facts; only scan/observation FK handles are
+rebound to marked reconstruction rows. Current exact bytes still require
+complete readback before committing. A LINK_ONLY witness never upgrades its
+unprotected claim or asserts present local bytes.
+
+Witnesses are snapshot-specific portable facts. They MUST NOT enter the
+ordinary current MetadataFact projection or the cross-parent current-value
+agreement comparison. Their signed payload remains in the recovery authority.
+Legacy references without this profile retain Store-free exact reading and
+restore. Store-backed reconstruction MUST visibly refuse required relations
+that cannot be grounded; it MUST NOT substitute guessed rows. Existing signed
+records are never rewritten. This profile alone grants no implementation or
+qualification credit.
+
+#### Current user-metadata publication coverage
+
+An ordinary admitted annotation or description mutation MUST preserve its
+committed catalog write even if later portable-fact publication fails. A
+successful claim of authenticated recovery for that mutation requires its exact
+record identity, revision, body digest and lifecycle state to be present in a
+verified complete-state successor for **every retained authenticated committed
+parent whose subject mapping contains an affected stable subject**. This applies
+to creates, revisions, tombstones, imports, partial batch changes and retained
+generated description candidates. An unchanged/no-op write may reuse an already
+covering child without creating another sequence.
+
+In the current non-destructive profile, retained parents are the valid committed
+publications in the configured repository and publication domain. Resolve parent
+identity and membership from authenticated commits, manifests and portable
+subject mappings. A newest namespace entry, latest-per-source root, search hit
+or catalog publication pointer alone MUST NOT define this parent set. Missing,
+invalid or ambiguous required membership evidence prevents a complete coverage
+claim; do not silently omit that parent. If an affected subject has no verified
+parent, the result cannot claim authenticated portable recovery for that subject.
+
+The existing parent commit and exact bytes remain immutable. A later child records
+facts known at that later sequence; it does not reinterpret the snapshot's capture
+time or grant an old exported reference knowledge of future children. Recovery
+export remains observational and exports only already authenticated records.
+
+The catalog mutation and repository publication are not one atomic transaction.
+After a catalog commit, preserve and return the saved record identity/revision
+when reporting failed, partial or unknown publication through the existing
+degraded outcome. Do not roll back the saved text, report complete recovery, or
+repeat the metadata mutation merely to retry publication. Reconciliation reuses
+the fixed authenticated parents and existing signed successor/idempotency/fencing
+mechanism; it does not authorize re-ingest, processor rerouting or a background
+retry service. Each successful coverage claim must be joined to the committed
+mutation's own records, even when concurrent writes add newer revisions.
+
+An authenticated child chain's existence and the immutable prepared capture
+profile's coverage are distinct from this mutation-specific postcondition.
+`fact_health=COMPLETE` alone MUST NOT be treated as proof that later catalog
+writes were published. If a process stops between catalog commit and child
+publication, that latest coverage remains unproven until reconciled and verified;
+this clarification adds no durable queue, schema, signed field or new operation.
+
+A description revision's `config_digest` identifies its own creation
+configuration. It MUST remain a valid, nonempty SHA-256 digest when that
+immutable revision is included under retained parents with different manifest
+configuration digests. Any duplicated creation-config value in record provenance
+MUST agree with the payload. Each parent retains its independently authenticated
+manifest configuration; equality between the two configurations is not a
+membership or recovery requirement. Signature, payload/body digest, attachment,
+subject, lineage and producer-profile checks remain required. This clarification
+changes no record shape or stored value. Older readers that impose parent-config
+equality may reject such metadata children or their exports; acceptance requires
+a reader tested against this rule and does not claim compatibility with those
+older readers.
+
+#### Bounded recovery-reference artifacts
+
+The admitted compact selector successor is `org.cairn.recovery-reference.v3`
+(ADR-051). It addresses the measured case where individually bounded prepared
+and complete-state fact records make their containing v2 reference exceed the
+existing `16777216`-byte clean-reader bound. It introduces no repository record
+role, catalog schema, signing format, payload placement, or live metadata store.
+Existing signed record bytes, digests and signatures MUST remain unchanged;
+records that fit still use the v1/v2 placement required by the content-store
+contract. Existing record-part envelopes and all their checks remain required.
+
+The exact v3 JSON fields are `schema`, `snapshot_ref`, `publication_domain`,
+`repository`, `required_trust_anchor`, `publication_commit_digest`,
+`publication_commit`, `prepared_closure`, `fact_health`,
+`portable_fact_closures`, `required_reader_dependencies`, `critical_extensions`,
+`optional_extensions`, and the populated `self_digest`. Bindings and the signed
+commit retain their v2 meanings. `prepared_closure` is a descriptor with
+`record_role=PREPARED_CLOSURE` and `record_digest` equal to the signed commit's
+prepared-object digest. There is no embedded prepared envelope or additional
+top-level prepared digest in v3.
+
+Each `portable_fact_closures` descriptor has exactly `record_role` (fixed to
+`PORTABLE_FACT_CLOSURE`), `record_digest`, `closure_digest`, `closure_sequence`,
+and `predecessor_closure_digest`. The ordered list MUST contain every selected
+successor from sequence one through the exported head. Sequence one has no
+predecessor; each later descriptor names the preceding signed closure digest.
+The arrays and extension containers are explicit, non-null values; optional
+extensions are an object. Unknown fields, schema or critical extensions are
+refused. `self_digest` uses the existing compact-JSON/SHA-256 rule with that
+field omitted. The final canonical artifact, including its self-digest, MUST
+fit the unchanged clean-reader bound before any output file is created.
+
+An importer MUST open descriptors only through the configured repository's
+existing record role and SHA-256 digest, hash the raw record bytes independently,
+strictly decode, and apply the existing commit/prepared, manifest, signature,
+parent, sequence, bundle, attachment, processor-child and reader-dependency
+checks. It MUST follow existing prepared/fact parts and verify reassembly;
+v3 does not rescue an invalid or individually oversized placed record. No
+SQLite catalog, search index, private key, external path or network acquisition
+is needed to validate this selector. Missing, corrupt or incompatible selected
+records are errors, never a shorter successful prefix.
+
+The selected prefix is frozen at export. Later valid repository successors
+MUST NOT be adopted when resolving that artifact. Existing authenticated
+repository discovery remains the conflict authority: a known conflicting or
+forked chain, including after the selected head, rejects admission. Its current
+strict handling of malformed/unsupported repository records before domain/parent
+filtering is preserved; this profile does not add selective ignore rules.
+`COMPLETE` describes the fully verified selected prefix, not currentness against
+later metadata. `INCOMPLETE` is only the existing explicit empty-fact case.
+Invalid selected dependencies cannot be downgraded to `INCOMPLETE`.
+
+The new compact export/import paths MUST validate history sequentially and
+release each decoded body after use, retaining descriptors and lightweight
+lineage evidence rather than all historical bundles. A generic writer MAY
+retain only a bounded v2 candidate and discard it once the v2 byte bound is
+proved exceeded. It MUST NOT first materialize an unbounded expanded v2 chain
+merely to decide to emit v3. Existing per-logical-record reassembly requirements
+are unchanged; no constant-memory or unbounded-history performance qualification
+is implied. Preserve context cancellation and visible read/resource failures.
+All required validation, manifest/result totals, serialization and size checks
+MUST finish before create-new output. Existing destinations and failed outputs
+MUST remain untouched by a size or admission refusal.
+
+Explicit v2 marshal/export and the v2 loader retain their version and bounds.
+Generic signed export emits the same v2 bytes when they fit; only a distinctly
+typed v2 size refusal permits compact v3 selection. Build, authentication,
+dependency, provider and destination failures MUST NOT trigger that fallback.
+Import dispatches v1/v2/v3 explicitly and reports the actual input schema.
+Service-level migration preserves small v1-to-v2 and v2-to-v2 behavior; a legacy
+v1 migration that selects a larger authenticated current chain may emit v3 only
+on the typed v2 size refusal. A v3 migration validates and copies its selected
+prefix as v3 without adopting a suffix or downgrading it. Source artifacts are
+never overwritten. No new CLI or dispatcher migration operation is implied.
+The clean-reader daemon accepts typed v2/v3 references using the separately
+supplied anchor's domain and continues to reject legacy v1 startup references.
+Older readers MUST reject v3 clearly; old-reader interoperability is not claimed.
+
 ### 20.2 Deferred distributed-control publication state model
 
 > **Superseded for RW-MVP-1:** The remainder of Section 20 preserves the former CAS head, AtomicPublicationReceipt, witness, and fork-resolution design for a possible later distributed-control profile. It is not part of the current release contract.

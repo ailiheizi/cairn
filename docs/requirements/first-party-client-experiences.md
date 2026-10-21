@@ -18,6 +18,27 @@ informative browse-only/maintenance schedules for these specific client tasks.
 
 MUST/MUST NOT/SHOULD/MAY express normative requirements.
 
+### ML-1: Ordinary material-list snapshots
+
+The owner's 2026-10-21 instruction admits a bounded first-party client workflow:
+selected exact regular files plus copied live user NOTE/TAG context, optional
+ordinary Skill text, manual or external-AI-assisted arrangement, reviewed
+ordinary file capture, reopening and identity-checked original takeout.
+The [ML-1 client contract](../technical/material-list-client-contract.md) is
+incorporated here for its format, reference, budget and acceptance requirements.
+
+The result is ordinary `cairn.material-list.v1` JSON content. It MUST NOT become
+a new subject kind, catalog schema, list-head service, recovery record, kernel
+membership authority, runtime plugin or processor. Edits create another
+ordinary snapshot; automatic replacement or following a current guide head is
+not admitted. Existing Notes and description records stay unchanged. Copying
+text to an external AI is an explicit user action; imported results MUST retain
+the chosen guide and reference only supplied exact material. No implicit model
+call, remote fetch, instruction execution or human TAG mutation is admitted.
+Unknown, invalid, over-budget and unresolved loaded-scope states MUST remain
+visible. Existing exact capture and takeout verification remain authoritative.
+This successor grants no Phase 4/5/6 or release completion credit.
+
 ## 2. Shared authority and migration analysis
 
 All content, subject/file-version resolution, protection, facts, tags, Notes,
@@ -111,6 +132,14 @@ Loading/error/empty outcomes remain visible; rename/delete are not invented.
 **Exit:** save a supported named query -> leave/refresh -> open retrieval
 directly -> recall its dynamic lexical query without internal IDs. New matching
 content may change membership. Unsupported active conditions are refused.
+
+The legacy exact-TAG maintenance profile in the content-store contract allows
+the ordinary Library's active user tags to be saved as complete JSON-quoted
+`tag=` fields, including a tag-only Library retrieval. The client MUST preview
+those values, retain them through update/recall/export and distinguish them
+from keyword prefixes. The existing restrictions on unsupported axes, source
+scope and local Photos/Music filters remain. Unsuccessful resolve/evaluate
+responses MUST surface failure, not a successful empty saved retrieval.
 
 ## 6. Full-domain successors and explicit exclusions
 
@@ -218,6 +247,16 @@ reading bytes. ZIP construction is transient browser state; the budgets are
 enforced ceilings, not measured performance guarantees. Large files retain
 the existing single-original download and server-directory export actions.
 Zero-length files MUST retain their valid exact identity.
+
+A refusal caused by these client budgets or unknown size SHOULD expose the
+existing server-directory export action and, for one valid regular-file
+identity, the existing single-original download. Any continuation MUST retain
+the attempted workspace and complete explicit selection, independently of
+later selection changes; workspace change or dismissal invalidates it. This
+transient selection is not a frozen manifest. Opening the existing export
+drawer requires a new explicit plan/review/apply through its ordinary
+contracts. Invalid identities, changed frozen items and verification failures
+MUST NOT silently substitute membership or bypass the failed check.
 
 Progress and cancellation MUST remain reachable during client navigation.
 Cancellation, workspace change and member/validation failure MUST prevent an
@@ -511,6 +550,38 @@ preserve or visibly guard active scope/drafts -> verify readable 390 px and
 1280 px layouts in light/dark without horizontal overflow. This is local client
 implementation evidence, not full Photos/Music or release qualification.
 
+### 14.1 Explicit photo slideshows and immersive listening (2026-10-20)
+
+Following the owner's request for substantial, demonstrable client functions,
+the existing Exhibition MAY offer explicit timed playback of its loaded photo
+sequence, selectable 3/5/10/20-second intervals, pause and an explicit loop.
+It MUST start paused, stop at the end unless loop was selected, pause when the
+page is hidden or the result identity/order changes, and clear timers on exit.
+It MUST reuse the existing five-preview exhibition window and all existing
+read/identity/pixel/cache ceilings; starting a slideshow does not authorize
+fetching another page or loading the whole library. Unavailable previews stay
+visible. Immersive presentation MUST retain an exit, keyboard focus containment
+and usable return focus. Opening host inspection or Details exits that overlay
+and pauses timed navigation so the host action remains visible.
+
+The existing App-owned audio player MAY offer an immersive listening layout
+with recorded labels, seek/transport controls and its existing transient queue.
+The audio element, verified Blob and playback state MUST remain the same when
+entering or leaving that layout. No second player, repeated download, fabricated
+cover, waveform or lyric fact is admitted. Verified labels require an actually
+verified current original; loading/error states cannot claim verification.
+Escape/close MUST restore usable focus without stopping valid playback.
+
+The shared exit is one retained-content browser journey: explicitly play and
+pause a slideshow, change its interval/loop, enter/leave immersive Photos,
+reach host inspection/original actions, then play supported original audio,
+enter/operate/leave immersive Music with the same media element/source and
+usable queue. Verify exact-original takeout and readable narrow layouts in
+that journey. This refines the existing client track; it does not admit durable
+albums/playlists, a new backend contract or a core-phase result. CLIP delivery
+is separately admitted by VIS-1/2/3 in the content-store contract; the combined
+browser journey may also verify that independently admitted capability.
+
 ## 15. Implementation order and evidence
 
 This bounded client track MAY run in parallel with existing Phase 4/5 work
@@ -519,9 +590,11 @@ completion and does not move LinkGroup implementation ahead of its gates.
 Disjoint client files may be implemented in parallel; integration is owned by
 one primary agent with one shared App state and typed-operation path.
 
-Run focused client/build/lifecycle and local browser checks, a practical broad
-Go regression once for the integrated cohort, and `git diff --check`. Repeat
-checks only for relevant changes/failures. Local Mac/browser experience evidence
+Follow the owner's feature-first testing order in AGENTS and the Cairn testing
+skill: integrate the complete feature, run its selected browser journey, and
+diagnose actual failures locally. Run affected build checks and `git diff --check`;
+do not repeat unrelated Go suites for a client-only cohort. Repeat checks only
+for relevant changes/failures. Local Mac/browser experience evidence
 does not require a Linux qualification detour and does not qualify another
 host, deployment or release. Record implemented, partial and missing scope
 honestly; mock tests alone do not prove decoding, listening or photo usability.

@@ -301,7 +301,7 @@ Display paths are for people. Machine clients SHOULD pass `path_ref`. A CLI conv
 | `description.create` | Durable description write | Create an immutable user, imported, extracted, or model-labeled description revision and its source-aligned segments. |
 | `view.save` | Durable catalog mutation | Create a revisioned dynamic query and presentation policy. |
 | `view.get` | None | Read one saved view revision without evaluating membership. |
-| `view.evaluate` | None | Evaluate one saved view against explicit generation references. |
+| `view.evaluate` | None | Evaluate one saved view; optional bounded continuation retains its exact stored conditions and current projection. |
 | `export.plan` | None | Freeze subjects, representations, names, target profile, and expected effects into an immutable `ExportManifest`. |
 | `export.apply` | Destination mutation | Materialize one exact export-manifest digest to an explicit destination. |
 | `export.verify` | Bounded read | Verify materialized output against its manifest and selected representations. |
@@ -740,6 +740,25 @@ contracts remain distinct for clients that need their full durable semantics.
 
 The current reference command accepts at most 16 MiB of UTF-8 text and splits it at UTF-8-safe sentence or whitespace boundaries into ordered segments of at most 1024 source bytes where practical. Every segment retains a digest and `[start_byte,end_byte)` source span. `description.list` defaults to 100 summaries and accepts a limit from 1 to 1000; summaries exclude body and segment text. `description.get` returns one full revision and its segments.
 
+The existing `description.list` operation MAY accept `current_only: true` and
+the ordinary optional `page: {limit, token}` request. Without these additions,
+its historical-revision listing remains compatible. `current_only` is a
+read-only catalog projection: a revision is current only if no successor in
+the authoritative workspace/subject chain references it, regardless of which
+page a caller has loaded. A truncated historical prefix MUST NOT establish
+currentness. No revision is deleted, rewritten or copied into another Note.
+
+Paged answers MUST echo their workspace, optional subject scope and current-only
+mode, identify the exact summary projection, and carry the ordinary `PageData`
+bound, count, completeness and authenticated continuation. The total order is
+subject reference, revision, then document identity. Tokens bind that order,
+scope, mode, projection and expiry using the existing process-local token
+authority; a changed projection, malformed/tampered token or cross-scope token
+fails visibly without appending a partial replacement. Page-size changes are
+allowed within one projection. Each page is at most 1,000 summaries and never
+loads body or segment text. This admits no new index dimension, persistent
+cursor table, service, endpoint, schema or recovery format.
+
 These operations establish the catalog and command shape only. A description is not fully portable until its body, revisions, segments, provenance, config/profile digests, and authenticated bundle or recovery-closure reference survive loss of the operational SQLite catalog. Vector generations remain disposable and never become the only copy of description text.
 
 ## 10. Search and query operations
@@ -876,6 +895,29 @@ If no provider is configured, the operation returns `BLOCKED` with `QUERY_PROVID
 
 `capability.list` reports configured processor, index, and query capabilities, versions, health, supported content classes, model spaces, and declared resource requirements. It does not expose invocation escape hatches.
 
+### Installed provider metadata for explicit description authorization
+
+The existing `semantic.provider.list` operation MAY accept optional
+`include_describe: true`. Omitted/empty input retains its embedding-only
+`models_root` and `profiles` response. The opt-in projection adds a separate
+`describe` result with `state`, `profiles` and an explicit failure `reason`
+when unavailable; it MUST NOT put describe profiles in the embedding list.
+Rows expose validated installed profile identity/digest, sanitized destination,
+model/output schema, declared data/subject classes, budgets and expiry. They
+contain no credential values. Missing profile directories mean an available
+empty list; malformed or unreadable describe metadata remains visibly
+unavailable without hiding the embedding result. Listing resolves no secret,
+sends no data, installs/activates nothing and creates no grant.
+
+The local client MAY compose an explicit `DESCRIBE` grant through the existing
+grant operation, separate from `DOCUMENT`/`QUERY` grants. Its scope and ceilings
+MUST fit the selected installed profile; its expiry cannot exceed that profile.
+The existing per-subject generation confirmation remains required. A covering
+grant must match the configured describe profile ID/digest, destination and
+model; another live DESCRIBE grant is not a substitute. Absent provider or
+unreadable profile facts remain unavailable. This adds no provider interface,
+profile format, automatic generation or AI-client integration.
+
 ## 11. Verification and recovery export
 
 ### 11.1 Snapshot verification
@@ -907,7 +949,26 @@ The export result reports artifact path or stream handle, digest, length, snapsh
 
 The operation accepts an optional subject scope and output form. Snapshot scope exports the portable closure bundle. Subject scope may export a deterministic signed `RecoveryToken` set: one token per selected `RecoveryReference`, including exact, reversible, and link-only references and their honest protection claims. A token export for `LINK_ONLY_UNPROTECTED` preserves that warning and MUST NOT imply that bytes are inside the token or currently reacquirable. A metadata-only subject returns its `EXPLICITLY_UNPROTECTED` record and no token.
 
-The reference signed implementation writes a bundle containing the selected `PUBLICATION_COMMIT`, its `PREPARED_CLOSURE`, their authenticated digests, and the required trust-anchor key ID/digest. The bundle does not contain a private key and is not itself the trust root. A non-signed development profile may export the legacy portable snapshot form, but that profile does not satisfy the signed recovery contract.
+The signed implementation binds the selected `PUBLICATION_COMMIT`, its `PREPARED_CLOSURE`, their authenticated digests, and the required trust-anchor key ID/digest. Depending on the reported reference version, the prepared record is embedded or referenced by authenticated role/digest. The artifact contains no private key and is not itself the trust root. A non-signed development profile may export the legacy portable snapshot form, but that profile does not satisfy the signed recovery contract.
+
+The reviewed compact recovery-reference successor is defined in
+[Restore Manifest section 20.1](restore-manifest.md#bounded-recovery-reference-artifacts).
+Generic signed export retains v2 for fitting artifacts and uses v3 only for a
+typed v2 size refusal. Import and the clean-reader startup recognize the actual
+supported schema; no new command, endpoint or migration operation is introduced.
+The bounded development implementation has focused adversarial and combined
+tests, including separate-process clean-reader import/full-byte verify/exact
+restore; see [the dated evidence](../technical/real-project-corpus-acceptance-20261016.md#compact-recovery-reference-successor-bounded).
+The Unix near-limit test used a 14,521,495-byte prepared v2 record and a
+16,210,219-byte fact v2 record; it refused their 30,734,625-byte expanded v2
+reference and emitted a 3,014-byte v3 reference. Its separate-anchor,
+no-catalog/no-key reader restored 201 files / 3,847 bytes while the source
+remained available. This is the bounded large-prepared/near-limit-fact aggregate
+case; no exact prepared-record size sweep was run. A separate actual-corpus
+metadata drill used a fitting 16,466,616-byte v2 reference and verified seven
+facts plus the exact 104-file restore; it is not v3-selection evidence. See
+[dated evidence](../technical/real-project-corpus-acceptance-20261016.md#2026-10-16-bounded-metadata-corpus-recovery-drill). The final combined Go run passed. History-scale performance, full catalog
+reconstruction and release qualification remain open.
 
 ### 11.3 Recovery trust-anchor export
 
