@@ -6,20 +6,20 @@
 
 ### Visible next action and board (2026-10-21)
 
-Use the [Cairn Linear board](https://linear.app/waoffer/project/cairn-c2dec938b522)
+Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536)
 and [focused delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
 They represent this same queue; the Core MVP Execution Plan still owns core
-phase order. **Only next action: WAO-7, review and finish the single-guide reuse
+phase order. **Only next action: AIL-7, review and finish the single-guide reuse
 design. No product implementation is active during this planning batch.**
 
 | Queue | Task | State |
 | --- | --- | --- |
-| Existing delivery | [WAO-5](https://linear.app/waoffer/issue/WAO-5), ML-1 | Done for stated local scope |
-| Existing delivery | [WAO-6](https://linear.app/waoffer/issue/WAO-6), ML-2 | Done for stated local scope |
-| **Next** | [WAO-7](https://linear.app/waoffer/issue/WAO-7), ordinary Skill/correction reuse design | Todo |
-| After review | [WAO-8](https://linear.app/waoffer/issue/WAO-8), close actual reuse friction | Backlog; blocked by WAO-7 |
-| Then design | [WAO-9](https://linear.app/waoffer/issue/WAO-9), explicit AI organizer contract | Backlog; blocked by WAO-8 |
-| After AI admission | [WAO-10](https://linear.app/waoffer/issue/WAO-10), AI candidate → confirm → saved list | Backlog; blocked by WAO-9 |
+| Existing delivery | [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Done for stated local scope |
+| Existing delivery | [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Done for stated local scope |
+| **Next** | [AIL-7](https://linear.app/ailiheizi/issue/AIL-7), ordinary Skill/correction reuse design | Todo |
+| After review | [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), close actual reuse friction | Backlog; blocked by AIL-7 |
+| Then design | [AIL-9](https://linear.app/ailiheizi/issue/AIL-9), explicit AI organizer contract | Backlog; blocked by AIL-8 |
+| After AI admission | [AIL-10](https://linear.app/ailiheizi/issue/AIL-10), AI candidate → confirm → saved list | Backlog; blocked by AIL-9 |
 
 Read-only source inspection confirms standalone text saving, Skill selection
 and frozen guide capture already exist. The proposed refinement uses one

@@ -36,20 +36,20 @@ and [core execution order](../../technical/core-mvp-execution-plan.md).
 
 ## Current baseline and ordered work
 
-The Linear board is [Cairn](https://linear.app/waoffer/project/cairn-c2dec938b522).
-The [Chinese planning overview](https://linear.app/waoffer/document/cairn当前主线下一步与防漂移-todo2026-10-21-d99583075771)
+The Linear board is [Cairn](https://linear.app/ailiheizi/project/cairn-15f834de8536).
+The [Chinese planning overview](https://linear.app/ailiheizi/document/cairn当前主线下一步与防漂移-todo2026-10-21-1fa39dca65df)
 is attached to that project for the owner to read alongside its tasks.
 Product progress enters through [Product Experience Todo](../../technical/product-experience-todo.md).
 This plan expands those tasks; it is not a parallel queue to choose from.
 
 | Order | Task | State at planning | Usable outcome / exit |
 | --- | --- | --- | --- |
-| Baseline | [WAO-5](https://linear.app/waoffer/issue/WAO-5) ML-1 | Locally delivered | Notes/Skill/context → reviewed ordinary list snapshot → reopen/exact takeout |
-| Baseline | [WAO-6](https://linear.app/waoffer/issue/WAO-6) ML-2 | Locally delivered | Ordered repeated audio queue and unique-file ZIP/server export handoff |
-| **Now** | [WAO-7](https://linear.app/waoffer/issue/WAO-7) Skill reuse design | **Todo; only next task** | Owner-reviewed single-guide design and concrete actual-gap decision |
-| Next | [WAO-8](https://linear.app/waoffer/issue/WAO-8) Reuse refinement | Backlog; blocked by WAO-7 | Corrected ordinary guide explicitly reused; old list remains unchanged |
-| Then | [WAO-9](https://linear.app/waoffer/issue/WAO-9) AI organizer contract | Backlog; blocked by WAO-8 | Written spec/ADR, necessary admission and bounded implementation plan reviewed |
-| After that | [WAO-10](https://linear.app/waoffer/issue/WAO-10) AI organizer delivery | Backlog; blocked by WAO-9 | Explicit AI candidate → confirm → ordinary saved list → use without AI |
+| Baseline | [AIL-5](https://linear.app/ailiheizi/issue/AIL-5) ML-1 | Locally delivered | Notes/Skill/context → reviewed ordinary list snapshot → reopen/exact takeout |
+| Baseline | [AIL-6](https://linear.app/ailiheizi/issue/AIL-6) ML-2 | Locally delivered | Ordered repeated audio queue and unique-file ZIP/server export handoff |
+| **Now** | [AIL-7](https://linear.app/ailiheizi/issue/AIL-7) Skill reuse design | **Todo; only next task** | Owner-reviewed single-guide design and concrete actual-gap decision |
+| Next | [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) Reuse refinement | Backlog; blocked by AIL-7 | Corrected ordinary guide explicitly reused; old list remains unchanged |
+| Then | [AIL-9](https://linear.app/ailiheizi/issue/AIL-9) AI organizer contract | Backlog; blocked by AIL-8 | Written spec/ADR, necessary admission and bounded implementation plan reviewed |
+| After that | [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) AI organizer delivery | Backlog; blocked by AIL-9 | Explicit AI candidate → confirm → ordinary saved list → use without AI |
 
 The two baseline rows are not phase/release completion. Their existing local
 reports are recorded in the current ledger; do not rerun them just to plan.
@@ -58,19 +58,19 @@ No invented delivery dates are attached to unresolved design gates.
 ## Review focus
 
 1. Existing text-file saving/guide selection must not be sold or rebuilt as a
-   missing feature; WAO-7 separates navigation friction from absent capability.
+   missing feature; AIL-7 separates navigation friction from absent capability.
 2. Corrections must actually enter the chosen complete guide text. Merely
    saving a separate document does not make it an organizing input.
 3. Reusing B must not rewrite the frozen A instructions or original Notes/Tags;
-   WAO-8's journey compares those identities after reopening.
+   AIL-8's journey compares those identities after reopening.
 4. Stale workspace/selection, unreadable/oversized input and abandoned review
    must preserve prior usable material. Inspect these paths in the owning
    feature; add local checks only if its whole journey leaves a concrete gap.
 5. Current copy/paste includes references, labels and context, not arbitrary
-   original bodies. WAO-9 must specify actual authorized inputs and a real
+   original bodies. AIL-9 must specify actual authorized inputs and a real
    provider journey, rather than claiming an AI organizer from existing UI.
 
-## Task 1: Finish the reuse decision (WAO-7)
+## Task 1: Finish the reuse decision (AIL-7)
 
 **Files:** Read the spec above; inspect `web/src/main.tsx`,
 `components/NotesSurface.tsx`, `components/SourceDrawer.tsx`,
@@ -82,13 +82,13 @@ Write only the spec/this plan/current ledger until scope is reviewed.
   one ordinary guide with corrections merged into it as the proposed design.
 - [ ] Identify the exact remaining entry/draft/selection obstacle, if any;
   explain the minimal change and whether a narrow normative successor is needed.
-- [ ] Obtain owner review of the written design before starting WAO-8. A
+- [ ] Obtain owner review of the written design before starting AIL-8. A
   planning document or Linear Todo does not itself authorize product scope.
 
-## Task 2: Close only the admitted reuse gap (WAO-8)
+## Task 2: Close only the admitted reuse gap (AIL-8)
 
 **Ownership:** Existing text-file intake and material-list client; no backend
-or durable format change. Consume the exact flow/file decision from WAO-7.
+or durable format change. Consume the exact flow/file decision from AIL-7.
 Produce ordinary text files and `cairn.material-list.v1`, not new domain types.
 
 - [ ] If the existing combination suffices, improve the usage explanation and
@@ -98,9 +98,9 @@ Produce ordinary text files and `cairn.material-list.v1`, not new domain types.
 - [ ] For the code-change branch, run one journey: save/select A → list A → corrections merged into B →
   reviewed ordinary B capture → new list uses B → reopen A/B and compare exact
   retained guide text → take out unchanged originals. Reuse successful mutations.
-- [ ] Root reviews the diff and evidence; update WAO-8/ledger, commit and push.
+- [ ] Root reviews the diff and evidence; update AIL-8/ledger, commit and push.
 
-## Task 3: Specify explicit AI organization (WAO-9)
+## Task 3: Specify explicit AI organization (AIL-9)
 
 **Files to inspect:** `server/controlplane/description_ops.go`
 (`handleDescriptionGenerate`), `server/controlplane/online_provider_ops.go`,
@@ -119,7 +119,7 @@ This is a design task: no endpoint or AI runner edits.
   implementation plan. Do not reinterpret `description.generate` as a generic
   list organizer just because a model profile exists.
 
-## Task 4: Deliver the approved AI loop (WAO-10)
+## Task 4: Deliver the approved AI loop (AIL-10)
 
 This task remains blocked until Task 3 supplies its actual contracts and file
 boundaries. No speculative function signatures, schema or provider is selected

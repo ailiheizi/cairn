@@ -44,9 +44,9 @@ material and its live Notes/Tags are unchanged.
 
 Before any product edit, identify a concrete obstacle in that existing flow:
 the exact entry, draft handoff or selection state that prevents completion.
-Specify the smallest changed interaction and affected files in WAO-7. If the
+Specify the smallest changed interaction and affected files in AIL-7. If the
 existing combination suffices, document it and reuse applicable evidence;
-do not invent code, a new library or a new page to fill WAO-8.
+do not invent code, a new library or a new page to fill AIL-8.
 
 Candidate ownership is limited to `NotesSurface.tsx`, `SourceDrawer.tsx`,
 `components/material/MaterialListComposer.tsx`, `lib/materialListIO.ts`, and
@@ -63,13 +63,13 @@ saved Skill or silently replace the selected instructions. No second Notes
 concept, artificial description copy, AI call, tag mutation or automatic
 refresh is introduced.
 
-WAO-7 exits with the owner-reviewed choice and an actual-gap decision. WAO-8
+AIL-7 exits with the owner-reviewed choice and an actual-gap decision. AIL-8
 then delivers only that admitted gap, or documents that the existing flow
 already satisfies the result. If code changes, the single journey above must
 prove frozen A/B text identities and unchanged originals after integration.
 Local diagnostics are reserved for actual failures or uncovered trust
 invariants; documentation-only delivery runs no application tests.
 
-This design does not admit an AI executor. WAO-9 must separately resolve
+This design does not admit an AI executor. AIL-9 must separately resolve
 authorized body reads, provider location and disclosure, budgets, exact input
-bindings, stale/canceled work and candidate confirmation before WAO-10 starts.
+bindings, stale/canceled work and candidate confirmation before AIL-10 starts.
