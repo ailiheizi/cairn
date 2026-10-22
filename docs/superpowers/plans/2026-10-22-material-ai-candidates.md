@@ -69,7 +69,7 @@ Operator configuration: optional `organizing.provider_profile`, installed immuta
 - [x] Use isolated retained synthetic ML1 profile and authorized local Sub2API `deepseek-v4.1-flash` connection via credential reference. Never print or retain secrets.
 - [x] One journey: inspect exact disclosure and grant → real candidate → review/use/edit → one confirmed ordinary capture → reopen → exact original takeout; prove no model call on reopen.
 - [x] In the same journey exercise cancellation/stale/invalid foreign-ref handling where practical. Focused checks only for actual failure or specific uncovered changed invariant; state what each proves. Preserve successful mutation marker before reruns.
-- [ ] Record actual usable scope/remaining gap; `git diff --check`; root reads diff, commits and pushes previously authorized main integration. Update existing F12 ledger and Linear from executable evidence only.
+- [x] Record actual usable scope/remaining gap; `git diff --check`; root reads diff, commits and pushes previously authorized main integration. Update existing F12 ledger and Linear from executable evidence only.
 
 ## Decisions and evidence
 
@@ -88,3 +88,5 @@ closed-purpose vocabulary were checked separately after the whole journey.
 Daemon and Web builds and `git diff --check` passed. Commit/push metadata is
 recorded in the delivery ledger/Linear after integration, without rerunning the
 model for documentation-only changes. This is local feature delivery only.
+
+Feature commit `27e99d5` was fast-forwarded to main and pushed to origin; AIL-10 and the existing Chinese functional plan were updated to the verified local delivery scope.

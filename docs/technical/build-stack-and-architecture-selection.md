@@ -2952,7 +2952,9 @@ and [current function plan](../superpowers/plans/2026-10-21-cairn-focused-delive
 ## ADR-071: Admit one explicit material-list AI candidate operation
 
 **Date:** 2026-10-22. **Status:** Accepted by the owner for bounded ML-3
-implementation. F12 implementation and real-provider acceptance are pending.
+implementation; now implemented and locally validated through a real-provider
+candidate, one ordinary capture, reopening and exact-original takeout. No core
+phase or release qualification is claimed.
 
 **Decision:** Add a bounded `material.organize` typed operation over the
 existing local command route. The server sends only an explicitly reviewed
