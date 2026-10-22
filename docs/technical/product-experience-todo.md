@@ -4,7 +4,7 @@
 
 ## Current direction
 
-### Function-level delivery and board (2026-10-21)
+### Function-level delivery and board (updated 2026-10-22)
 
 Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536),
 [function delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md),
@@ -19,9 +19,19 @@ The Core MVP Execution Plan still owns core phase order.
 | --- | --- | --- |
 | Existing delivery | F09 / [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Ordinary saved list snapshots, locally delivered |
 | Existing delivery | F10 / [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Saved-list playback and unique takeout, locally delivered |
-| **Next** | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), Skill correction/reuse | Todo; actual-gap/design work is inside this feature |
-| Next large capability | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10), explicit AI organization | Backlog; necessary contract/admission remains inside this feature |
-| Then select by user impact | F14 Photos, F15 Music, F03 global retrieval | Existing usable subfeatures plus explicitly named residuals |
+| **Next client candidate** | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | Todo; browse/listen/queue/save/reopen over shared host; design for review |
+| Then | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | Backlog; view/annotate/save selection/takeout/return |
+| Then | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | Backlog; derive the smallest compiled seams from Music/Photos |
+| Retained sequence | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), then F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Skill reuse remains planned; integrated AI still requires its contract/admission |
+| Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
+
+The owner requested planning a shared server and specialist client applications
+on 2026-10-22. The [detailed product-form design](../superpowers/specs/2026-10-22-server-client-product-form.md)
+is for review. This changes client priority, not the core phase order. No new
+architecture/testing issue is added and no runtime plugin or media service is
+admitted. Source inspection confirmed Music already has metadata browsing,
+queue controls and sleep timer; the selection-to-list/reopen handoff and
+interaction hierarchy are the chosen delivery seams.
 
 AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
 No product implementation is active during this requirements/planning batch.
@@ -77,12 +87,13 @@ source repairs. Only the affected frontend build and user journey ran, with no
 backend rebuild or broad regression suite. The isolated daemon stopped. These
 results grant no core phase or release qualification.
 
-After ML-2, evaluate two focused candidates in order: make ordinary Skill and
+The earlier post-ML-2 queue proposed two focused candidates in order: make ordinary Skill and
 correction-document creation/reuse easier, then define an explicit AI organizer
 that reads selected material/instructions and returns a reviewable candidate.
 They are candidates requiring their own bounded contract, not authorization for
 an AI runner, automatic refresh, a mutable list head or another platform. The
-core phase plan remains the implementation authority.
+core phase plan remains the implementation authority. The 2026-10-22 client
+queue above supersedes their immediate priority without deleting either goal.
 
 ## ML-1 material-list delivery — 2026-10-21
 

@@ -2883,3 +2883,47 @@ export review remain authoritative. This adds no durable schema or format,
 endpoint, model, processor, scheduler, runtime extension or migration. One
 mixed-list user journey proves playback occurrences and exact takeout; it does
 not close a core phase or qualify a release.
+
+## ADR-070: One default client with specialist applications over the shared server
+
+**Date:** 2026-10-22. **Status:** Proposed detailed product design following the
+owner's request to plan server/client separation. Client queue clarification
+only; no new kernel, remote-access, media or runtime-extension admission.
+
+**Decision:** Target one Cairn service and one default client containing useful
+Music, Photos and Library applications. Keep the existing repository and easy
+default deployment. Applications may replace full layouts and interaction
+hierarchies while the host retains navigation/context, authorized actions and
+one playback session. Original material, Notes/TAG, program-readable ordinary
+lists, discovery and recovery retain their existing shared authority. Local
+view state and transient queues do not become independent durable catalogs.
+
+**Why:** The owner wants specialist-client usability and personal customization
+over the same saved material. One default client makes installation and
+cross-application continuity simpler than immediate independent products. A
+server-only product would leave the desired daily experience to other tools.
+Shared capability ownership permits independent UI without competing players,
+search authorities or list databases. Default applications must work before
+users install or configure extensions.
+
+**Delivery:** Complete F15 Music's browse/listen/queue/save/reopen journey, then
+F14 Photos' find/view/annotate/save/takeout/return journey, reusing F09/F10.
+Extract demonstrated compiled contribution seams inside F16 afterward. F11/F12
+remain planned; AI is not needed to consume saved results. Necessary design,
+refactoring and one complete user journey stay within each feature card.
+
+**Boundaries:** Existing token packs do not execute UI components. A compiled
+trusted contribution is not a sandbox. Independently installable executable
+extensions need a separate design; this ADR does not widen ADR-032 or admit a
+marketplace. Larger-media start/seek, transcoding, offline use and cross-device
+progress require their concrete read/processing/persistence semantics. The
+present 32 MiB verified-original player is a bounded baseline, not a claim of
+mature streaming parity or the permanent product ceiling. The existing local
+API does not prove a supported remote third-party client profile.
+
+**Evidence:** Source inspection found the existing API, shared host and player,
+compiled shell registry, data-only packages and missing domain-to-list handoff.
+No product code or runtime evidence changed. The attempted configured Opus 5.5
+consultation returned `EMPTY_RESPONSE`, so no model consensus is claimed.
+See the [detailed design and functional checklists](../superpowers/specs/2026-10-22-server-client-product-form.md)
+and [current function plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).

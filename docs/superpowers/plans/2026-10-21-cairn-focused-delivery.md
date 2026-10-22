@@ -34,14 +34,21 @@ or every Phase 4 field. A future LinkGroup/group-aware export successor remains
 behind its actual Phase 4/5 gates. Dependencies below describe reuse or real
 delivery prerequisites; they do not create extra board blockers.
 
-**WIP 1 / next:** [F11 — AIL-8](#f11), finish the ordinary Skill/correction
-reuse function from the actual user friction. The former AIL-7 design work is
-an internal checklist within F11, not another card. Then deliver the minimal
-[F12 — AIL-10](#f12) function only after its necessary AI contract and owner
-admission are settled inside that work. Afterward, choose the next admitted
-Photos, Music or global-search residual by user impact. F09/F10 are delivered
-local baselines, not a reason to repeat their journeys. Safe exact-identity and
-authorization behavior stays in place without spawning new campaigns.
+**Client planning update, 2026-10-22 / WIP 1:** the owner requested a shared
+server with specialist client applications. The detailed
+[product-form design](../specs/2026-10-22-server-client-product-form.md) is for
+review; no product implementation is active in this planning batch. The next
+functional candidate is [F15 — AIL-54](#f15): finish the Music browse/listen/
+save/reopen journey, reusing F02 continuity and the delivered F09/F10 list
+flows. Then finish [F14 Photos](#f14), then extract only the shared application
+seams needed for [F16 complete interfaces](#f16). This changes client priority,
+not the core phase order or any media/runtime-extension admission.
+
+[F11](#f11) and [F12](#f12) remain planned in that relative order; integrated
+AI still needs its necessary contract/admission inside F12. F03 owns concrete
+retrieval gaps. F09/F10 remain delivered local baselines, reused without new
+independent test campaigns. Existing exact-identity and authorization behavior
+stays in place. No additional architecture or plugin-platform issue is created.
 
 No row authorizes a new durable schema, endpoint, processor, runtime loader,
 third-party kernel code, marketplace or test framework. Runtime kernel plugins,
@@ -314,7 +321,11 @@ SHA-256 plus logical length; local development evidence is not release proof.
 | Saved selection | Ordinary list usable; Photos entry partial | Reuse F09, no second album model. |
 | Map, face, editing, native sync, album-fill suggestions | Out of scope | Keep future ideas out of the delivered surface. |
 
-**Reuse and steps:** Reuse Photos, viewer, exhibition, current subject scope, Notes/TAG and original takeout. Prioritize observed filter/selection handoff; keep camera/location/similarity from silently inventing facts; use ordinary lists for saved selections.
+**Reuse and steps:** Follow Music in the 2026-10-22 client queue. Reuse Photos,
+viewer, exhibition, current subject scope, Notes/TAG and original takeout.
+Connect selected Photos to the same host material-list editor and Reader;
+preserve scope/focus/selection on return. Keep camera/location/similarity from
+silently inventing facts. No second album model or new application framework.
 
 **Finished looks like:** On real photos, filter and find an image, view/exhibit, add Notes/Favorite, save a selection or take out originals, then return to the same place.
 
@@ -334,7 +345,23 @@ SHA-256 plus logical length; local development evidence is not release proof.
 | Saved playlist-like result | List usable; Music entry partial | Reuse F09/F10 ordinary lists. |
 | Artwork completion/transcode/lyrics/analytics | Not complete; not all in scope | Choose only a concrete user-value gap. |
 
-**Reuse and steps:** Reuse Music page, existing facts, shared player and transient queue. Improve primary browse/play hierarchy; keep missing metadata honest; use material lists for saved results without claiming persistent playlists.
+**Reuse and steps:** This is the next client delivery candidate under the
+[2026-10-22 design](../specs/2026-10-22-server-client-product-form.md).
+Track/artist/album/year browsing, repeat/shuffle/reorder and sleep timer already
+have implementations; do not rebuild them. Improve the primary browse/play
+hierarchy and on-demand controls. Pass explicit displayed/selected Music
+targets to the existing host material-list editor, make saved-result reopening
+and ML-2 actions discoverable, and preserve the same player through navigation.
+Saving a selection is distinct from serializing a repeated live queue. Use
+`MusicLibraryExperience`, its props, `main.tsx`/`LibraryPageHost` and existing
+composer/Reader; change shared hooks only for observed integration gaps.
+
+**Playback depth:** The present 32 MiB full-download/verification ceiling is
+an honest initial bound, not the final product target. Keep a larger-media
+start/seek/cancel proposal inside F15; it needs its own authorized-read and
+playback-evidence contract before implementation. It is not delivered by a UI
+module or by increasing the byte constant. Streaming/transcoding remains
+outside this admitted client batch.
 
 **Finished looks like:** Browse artist/album, play A/B/A, edit the queue, switch pages while playback continues, then save/reopen a list and listen again; oversized content has a clear takeout route.
 
@@ -357,7 +384,12 @@ SHA-256 plus logical length; local development evidence is not release proof.
 
 **Finished looks like:** Switch the same content between two complete layouts, find/play/annotate/take out, and return with state intact; example contribution demonstrates structure changes, not only recoloring.
 
-**Dependencies:** Existing first-party shell and presentation admission. **Scope:** No widening ADR-032 or runtime code. **Sources:** [client extension guide](../../technical/client-experience-extension-guide.md), [architecture ADRs](../../technical/build-stack-and-architecture-selection.md).
+**Delivery position:** After Music and Photos, extract only their demonstrated
+common host/contribution boundaries. Compiled first-party complete layouts and
+data-only theme packages are different capabilities. Independently installable
+executable UI remains a future design decision, not a shipped F16 subfeature.
+
+**Dependencies:** Existing first-party shell and presentation admission. **Scope:** No widening ADR-032 or runtime code. **Sources:** [client extension guide](../../technical/client-experience-extension-guide.md), [architecture ADRs](../../technical/build-stack-and-architecture-selection.md), [product-form design](../specs/2026-10-22-server-client-product-form.md).
 
 ### F17 · [AIL-61](https://linear.app/ailiheizi/issue/AIL-61) — Watch locally saved video within a clear first boundary
 <a id="f17"></a><a id="r35"></a><a id="r36"></a><a id="r37"></a><a id="r58"></a><a id="r66"></a>
