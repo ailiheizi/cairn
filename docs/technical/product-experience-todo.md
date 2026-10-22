@@ -25,8 +25,12 @@ The Core MVP Execution Plan still owns core phase order.
 | Retained sequence | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), then F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Skill reuse remains planned; integrated AI still requires its contract/admission |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
-The owner requested planning a shared server and specialist client applications
-on 2026-10-22. The [detailed product-form design](../superpowers/specs/2026-10-22-server-client-product-form.md)
+The owner clarified the 2026-10-22 direction: build the Web application once,
+prioritize the computer/desktop layout, and reuse the same applications and
+settings UI in a future desktop wrapper. Four default workflows cover save,
+find/takeout, listening and photo viewing; plugins enhance those workflows.
+No separate desktop product or mobile adaptation campaign is planned now.
+The [detailed product-form design](../superpowers/specs/2026-10-22-server-client-product-form.md)
 is for review. This changes client priority, not the core phase order. No new
 architecture/testing issue is added and no runtime plugin or media service is
 admitted. Source inspection confirmed Music already has metadata browsing,

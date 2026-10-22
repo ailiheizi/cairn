@@ -2890,27 +2890,41 @@ not close a core phase or qualify a release.
 owner's request to plan server/client separation. Client queue clarification
 only; no new kernel, remote-access, media or runtime-extension admission.
 
-**Decision:** Target one Cairn service and one default client containing useful
-Music, Photos and Library applications. Keep the existing repository and easy
-default deployment. Applications may replace full layouts and interaction
+**Decision, clarified by the owner later on 2026-10-22:** Target one Cairn
+service and one shared Web implementation containing useful Music, Photos and
+Library applications. Build the computer/desktop layout first, then reuse that
+frontend in a future desktop wrapper. Keep the existing repository and easy
+default deployment. Both hosts use the same settings definitions and controls;
+local preference values do not thereby become automatically synchronized.
+Applications may replace full layouts and interaction
 hierarchies while the host retains navigation/context, authorized actions and
 one playback session. Original material, Notes/TAG, program-readable ordinary
 lists, discovery and recovery retain their existing shared authority. Local
 view state and transient queues do not become independent durable catalogs.
 
 **Why:** The owner wants specialist-client usability and personal customization
-over the same saved material. One default client makes installation and
+over the same saved material, without maintaining browser and native products
+separately. One default client makes installation and
 cross-application continuity simpler than immediate independent products. A
 server-only product would leave the desired daily experience to other tools.
 Shared capability ownership permits independent UI without competing players,
 search authorities or list databases. Default applications must work before
-users install or configure extensions.
+users install or configure extensions. Standard save, find/takeout, listening
+and photo-view workflows come first; extensions enhance their existing host
+actions and presentation. The browser can show fewer advanced controls by
+default without becoming a deliberately incomplete client. A desktop host adds
+only concrete native capabilities, not a second application implementation.
 
 **Delivery:** Complete F15 Music's browse/listen/queue/save/reopen journey, then
 F14 Photos' find/view/annotate/save/takeout/return journey, reusing F09/F10.
 Extract demonstrated compiled contribution seams inside F16 afterward. F11/F12
 remain planned; AI is not needed to consume saved results. Necessary design,
 refactoring and one complete user journey stay within each feature card.
+
+**Configuration:** Reuse existing persisted operator configuration and typed
+operations. UI/application options share definitions; device/session state
+stays local. An explicit portable preference profile is a possible later F16
+feature, not a reason to add a configuration database or sync engine now.
 
 **Boundaries:** Existing token packs do not execute UI components. A compiled
 trusted contribution is not a sandbox. Independently installable executable
@@ -2923,7 +2937,11 @@ API does not prove a supported remote third-party client profile.
 
 **Evidence:** Source inspection found the existing API, shared host and player,
 compiled shell registry, data-only packages and missing domain-to-list handoff.
-No product code or runtime evidence changed. The attempted configured Opus 5.5
-consultation returned `EMPTY_RESPONSE`, so no model consensus is claimed.
+No product code or runtime evidence changed. After an initial `EMPTY_RESPONSE`,
+the configured Opus 5.5 route returned two nonempty headless discussion turns.
+The follow-up corrected proposals for a duplicate settings table, immediate
+queue unbounding and token-only customization. Root retained the existing
+configuration/read contracts and adopted the owner's Web-first, computer-layout
+direction; route identity is not independent provider/model verification.
 See the [detailed design and functional checklists](../superpowers/specs/2026-10-22-server-client-product-form.md)
 and [current function plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).

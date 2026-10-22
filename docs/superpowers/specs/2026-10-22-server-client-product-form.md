@@ -1,8 +1,9 @@
 # Cairn server, client and application product form
 
 **Date:** 2026-10-22
-**Status:** Proposed detailed design following the owner's direction to plan a
-shared server and client-side applications/extensions. Documentation only;
+**Status:** Proposed detailed design, clarified by the owner on 2026-10-22:
+build one Web client first, reuse it in a future desktop wrapper, and prioritize
+the computer/desktop layout and a few standard workflows. Documentation only;
 existing admissions and core phase gates are unchanged. The functional order
 below updates the current client queue, not the core execution plan.
 
@@ -15,23 +16,33 @@ layouts and interaction patterns. Mature music clients are relevant references
 alongside self-hosted storage products. Delivery must improve a complete user
 activity, with few concepts and extensive reuse.
 
-Choose **one Cairn service, one default client, and replaceable applications
-inside that client**. The default client includes Library, Music and Photos;
+Choose **one Cairn service and one shared Web client, delivered through the
+browser and later a desktop wrapper**. Both use the same application modules,
+settings definitions and user-visible data semantics. The client includes Library, Music and Photos;
 Overview is a composed starting view. Users enter an application directly and
 return without losing their place or ongoing playback. Search, Notes and
 takeout remain reachable on demand. An application's own navigation can occupy
 the whole page; shared state does not require permanent shared toolbars.
 
-Keep one repository and the existing deployment shape initially. Logical
-separation does not require new processes, packages or installations. A future
-independent client can consume the same content contracts once actual external
-access, compatibility and distribution requirements are settled. A local API
-is not evidence that remote authentication, transport or supported third-party
-client compatibility is already delivered.
+Keep one repository and the existing deployment shape initially. Complete the
+computer-sized browser experience before packaging a desktop wrapper. The
+wrapper reuses that frontend and adds only concrete host capabilities; it does
+not establish another product, business-logic implementation or settings UI.
+The browser's default surface can disclose fewer advanced controls while still
+using the same underlying application. Desktop-only actions appear when the
+host actually supplies the relevant capability.
+
+The current UI work targets computer/desktop layouts. Do not open a phone,
+tablet, TV or cross-platform packaging workstream. Choose one representative
+desktop viewport for each feature journey and preserve ordinary keyboard,
+scroll and resize usability; no new responsive-layout matrix is required.
+A future separately authored client is an interoperability possibility, not
+the planned desktop implementation. The local API does not establish remote
+authentication, transport or third-party compatibility guarantees.
 
 | Alternative | Benefit | Cost and decision |
 | --- | --- | --- |
-| Default client containing specialist applications | Consistent install, selection, Notes, playback and original access; deep domain layouts | Requires disciplined shared ownership; selected |
+| Shared Web client with specialist applications, then desktop wrapper | One set of UI, workflows and settings; deep domain layouts plus optional host integration | Native capabilities require a narrow adapter; selected |
 | Separate Music, Photos and Library products immediately | Maximum UI independence | Repeats connection, settings, discovery and integration work; later only for a concrete device/use need |
 | Server only, external clients supply all experience | Smaller first-party UI commitment | Gives up the comfortable default workflow the owner wants; not the product target |
 
@@ -40,7 +51,8 @@ client compatibility is already delivered.
 | Owner | Responsibilities | Reuse boundary |
 | --- | --- | --- |
 | Server | Exact original content, authoritative Notes/TAG/facts, capture, lexical/structured/local semantic discovery, authorized takeout and recovery | Existing daemon, one catalog/repository and typed operations; no music/photo catalog fork |
-| Client host | Connection and command adapter, navigation and shared result/selection context, drafts, original access, one playback session, device preferences | Existing hooks and host actions; no alternate policy or content identity |
+| Shared client host | Connection and command adapter, navigation and shared result/selection context, drafts, original access, one playback session, settings UI | Same Web code in browser/desktop; existing hooks and actions retain authority |
+| Environment adapter | Concrete file selection/download handoff and optional system/media integration | Browser implementation first; desktop supplies capability-specific additions later, without direct catalog access |
 | Application module | Domain browsing, hierarchy, full-page layout, application-specific controls, interpretation of existing saved material | Music/Photos consume host capabilities; route changes preserve host state |
 | Application extension | A bounded contribution such as a viewer layout, now-playing panel or a future lyrics display | Start with trusted compiled components; use actual application needs to define seams |
 
@@ -64,19 +76,76 @@ owning feature. Reusing file storage alone does not implement synchronization,
 conflict resolution or recovery of new meaning. Disabling an application never
 deletes saved originals or ordinary user-authored material.
 
+## Standard workflows and adaptation
+
+Deliver four recognizable workflows before expanding the extension system.
+Music and Photos are currently the incomplete delivery priorities; existing
+save/find/takeout operations supply their common foundation.
+
+| Standard workflow | Default result | Extension opportunity |
+| --- | --- | --- |
+| Save | Select/drop files or enter text → review → confirm save → locate result | Alternative entry or capture UI submits to the same reviewed intake |
+| Find and take out | Search/filter → inspect useful context → select → download/export | Alternative result presentation or detail panel uses the same authorized results/actions |
+| Listen | Browse → play → manage queue → save an explicit selection → reopen/listen | Browse layout, current-track panel or future controls consume the host playback session |
+| View photos | Find → view/exhibit → annotate → save selection/take out → return | Viewer/gallery arrangement consumes the same subject scope and host actions |
+
+Use a desktop page convention rather than cloning one rigid toolbar: stable
+application entry, domain navigation and primary actions, main content, and
+on-demand details/secondary actions. The shared player stays reachable when
+active. Applications and complete layouts may rearrange these regions while
+preserving the workflow and return context.
+
+Each standard journey must complete with optional extensions disabled. Music
+lists and saved photo selections use the same existing v1 material-list save,
+reopen and takeout behavior. This is a condition of the single feature journey,
+not a new independent extension-test matrix.
+
+The initial adaptation conventions are small: the existing typed server
+command boundary; the client host's selected-content and action context; and
+actual environment capabilities for file/media/system integration. Keep
+browser behavior working as the reference implementation. Add an adapter
+operation only when a delivered desktop feature requires it, rather than
+inventing a generic platform SDK or empty method inventory now. A desktop file
+path is not automatically a server-local path or permission to bypass intake.
+
+## One settings system, explicit scope
+
+Both browser and desktop use the same settings definitions, controls, defaults
+and application behavior. Do not build a separate desktop configuration tree.
+The target includes using the same portable UI/application choices in either
+host, but shared code alone does not synchronize independently stored values.
+
+| Setting scope | Meaning and minimal treatment |
+| --- | --- |
+| Instance | The server's configured repository, available processing/search profiles and other existing operator configuration; both clients read/change the same server through existing authorized operations |
+| Portable client preference | Appearance, application layout and normal app options have one definition and the same settings UI; a later explicit shared/importable profile is preferable to an implicit new synchronization engine |
+| Device/session | Window state, output device, local paths, OS shortcuts, credentials and temporary queue remain scoped to the host/session; exclude secrets and machine-local values from portable preference files |
+
+Current appearance preferences live in browser localStorage. A desktop WebView
+normally has a different storage area. No cross-host value synchronization,
+profile export/import or persistent playback session is delivered by this
+design. If selected in F16, define a minimal explicit preference handoff inside
+that feature; do not silently add a settings service, durable schema or live
+sync system. Reusing settings means matching meaning and controls first, with
+value portability reported separately.
+
 ## Extension boundary
 
 The useful long-term capability is replaceable experiences. Runtime execution
 of arbitrary third-party plugins is one possible mechanism, not a prerequisite.
 
 1. **Now:** trusted compiled first-party Music/Photos and complete shells use
-   existing registries. Improve their real flows before extracting packages.
+   existing registries in the shared Web client. Improve their desktop-layout
+   standard flows before extracting packages.
 2. **After both applications:** document the smallest contribution contract
    actually used by both: namespaced identity and host compatibility, route or
    slot ownership, required host capabilities, local settings, activation and
    cleanup, and unavailable/fallback behavior. Reject duplicate registrations;
    retain the host's usable default layout. Do not create a generic service
    graph, new public SDK or marketplace to exercise these examples.
+   One application contribution serves browser and desktop. Environment-specific
+   enhancements declare their concrete host requirement and preserve the base
+   workflow when unavailable; do not maintain browser/desktop copies of it.
 3. **Separate future decision:** independently installable executable UI and
    third-party runtime extensions need a concrete distribution and isolation
    design. Running code in a frontend or compiling it does not make it isolated
@@ -102,6 +171,7 @@ slots. Advanced customization stays out of the ordinary onboarding flow.
 | Fast start and seeking for larger media | Requires an explicit authorized content-read/playback design; changing UI or lifting a number is insufficient |
 | Transcoding or unsupported formats | Requires actual decoding/representation capability; not a frontend plugin claim |
 | Cross-device playback progress, cached offline use | Requires defined persistence/cache and access behavior; not provided by current temporary state |
+| Native file picker, system shortcuts, tray or richer media integration | Possible later desktop-host additions; a wrapper does not automatically provide them, and not every item is selected |
 | OCR, embeddings and retained extraction | Shared server capability profiles; replacing UI does not duplicate these pipelines |
 
 Current music downloads and checks complete originals before playback, with a
@@ -119,9 +189,9 @@ are steps within a useful result. WIP remains one complete feature.
 
 | Position | Existing card | Result and minimum work |
 | --- | --- | --- |
-| Next | F15 Music / AIL-54, reusing F02/F09/F10 | A coherent browse → listen → queue → save selection → reopen/listen workflow in its own page. Integrate the existing list editor, simplify control hierarchy and preserve playback/context. No backend rewrite. |
-| Then | F14 Photos / AIL-49, reusing F02/F09/F10 | Find → continuously view/exhibit → annotate → save selection/take out → return to the same place. Reuse the same list and host flows. |
-| Then | F16 interface choice / AIL-58 | Two meaningfully different compiled layouts using the shared host, plus a contribution example within current admission. Extract only boundaries proven necessary by Music/Photos. |
+| Next | F15 Music / AIL-54, reusing F02/F09/F10 | Deliver the standard listening workflow in the shared Web implementation, computer layout first. Integrate the existing list editor and primary controls while preserving playback/context. |
+| Then | F14 Photos / AIL-49, reusing F02/F09/F10 | Deliver the standard photo workflow on the same shared Web/desktop-layout foundation, reusing list and host flows. |
+| Then | F16 interface choice / AIL-58 | Two meaningful compiled layouts and a small contribution example over the same host/settings. Extract demonstrated boundaries; decide desktop packaging only for a concrete host benefit. |
 | Retained | F11 then F12 | Correct ordinary Skills and reviewable AI organization remain planned; F12's execution/input contract and admission are still unresolved. AI is not required to use saved results. |
 
 F03 retrieval continues to own discovery gaps; a concrete miss blocking the
@@ -198,13 +268,29 @@ keyboard control, ReplayGain and components. Documentation was inspected;
 competitors were not installed or trialled. These references support selected
 experience questions, not copying their entire features or licensing code.
 
-One actual DSH headless consultation used the configured
-`openainext / claude-opus-5-5` route. It returned `EMPTY_RESPONSE`, exit 1, with
-no model advice and no tool events. No Opus endorsement is claimed. Local
-metadata is `dist/client-server-form-20261022/initial-result.json` and the error
-is in `initial-events.jsonl`. The temporary private overlay was removed and
-global Harness settings were unchanged. Decisions here are the root agent's,
-informed by Luna's source inspection and the owner's direction.
+The initial DSH headless consultation returned `EMPTY_RESPONSE`, exit 1. At the
+owner's request, the configured `openainext / claude-opus-5-5` route was retried
+with the clarified Web-first/desktop-layout brief. Both the retry and a
+follow-up challenge completed with exit 0 and nonempty answers, with no tool
+events, in session `session-bb2bbab7-16e8-44bf-a901-ebbe7f9f574e`. This identifies
+the configured route, not an independent verification of the provider's model.
+Records are in `dist/client-server-form-20261022/retry-01/`: `initial-result.json`,
+`followup-result.json` and their response Markdown files. Temporary private
+overlays were removed and global Harness settings were unchanged.
+
+| Consultation point | Root decision after checking current code/contracts |
+| --- | --- |
+| Shared Web implementation, future thin desktop host, computer layout first | Adopt; this matches the owner's clarified intent |
+| Four standard journeys and shared ordinary-list save/reopen/consume | Adopt; optional extensions must not be required for the baseline |
+| Same settings definitions, existing operator config, local preference values initially | Adopt after the follow-up corrected an unnecessary proposal for a new SQLite key/value table |
+| Uncap the queue and add Range streaming immediately | Reject as this batch's work; virtualization alone does not solve resource/read/verification limits. Keep the larger-media successor visible within F15 |
+| Client plugins may register extraction or freely discard derived records | Reject; server processing and retained user/model facts retain their current semantics |
+| Differences are only layout tokens | Corrected in follow-up: reuse code while allowing full layout/interaction alternatives |
+
+The root agent owns these decisions. Luna's read-only inspection confirmed no
+desktop wrapper is currently shipped and localStorage preferences do not
+already synchronize between hosts. No application tests, packaging or runtime
+feature verification were performed during this documentation update.
 
 Review this detailed product shape before implementation. This document does
 not widen ADR-032, remote access, integrated AI or media-streaming admission.

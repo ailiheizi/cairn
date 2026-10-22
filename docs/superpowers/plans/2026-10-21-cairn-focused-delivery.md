@@ -35,7 +35,13 @@ behind its actual Phase 4/5 gates. Dependencies below describe reuse or real
 delivery prerequisites; they do not create extra board blockers.
 
 **Client planning update, 2026-10-22 / WIP 1:** the owner requested a shared
-server with specialist client applications. The detailed
+server with specialist applications built once in the Web client, then reused
+in a future desktop wrapper. The immediate UI target is computer/desktop
+layout. Standard save, find/takeout, listen and photo-view workflows work by
+default; extensions enhance them. Browser and desktop share settings meaning
+and controls, while value synchronization is a separate undelivered concern.
+No parallel native app, mobile adaptation campaign or settings store is added.
+The detailed
 [product-form design](../specs/2026-10-22-server-client-product-form.md) is for
 review; no product implementation is active in this planning batch. The next
 functional candidate is [F15 — AIL-54](#f15): finish the Music browse/listen/
@@ -384,8 +390,12 @@ outside this admitted client batch.
 
 **Finished looks like:** Switch the same content between two complete layouts, find/play/annotate/take out, and return with state intact; example contribution demonstrates structure changes, not only recoloring.
 
-**Delivery position:** After Music and Photos, extract only their demonstrated
-common host/contribution boundaries. Compiled first-party complete layouts and
+**Delivery position:** After Music and Photos in the computer-layout Web client,
+extract only their demonstrated common host/contribution boundaries. Reuse the
+same applications, full-layout choices and settings definitions in a later
+desktop wrapper. Add concrete native capabilities only when a feature needs
+them; do not clone the UI, invent a platform SDK or claim cross-host setting
+values already synchronize. Compiled first-party complete layouts and
 data-only theme packages are different capabilities. Independently installable
 executable UI remains a future design decision, not a shipped F16 subfeature.
 
