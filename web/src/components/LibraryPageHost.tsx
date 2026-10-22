@@ -67,7 +67,7 @@ export type LibraryPageHostProps = {
   onNavigate?: (mode: "content" | LibraryPageMode) => void;
 };
 
-function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
+function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
   return <PhotoLibraryExperience
     {...resultProps}
     onOpenHit={onOpenHit}
@@ -81,6 +81,8 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubjec
     onVisualTextSearch={onVisualTextSearch}
     imageSearchBusy={imageSearchBusy}
     onDownloadOriginals={onDownloadOriginals}
+    onCreateMaterialList={onCreateMaterialList}
+    materialListCreationDisabled={materialListCreationDisabled}
     originalTakeoutBusy={originalTakeoutBusy}
   />;
 }

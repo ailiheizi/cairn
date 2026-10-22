@@ -16,6 +16,8 @@ export type PhotoLibraryExperienceProps = ComponentProps<typeof ResultList> & {
   onVisualTextSearch?: (description: string) => void;
   imageSearchBusy?: boolean;
   onDownloadOriginals?: (subjects: SearchHit[]) => void;
+  onCreateMaterialList?: (subjects: SearchHit[]) => void;
+  materialListCreationDisabled?: boolean;
   originalTakeoutBusy?: boolean;
   loading?: boolean;
   error?: string;

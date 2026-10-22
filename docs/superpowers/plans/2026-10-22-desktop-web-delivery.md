@@ -195,22 +195,22 @@ original row/index mappings or introduce an album store.
 
 ### Steps
 
-- [ ] **S2.1 — Reuse the domain handoff.** Extend Photos' existing props with
+- [x] **S2.1 — Reuse the domain handoff.** Extend Photos' existing props with
   S1's optional list callback/disabled state and thread it from `renderPhotos`.
   The current global list action stays available.
-- [ ] **S2.2 — Make the saved set explicit.** Add one direct save-selection
-  action in the existing photo bulk disclosure. Resolve selected matching
+- [x] **S2.2 — Make the saved set explicit.** Add one direct contextual save-selection
+  action beside View selected photos, outside secondary filter disclosures. Resolve selected matching
   Photos only, show the count and exclude unrelated off-view global selection.
   Do not record temporary filters/viewer position as list membership authority.
-- [ ] **S2.3 — Close save/reopen/takeout.** Reuse the same composer, capture and
+- [x] **S2.3 — Close save/reopen/takeout.** Reuse the same composer, capture and
   Reader as Music. Preserve user-edited list context, unresolved rows and
   existing unique-file takeout behavior. Show the difference between looking
   at a photo rendition and taking out the exact original.
-- [ ] **S2.4 — Refine the computer workflow.** Keep date/tag/format filters and
+- [x] **S2.4 — Refine the computer workflow.** Keep date/tag/format filters and
   main viewing controls easy to reach. Preserve filter, focus, selection and
   unsaved-note guards through viewer/exhibition, Notes/Favorite and takeout.
   Keep missing date, unavailable preview and original fallback understandable.
-- [ ] **S2.5 — Deliver the whole result.** Build the affected client and run
+- [x] **S2.5 — Deliver the whole result.** Build the affected client and run
   one **Photo selection/reopen journey**. Root reviews, records the usable
   result and gap, commits/pushes and updates AIL-49; no unrelated image/model
   or backend regression campaign.
@@ -221,6 +221,22 @@ save and reopen the selected set through the shared Reader, take out originals
 and return to the same filter/focus/selection. Keep an unrelated selection out
 of the saved photo set. Use the existing unavailable-preview/original fallback
 in this journey where applicable. Optional enhancements are disabled.
+
+**S2 delivered locally, 2026-10-22:** the selected matching Photos action
+opens the shared composer directly, outside secondary filter disclosures.
+PNG/name filtering, persisted Notes/Favorite, Exhibition navigation/slideshow,
+one reviewed 959-byte list capture, Reader reopening and exact-original ZIP
+passed on `index-Ci2kVb7W.js` / `index-CyK9lCIg.css`. The list contained only
+Photo-A/B, excluding foreign audio/text selections. Date controls honestly name
+source modification time; this journey did not prove camera capture dates.
+Closing Details through Back to results restored Photo-A keyboard focus with
+filter and selection intact. The initial `.is-current` assertion confused the
+Details subject with browsing focus; source tracing and actual DOM focus
+resolved it without a product patch. Capture was not repeated. A continuation
+driver did repeat the already verified ZIP once; both outputs matched the same
+retained originals and no further takeout was requested. Evidence:
+`dist/photo-s2-20261022/acceptance/journey.log` and screenshots. Root reviewed
+the product diff and browser screenshots. No core phase or release credit.
 
 ## S3 — Complete interface choice over the same application
 
@@ -337,5 +353,6 @@ now do, its real limits, the named journey result and the code commit.
 
 Root decides/reviews; Luna implements; one assigned owner runs the stage's
 journey after integration. This plan authorizes no product code by itself and
-does not alter the core phase gates. The current next task is **S1.1–S1.7 as one
-Music feature delivery**, not a new architecture, platform or test project.
+does not alter the core phase gates. The current remaining admitted task is **S3 complete-interface continuity and
+contribution guidance**. S1 Music and S2 Photos have bounded local delivery
+evidence above; conditional desktop/AI/media successors are not started.

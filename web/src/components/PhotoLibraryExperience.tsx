@@ -13,6 +13,7 @@ import { photoCandidateMime } from "../lib/photoRendition";
 import { matchesPhotoTimelinePeriod, parsePhotoTimelinePeriod, photoTimelineCalendarDate, photoTimelineMonthKey, photoTimelineParts, photoTimelinePeriodValue, type PhotoTimelineBucket } from "../lib/photoTimeline";
 import { capturedModificationTimeMillis } from "../lib/capturedTime";
 import { uniqueSubjectHits } from "../lib/subjectHits";
+import { materialListSelectionEligible } from "../lib/materialListIO";
 import type { SearchHit } from "../lib/types";
 import { formatFacetValue, renderedColumnCount } from "../lib/format";
 import "./PhotoLibraryExperience.css";
@@ -43,7 +44,7 @@ const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_AXIS_RATIO = 1.6;
 
 export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
-  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, imageSearchBusy = false, onDownloadOriginals, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
+  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, imageSearchBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
   const photoTagStatus = favoriteControls?.status ?? "unavailable";
   const [format, setFormat] = useClientBrowseValue("photos", "format", "all");
   const [photoSortValue, setPhotoSort] = useClientBrowseValue<"library" | "filename" | "size" | "modified">("photos", "sort", "library");
@@ -212,6 +213,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }, [locale, periodItems, photoSort, photoSortDirection]);
   const matchingSubjects = useMemo(() => uniqueSubjectHits(visibleItems.map(({ hit }) => hit)), [visibleItems]);
   const selectedMatchingSubjects = useMemo(() => matchingSubjects.filter((hit) => Boolean(hit.subject_ref && selectionRefs.includes(hit.subject_ref))), [matchingSubjects, selectionRefs]);
+  const materialListSelectionValid = materialListSelectionEligible(selectedMatchingSubjects);
   const selectedPhotoItems = useMemo(() => {
     const remaining = new Set(selectedMatchingSubjects.map((hit) => hit.subject_ref).filter((value): value is string => Boolean(value)));
     return visibleItems.filter((item) => {
@@ -948,8 +950,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
           </section>
           {(onSelectSubjects || onDownloadOriginals) && <section className="photo-library__bulk-actions" aria-label={t("Selection and takeout")}>
             <strong>{t("Selection and takeout")}</strong>
-            <button type="button" className="photo-library__review-selected" disabled={!selectedPhotoItems.length} onClick={openSelectedViewer}>{t("View selected photos ({{count}})", { count: selectedPhotoItems.length })}</button>
-            {(onSelectSubjects || onDownloadOriginals) && <details className="photo-takeout">
+            <details className="photo-takeout">
               <summary>{t("Selection actions and original ZIP")}</summary>
               <div className="photo-takeout__body">
                 <p className="photo-takeout__count" role="status">{t("{{selected}} selected in {{matches}} current photo matches", { selected: selectedMatchingSubjects.length, matches: visibleItems.length })}</p>
@@ -966,10 +967,14 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
                 <p className="photo-takeout__note">{t("Selection actions affect only the current photo matches. Other selected items are retained.")}</p>
                 <p className="photo-takeout__note">{t("Select a photo, then Shift-click or Shift+Space another to add the displayed range.")}</p>
               </div>
-            </details>}
+            </details>
           </section>}
         </div>
       </details>
+      {selectedMatchingSubjects.length > 0 && <div className="photo-library__selected-actions" role="group" aria-label={t("Selection in current photo matches")}>
+        <button type="button" className="photo-library__review-selected" disabled={!selectedPhotoItems.length} onClick={openSelectedViewer}>{t("View selected photos ({{count}})", { count: selectedPhotoItems.length })}</button>
+        {onCreateMaterialList && <button type="button" className="photo-library__save-list" disabled={!materialListSelectionValid || materialListCreationDisabled} onClick={() => onCreateMaterialList(selectedMatchingSubjects)}>{t("Save selected photos as list ({{count}})", { count: selectedMatchingSubjects.length })}</button>}
+      </div>}
       {hasLocalPhotoFilters && <div className="photo-library__active-filters">
         <span>{activePhotoFilters}{photoSort === "library" ? "" : ` · ${activeSortLabel} · ${activeSortDirectionLabel}`}</span>
         <button type="button" onClick={clearPhotoFilters}>{t("Clear filters")}</button>

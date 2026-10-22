@@ -19,9 +19,9 @@ The Core MVP Execution Plan still owns core phase order.
 | --- | --- | --- |
 | Existing delivery | F09 / [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Ordinary saved list snapshots, locally delivered |
 | Existing delivery | F10 / [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Saved-list playback and unique takeout, locally delivered |
-| **Next client candidate** | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | Todo; browse/listen/queue/save/reopen over shared host; design for review |
-| Then | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | Backlog; view/annotate/save selection/takeout/return |
-| Then | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | Backlog; derive the smallest compiled seams from Music/Photos |
+| Locally delivered | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | S1 browse/listen/queue/scoped save/reopen delivered locally |
+| Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
+| **Current client delivery** | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 shared-layout continuity and compiled contribution guidance |
 | Retained sequence | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), then F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Skill reuse remains planned; integrated AI still requires its contract/admission |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
@@ -31,7 +31,7 @@ settings UI in a future desktop wrapper. Four default workflows cover save,
 find/takeout, listening and photo viewing; plugins enhance those workflows.
 No separate desktop product or mobile adaptation campaign is planned now.
 The [detailed product-form design](../superpowers/specs/2026-10-22-server-client-product-form.md)
-is for review. This changes client priority, not the core phase order. No new
+records the implemented client direction. This changes client priority, not the core phase order. No new
 architecture/testing issue is added and no runtime plugin or media service is
 admitted. Source inspection confirmed Music already has metadata browsing,
 queue controls and sleep timer. Both Music and Photos already expose list
@@ -41,11 +41,10 @@ domain-scoped list entry, clear reopening and interaction hierarchy.
 Use the [detailed staged todo](../superpowers/plans/2026-10-22-desktop-web-delivery.md)
 for S1–S3 files, ordered implementation steps, actual user outcomes and a
 single whole-feature journey per stage. Desktop packaging and later AI/media
-candidates are conditional. The plan is documentation, not new implementation
-or completion evidence.
+candidates are conditional. The plan records bounded S1/S2 delivery evidence; S3 remains in progress.
 
 AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
-No product implementation is active during this requirements/planning batch.
+S1/S2 client implementation is delivered locally; S3 is the remaining admitted client stage.
 The [superseded complete idea draft](../history/whole-product-planning-draft-20261021.md)
 preserves historical goals; its rows are not another queue. Canceled planning
 cards mean merged or documentation-only, not successful feature completion.
@@ -68,7 +67,7 @@ After the repository review, the owner selected the bounded material/Notes/Skill
 
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
 
-The earlier Photos/Music interaction polish is paused, not complete. Its remaining acceptance and delivery state is preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+The earlier Photos/Music interaction-polish record is historical; current S1/S2 delivery is recorded below. Earlier acceptance and remaining unrelated scope are preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
 
 ## S1 Music delivery — 2026-10-22
 
@@ -93,6 +92,29 @@ Only the affected Web builds and named journey ran. Server schema, processing,
 endpoints, original verification and 32 MiB/1,000 queue limits are unchanged.
 No core phase or release qualification is claimed. Next admitted client work:
 S2 Photos, reusing the same callback, editor/Reader and selection disclosure.
+
+## S2 Photos delivery — 2026-10-22
+
+Implemented and locally validated: **current matching selected Photos → ordinary
+list → reopen/takeout → return**. View selected and Save selected photos as list
+are visible together when photos are selected; secondary filters and global
+selection tools disclose on demand. Foreign audio/text selections stay outside
+the photo list. No second album or selection store was added.
+
+The integrated journey used PNG/name filters, persisted Notes/Favorite,
+Exhibition navigation/slideshow, one reviewed list capture and Reader reopening.
+Taken-out Photo-A/B matched independently retained SHA-256 digests and lengths.
+Back to results restored Photo-A keyboard focus, filter and selection. The
+initial focus assertion inspected the Details highlight instead of browsing
+focus; the actual return path passed without a code change. One continuation
+driver repeated the successful ZIP once; both outputs were verified, while the
+list was captured only once. Date labels report source mtime, not camera dates.
+Evidence: `dist/photo-s2-20261022/acceptance/journey.log` and screenshots;
+current assets `index-Ci2kVb7W.js` / `index-CyK9lCIg.css`.
+
+Root reviewed the source and screenshots. Only the affected Web build and
+named journey ran; no backend, model, schema or recovery change was made.
+The next admitted client stage is S3, not native packaging or integrated AI.
 
 ## ML-2 delivery — use the saved result (2026-10-21)
 

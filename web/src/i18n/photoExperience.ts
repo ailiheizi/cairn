@@ -36,4 +36,5 @@ export const photoExperience: Record<string, string> = {
   "No tags": "没有标签",
   "Details unavailable": "详情不可用",
   "Select a photo, then Shift-click or Shift+Space another to add the displayed range.": "先选择一张照片，再按住 Shift 点击另一张照片，或按 Shift+空格，将显示范围加入选择。",
+  "Save selected photos as list ({{count}})": "将所选照片保存为清单（{{count}}）",
 };
