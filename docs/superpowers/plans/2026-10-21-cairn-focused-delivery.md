@@ -49,8 +49,8 @@ S3 [complete interfaces F16](#f16) also has current layout-continuity evidence
 and a documented compiled contribution example. No successor batch is active. This
 changes client priority, not core phase order or media/runtime admission.
 
-[F11](#f11) and [F12](#f12) remain planned in that relative order; integrated
-AI still needs its necessary contract/admission inside F12. F03 owns concrete
+[F11](#f11) is now locally delivered after the S1–S3 continuation; [F12](#f12)
+remains conditional and needs its necessary contract/admission inside F12. F03 owns concrete
 retrieval gaps. F09/F10 remain delivered local baselines, reused without new
 independent test campaigns. Existing exact-identity and authorization behavior
 stays in place. No additional architecture or plugin-platform issue is created.
@@ -268,16 +268,16 @@ SHA-256 plus logical length; local development evidence is not release proof.
 ### F11 · [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) — Reuse corrected Skills in the next list
 <a id="f11"></a><a id="r04"></a><a id="r03"></a><a id="r07"></a>
 
-**Baseline:** Ordinary Skill text save/select and frozen snapshots work. Corrected-text handoff and examples need a real friction check. **Outcome:** A new list uses corrected guide B while old list A retains guide A.
+**Baseline:** The F11 journey now joins correction, exact old/new snapshots and explicit later guide reuse. The stale selector after editing is fixed; two ordinary method examples are documented. **Outcome:** A new list uses corrected guide B while old list A retains guide A.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | Save/select ordinary Skill text | Usable | Reuse current text capture. |
 | Freeze Skill into a list | Usable | Preserve exact full text. |
-| Merge corrections and hand off | Partial; actual gap to confirm | Add only the shortest missing path. |
-| Ready-to-use method examples | Missing | Offer a few ordinary-text examples if useful. |
+| Merge corrections and hand off | Locally delivered | Edit the existing guide fields, review/save the new list and Skill, explicitly reuse saved B. |
+| Ready-to-use method examples | Documented | Music selection and research reading, usable by copy/paste or ordinary text saving. |
 
-**Reuse and steps:** Start with the former AIL-7 design checklist: inspect existing intake, Notes and list composer; document the concrete obstacle or conclude instructions suffice; only then make the smallest existing-file draft/confirm/select flow. Preserve drafts on cancel, stale selection or read failure.
+**Reuse and steps:** F11 fixed the existing selector rather than adding another instruction model. Editing the guide clears the visible verified-source choice; the original can be explicitly selected again. Ordinary capture saves the corrected guide alongside its result; source and error/retry authority are unchanged. See the [dated delivery evidence](../../technical/product-experience-todo.md#f11-skill-correction-and-reuse-2026-10-22).
 
 **Finished looks like:** Save A, create list A, correct and save B, create a new list with B, reopen both and see their respective frozen text and unchanged originals. If documentation alone solves the issue, do not implement code.
 

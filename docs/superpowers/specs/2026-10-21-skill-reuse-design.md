@@ -1,8 +1,9 @@
-# Single-Guide Reuse and Correction: Design for Review
+# Single-Guide Reuse and Correction
 
-Date: 2026-10-21. Status: proposed client refinement, for owner review.
-Planning and the Linear board are requested; product implementation is not
-started by this document. Existing ML-1/ML-2 meanings remain authoritative.
+Date: 2026-10-21; bounded execution decision updated 2026-10-22 after the
+owner requested the next delivery. The existing ML-1 client is the admitted
+boundary; this document alone adds no scope. Acceptance is recorded in F11
+and the product experience ledger. Existing ML-1/ML-2 meanings remain authoritative.
 
 ## Intent and baseline
 
@@ -37,10 +38,23 @@ Three approaches were considered:
 ## User flow and actual-gap rule
 
 Save instructions A through Notes' existing text-file action and ordinary
-review. Select A while organizing a list, then save list A. Merge the agreed
-correction into text B and save it as a new ordinary file. Explicitly select B
-for a new list. Reopening A still shows A; the new result shows B. Original
-material and its live Notes/Tags are unchanged.
+review, or reuse an already saved ordinary guide. Select A while organizing a
+list, then save list A. For the next material set, choose A and merge the
+agreed correction into the current Skill fields. Existing reviewed capture
+saves both list B and an ordinary Skill B; a separate preparatory B-save step
+is unnecessary. Later explicitly select saved B for another list. Reopening
+list A still shows A; list B shows B. Original material and live Notes/Tags
+remain unchanged. Standalone text saving remains an available alternative.
+
+The 2026-10-22 source audit found one bounded handoff defect: the file selector
+used an uncontrolled `defaultValue`. Editing cleared `guideSource` but left A
+visibly selected, preventing another explicit choice of the same A from firing
+`change`. The refinement derives the selected option from the successfully
+verified source's current candidate identity. Editing clears that option;
+selecting A again reads it normally. A failed read retains the earlier valid
+draft and its verified source, while Retry still targets the failed attempt.
+The selector is presentation state, not another source authority. The feature
+also supplies two plain-text examples through the existing user guide.
 
 Before any product edit, identify a concrete obstacle in that existing flow:
 the exact entry, draft handoff or selection state that prevents completion.
@@ -77,3 +91,13 @@ authorized body reads, provider location and disclosure, budgets, exact input
 bindings, stale/canceled work and candidate confirmation in its own design
 checklist. The former AIL-9 record is merged into that function; necessary
 review/admission remains required before executor implementation.
+
+## Local delivery — 2026-10-22
+
+The bounded F11 refinement passed its whole-feature journey: one reviewed
+list/Skill B capture, exact old/new guide identities on reopening, explicit B
+selection in a later unsaved draft, and unchanged originals/Notes/Tags. The
+selector correction and ordinary examples were reviewed. See the
+[delivery ledger](../../technical/product-experience-todo.md#f11-skill-correction-and-reuse-2026-10-22)
+for current build/evidence and retained limits. This result admits no AI runner
+or automatic refresh and grants no core phase or release credit.

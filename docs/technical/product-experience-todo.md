@@ -22,7 +22,8 @@ The Core MVP Execution Plan still owns core phase order.
 | Locally delivered | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | S1 browse/listen/queue/scoped save/reopen delivered locally |
 | Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
 | Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
-| Retained sequence | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), then F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Skill reuse remains planned; integrated AI still requires its contract/admission |
+| Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
+| Conditional successor | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Integrated AI still requires its own contract/admission |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
 The owner clarified the 2026-10-22 direction: build the Web application once,
@@ -49,13 +50,12 @@ The [superseded complete idea draft](../history/whole-product-planning-draft-202
 preserves historical goals; its rows are not another queue. Canceled planning
 cards mean merged or documentation-only, not successful feature completion.
 
-Read-only source inspection confirms standalone text saving, Skill selection
-and frozen guide capture already exist. The proposed refinement uses one
-ordinary guide with corrections merged into it; it must not rebuild those
-capabilities or introduce a second instruction type. See the
-[design for review](../superpowers/specs/2026-10-21-skill-reuse-design.md).
-If no actual gap remains, document the current combination and move on.
-Design status does not authorize new interfaces, an executor or a current head.
+F11 reused standalone text saving, Skill selection and frozen guide capture.
+Its concrete correction keeps the visible file selection consistent after
+editing, so the same original can be selected again. Two ordinary examples and
+the shortest correction/reuse path are in the [user guide](../wiki/material-lists.md#correct-and-reuse-a-saved-skill).
+See the [bounded design and actual-gap decision](../superpowers/specs/2026-10-21-skill-reuse-design.md).
+No second instruction type, executor or current head was added.
 
 At most one complete feature enters implementation. Each continuation names
 the functional result, existing subfeatures, actual gap and normal-use finish.
@@ -68,6 +68,32 @@ After the repository review, the owner selected the bounded material/Notes/Skill
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
 
 The earlier Photos/Music interaction-polish record is historical; current S1/S2 delivery is recorded below. Earlier acceptance and remaining unrelated scope are preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+
+## F11 Skill correction and reuse — 2026-10-22
+
+Implemented and locally validated: **choose an ordinary guide A → merge a
+correction B → review/save → explicitly reuse saved B next time**, while the
+old result keeps A. The file selector now derives from its verified source;
+editing clears the displayed choice and selecting A again rereads it normally.
+The existing composer saves the new list and ordinary Skill together. The
+[guide](../wiki/material-lists.md#correct-and-reuse-a-saved-skill) supplies music
+and research-reading examples as plain text, not executable modules.
+
+The current-build journey reused the retained ML-1 list/guide and Source-A/B.
+One `plan.apply` captured the new 1,363-byte list B and 311-byte Skill B. Reader
+reopening confirmed old list A still contains exact 174-byte guide A and list B
+contains the distinct exact guide B. A later draft explicitly selected saved B
+and closed without saving. Source identities and live Notes/Tags were unchanged.
+The confirmed capture was retained across a narrow drawer-close driver repair;
+no repeated capture or export occurred. Evidence:
+`dist/skill-reuse-20261022/acceptance/journey.log`, `capture-success.json` and
+screenshots; Web assets `index-DNw40pUM.js` / `index-CyK9lCIg.css`.
+
+Root reviewed the code, examples, log and screenshot. Only the affected Web
+build and the named full journey ran, with no backend rebuild or local-test
+campaign. The temporary daemon stopped. Existing 64 KiB guide and exact-read
+bounds remain; integrated AI, automatic refresh and mutable list heads are not
+delivered. This client result grants no core phase or release qualification.
 
 ## S1 Music delivery — 2026-10-22
 
@@ -136,8 +162,8 @@ Evidence: `dist/client-s3-20261022/acceptance/journey.log`, `journey.json` and
 screenshots. Root reviewed the guide, source, log and screenshot; no new build
 was needed after the documentation-only S3 changes.
 
-S1–S3 are locally delivered. F11 remains a later concrete reuse-friction
-candidate; native packaging, integrated AI and larger media are conditional.
+S1–S3 are locally delivered. The later F11 continuation is recorded above;
+native packaging, integrated AI and larger media remain conditional.
 No core phase or release qualification is claimed.
 
 ## ML-2 delivery — use the saved result (2026-10-21)

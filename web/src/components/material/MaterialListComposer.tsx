@@ -60,6 +60,12 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
     && typeof item.content_id === "string" && /^sha256:[0-9a-f]{64}$/.test(item.content_id)
     && Number.isSafeInteger(item.logical_size) && (item.logical_size as number) >= 0
     && Boolean(item.entry_id?.trim())), [catalogItems]);
+  const selectedGuideEntryID = guideSource
+    ? guideCandidates.find((candidate) => candidate.entry_id === guideSource.entry_id
+      && candidate.content_id === guideSource.content_id
+      && candidate.logical_size === guideSource.logical_size
+      && (!guideSource.subject_ref || candidate.subject_ref === guideSource.subject_ref))?.entry_id ?? ""
+    : "";
   const guideBytes = new TextEncoder().encode(guideBody).byteLength;
   const importBytes = new TextEncoder().encode(importText).byteLength;
 
@@ -315,12 +321,12 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
       <details className="material-list-guide">
         <summary>{t("Organizing Skill (optional)")}</summary>
         <p className="material-list-muted">{t("Choose a saved text file or enter instructions. The complete text is frozen in this list and also saved as an ordinary Skill file.")}</p>
-        <label>{t("Choose a saved .txt or .md file")}<select defaultValue="" disabled={guideLoading || busy} onChange={(event) => { const hit = guideCandidates.find((candidate) => candidate.entry_id === event.target.value); if (hit) chooseGuide(hit); }}><option value="">{t("Choose from loaded files")}</option>{guideCandidates.map((hit) => <option key={`${hit.entry_id}:${hit.content_id}`} value={hit.entry_id}>{hit.name}</option>)}</select></label>
+        <label>{t("Choose a saved .txt or .md file")}<select value={selectedGuideEntryID} disabled={guideLoading || busy} onChange={(event) => { const hit = guideCandidates.find((candidate) => candidate.entry_id === event.target.value); if (hit) chooseGuide(hit); }}><option value="" disabled>{t("Choose from loaded files")}</option>{guideCandidates.map((hit) => <option key={`${hit.entry_id}:${hit.content_id}`} value={hit.entry_id}>{hit.name}</option>)}</select></label>
         {guideLoading && <p role="status">{t("Reading and checking the selected Skill…")}</p>}
         {guideError && <div className="material-list-error" role="alert"><p>{guideError}</p>{guideHit && <button type="button" className="text-button" onClick={() => chooseGuide(guideHit)} disabled={guideLoading}>{t("Retry reading selected Skill")}</button>}</div>}
         <label>{t("Skill name")}<input value={guideName} onChange={(event) => { setGuideName(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
         <label>{t("Skill instructions")}<textarea value={guideBody} onChange={(event) => { setGuideBody(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
-        <small>{t("Skill text size: {{bytes}} / {{limit}} UTF-8 bytes.", { bytes: guideBytes, limit: MATERIAL_LIST_LIMITS.guideBytes })} {t("Editing clears the selected file identity.")}</small>
+        <small>{t("Skill text size: {{bytes}} / {{limit}} UTF-8 bytes.", { bytes: guideBytes, limit: MATERIAL_LIST_LIMITS.guideBytes })} {t("Saving revised instructions creates a new Skill file; earlier lists keep their original instructions.")}</small>
         {(guideBody || guideName || guideSource) && <button type="button" className="text-button" onClick={() => { setGuideBody(""); setGuideName(""); setGuideSource(undefined); setGuideHit(undefined); }}>{t("Remove instructions")}</button>}
       </details>
       <details className="material-list-import">

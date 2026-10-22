@@ -49,7 +49,7 @@ export const materialList: Record<string, string> = {
   "Skill instructions": "Skill 说明",
   "Skill name": "Skill 名称",
   "Skill text size: {{bytes}} / {{limit}} UTF-8 bytes.": "Skill 文本大小：{{bytes}} / {{limit}} UTF-8 字节。",
-  "Editing clears the selected file identity.": "编辑内容会清除所选文件的身份引用。",
+  "Saving revised instructions creates a new Skill file; earlier lists keep their original instructions.": "修订后的说明会在确认保存后另存为 Skill 文件；旧清单保留原说明。",
   "Imported JSON size: {{bytes}} / {{limit}} UTF-8 bytes.": "导入的 JSON 大小：{{bytes}} / {{limit}} UTF-8 字节。",
   "Tags as context": "作为上下文的标签",
   "The imported result is invalid.": "导入的结果无效。",

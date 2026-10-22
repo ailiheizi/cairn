@@ -27,6 +27,31 @@ Cairn does not contact a model, configure credentials or run the Skill itself
 in this first delivery. **Download JSON** can also hand the prepared result to
 another program without saving it in Cairn.
 
+### Correct and reuse a saved Skill
+
+A saved list and its Skill are snapshots. To correct instructions for new
+material, start a new list from the newly selected files, then choose the saved
+Skill text you want to revise. Edit its name or instructions in the current
+fields; editing clears the selected file identity, so the corrected text is a
+new Skill snapshot. Review the complete list and instructions, then save through
+the ordinary Add review and capture flow. The result is a new list (B) and,
+when instructions are present, a new ordinary `.skill.txt` capture (Skill B).
+The original list (A) and its embedded Skill remain unchanged.
+
+For a later list, refresh/load the catalog if needed and explicitly choose the
+saved Skill B. Cairn does not select a same-named file as “latest,” refresh a
+saved list's instructions, or replace an older snapshot automatically. Choose
+the exact saved text you intend to use.
+
+These plain-text examples can be copied into **Skill instructions** or saved
+through ordinary text intake, then selected from the loaded catalog:
+
+- [Music selection Skill](examples/music-selection-skill.md)
+- [Research reading Skill](examples/research-reading-skill.md)
+
+They are instructions for an explicitly chosen external AI handoff, not
+executable Skills or automatic tag/list updates.
+
 ## Reopen and use
 
 Find the saved `.cairn-list.json` file, open Details and choose **Open saved

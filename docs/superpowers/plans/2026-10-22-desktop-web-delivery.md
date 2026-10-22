@@ -373,6 +373,7 @@ now do, its real limits, the named journey result and the code commit.
 Root decides/reviews; Luna implements; one assigned owner runs the stage's
 journey after integration. This plan authorizes no product code by itself and
 does not alter the core phase gates. The selected **S1–S3 client batch is locally delivered** with evidence above.
-No next implementation batch is active. F11 remains the next reuse-friction
-candidate; integrated AI, desktop packaging and larger media retain their
-separate contracts and are not automatically started.
+No next implementation batch is active. The later F11 correction/reuse
+continuation is recorded in the [product ledger](../../technical/product-experience-todo.md#f11-skill-correction-and-reuse-2026-10-22).
+Integrated AI, desktop packaging and larger media retain their separate
+contracts and are not automatically started.
