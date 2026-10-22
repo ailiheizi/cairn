@@ -1,5 +1,5 @@
 import { AlertCircle, ArrowDown, ArrowUp, Calendar, Check, ChevronRight, Download as DownloadIcon, Folder, HardDrive, Home, Image, LayoutGrid, Hash, List as ListIcon, Music2, Plus, RefreshCw, Server, ShieldCheck, Sparkles, Tag, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import type { Locale, Translator } from "../i18n";
 import { ResultList } from "./ResultList";
@@ -94,11 +94,15 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
 }) {
   const [retrievalOpen, setRetrievalOpen] = useState(false);
   const selectionActionsRef = useRef<HTMLDivElement | null>(null);
+  const selectionActionsDisclosureRef = useRef<HTMLDetailsElement | null>(null);
   function showSelectionActions() {
     const target = selectionActionsRef.current;
     if (!target) return;
-    target.scrollIntoView({ block: "center" });
-    requestAnimationFrame(() => target.focus({ preventScroll: true }));
+    if (selectionActionsDisclosureRef.current) selectionActionsDisclosureRef.current.open = true;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "center" });
+      target.focus({ preventScroll: true });
+    });
   }
   const { hits, libraryItems, scopeFacetItems, scopeMonthFilteredItems, scopeTimelineItems, activeTags, activeSystemFacets, activeTimelineMonth, browseRoots, browseRootID, browseCrumbs, tagFacets, systemFacets, renderedHits, identityCounts, tagsBySubject } = library;
   const keywordPageApplied = keywordBrowse ? ["more", "loading-more", "complete", "more-error", "stale"].includes(keywordBrowse.phase) : false;
@@ -129,6 +133,15 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const isMusicView = pageDefinition?.mediaClass === "audio";
   const domainOwnsSelection = presentationMode === "photos" || presentationMode === "music";
   const isMediaView = Boolean(pageDefinition);
+  const wasMediaViewRef = useRef(isMediaView);
+  useLayoutEffect(() => {
+    const disclosure = selectionActionsDisclosureRef.current;
+    const enteredMediaView = !wasMediaViewRef.current && isMediaView;
+    wasMediaViewRef.current = isMediaView;
+    if (!disclosure) return;
+    if (!isMediaView || selection.tagMutationProgress) disclosure.open = true;
+    else if (enteredMediaView) disclosure.open = false;
+  }, [isMediaView, selection.tagMutationProgress]);
   const showLibraryViewSwitch = viewMode === "path" ? hits.length > 0 : library.libraryLoaded && libraryItems.length > 0 && (isMediaView || viewMode === "content" || viewMode === "search" || viewMode === "tag");
   const scopeCount = library.scopeHits.length;
   const photoScopeCount = mediaContentItems(library.scopeHits, "image").length;
@@ -465,8 +478,26 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
       <div className="first-use-actions"><button type="button" className="secondary-button compact" onClick={onFocusSearch}>{t("Search the library")}</button><button type="button" className="secondary-button compact" onClick={() => onOpenHit(firstSavedFile)}>{t("Open {{name}}", { name: firstSavedFile.name || t("saved file") })}</button></div>
     </details>}
     {viewMode === "sources" ? <SourcesSurface t={t} locale={locale} sources={sources.sources} staging={sources.staging} stagingBusy={sources.stagingBusy} sourceProjection={sources.sourceProjection} sourceChanges={sources.sourceChanges} busy={busy} coreStorageReady={coreStorageReady} isConnected={isConnected} onViewSource={onViewSource} onRecheckSource={onRecheckSource} onOpenAdd={onOpenAdd} onIngestStaged={() => sources.ingestStaged()} onCleanStaged={() => void sources.cleanStaged()} /> : renderedHits.length || isMediaView || selection.tagMutationProgress ? <>
-      {hiddenSelectionCount > 0 && <p className="library-selection-scope" role="status">{t("{{count}} selected items are outside this display. Batch actions still include them.", { count: hiddenSelectionCount })}</p>}
-      {(selection.selectionRefs.length > 0 || selection.tagMutationProgress) && <div ref={selectionActionsRef} className="selection-actions-focus-target" role="group" tabIndex={-1} aria-label={t("Selection actions")}><SelectionBar count={selection.selectionSubjects.length} subjects={selection.selectionSubjects} unresolvedCount={selection.selectionRefs.length - selection.selectionSubjects.length} workspaceID={workspaceID} locale={locale} viewMode={viewMode} query={lastExecutedQuery} tagDraft={selection.selectionTagDraft} tagActionsReady={selection.tagActionsReady} tagActionsUnavailableMessage={selection.tagActionsUnavailableMessage} tagMatchCount={selection.selectionTagMatchCount} favoriteMatchCount={selection.selectionTagMatchCount(FAVORITE_TAG)} busy={busy} originalTakeoutBusy={originalTakeoutBusy} t={t} onSelectAll={domainOwnsSelection ? undefined : selection.selectAllVisible} onInvertSelection={domainOwnsSelection ? undefined : selection.invertVisibleSelection} onExport={(trigger) => onOpenExport(trigger, selection.selectionSubjects)} onDownloadOriginals={onDownloadOriginals} onCreateMaterialList={onCreateMaterialList} materialListCreationDisabled={materialListCreationDisabled} onTagDraft={selection.setSelectionTagDraft} onApplyTag={() => void selection.applySelectionTag()} tagQueue={selection.selectionTagQueue} tagQueueDraft={selection.selectionTagQueueDraft} onTagQueueDraft={selection.setSelectionTagQueueDraft} onAddQueuedTag={selection.addSelectionTagToQueue} onRemoveQueuedTag={selection.removeQueuedSelectionTag} onClearQueuedTags={selection.clearQueuedSelectionTags} onApplyQueuedTags={() => void selection.applySelectionTagQueue()} onRemoveTag={() => void selection.removeSelectionTag()} onAddFavorite={() => void selection.addSelectionFavorite()} onRemoveFavorite={() => void selection.removeSelectionFavorite()} onClear={selection.clearSelection} onImageSearch={onImageSearch} tagMutationProgress={selection.tagMutationProgress} onStopTagMutation={selection.stopSelectionTagMutation} onRefreshTagState={() => void selection.refreshSelectionTagState()} /></div>}
+      {!isMediaView && hiddenSelectionCount > 0 && <p className="library-selection-scope" role="status">{t("{{count}} selected items are outside this display. Batch actions still include them.", { count: hiddenSelectionCount })}</p>}
+      {(selection.selectionRefs.length > 0 || selection.tagMutationProgress) && <details
+        ref={selectionActionsDisclosureRef}
+        className={`selection-actions-disclosure${isMediaView ? " is-media" : ""}`}
+        open={!isMediaView || Boolean(selection.tagMutationProgress) || undefined}
+        onToggle={() => {
+          if (selection.tagMutationProgress && !selectionActionsDisclosureRef.current?.open) {
+            requestAnimationFrame(() => { if (selectionActionsDisclosureRef.current) selectionActionsDisclosureRef.current.open = true; });
+          }
+        }}
+      >
+        <summary className={isMediaView ? undefined : "is-hidden"}>
+          {isMediaView && <>
+            <strong>{t("Selection actions ({{count}})", { count: selection.selectionRefs.length })}</strong>
+            {hiddenSelectionCount > 0 && <small>{t("{{hidden}} of {{selected}} selected items are outside this display; expanded actions apply to all.", { hidden: hiddenSelectionCount, selected: selection.selectionRefs.length })}</small>}
+            {selection.selectionRefs.length > selection.selectionSubjects.length && <small>{t("{{count}} selected items are unresolved.", { count: selection.selectionRefs.length - selection.selectionSubjects.length })}</small>}
+          </>}
+        </summary>
+        <div ref={selectionActionsRef} className="selection-actions-focus-target" role="group" tabIndex={-1} aria-label={t("Selection actions")}><SelectionBar count={selection.selectionSubjects.length} subjects={selection.selectionSubjects} unresolvedCount={selection.selectionRefs.length - selection.selectionSubjects.length} workspaceID={workspaceID} locale={locale} viewMode={viewMode} query={lastExecutedQuery} tagDraft={selection.selectionTagDraft} tagActionsReady={selection.tagActionsReady} tagActionsUnavailableMessage={selection.tagActionsUnavailableMessage} tagMatchCount={selection.selectionTagMatchCount} favoriteMatchCount={selection.selectionTagMatchCount(FAVORITE_TAG)} busy={busy} originalTakeoutBusy={originalTakeoutBusy} t={t} onSelectAll={domainOwnsSelection ? undefined : selection.selectAllVisible} onInvertSelection={domainOwnsSelection ? undefined : selection.invertVisibleSelection} onExport={(trigger) => onOpenExport(trigger, selection.selectionSubjects)} onDownloadOriginals={onDownloadOriginals} onCreateMaterialList={onCreateMaterialList} materialListCreationDisabled={materialListCreationDisabled} onTagDraft={selection.setSelectionTagDraft} onApplyTag={() => void selection.applySelectionTag()} tagQueue={selection.selectionTagQueue} tagQueueDraft={selection.selectionTagQueueDraft} onTagQueueDraft={selection.setSelectionTagQueueDraft} onAddQueuedTag={selection.addSelectionTagToQueue} onRemoveQueuedTag={selection.removeQueuedSelectionTag} onClearQueuedTags={selection.clearQueuedSelectionTags} onApplyQueuedTags={() => void selection.applySelectionTagQueue()} onRemoveTag={() => void selection.removeSelectionTag()} onAddFavorite={() => void selection.addSelectionFavorite()} onRemoveFavorite={() => void selection.removeSelectionFavorite()} onClear={selection.clearSelection} onImageSearch={onImageSearch} tagMutationProgress={selection.tagMutationProgress} onStopTagMutation={selection.stopSelectionTagMutation} onRefreshTagState={() => void selection.refreshSelectionTagState()} /></div>
+      </details>}
       {isMediaView ? <LibraryPageHost
         mode={presentationMode} enabledPageIds={enabledViews} resultProps={resultProps}
         onOpenHit={onOpenHit} focusedSubjectRef={focusedSubjectRef} onFocusSubject={onFocusSubject}
@@ -479,6 +510,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
         imageSearchBusy={busy}
         onDownloadOriginals={onDownloadOriginals}
         originalTakeoutBusy={originalTakeoutBusy}
+        onCreateMaterialList={onCreateMaterialList}
+        materialListCreationDisabled={materialListCreationDisabled || busy}
         onReturnToWall={() => onLibraryView(returnToPhotoWall ? "photos" : "content")}
         onNavigate={onLibraryView}
         returnLabel={exhibitionReturnLabel}

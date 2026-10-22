@@ -116,38 +116,38 @@ list Reader. Changing application does not restart the player.
 
 ### Steps
 
-- [ ] **S1.1 — Establish the first screen.** Keep existing browse modes and real
+- [x] **S1.1 — Establish the first screen.** Keep existing browse modes and real
   metadata/filename fallback. Make browsing, play/current track and queue easy
   to find; put selection management and original takeout in the existing
   disclosure. Reuse current controls rather than rebuilding facts or playback.
-- [ ] **S1.2 — Define exact action scope.** Use existing `selectedDisplayedHits`
+- [x] **S1.2 — Define exact action scope.** Use existing `selectedDisplayedHits`
   for selected visible tracks and `displayedTrackHits` for the current displayed
   set. Show which set/count an action uses. Keep off-view global selection out
   of a domain-scoped action and leave the global SelectionBar's existing
   broader semantics visible.
-- [ ] **S1.3 — Connect the domain entry.** Add optional
+- [x] **S1.3 — Connect the domain entry.** Add optional
   `onCreateMaterialList?: (subjects: SearchHit[]) => void` and
   `materialListCreationDisabled?: boolean` to the existing media host/Music
   props; thread the already-existing callback and disabled state from
   `LibrarySurface`. Reuse the `main.tsx` callback binding; no new command.
   Enable the domain action only under the same existing content/composer
   readiness and size/count restrictions as ordinary list creation.
-- [ ] **S1.4 — Finish save and review.** Open the current composer with that
+- [x] **S1.4 — Finish save and review.** Open the current composer with that
   explicit set. Preserve its name, order, optional copied context/Skill and
   review/save behavior. Report confirmed capture separately from an open draft
   or staged upload. A selected set is not a serialization of the repeated live
   queue; any user-edited snapshot repetitions retain existing ML-1 semantics.
-- [ ] **S1.5 — Finish reopening.** Make the existing Library → saved ordinary
+- [x] **S1.5 — Finish reopening.** Make the existing Library → saved ordinary
   file → Details Reader route understandable from Music and after successful
   capture. Reuse current navigation and visible saved content; do not create a
   new global playlist registry, silently search beyond loaded scope, or add a
   second Reader. Its play/append/takeout remain existing ML-2 host actions.
-- [ ] **S1.6 — Integrate continuity and useful exits.** Preserve the current
+- [x] **S1.6 — Integrate continuity and useful exits.** Preserve the current
   player through Photos/Overview/Library navigation. Keep queue limits,
   unresolved-member behavior and original-takeout options for unsupported or
   oversized audio. Fix actual entry/focus/continuity gaps exposed by the full
   journey; do not rewrite shared state solely to introduce abstractions.
-- [ ] **S1.7 — Deliver the whole result.** Build the affected Web client with
+- [x] **S1.7 — Deliver the whole result.** Build the affected Web client with
   `npm --prefix web run build`, then run the single named **Music save/reopen
   journey** below. Reuse existing local deployment and browser helpers; diagnose
   failures locally. Root reviews the diff, records what works and what remains,
@@ -162,6 +162,19 @@ with current source/position/queue intact. In that same journey retain visible
 unsupported/oversized fallback and unresolved-list behavior where exercised.
 Compare taken-out originals with the retained inputs. Optional enhancements
 are disabled; no native wrapper is needed.
+
+**S1 delivered locally, 2026-10-22:** the whole Music journey and the
+current-build no-save continuation passed. Domain save excludes off-view
+selection; a single selected track opens a one-track composer. The one captured
+734-byte list (`sha256:0c9462a51487ac6789b87cdd4960dbe555aae2e54f02ce7c4b3127a71d19f8b5`)
+reopened and appended its two audio members after a four-occurrence queue.
+Original ZIP bytes matched both retained MP3s. After the media-disclosure
+refinement, capture and ZIP evidence were reused; no second mutation was made.
+The final build preserved the same six occurrences, source and paused 3.48s
+position across Photos/Overview/Library. Evidence:
+`dist/music-s1-20261022/acceptance/journey.log` and screenshots; final assets
+`index-x-TRTQk6.js` / `index--HXH7Y6U.css`. Root reviewed the diff. This is the
+bounded local workflow, not streaming or release qualification.
 
 ## S2 — Photos: find, view, save a selection and return
 

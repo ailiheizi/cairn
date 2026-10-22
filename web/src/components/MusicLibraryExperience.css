@@ -13,7 +13,7 @@
 }
 
 /* Heading */
-.music-library-heading { display: flex; align-items: center; gap: .75rem; }
+.music-library-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
 .music-library-heading__copy { min-width: 0; }
 .music-library-heading__copy h1 { margin: 0; color: var(--ink); font-size: clamp(1.4rem, 2.6vw, 1.95rem); letter-spacing: -.03em; line-height: 1.1; }
 .music-library-heading__copy p { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .6rem; margin: .15rem 0 0; color: var(--muted); font-size: .8rem; }
@@ -160,6 +160,11 @@
    controls in view while secondary browse controls stay one disclosure away. */
 .music-library { gap: .55rem; }
 .music-library-heading__copy h1 { font-size: clamp(1.55rem, 2.2vw, 2rem); }
+.music-library-heading__saved-lists { min-height: 2.4rem; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: .6rem; color: var(--accent); background: var(--surface); font: inherit; font-size: .8rem; font-weight: 650; cursor: pointer; }
+.music-library-heading__saved-lists:hover { border-color: var(--accent); background: var(--accent-soft); }
+.music-queue-actions .music-save-list { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+.music-queue-actions .music-save-list:hover:not(:disabled) { background: var(--accent-soft); }
+.music-list-scope-note { color: var(--muted); font-size: .75rem; line-height: 1.4; }
 .music-library-heading__count { margin: .16rem 0 0; font-size: .75rem; font-weight: 600; }
 .music-library__toolbar { gap: .45rem; }
 .music-browse-modes button { min-height: 2.45rem; }

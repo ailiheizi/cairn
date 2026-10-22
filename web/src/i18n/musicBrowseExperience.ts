@@ -1,6 +1,10 @@
 export const musicBrowseExperience: Record<string, string> = {
   "Playback downloads and verifies the complete original first. It supports common browser audio formats up to 32 MiB; seeking starts after verification. Larger or unavailable files can still be downloaded from Details.": "播放前会下载并校验完整原件。支持浏览器可解码的常见音频格式，大小上限为 32 MiB；校验完成后可以跳转播放。更大或无法播放的文件仍可从详情下载。",
   "Browse music": "浏览音乐", "Tracks": "曲目", "Artists": "艺术家", "Albums": "专辑",
+  "Find saved lists in Library": "在资料库中查找已保存的清单",
+  "Save selected tracks as list ({{count}})": "将所选曲目保存为清单（{{count}}）",
+  "Save displayed tracks as list ({{count}})": "将当前显示曲目保存为清单（{{count}}）",
+  "Lists use selected or displayed tracks only, up to 200; off-view selections and repeated queue entries are excluded.": "清单仅使用当前所选或显示的曲目，最多 200 项；其他视图的选择和队列重复项不包含在内。",
   "Refresh music facts": "刷新音乐信息",
   "Search music": "搜索音乐", "Search track names and recorded facts": "搜索曲目名称和已记录信息",
   "Filter music in this view": "筛选当前音乐",

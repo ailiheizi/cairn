@@ -4,6 +4,7 @@ import { useBrowsePosition } from "../app/useBrowsePosition";
 import { Music2, Search, Shuffle } from "lucide-react";
 import type { AudioTrack } from "../lib/audioPlayback";
 import { mediaClassFromSuffix } from "../lib/format";
+import { materialListSelectionEligible } from "../lib/materialListIO";
 import { musicGroupKey, musicPlaybackEligibility, orderRecordedAlbumTracks, playableMusicTrack, sortMusicRows, type MusicSortDirection, type MusicSortField, type MusicTrackFacts } from "../lib/musicMetadata";
 import { GroupList, TrackRow } from "./music/MusicRows";
 import { buildGroups, filenameFormatToken, groupDurationSummary, matchesCurrentPlayback, musicRowSelectionKey, NO_FILENAME_EXTENSION, playbackStatusText, shuffleTracks, uniqueMusicHits, type MusicLibraryProps as Props, type MusicRow } from "./music/musicHelpers";
@@ -159,6 +160,8 @@ export function MusicLibraryExperience(props: Props) {
   const selectionOutsideDisplayedCount = props.selectionRefs.filter((subjectRef) => !displayedRefs.has(subjectRef)).length;
   const displayedTrackHits = useMemo(() => uniqueMusicHits(trackRows.map((row) => row.hit)), [trackRows]);
   const selectedDisplayedHits = useMemo(() => uniqueMusicHits(selectedDisplayedRows.map((row) => row.hit)), [selectedDisplayedRows]);
+  const materialListSubjects = selectedDisplayedHits.length ? selectedDisplayedHits : displayedTrackHits;
+  const materialListSelectionValid = materialListSelectionEligible(materialListSubjects);
   const showingTrackRows = mode === "tracks" || Boolean(mode === "albums" && selectedGroup) || Boolean(mode === "artists" && selectedGroup && (selectedArtistAlbum || artistTracksView));
   const currentPlayback = props.queueControls?.currentPlayback;
   const browseScopeIdentity = useBrowsePositionScopeIdentity();
@@ -385,6 +388,7 @@ export function MusicLibraryExperience(props: Props) {
         <h1>{t("Music")}</h1>
         {!groupFactsPending && <p className="music-library-heading__count">{t("{{count}} tracks in this view", { count: artistAlbumLanding ? artistTrackRows.length : trackRows.length })}</p>}
       </div>
+      {props.onNavigate && <button type="button" className="music-library-heading__saved-lists" onClick={() => props.onNavigate?.("content")}>{t("Find saved lists in Library")}</button>}
     </header>
     <div className="music-library__toolbar">
       <nav className="music-browse-modes" aria-label={t("Browse music")}>
@@ -419,9 +423,13 @@ export function MusicLibraryExperience(props: Props) {
           </fieldset> : <p>{t("No tags are available in the loaded music view.")}</p> : null}
           <button type="button" disabled={!selectedTagFilters.length && !onlySelectedTracks} onClick={() => { setSelectedTagFilters([]); setOnlySelectedTracks(false); }}>{t("Clear tag and selection filters")}</button>
           {props.metadata?.reload && <button type="button" className="music-refresh-facts" disabled={props.metadata.status === "loading"} onClick={props.metadata.reload}>{t("Refresh music facts")}</button>}
-          {showingTrackRows && (props.onSelectSubjects || props.onDownloadOriginals) && <details className="music-scope-actions">
+          {showingTrackRows && (props.onSelectSubjects || props.onDownloadOriginals || props.onCreateMaterialList) && <details className="music-scope-actions">
             <summary>{t("Selection and original takeout")}</summary>
             <div className="music-scope-actions__menu">
+              {props.onCreateMaterialList && <>
+                <button type="button" disabled={!selectedDisplayedHits.length || !materialListSelectionValid || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(selectedDisplayedHits)}>{t("Save selected tracks as list ({{count}})", { count: selectedDisplayedHits.length })}</button>
+                <button type="button" disabled={!materialListSelectionEligible(displayedTrackHits) || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(displayedTrackHits)}>{t("Save displayed tracks as list ({{count}})", { count: displayedTrackHits.length })}</button>
+              </>}
               {props.onSelectSubjects && <>
                 <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "add")}>{t("Select current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
                 <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "invert")}>{t("Invert selection in current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
@@ -487,6 +495,8 @@ export function MusicLibraryExperience(props: Props) {
           <button className="music-play-displayed" type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(displayedPlayable)}>{t("Play these tracks ({{count}})", { count: displayedPlayable.length })}</button>
           <button type="button" disabled={!props.onPlayTracks} onClick={() => randomize(displayedPlayable)}><Shuffle aria-hidden="true" /> {t("Shuffle these tracks ({{count}})", { count: displayedPlayable.length })}</button>
         </>}
+        {props.onCreateMaterialList && <button className="music-save-list" type="button" disabled={!materialListSelectionValid || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(materialListSubjects)}>{t(selectedDisplayedHits.length ? "Save selected tracks as list ({{count}})" : "Save displayed tracks as list ({{count}})", { count: materialListSubjects.length })}</button>}
+        {props.onCreateMaterialList && <small className="music-list-scope-note">{t("Lists use selected or displayed tracks only, up to 200; off-view selections and repeated queue entries are excluded.")}</small>}
       </div>}
       <div className="music-queue-secondary">
         {displayedPlayable.length > 0 && <details className="music-displayed-actions">

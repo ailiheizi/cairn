@@ -54,6 +54,8 @@ export type LibraryPageHostProps = {
   imageSearchBusy?: boolean;
   onDownloadOriginals?: (subjects: SearchHit[]) => void;
   originalTakeoutBusy?: boolean;
+  onCreateMaterialList?: (subjects: SearchHit[]) => void;
+  materialListCreationDisabled?: boolean;
   musicMetadata?: MusicMetadataState;
   favoriteControls?: FavoriteControls;
   musicQueueControls?: MusicQueueControls;
@@ -83,7 +85,7 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubjec
   />;
 }
 
-function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy }: LibraryPageHostProps) {
+function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
   return <MusicLibraryExperience
     {...resultProps}
     onPlayTrack={onPlayTrack ?? (() => undefined)}
@@ -93,6 +95,9 @@ function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, mus
     favoriteControls={favoriteControls}
     queueControls={musicQueueControls}
     onSelectSubjects={onSelectSubjects}
+    onCreateMaterialList={onCreateMaterialList}
+    materialListCreationDisabled={materialListCreationDisabled}
+    onNavigate={onNavigate}
     onDownloadOriginals={onDownloadOriginals}
     originalTakeoutBusy={originalTakeoutBusy}
   />;

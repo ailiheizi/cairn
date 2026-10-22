@@ -70,6 +70,30 @@ The broader product direction remains reuse of ordinary stored material—origin
 
 The earlier Photos/Music interaction polish is paused, not complete. Its remaining acceptance and delivery state is preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
 
+## S1 Music delivery — 2026-10-22
+
+Implemented and locally validated: **displayed/selected Music tracks → ordinary
+list → reopen/use**, retaining the single player across navigation. Music now
+has scoped save actions and a clear route back to the existing Library/Reader.
+Global selection tools in media pages disclose on demand; their count and
+scope remain visible, and existing programmatic selection actions still open
+and focus them. Ordinary Library actions remain expanded.
+
+The integrated journey observed real audio title/artist/album facts, verified
+playback, a repeated/reordered four-entry queue, one reviewed list capture,
+Reader append to six entries and exact original ZIP takeout. The final-build
+continuation additionally opened a composer containing only Track A despite
+foreign selections, closed without saving, and retained source/position/queue
+through Photos/Overview/Library. Prior successful capture/ZIP results were
+reused after the layout refinement. Driver role/text corrections did not repeat
+confirmed mutations. Evidence: `dist/music-s1-20261022/acceptance/journey.log`
+and `screenshots/`; the isolated daemon stopped cleanly.
+
+Only the affected Web builds and named journey ran. Server schema, processing,
+endpoints, original verification and 32 MiB/1,000 queue limits are unchanged.
+No core phase or release qualification is claimed. Next admitted client work:
+S2 Photos, reusing the same callback, editor/Reader and selection disclosure.
+
 ## ML-2 delivery — use the saved result (2026-10-21)
 
 Implemented and locally validated: **open a saved list → listen or take out its files**.

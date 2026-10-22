@@ -4,7 +4,7 @@ import type { AudioTrack } from "../../lib/audioPlayback";
 import { playableMusicTrack, type MusicMetadataState, type MusicTrackFacts } from "../../lib/musicMetadata";
 import type { MusicCurrentPlayback, MusicQueueControls } from "../../lib/musicQueueControls";
 import type { FavoriteControls } from "../../lib/favorites";
-import type { SearchHit } from "../../lib/types";
+import type { LibraryPageMode, SearchHit } from "../../lib/types";
 import { uniqueSubjectHits } from "../../lib/subjectHits";
 
 type ResultListProps = ComponentProps<typeof ResultList>;
@@ -13,6 +13,9 @@ export type MusicLibraryProps = Pick<ResultListProps, "hits" | "libraryListRef" 
   onQueueTrack: (track: AudioTrack) => void;
   onPlayTracks?: (tracks: AudioTrack[]) => void;
   onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove" | "invert") => void;
+  onCreateMaterialList?: (subjects: SearchHit[]) => void;
+  materialListCreationDisabled?: boolean;
+  onNavigate?: (mode: "content" | LibraryPageMode) => void;
   onDownloadOriginals?: (subjects: SearchHit[]) => void;
   originalTakeoutBusy?: boolean;
   metadata?: MusicMetadataState;

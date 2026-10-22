@@ -3,6 +3,14 @@
  * focused Photos/Music/Exhibition header, SelectionBar and ResultList keep
  * their existing styles. Light and dark mode use the shared tokens. */
 
+.selection-actions-disclosure.is-media { margin: .5rem 0; }
+.selection-actions-disclosure > summary.is-hidden { display: none; }
+.selection-actions-disclosure.is-media > summary { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .75rem; min-height: 2.5rem; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: .7rem; color: var(--ink); background: var(--surface); cursor: pointer; list-style: none; }
+.selection-actions-disclosure.is-media > summary::-webkit-details-marker { display: none; }
+.selection-actions-disclosure.is-media > summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 62%, transparent); outline-offset: 2px; }
+.selection-actions-disclosure.is-media > summary strong { font-size: .82rem; }
+.selection-actions-disclosure.is-media > summary small { color: var(--muted); font-size: .74rem; line-height: 1.4; }
+
 .library-workflow-bar {
   display: flex;
   flex-wrap: wrap;

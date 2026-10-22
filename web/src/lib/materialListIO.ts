@@ -16,6 +16,13 @@ const canonicalContentID = /^sha256:[0-9a-f]{64}$/;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
+export function materialListSelectionEligible(hits: SearchHit[]): boolean {
+  return hits.length > 0 && hits.length <= MATERIAL_LIST_LIMITS.items && hits.every((hit) =>
+    hit.entry_type === "REGULAR_FILE" && Boolean(hit.subject_ref?.trim()) && Boolean(hit.entry_id?.trim())
+    && /^sha256:[0-9a-f]{64}$/.test(hit.content_id ?? "")
+    && (hit.logical_size === undefined || (Number.isSafeInteger(hit.logical_size) && hit.logical_size >= 0)));
+}
+
 function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
 }
