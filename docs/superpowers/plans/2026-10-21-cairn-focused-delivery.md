@@ -296,7 +296,7 @@ SHA-256 plus logical length; local development evidence is not release proof.
 | Saved result reopen/play/takeout | Underlying use exists; integration missing | Reuse F09/F10. |
 | Weighted facts, web research, automatic refresh | Out of scope for first delivery | Keep separate; do not imply admission. |
 
-**Reuse and steps:** AIL-9 is an internal contract/admission step, not a separate active card. Bound selected versions, Notes, Skill and readable bodies; define provider/data transfer, budgets, cancellation, stale references and confirmation; implement only the reviewed single flow on existing list save/use.
+**Reuse and steps:** AIL-9 remains an internal contract/admission step, not a separate active card. The [F12 proposal](../specs/2026-10-22-material-ai-candidates.md) now defines an explicit draft-only first input: labels, exact refs, copied/edited context and frozen Skill, without automatic original-body reads. Its narrow server candidate operation/profile/egress purpose awaits owner review. Reuse current prompt validation, editor and capture; do not implement before admission.
 
 **Finished looks like:** With a real provider, authorize selected inputs, invoke, inspect/edit and confirm a candidate, reopen without AI, and use/take out originals; cancellation/refusal/stale input leaves prior material intact.
 

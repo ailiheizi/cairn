@@ -2947,3 +2947,46 @@ configuration/read contracts and adopted the owner's Web-first, computer-layout
 direction; route identity is not independent provider/model verification.
 See the [detailed design and functional checklists](../superpowers/specs/2026-10-22-server-client-product-form.md)
 and [current function plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
+
+
+## ADR-071: Propose one explicit material-list AI candidate operation
+
+**Date:** 2026-10-22. **Status:** Proposed for owner review; not implementation
+admission. F11 correction/reuse is delivered locally; F12 remains unimplemented.
+
+**Proposed decision:** Add a bounded `material.organize` typed operation over the
+existing local command route. The server sends only an explicitly reviewed
+ordinary-list draft and its frozen Skill to one operator-selected online
+profile; a valid response is a transient candidate. The person explicitly uses
+it in the current editor before the existing reviewed ordinary-file save.
+No model call writes source Notes, TAGs, a DescriptionRevision or list state.
+
+**Why:** The product needs a shorter selected-material → organized-result loop
+while keeping ordinary data reusable without another model call. Existing
+prompt/ref validation, composer, capture and Reader already support most of
+that outcome. `description.generate` would persist a subject description and
+excludes private Notes; repurposing it would misstate both disclosure and
+persistence. Browser-held provider keys would bypass the existing host grant
+and protection boundaries. A separate narrow task reuses those boundaries
+without adding an agent platform, database, scheduler or tool execution.
+
+**Proposed bounds:** At most 32 input/candidate occurrences, 128 KiB serialized
+input, 512 KiB candidate, existing 64 KiB Skill limit, one provider request and
+90 seconds, further restricted by the configured profile/grant. No implicit
+original-body/EXTRACT/image/audio reads. Input snapshots, exact refs and guide
+identity bind review; foreign refs, stale/cancelled results and invalid JSON
+leave the editor draft intact. Existing ML-1 200-item content format is unchanged.
+
+**Admission needed:** One immutable organizer profile, distinct `ORGANIZE`
+purpose and `text.material_list` class, typed-operation contract and bounded
+interactive exception in the AI-control/client requirements. Current ML-1
+copy/paste admission does not authorize this model call. Existing DESCRIBE
+profiles/grants do not automatically cover it. No normative gate is changed
+by recording this proposal.
+
+**Delivery:** The [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
+defines request/review/exit behavior. After approval, Luna implements the whole
+selected flow, root reviews, and one real-provider journey demonstrates
+candidate → human review/edit → single confirmed capture → reopen/use with
+unchanged originals and no model call on reopen. A design, interface or fixture
+response is not F12 delivery or release qualification.

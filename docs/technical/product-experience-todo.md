@@ -23,7 +23,7 @@ The Core MVP Execution Plan still owns core phase order.
 | Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
 | Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
 | Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
-| Conditional successor | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Integrated AI still requires its own contract/admission |
+| Proposed next feature | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Concrete candidate-flow spec / ADR-071 awaiting owner review; unimplemented |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
 The owner clarified the 2026-10-22 direction: build the Web application once,
@@ -68,6 +68,23 @@ After the repository review, the owner selected the bounded material/Notes/Skill
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
 
 The earlier Photos/Music interaction-polish record is historical; current S1/S2 delivery is recorded below. Earlier acceptance and remaining unrelated scope are preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+
+## F12 candidate-flow design checkpoint — 2026-10-22
+
+The owner requested the next feature after F11. Root and Luna inspected the
+existing prompt/validator/composer and online description provider. No current
+operation returns an ephemeral material-list candidate: `description.generate`
+writes a subject description and cannot be repurposed for this task.
+
+The [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
+and [proposed ADR-071](build-stack-and-architecture-selection.md#adr-071-propose-one-explicit-material-list-ai-candidate-operation)
+define one explicit server-mediated candidate from the current draft and Skill,
+followed by human editor acceptance and ordinary capture. They name the needed
+new typed operation, immutable organizer profile and separate egress purpose /
+data class. No model call, application build or test ran; this is design, not a
+delivered capability. Current normative admissions and core phase gates are
+unchanged. Owner review and a real operator-selected profile are prerequisites
+for implementation and real-provider acceptance respectively.
 
 ## F11 Skill correction and reuse — 2026-10-22
 
