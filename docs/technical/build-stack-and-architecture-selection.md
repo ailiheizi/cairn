@@ -2936,7 +2936,9 @@ mature streaming parity or the permanent product ceiling. The existing local
 API does not prove a supported remote third-party client profile.
 
 **Evidence:** Source inspection found the existing API, shared host and player,
-compiled shell registry, data-only packages and missing domain-to-list handoff.
+compiled shell registry and data-only packages. Further inspection confirmed
+global SelectionBar list creation already works from Music/Photos in source;
+the missing handoff is a direct domain-scoped action, not all list creation.
 No product code or runtime evidence changed. After an initial `EMPTY_RESPONSE`,
 the configured Opus 5.5 route returned two nonempty headless discussion turns.
 The follow-up corrected proposals for a duplicate settings table, immediate

@@ -255,9 +255,13 @@ material; it does not validate or admit a runtime third-party loader.
 ## Evidence, consultation and limits
 
 Source inspection on 2026-10-22 found the expected server/client split and
-existing audio/viewer controls. Music's selection-to-list entry is missing;
-`main.tsx` already supplies a list callback to the generic Library host. Photos
-has the analogous integration need. These are source findings, not new runtime
+existing audio/viewer controls. Music and Photos already reach ordinary list
+creation through the global SelectionBar; the earlier claim that list creation
+was wholly absent from those pages was too broad. The missing entry is a direct
+domain-scoped action passing the exact displayed/selected domain set. The
+global action may include off-view selected material and explicitly warns about
+that. Both domains reuse `main.tsx`'s existing composer callback. These are
+source findings, not new runtime
 acceptance or evidence that all other interaction details work perfectly.
 
 Primary client references: [Feishin](https://github.com/jeffvli/feishin) and its
@@ -296,3 +300,8 @@ Review this detailed product shape before implementation. This document does
 not widen ADR-032, remote access, integrated AI or media-streaming admission.
 See [ADR-070](../../technical/build-stack-and-architecture-selection.md#adr-070-one-default-client-with-specialist-applications-over-the-shared-server)
 and the [current functional plan](../plans/2026-10-21-cairn-focused-delivery.md).
+
+The [stage-by-stage execution checklist](../plans/2026-10-22-desktop-web-delivery.md)
+details files, handoffs, ordered steps, usable stage results and conditional
+future capabilities. It preserves the same feature cards and whole-feature
+acceptance rule.

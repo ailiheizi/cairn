@@ -56,6 +56,14 @@ retrieval gaps. F09/F10 remain delivered local baselines, reused without new
 independent test campaigns. Existing exact-identity and authorization behavior
 stays in place. No additional architecture or plugin-platform issue is created.
 
+The [detailed staged todo](2026-10-22-desktop-web-delivery.md) is the execution
+companion: S1 Music, S2 Photos, S3 interface choice, with files, callback
+handoffs, step checklists and one complete journey per feature. S4 desktop
+packaging and later AI/media candidates are explicitly conditional, not a new
+automatic implementation queue. Music and Photos already support list creation
+through the global SelectionBar; the planned addition is a clear domain-scoped
+entry that excludes unrelated hidden selections.
+
 No row authorizes a new durable schema, endpoint, processor, runtime loader,
 third-party kernel code, marketplace or test framework. Runtime kernel plugins,
 multi-tenancy, filesystem gateways/OpenList forks, automatic acquisition or

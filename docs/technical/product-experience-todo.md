@@ -34,8 +34,15 @@ The [detailed product-form design](../superpowers/specs/2026-10-22-server-client
 is for review. This changes client priority, not the core phase order. No new
 architecture/testing issue is added and no runtime plugin or media service is
 admitted. Source inspection confirmed Music already has metadata browsing,
-queue controls and sleep timer; the selection-to-list/reopen handoff and
-interaction hierarchy are the chosen delivery seams.
+queue controls and sleep timer. Both Music and Photos already expose list
+creation through the global SelectionBar; the chosen seams are a direct
+domain-scoped list entry, clear reopening and interaction hierarchy.
+
+Use the [detailed staged todo](../superpowers/plans/2026-10-22-desktop-web-delivery.md)
+for S1–S3 files, ordered implementation steps, actual user outcomes and a
+single whole-feature journey per stage. Desktop packaging and later AI/media
+candidates are conditional. The plan is documentation, not new implementation
+or completion evidence.
 
 AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
 No product implementation is active during this requirements/planning batch.
