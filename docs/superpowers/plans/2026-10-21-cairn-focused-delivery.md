@@ -34,7 +34,7 @@ or every Phase 4 field. A future LinkGroup/group-aware export successor remains
 behind its actual Phase 4/5 gates. Dependencies below describe reuse or real
 delivery prerequisites; they do not create extra board blockers.
 
-**Client planning update, 2026-10-22 / WIP 1:** the owner requested a shared
+**Client delivery update, 2026-10-22:** the owner requested a shared
 server with specialist applications built once in the Web client, then reused
 in a future desktop wrapper. The immediate UI target is computer/desktop
 layout. Standard save, find/takeout, listen and photo-view workflows work by
@@ -42,13 +42,12 @@ default; extensions enhance them. Browser and desktop share settings meaning
 and controls, while value synchronization is a separate undelivered concern.
 No parallel native app, mobile adaptation campaign or settings store is added.
 The detailed
-[product-form design](../specs/2026-10-22-server-client-product-form.md) is for
-review; no product implementation is active in this planning batch. The next
-functional candidate is [F15 — AIL-54](#f15): finish the Music browse/listen/
-save/reopen journey, reusing F02 continuity and the delivered F09/F10 list
-flows. Then finish [F14 Photos](#f14), then extract only the shared application
-seams needed for [F16 complete interfaces](#f16). This changes client priority,
-not the core phase order or any media/runtime-extension admission.
+[product-form design](../specs/2026-10-22-server-client-product-form.md) now has
+bounded S1 [Music F15](#f15) and S2 [Photos F14](#f14) local delivery evidence:
+domain-scoped list creation, shared reopening/takeout and navigation continuity.
+S3 [complete interfaces F16](#f16) also has current layout-continuity evidence
+and a documented compiled contribution example. No successor batch is active. This
+changes client priority, not core phase order or media/runtime admission.
 
 [F11](#f11) and [F12](#f12) remain planned in that relative order; integrated
 AI still needs its necessary contract/admission inside F12. F03 owns concrete
@@ -61,8 +60,8 @@ companion: S1 Music, S2 Photos, S3 interface choice, with files, callback
 handoffs, step checklists and one complete journey per feature. S4 desktop
 packaging and later AI/media candidates are explicitly conditional, not a new
 automatic implementation queue. Music and Photos already support list creation
-through the global SelectionBar; the planned addition is a clear domain-scoped
-entry that excludes unrelated hidden selections.
+through the global SelectionBar; S1/S2 add clear domain-scoped entries that
+exclude unrelated hidden selections.
 
 No row authorizes a new durable schema, endpoint, processor, runtime loader,
 third-party kernel code, marketplace or test framework. Runtime kernel plugins,
@@ -324,7 +323,7 @@ SHA-256 plus logical length; local development evidence is not release proof.
 ### F14 · [AIL-49](https://linear.app/ailiheizi/issue/AIL-49) — Photos: find, view, exhibit and save selections
 <a id="f14"></a><a id="r23"></a><a id="r24"></a><a id="r25"></a><a id="r26"></a><a id="r27"></a><a id="r64"></a><a id="r65"></a>
 
-**Baseline:** Photos wall, viewer, selection, slideshow, tags and original actions have local journeys. Some filter/return/selection entry points remain rough. **Outcome:** Find a real photo set, view it continuously, add context and preserve or take out a selection.
+**Baseline:** The S2 local journey now joins filtering, viewer/exhibition, Notes/Favorite, scoped list saving, Reader, exact original takeout and return. Date labels use source mtime, not camera dates. **Outcome:** Find a real photo set, view it continuously, add context and preserve or take out a selection.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
@@ -332,10 +331,10 @@ SHA-256 plus logical length; local development evidence is not release proof.
 | Continuous view/full-screen/return | Partial, locally joined | Fix only observed breakpoints. |
 | Exhibition/slideshow | Locally joined | Reuse current presentation and host actions. |
 | Original and multi-select ZIP | Locally joined | Keep actions reachable while viewing/selecting. |
-| Saved selection | Ordinary list usable; Photos entry partial | Reuse F09, no second album model. |
+| Saved selection | S2 locally delivered | Direct selected-matching Photos entry reuses F09; no second album model. |
 | Map, face, editing, native sync, album-fill suggestions | Out of scope | Keep future ideas out of the delivered surface. |
 
-**Reuse and steps:** Follow Music in the 2026-10-22 client queue. Reuse Photos,
+**Reuse and steps:** S2 followed Music in the 2026-10-22 client queue. Reuse Photos,
 viewer, exhibition, current subject scope, Notes/TAG and original takeout.
 Connect selected Photos to the same host material-list editor and Reader;
 preserve scope/focus/selection on return. Keep camera/location/similarity from
@@ -348,7 +347,7 @@ silently inventing facts. No second album model or new application framework.
 ### F15 · [AIL-54](https://linear.app/ailiheizi/issue/AIL-54) — Music: browse, keep playing, manage queue and save a result
 <a id="f15"></a><a id="r28"></a><a id="r29"></a><a id="r30"></a><a id="r31"></a>
 
-**Baseline:** Browsing, shared playback, queue and list playback have local evidence. Entry hierarchy and persistent playlist concepts are not complete. **Outcome:** Find tracks by available facts, listen across pages, arrange a transient queue and save a reusable result.
+**Baseline:** The S1 local journey now joins real artist/album browsing, verified playback, occurrence-aware queue, scoped list saving, Reader actions and cross-page continuity. Persistent playlist heads remain outside this slice. **Outcome:** Find tracks by available facts, listen across pages, arrange a transient queue and save a reusable result.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
@@ -356,10 +355,10 @@ silently inventing facts. No second album model or new application framework.
 | Playback/progress/volume/cross-page continuity | Locally joined | Retain one player; supported browser audio requires full verification and a maximum 32 MiB original. Larger files use original takeout. |
 | Repeat/shuffle/reorder/append | Locally joined | Keep occurrence-aware transient queue. |
 | Radio/current-track entry | Partial | Clarify without disrupting current listening. |
-| Saved playlist-like result | List usable; Music entry partial | Reuse F09/F10 ordinary lists. |
+| Saved playlist-like result | S1 locally delivered | Direct displayed/selected Music entries reuse F09/F10 ordinary lists. |
 | Artwork completion/transcode/lyrics/analytics | Not complete; not all in scope | Choose only a concrete user-value gap. |
 
-**Reuse and steps:** This is the next client delivery candidate under the
+**Reuse and steps:** S1 is locally delivered under the
 [2026-10-22 design](../specs/2026-10-22-server-client-product-form.md).
 Track/artist/album/year browsing, repeat/shuffle/reorder and sleep timer already
 have implementations; do not rebuild them. Improve the primary browse/play
@@ -384,13 +383,13 @@ outside this admitted client batch.
 ### F16 · [AIL-58](https://linear.app/ailiheizi/issue/AIL-58) — Switch complete interfaces and support safe presentation contributions
 <a id="f16"></a><a id="r32"></a><a id="r33"></a><a id="r34"></a>
 
-**Baseline:** Workspace/Showcase compiled shells and token-only theme packages exist; user-state continuity and contribution documentation need refinement. **Outcome:** Choose meaningfully different layouts without forking product logic.
+**Baseline:** S3 validated the existing Workspace/Showcase shared query, selection, draft and player; the contribution guide now includes the actual Showcase binding. Token-only theme packages remain a separate mechanism. **Outcome:** Choose meaningfully different layouts without forking product logic.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
-| Built-in complete shells | Partial local delivery | Validate normal find/play/Notes/takeout use. |
+| Built-in complete shells | S3 locally delivered | Current layout-switch journey; existing takeout action remains reachable. |
 | Compiled presentation registration | Implemented under trust boundary | Clarify stable slots and contribution example. |
-| Query/draft/playback across switch | Partial local evidence | Keep state in host. |
+| Query/draft/playback across switch | S3 locally validated | Same host state and paused verified source retained. |
 | Data-only theme packages | Usable within ADR-032 | Keep design-token boundary. |
 | Runtime third-party code/store | Out of scope | Not a missing feature. |
 

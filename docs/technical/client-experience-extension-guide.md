@@ -6,14 +6,21 @@ admitted `RW-PERSONAL-UX-1` / UX-E2/M2 client track alongside Phases 4 and 5.
 It does not add a backend endpoint, provider, processor, durable domain record,
 public ABI, release gate, or phase credit.
 
+The current delivery target is the computer-sized Web experience. A future
+desktop wrapper is intended to reuse this same Web implementation and compiled
+contributions; it is not a separate UI package or runtime plugin host. A
+contribution must work within the host-provided capabilities and leave the
+standard save, find/takeout, listen, and photo-view workflows usable when it is
+unavailable.
+
 The governing contract remains
 [First-Party Personal Client Experiences](../requirements/first-party-client-experiences.md).
 The contribution triple is: **phase:** UX-E2/M2; **requirement:** compiled
 pages and whole-interface shells share host-owned authority; **exit:** a
-registered page can switch from the photo wall and back while retaining the
-same host selection, subject focus, Details/Notes draft, and active player,
-with route/collision rejection and visible renderer fallback. A guide or build
-does not establish that browser exit evidence.
+registered interface can switch between complete layouts over the same Music
+and Photos activities while retaining host-owned query/selection scope,
+Details/Notes draft, and active player, with unknown-choice and renderer-failure
+fallback. A guide or build does not establish that browser exit evidence.
 
 ## Keep shared authority in the App
 
@@ -110,13 +117,15 @@ tags, Notes, or any other retained facts.
 Namespace page styles under a page root such as `.photo-exhibition__*`. Keep
 visual transforms on the artwork plane only; do not transform a wrapper that
 also contains Details, selection, or navigation controls, because its visual
-position can diverge from its pointer hit area. Verify pointer activation as
-well as keyboard focus, narrow layouts around 400 px, reduced-motion behavior,
-and useful fallbacks for empty, unavailable, and failed previews. For example,
+position can diverge from its pointer hit area. In the owning feature journey,
+check pointer and keyboard behavior when the changed controls use them, and
+check resize or reduced-motion behavior when the change affects those cases.
+Use useful fallbacks for empty, unavailable, and failed previews. For example,
 the Exhibition moves focus with arrow keys, limits mounted preview work, and
 returns to the ordinary Photos wall when enabled, or to All types when that
 presentation is disabled. Return actions must honor the same preferences as
-the domain navigation.
+the domain navigation. Do not turn one contribution into an unrelated viewport
+matrix.
 
 Translations belong to a surface partial under `web/src/i18n/`, imported by
 `web/src/i18n.ts`. Keep labels and unavailable states in that catalog rather
@@ -153,6 +162,51 @@ Keep color palettes as the secondary appearance layer. A shell can make a
 substantially different composition through layout, typography, density,
 spacing, and imagery while consuming shared semantic color tokens; a palette
 change alone is not a new whole-interface experience.
+
+### Existing compiled contribution example: Showcase
+
+`Workspace` and `Showcase` are the two compiled whole-client layouts already
+registered in this codebase. The following is the existing Showcase catalog
+shape, paired with its renderer binding; it documents the current in-repository
+seam and is not a package manifest or extension ABI:
+
+```ts
+// web/src/lib/interfaceCatalog.ts
+{
+  id: "showcase",
+  renderSlot: "shell.cairn.showcase",
+  label: "Content showcase",
+  description: "Give saved content more room with a visual, browse-first layout.",
+  preview: "showcase",
+}
+
+// web/src/components/InterfaceFrame.tsx
+["shell.cairn.showcase", ShowcaseFrame]
+```
+
+`ShowcaseFrame` rearranges only the host-provided header, navigation, content,
+and Details nodes. It does not own the query, selected subjects, Notes drafts,
+playback, settings, or authorized actions. The existing chooser derives its
+options from `interfaceCatalog`; unknown saved choices normalize to Workspace,
+and a render failure returns to Workspace through `InterfaceRenderBoundary`.
+Keep those root-owned callbacks and fallbacks when making another compiled
+layout. The same source/build can provide this choice in a future desktop
+wrapper, but the current appearance choice is stored in browser `localStorage`;
+another host's storage does not synchronize automatically. Instance settings,
+browser-local preferences, and device/session values remain distinct.
+
+The structural difference is visible in the ordinary Library: Workspace keeps
+the header above its work area, while Showcase uses a navigation rail and a
+separate content stage. Focused Music and Photos intentionally use the shared
+`ImmersiveFrame` under either choice. A layout preference does not replace those
+domain presentations or create a second player.
+
+A shell switch may unmount presentation children. Keep recoverable query,
+draft, selection and playback state in the host, and release presentation-owned
+listeners, timers and transient preview handles in their existing effect
+cleanup. A callback retained from an old workspace/result scope must not update
+the new scope; reuse the existing session guards rather than persisting it in a
+layout or adding a second lifecycle manager.
 
 ## Group domain presentations and compose shared scopes
 
@@ -214,21 +268,21 @@ repository authority. A future package lifecycle, capabilities model, trust
 store, compatibility policy, or isolation mechanism would need a separate
 review and admission; this guide makes no promise that such a runtime exists.
 
-For a page or shell contribution, run the relevant existing checks from the
-repository root and the web build:
+For a page or shell feature, first complete the owning feature's one named
+user journey at the representative computer layout. Check the visible result
+and real side effects, including unchanged host actions and fallbacks exercised
+by that journey. Build only as needed to run the journey. Run an existing
+focused check only when it proves a concrete changed invariant the journey
+cannot show; investigate an observed failure locally. Do not run every
+registry, preference, metadata, queue, and interface script for each
+contribution. When a changed visual or interaction needs extra evidence, add it
+to the same journey rather than creating a per-button suite. When changing
+registration or package admission, retain the applicable collision, refusal,
+and fallback checks; the feature journey does not replace those trust-boundary
+invariants.
 
-```sh
-node scripts/web-page-registry-check.mjs
-node scripts/web-client-preferences-check.mjs
-node scripts/web-music-metadata-check.mjs       # when changing music facts
-node scripts/web-playback-queue-check.mjs       # when changing the player queue
-node scripts/web-interface-experiences-e2e.mjs  # shell and shared-state browser coverage
-```
-
-Then run `npm run build` from `web/`. The interface E2E script uses the local
-QA fixture and Chrome and covers its existing shell-switching and shared-state
-scenarios; it is not proof of a new page's image rendering or pointer hit
-targets. Add or perform an appropriate local browser pass with retained images
-for those claims. Synthetic registry checks and this document do not establish
-a browser `PASS`, complete Photos or Music usability, a closed core phase, or
-release qualification.
+The existing interface browser journey is reusable for layout switching and
+shared-state continuity; adapt it to the current feature's real saved material
+and actions. A source check, build, guide, or synthetic fixture is not by itself
+browser acceptance, complete Photos or Music usability, a closed core phase,
+or release qualification.

@@ -21,7 +21,7 @@ The Core MVP Execution Plan still owns core phase order.
 | Existing delivery | F10 / [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Saved-list playback and unique takeout, locally delivered |
 | Locally delivered | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | S1 browse/listen/queue/scoped save/reopen delivered locally |
 | Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
-| **Current client delivery** | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 shared-layout continuity and compiled contribution guidance |
+| Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
 | Retained sequence | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8), then F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Skill reuse remains planned; integrated AI still requires its contract/admission |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
@@ -41,10 +41,10 @@ domain-scoped list entry, clear reopening and interaction hierarchy.
 Use the [detailed staged todo](../superpowers/plans/2026-10-22-desktop-web-delivery.md)
 for S1–S3 files, ordered implementation steps, actual user outcomes and a
 single whole-feature journey per stage. Desktop packaging and later AI/media
-candidates are conditional. The plan records bounded S1/S2 delivery evidence; S3 remains in progress.
+candidates are conditional. The plan records bounded S1–S3 delivery evidence; no successor implementation batch is active.
 
 AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
-S1/S2 client implementation is delivered locally; S3 is the remaining admitted client stage.
+The selected S1–S3 client batch is delivered locally. Conditional successors remain outside this completed batch.
 The [superseded complete idea draft](../history/whole-product-planning-draft-20261021.md)
 preserves historical goals; its rows are not another queue. Canceled planning
 cards mean merged or documentation-only, not successful feature completion.
@@ -90,8 +90,8 @@ and `screenshots/`; the isolated daemon stopped cleanly.
 
 Only the affected Web builds and named journey ran. Server schema, processing,
 endpoints, original verification and 32 MiB/1,000 queue limits are unchanged.
-No core phase or release qualification is claimed. Next admitted client work:
-S2 Photos, reusing the same callback, editor/Reader and selection disclosure.
+No core phase or release qualification is claimed. S2 subsequently reused the
+same callback, editor/Reader and selection disclosure.
 
 ## S2 Photos delivery — 2026-10-22
 
@@ -114,7 +114,31 @@ current assets `index-Ci2kVb7W.js` / `index-CyK9lCIg.css`.
 
 Root reviewed the source and screenshots. Only the affected Web build and
 named journey ran; no backend, model, schema or recovery change was made.
-The next admitted client stage is S3, not native packaging or integrated AI.
+S3 subsequently checked layout continuity and documented the existing seam.
+
+## S3 complete-interface delivery — 2026-10-22
+
+The existing Workspace and Showcase now have current-build continuity evidence
+and a worked compiled contribution example in the
+[extension guide](client-experience-extension-guide.md). Both compose the same
+host-owned content/actions/settings; focused Photos/Music keep their shared
+immersive frame. Browser-local preference values do not automatically sync.
+
+The read-only journey retained real Track-A query/selection, an unsaved Notes
+draft and verified paused playback at 0.45s through Workspace → Showcase →
+Workspace. Unknown stored interface choice fell back to Workspace. The saved
+S1 list reopened both tracks and exposed takeout without another download;
+Notes were explicitly discarded only after the switch check. No content
+mutation occurred. The QA profile reported degraded semantic coverage, so this
+proves layout continuity, not a qualified semantic installation. Existing
+registry/render-failure boundaries were unchanged and not fault-injected.
+Evidence: `dist/client-s3-20261022/acceptance/journey.log`, `journey.json` and
+screenshots. Root reviewed the guide, source, log and screenshot; no new build
+was needed after the documentation-only S3 changes.
+
+S1–S3 are locally delivered. F11 remains a later concrete reuse-friction
+candidate; native packaging, integrated AI and larger media are conditional.
+No core phase or release qualification is claimed.
 
 ## ML-2 delivery — use the saved result (2026-10-21)
 

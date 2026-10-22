@@ -253,26 +253,26 @@ layouts, shared settings UI, and one documented compiled contribution example.
 
 ### Steps
 
-- [ ] **S3.1 — Use the existing two shells.** Make Workspace and Showcase
+- [x] **S3.1 — Use the existing two shells.** Make Workspace and Showcase
   express distinct navigation/layout arrangements for the same Music/Photos
   flows. Preserve standard actions and active-player reachability. Do not count
   a color change alone as a second complete interface.
-- [ ] **S3.2 — Keep settings single-source.** Reuse appearance/interface
+- [x] **S3.2 — Keep settings single-source.** Reuse appearance/interface
   definitions and settings controls. Describe instance configuration separately
   from client preferences and device/session state. Existing localStorage
   remains local; no settings table, new endpoint or silent synchronization.
-- [ ] **S3.3 — Extract only a demonstrated seam.** Document the IDs and slots
+- [x] **S3.3 — Extract only a demonstrated seam.** Document the IDs and slots
   already used by the compiled catalog, same-host-build/context compatibility,
   required host callbacks, settings
   ownership, activation/cleanup and available fallback. Supply one trusted
   in-repo example reusing those mechanisms; avoid a speculative public ABI,
   generic service graph or a second module registry.
-- [ ] **S3.4 — Preserve defaults and failure exits.** Retain existing duplicate
+- [x] **S3.4 — Preserve defaults and failure exits.** Retain existing duplicate
   registration refusal, unknown-choice fallback and render boundary. Explain
   which host actions are unavailable; optional contributions must not remove
   default save/find/takeout/listen/view capability. A token package cannot
   supply JavaScript components or alter durable data meaning.
-- [ ] **S3.5 — Deliver the whole result.** Build and run one **Layout switch
+- [x] **S3.5 — Deliver the whole result.** Build and run one **Layout switch
   journey** using the same real saved material and host session. Reuse the
   existing interface journey/helper when applicable, adapting its relevant
   steps rather than running its unrelated historical fault campaign. Review,
@@ -283,6 +283,25 @@ complete layout, use the same saved list/original takeout and return with
 scope, draft guard and playback preserved. Demonstrate the default usable
 layout with the optional example disabled/unavailable. This proves client
 composition only; no new server or runtime-plugin capability is claimed.
+
+**S3 delivered locally, 2026-10-22:** the current S2 Web build passed a
+read-only Workspace → Showcase → Workspace journey with real Track-A search,
+selection, an unsaved Notes draft and the same verified player paused at 0.45s.
+Unknown stored interface choice fell back to Workspace before playback.
+The existing S1 saved list reopened both tracks and exposed enabled unique
+original takeout; no save or download was requested. The draft was discarded
+only through the existing explicit guard after continuity was proved. The QA
+profile visibly reported degraded semantic coverage; this is layout evidence,
+not qualification of the default semantic profile. Existing registration and
+renderer boundaries were retained, not changed or fault-injected.
+
+The contribution guide now includes the real Showcase catalog/renderer example,
+host-node and settings ownership, shared focused-media composition, browser-local
+preference limits and feature-level acceptance guidance. No third shell or
+extension framework was needed. Root reviewed source, guide, log and screenshot.
+Evidence: `dist/client-s3-20261022/acceptance/journey.log`, `journey.json` and
+screenshots. The temporary daemon stopped. This completes the selected S1–S3
+client batch only; it grants no core phase or release credit.
 
 ## S4 — Future desktop wrapper: reuse the delivered Web product
 
@@ -353,6 +372,7 @@ now do, its real limits, the named journey result and the code commit.
 
 Root decides/reviews; Luna implements; one assigned owner runs the stage's
 journey after integration. This plan authorizes no product code by itself and
-does not alter the core phase gates. The current remaining admitted task is **S3 complete-interface continuity and
-contribution guidance**. S1 Music and S2 Photos have bounded local delivery
-evidence above; conditional desktop/AI/media successors are not started.
+does not alter the core phase gates. The selected **S1–S3 client batch is locally delivered** with evidence above.
+No next implementation batch is active. F11 remains the next reuse-friction
+candidate; integrated AI, desktop packaging and larger media retain their
+separate contracts and are not automatically started.
