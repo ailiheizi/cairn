@@ -55,15 +55,20 @@ type Dispatcher struct {
 	// describeModelsRoot is the models root the describe provider's profile
 	// was admitted from. Egress grant creation verifies a grant against the
 	// installed profile there when no embedding profile matches.
-	describeModelsRoot string
-	now                func() time.Time
-	exact              *exact.Service
-	search             *search.Indexer
-	fixtureDimensions  bool
-	sessions           *contentSessions
-	access             *access.Service
-	recoveryReader     *recoveryReaderState
-	operatorConfig     *operatorConfigState
+	describeModelsRoot          string
+	materialOrganizer           search.MaterialOrganizer
+	materialOrganizeModelsRoot  string
+	materialOrganizeProfileID   string
+	materialOrganizeUnavailable string
+	materialOrganizeMu          sync.Mutex
+	now                         func() time.Time
+	exact                       *exact.Service
+	search                      *search.Indexer
+	fixtureDimensions           bool
+	sessions                    *contentSessions
+	access                      *access.Service
+	recoveryReader              *recoveryReaderState
+	operatorConfig              *operatorConfigState
 	// ocrBundleRoot is the single operator-installed OCR profile location
 	// below the resolved paths.models root. It is empty when no persisted
 	// profile was supplied; OCR then reports NOT_BUILT and never runs.
@@ -320,6 +325,18 @@ func WithDescribeProvider(provider search.DescribeProvider, modelsRoot string) D
 	}
 }
 
+// WithMaterialOrganizer binds the optional first-party material-list
+// organizer. A missing or invalid selected profile leaves the ordinary save
+// path available and the opt-in status projection honestly unavailable.
+func WithMaterialOrganizer(provider search.MaterialOrganizer, modelsRoot, activeProfileID, unavailable string) DispatcherOption {
+	return func(d *Dispatcher) {
+		d.materialOrganizer = provider
+		d.materialOrganizeModelsRoot = strings.TrimSpace(modelsRoot)
+		d.materialOrganizeProfileID = strings.TrimSpace(activeProfileID)
+		d.materialOrganizeUnavailable = strings.TrimSpace(unavailable)
+	}
+}
+
 // WithExact enables capture-qualified ingest, snapshot list/diff/verify,
 // recovery.export, and catalog-free restore when a repository-backed exact
 // service is available.
@@ -435,6 +452,9 @@ func NewDispatcher(store *sqlite.Store, catalogPath, socketPath string, opts ...
 	// capability.list reports it as unavailable.
 	if dispatcher.describeProvider != nil {
 		implemented[command.OpDescriptionGenerate] = true
+	}
+	if dispatcher.materialOrganizer != nil {
+		implemented[command.OpMaterialOrganize] = true
 	}
 	if dispatcher.store != nil {
 		// Egress grant operations are durable catalog facts; they need no
@@ -643,6 +663,8 @@ func (d *Dispatcher) Handle(ctx context.Context, raw command.Envelope) command.R
 		return d.handleDescriptionCreate(ctx, env, started)
 	case command.OpDescriptionGenerate:
 		return d.handleDescriptionGenerate(ctx, env, started)
+	case command.OpMaterialOrganize:
+		return d.handleMaterialOrganize(ctx, env, started)
 	case command.OpPlanRestore:
 		return d.handlePlanRestore(ctx, env, started)
 	case command.OpSnapshotList:

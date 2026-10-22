@@ -43,6 +43,12 @@
 > connects validated saved lists to existing playback and exact-takeout actions
 > with no kernel change or phase credit.
 
+> **2026-10-22 ML-3 client admission:** The owner approved one explicit
+> material-list model candidate task. It adds `material.organize` plus its
+> separately scoped organizer profile/egress purpose, human candidate review
+> and existing ordinary capture; see the [ML-3 contract](material-list-client-contract.md#explicit-ai-candidates-ml-3).
+> No new operational store, processor, recovery format or phase credit follows.
+
 ## 1. What We Are Building
 
 The first useful Cairn core is one operator loop:

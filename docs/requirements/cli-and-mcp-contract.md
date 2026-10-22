@@ -918,6 +918,32 @@ model; another live DESCRIBE grant is not a substitute. Absent provider or
 unreadable profile facts remain unavailable. This adds no provider interface,
 profile format, automatic generation or AI-client integration.
 
+### Explicit material-list organizer (ML-3)
+
+The owner-approved ML-3 exception admits `material.organize` on the existing
+local `/api/v1/command` dispatcher only. It is an explicitly confirmed egress
+operation, not a general prompt proxy or a CLI/MCP command. Its strict input
+contains `workspace_id`, `document_json`, `base_digest`, and an
+`egress_confirmation` binding `profile_id`, `profile_digest`, `endpoint_host`,
+`model`, purpose `ORGANIZE`, and `grant_id`. The digest covers the exact UTF-8
+serialized ordinary-list draft. No caller provider/prompt/tool override exists.
+
+The host verifies submitted identities and protection, including guide source,
+and returns only `candidate_json`, `base_digest`, `profile_id`, and
+`profile_digest`. It writes no list, description, annotation or membership;
+existing egress receipts remain the only durable operation effect. The
+[ML-3 contract](../technical/material-list-client-contract.md#explicit-ai-candidates-ml-3)
+defines immutable profile, limits, validation and explicit use/save boundaries.
+
+`semantic.provider.list` MAY additionally accept `include_organize: true`,
+leaving its default response unchanged. Its separate `organize` projection
+contains `state` (`READY` or `UNAVAILABLE`), optional `reason`,
+`active_profile_id`, and `profiles`. Safe profile rows contain identity/digest,
+provider, sanitized `endpoint_host`, `model_id`, `model_revision`, disclosed
+and allowed subject classes, expiry and budgets, never credential values.
+Listing sends nothing or resolves no secret. Existing grant operations may
+explicitly authorize `ORGANIZE` / `text.material_list`; a DESCRIBE grant cannot.
+
 ## 11. Verification and recovery export
 
 ### 11.1 Snapshot verification

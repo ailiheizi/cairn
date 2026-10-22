@@ -98,6 +98,13 @@ type DescriptionConfig struct {
 	RetainFullText  bool   `yaml:"retain_full_text" toml:"retain_full_text" json:"retain_full_text"`
 }
 
+// OrganizingConfig selects the optional first-party material-list organizer.
+// A nil section is omitted from persisted JSON/TOML so legacy config digests
+// remain stable until an operator explicitly selects a profile.
+type OrganizingConfig struct {
+	ProviderProfile string `yaml:"provider_profile" toml:"provider_profile" json:"provider_profile"`
+}
+
 // Descriptions is retained as a convenient field/type name for callers that
 // use the wording from the configuration document.
 type Descriptions = DescriptionConfig
@@ -127,6 +134,7 @@ type Config struct {
 	Storage      StorageConfig     `yaml:"storage" toml:"storage" json:"storage"`
 	Semantic     SemanticConfig    `yaml:"semantic" toml:"semantic" json:"semantic"`
 	Descriptions DescriptionConfig `yaml:"descriptions" toml:"descriptions" json:"descriptions"`
+	Organizing   *OrganizingConfig `yaml:"organizing,omitempty" toml:"organizing,omitempty" json:"organizing,omitempty"`
 	Recovery     RecoveryConfig    `yaml:"recovery" toml:"recovery" json:"recovery"`
 	API          APIConfig         `yaml:"api" toml:"api" json:"api"`
 
@@ -824,6 +832,11 @@ func validate(cfg Config, resolvedPaths bool) error {
 	}
 	if cfg.Descriptions.CredentialRef != "" && containsSecretValue(cfg.Descriptions.CredentialRef) {
 		return errors.New("descriptions.credential_ref appears to contain a secret; use a host secret reference")
+	}
+	if cfg.Organizing != nil && strings.TrimSpace(cfg.Organizing.ProviderProfile) != "" {
+		if err := validateProfileName("organizing.provider_profile", cfg.Organizing.ProviderProfile); err != nil {
+			return err
+		}
 	}
 	if cfg.Semantic.OnlineCredentialRef != "" && containsSecretValue(cfg.Semantic.OnlineCredentialRef) {
 		return errors.New("semantic.online_credential_ref appears to contain a secret; use a host secret reference")

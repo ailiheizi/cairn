@@ -107,7 +107,8 @@ func (d *Dispatcher) handleSemanticProviderList(_ context.Context, env command.E
 	}
 	onlineModelsRoot := strings.TrimSpace(d.onlineProviderModelsRoot)
 	describeModelsRoot := strings.TrimSpace(d.describeModelsRoot)
-	if onlineModelsRoot == "" && (!input.IncludeDescribe || describeModelsRoot == "") {
+	if onlineModelsRoot == "" && (!input.IncludeDescribe || describeModelsRoot == "") &&
+		(!input.IncludeOrganize || strings.TrimSpace(d.materialOrganizeModelsRoot) == "") {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "online provider registry is unavailable: no models root is configured"))
 	}
 	profiles := []search.InstalledOnlineEmbeddingProfile{}
@@ -152,7 +153,69 @@ func (d *Dispatcher) handleSemanticProviderList(_ context.Context, env command.E
 		}
 		data.Describe = projectDescribeProviderList(root, onlineModelsRoot, describeModelsRoot)
 	}
+	if input.IncludeOrganize {
+		data.Organize = d.projectMaterialOrganizeProviderList()
+	}
 	return succeeded(env, started, data)
+}
+
+func (d *Dispatcher) projectMaterialOrganizeProviderList() *command.MaterialOrganizeProviderListData {
+	data := &command.MaterialOrganizeProviderListData{State: "UNAVAILABLE", Profiles: []command.MaterialOrganizeProviderProfileData{}, ActiveProfileID: d.materialOrganizeProfileID}
+	if strings.TrimSpace(d.materialOrganizeModelsRoot) == "" {
+		data.Reason = "material organizer models root is not configured"
+		return data
+	}
+	profiles, err := search.ListOnlineOrganizeProfiles(d.materialOrganizeModelsRoot)
+	if err != nil {
+		data.Reason = "material organizer profile listing unavailable"
+		return data
+	}
+	for _, installed := range profiles {
+		profile := installed.Profile
+		data.Profiles = append(data.Profiles, command.MaterialOrganizeProviderProfileData{
+			ProfileID: profile.ProfileID, ProfileDigest: profile.ProviderProfileDigest(), Provider: profile.Provider,
+			EndpointHost: profile.EndpointHost(), ModelID: profile.ModelID, ModelRevision: profile.ModelRevision,
+			OutputSchema: profile.OutputSchema, Destination: installed.Destination, Expiry: profile.Egress.Expiry,
+			DisclosedDataClasses:  append([]string(nil), profile.Egress.DisclosedDataClasses...),
+			AllowedSubjectClasses: append([]string(nil), profile.Egress.AllowedSubjectClasses...),
+			MaxRequests:           profile.Egress.Budgets.MaxRequests, MaxBytes: profile.Egress.Budgets.MaxBytes,
+			MaxSeconds: profile.Egress.Budgets.MaxSeconds, MaxOutputBytes: profile.MaxOutputBytes,
+			TimeoutMS: profile.TimeoutMS, Expired: installed.Expired,
+		})
+	}
+	if d.materialOrganizer == nil {
+		if d.materialOrganizeUnavailable != "" {
+			data.Reason = d.materialOrganizeUnavailable
+		} else {
+			data.Reason = "no active material organizer profile is configured"
+		}
+		return data
+	}
+	if d.materialOrganizeProfileID == "" || d.materialOrganizer.Profile().ProfileID != d.materialOrganizeProfileID {
+		data.Reason = "the selected material organizer profile is unavailable"
+		return data
+	}
+	// READY means the selected installed profile is valid and bound to this
+	// daemon. Listing does not resolve credentials or inspect live grants;
+	// those checks happen only on an explicitly confirmed organize request.
+	selected := d.materialOrganizer.Profile()
+	if err := selected.ValidateAt(time.Now().UTC()); err != nil {
+		data.Reason = "the selected organizer profile is expired or invalid"
+		return data
+	}
+	listed := false
+	for _, profile := range profiles {
+		if profile.Profile.ProfileID == d.materialOrganizeProfileID && profile.Profile.ProviderProfileDigest() == selected.ProviderProfileDigest() {
+			listed = true
+			break
+		}
+	}
+	if !listed {
+		data.Reason = "the selected organizer profile is not installed in the configured models root"
+		return data
+	}
+	data.State = "READY"
+	return data
 }
 
 func projectDescribeProviderList(modelsRoot, onlineModelsRoot, describeModelsRoot string) *command.DescribeProviderListData {

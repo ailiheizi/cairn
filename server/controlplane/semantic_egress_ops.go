@@ -131,23 +131,28 @@ func (p semanticEgressSubjectPolicy) SemanticEgressSubjectAllowed(ctx context.Co
 		}
 		return false, "", search.EgressReasonSubjectPolicyUnavail, "reading the subject protection record failed"
 	}
-	switch record.Outcome {
+	class, reason, message := egressClassForProtection(record.Outcome)
+	return reason == "", class, reason, message
+}
+
+func egressClassForProtection(outcome sqlite.ProtectionOutcome) (string, search.SemanticEgressReason, string) {
+	switch outcome {
 	case sqlite.ProtectionExactProtected:
-		return true, search.EgressSubjectClassExactProtected, "", ""
+		return search.EgressSubjectClassExactProtected, "", ""
 	case sqlite.ProtectionExactFallback:
-		return true, search.EgressSubjectClassExactFallback, "", ""
+		return search.EgressSubjectClassExactFallback, "", ""
 	case sqlite.ProtectionExternalReplayable:
-		return true, search.EgressSubjectClassExternalReplayable, "", ""
+		return search.EgressSubjectClassExternalReplayable, "", ""
 	case sqlite.ProtectionLinkOnlyUnprotected:
-		return false, "", search.EgressReasonSubjectUnprotected,
+		return "", search.EgressReasonSubjectUnprotected,
 			"LINK_ONLY_UNPROTECTED content is never sent to a remote embedding provider"
 	case sqlite.ProtectionExplicitlyUnprotected:
-		return false, "", search.EgressReasonSubjectUnprotected,
+		return "", search.EgressReasonSubjectUnprotected,
 			"explicitly unprotected content is never sent to a remote embedding provider"
 	case sqlite.ProtectionBlocked:
-		return false, "", search.EgressReasonSubjectBlocked, "the subject protection state is BLOCKED"
+		return "", search.EgressReasonSubjectBlocked, "the subject protection state is BLOCKED"
 	default:
-		return false, "", search.EgressReasonSubjectUnknown,
+		return "", search.EgressReasonSubjectUnknown,
 			"the subject protection outcome is not admitted for remote disclosure"
 	}
 }
@@ -207,6 +212,12 @@ func (l semanticEgressGrantLookup) EgressGrants(ctx context.Context, query searc
 // workspace fails the egress closed instead of writing an unattributable
 // receipt.
 func semanticEgressWorkspaceID(ctx context.Context, store *sqlite.Store) (string, error) {
+	if requested, ok := search.EgressWorkspaceID(ctx); ok {
+		if _, err := store.GetWorkspace(ctx, requested); err != nil {
+			return "", errors.New("the requested egress workspace is unavailable")
+		}
+		return requested, nil
+	}
 	workspace, err := store.GetWorkspaceByName(ctx, "default")
 	if err != nil {
 		if errors.Is(err, sqlite.ErrNotFound) {

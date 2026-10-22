@@ -104,6 +104,9 @@ export const operations = {
     bundleInstall: "semantic.bundle.install",
     providerList: "semantic.provider.list",
   },
+  material: {
+    organize: "material.organize",
+  },
   // Durable typed media facts: one subject-scoped read of the same
   // metadata_facts rows the processor host writes. Track and work metadata
   // stay in their own projections the daemon already keeps.

@@ -56,6 +56,7 @@ const (
 	OpDescriptionGet          = "description.get"
 	OpDescriptionCreate       = "description.create"
 	OpDescriptionGenerate     = "description.generate"
+	OpMaterialOrganize        = "material.organize"
 	OpRecoveryImport          = "recovery.import"
 	OpRecoveryTokenExport     = "recovery.token.export"
 	OpViewSave                = "view.save"
@@ -125,6 +126,7 @@ func KnownOperations() []string {
 		OpDescriptionGet,
 		OpDescriptionCreate,
 		OpDescriptionGenerate,
+		OpMaterialOrganize,
 		OpRecoveryImport,
 		OpRecoveryTokenExport,
 		OpViewSave,

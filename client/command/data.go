@@ -1317,6 +1317,7 @@ type SemanticProviderInstallData struct {
 // that rely on the legacy embedding-only projection keep its original shape.
 type SemanticProviderListInput struct {
 	IncludeDescribe bool `json:"include_describe,omitempty"`
+	IncludeOrganize bool `json:"include_organize,omitempty"`
 }
 
 // UnmarshalJSON rejects null explicitly: encoding/json otherwise treats null
@@ -1328,11 +1329,11 @@ func (input *SemanticProviderListInput) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for name, value := range fields {
-		if !strings.EqualFold(name, "include_describe") {
+		if !strings.EqualFold(name, "include_describe") && !strings.EqualFold(name, "include_organize") {
 			return errors.New("unknown field " + name)
 		}
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return errors.New("include_describe must be a boolean, not null")
+			return errors.New(name + " must be a boolean, not null")
 		}
 	}
 	type plain SemanticProviderListInput
@@ -1400,9 +1401,65 @@ type SemanticProviderProfileData struct {
 }
 
 type SemanticProviderListData struct {
-	ModelsRoot string                        `json:"models_root"`
-	Profiles   []SemanticProviderProfileData `json:"profiles"`
-	Describe   *DescribeProviderListData     `json:"describe,omitempty"`
+	ModelsRoot string                            `json:"models_root"`
+	Profiles   []SemanticProviderProfileData     `json:"profiles"`
+	Describe   *DescribeProviderListData         `json:"describe,omitempty"`
+	Organize   *MaterialOrganizeProviderListData `json:"organize,omitempty"`
+}
+
+// MaterialOrganizeProviderListData is the opt-in safe projection for installed
+// material organizer profiles. It contains no credential reference or task
+// instruction.
+type MaterialOrganizeProviderListData struct {
+	// READY means the configured installed profile is valid and host-bound. It
+	// does not probe credentials or live grants; those are checked at organize.
+	State           string                                `json:"state"`
+	Reason          string                                `json:"reason,omitempty"`
+	ActiveProfileID string                                `json:"active_profile_id,omitempty"`
+	Profiles        []MaterialOrganizeProviderProfileData `json:"profiles"`
+}
+
+type MaterialOrganizeProviderProfileData struct {
+	ProfileID             string   `json:"profile_id"`
+	ProfileDigest         string   `json:"profile_digest"`
+	Provider              string   `json:"provider"`
+	EndpointHost          string   `json:"endpoint_host"`
+	ModelID               string   `json:"model_id"`
+	ModelRevision         string   `json:"model_revision"`
+	OutputSchema          string   `json:"output_schema"`
+	Destination           string   `json:"destination"`
+	Expiry                string   `json:"expiry"`
+	DisclosedDataClasses  []string `json:"disclosed_data_classes"`
+	AllowedSubjectClasses []string `json:"allowed_subject_classes"`
+	MaxRequests           int64    `json:"max_requests"`
+	MaxBytes              int64    `json:"max_bytes"`
+	MaxSeconds            int64    `json:"max_seconds"`
+	MaxOutputBytes        int64    `json:"max_output_bytes"`
+	TimeoutMS             int      `json:"timeout_ms"`
+	Expired               bool     `json:"expired"`
+}
+
+type MaterialOrganizeConfirmation struct {
+	ProfileID     string `json:"profile_id"`
+	ProfileDigest string `json:"profile_digest"`
+	EndpointHost  string `json:"endpoint_host"`
+	Model         string `json:"model"`
+	Purpose       string `json:"purpose"`
+	GrantID       string `json:"grant_id"`
+}
+
+type MaterialOrganizeInput struct {
+	WorkspaceID        string                       `json:"workspace_id"`
+	DocumentJSON       string                       `json:"document_json"`
+	BaseDigest         string                       `json:"base_digest"`
+	EgressConfirmation MaterialOrganizeConfirmation `json:"egress_confirmation"`
+}
+
+type MaterialOrganizeData struct {
+	CandidateJSON string `json:"candidate_json"`
+	BaseDigest    string `json:"base_digest"`
+	ProfileID     string `json:"profile_id"`
+	ProfileDigest string `json:"profile_digest"`
 }
 
 // EgressGrantCreateInput creates one immutable egress grant. The profile,

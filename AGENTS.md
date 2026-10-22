@@ -95,6 +95,37 @@ first-party client contract and incorporated material-list client contract.
 No new endpoint, durable state, list head, AI runner, media server, runtime
 loader or phase/release completion is admitted.
 
+### ML-3 explicit AI material-list candidate admission (2026-10-22)
+
+The owner approved the concrete F12 specification in
+`docs/superpowers/specs/2026-10-22-material-ai-candidates.md` after review.
+The bounded first-party client may explicitly send its current ordinary-list
+snapshot and one frozen Skill through one new `material.organize` typed
+operation on the existing local command route. A dedicated immutable organizer
+profile uses the separate `ORGANIZE` purpose and `text.material_list` data
+class. Reuse existing credential references, protection policy, grants and
+append-only egress audit; old DESCRIBE profiles/grants do not authorize it.
+The operation returns only an untrusted transient candidate. Human acceptance
+updates the editor; existing reviewed capture remains the only content write.
+
+This is the narrow exception to ML-1's external-copy-only model handoff and to
+no-new-provider/operation delegation restrictions, only for the approved
+organizer/config/egress/client seams. No new HTTP route, operational durable
+schema, processor, candidate store, list head, runtime loader, CLI/MCP surface,
+tool execution or automatic refresh is admitted. No automatic original-body,
+EXTRACT, image or audio reads occur. Input/candidate occurrences are capped at
+32, serialized input at 128 KiB, candidate at 512 KiB, Skill at its existing
+64 KiB, one provider request and 90 seconds, with stricter profile/grant bounds
+winning. Late/cancelled/stale/invalid results leave the original draft intact.
+See the incorporated ML-3 client and typed-provider contracts. One real-provider
+whole-feature journey is required; a fixture or configured interface is not
+F12 delivery. This admission changes no core phase or release gate.
+
+The ML-3 admission of `ORGANIZE` in the existing grant ledger includes the
+mechanical migration needed to widen its existing SQL purpose CHECK only.
+Preserve existing grant rows/fields/indexes/triggers/foreign keys and all prior
+purpose semantics; this admits no new durable entity, column or list format.
+
 ### CS-1/2/3 document-search admission (2026-10-19)
 
 The owner explicitly approved the narrow PDF/DOCX body-search milestone in

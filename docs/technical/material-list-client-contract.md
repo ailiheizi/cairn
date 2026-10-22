@@ -125,3 +125,48 @@ Automatic refresh, persistent current-list heads, conversation execution,
 guided `description.generate`, remote-AI configuration, application adapters,
 and catalog-free semantic resolution remain separately reviewed work. This
 delivery does not close Phase 4, 5, 6, recovery or release qualification.
+
+## Explicit AI candidates (ML-3)
+
+The owner approved the [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
+on 2026-10-22. It governs one explicit model call over the current ordinary
+list, rather than extending ML-1 copy/paste into arbitrary execution.
+
+The client MUST serialize the current document and bind its SHA-256, workspace,
+profile and matching grant to the visible disclosure confirmation. Only title,
+occurrences/exact refs, labels, existing draft context and one exact Skill are
+sent. Human-edited context is a snapshot, not a live-source provenance claim.
+No automatic content/EXTRACT/media fetch or hidden query may enlarge it.
+
+The daemon MUST validate every exact ref, including guide.source, and its
+current protection policy before sending. Client-side result validation does
+not replace that authorization. Use a separately admitted organizer profile,
+ORGANIZE purpose and text.material_list class; existing DESCRIBE permissions
+never imply authorization. Credentials stay in existing server-side references.
+The audit retains bounded metadata/digests, not private prompt/candidate bodies.
+
+An invocation admits at most 32 input and 32 candidate occurrences, 128 KiB
+UTF-8 serialized input, 512 KiB final normalized candidate, existing per-field
+and 64 KiB Skill bounds, one provider request and 90 seconds. Tighter declared
+profile/grant limits win. Refuse rather than truncate; no automatic retry.
+
+A candidate MUST contain only exactly supplied refs. If the model includes a
+guide it must match the original; otherwise reattach the original, then check
+the normalized size. An empty valid list may be proposed with omissions shown.
+Show title/order/context and omission/repetition changes separately. Only
+explicit Use candidate in editor replaces the draft, followed by existing
+editing/review/capture. The operation MUST NOT write descriptions, source
+annotations, lists or membership, apart from the existing egress audit.
+
+The host permits one in-flight organizer call per instance. The client checks
+workspace, original context, exact current draft bytes/digest and profile on
+arrival and acceptance. Refusal, stale/unknown/cancelled outcome or malformed
+candidate leaves the draft unchanged. Abort transport where available and
+ignore late results; never promise recall of already sent bytes or zero charge.
+No durable candidate, automatic refresh or current head is created. The ML-1
+format remains unchanged and usable manually or with external copy/paste.
+
+Exit is the spec's one real-provider journey: disclose → generate → review/edit
+→ single confirmed capture → reopen/use exact originals without another model
+call. Include applicable invalid/stale/cancel checks in that journey; focused
+checks serve only changed trust invariants it cannot prove. No release credit.

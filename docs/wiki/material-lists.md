@@ -23,9 +23,47 @@ does not invoke AI or change the originals, their Notes or their Tags.
    confirm that plan. The files are saved only when capture succeeds.
 
 Copying a prompt is an explicit disclosure to the destination you choose.
-Cairn does not contact a model, configure credentials or run the Skill itself
-in this first delivery. **Download JSON** can also hand the prepared result to
-another program without saving it in Cairn.
+The clipboard path does not contact a model. An explicitly configured in-product
+organizer is a separate choice below. **Download JSON** can also hand the
+prepared result to another program without saving it in Cairn.
+
+### Organize inside Cairn with a configured model
+
+Open **Organize with AI** in the list editor. The server must have an installed
+`cairn.online-organize-profile.v1` manifest under
+`<paths.models>/online-organize/<profile_id>/profile.json`. Select that profile
+through the existing Settings or `organizing.provider_profile`, save and restart
+the daemon. Endpoint/model/revision, credential reference, egress declarations
+and finite budgets belong to that immutable manifest. Credentials resolve from
+the server's `env://` or `keychain://` reference; do not paste a key into a list,
+Skill, browser or repository. Changing manifest facts changes its digest and
+requires a corresponding authorization.
+
+1. If necessary, explicitly authorize this organizer. The grant is limited by
+   the installed profile, expires within 24 hours, and permits one request per
+   generation. It remains reusable until expiry or revocation; it does not
+   automatically send anything.
+2. Choose **Review exact disclosure**. Inspect the current title, labels,
+   exact refs, copied/edited Notes/Tags context and complete embedded Skill.
+   Inspect the destination, model/revision, profile digest and matching grant.
+   No original body, EXTRACT text, picture or audio is read for this request.
+3. Confirm **Send one request**. A result appears as a separate candidate;
+   the editor remains unchanged. Review title/order/context and omitted or
+   repeated occurrences. The selected Skill remains unchanged.
+4. Reject the candidate or choose **Use candidate in editor**. Edit further if
+   needed, then use the existing **Review and save files** flow. A candidate is
+   not a saved list; ordinary confirmed capture is still required.
+
+Each generation accepts at most 32 occurrences and 128 KiB of serialized UTF-8
+input, returns at most 32 occurrences and 512 KiB including retained Skill,
+and makes at most one request within 90 seconds. Lower profile/grant bounds
+win. These operation bounds do not change the 200-occurrence ordinary format.
+
+Changing the draft, workspace or active profile invalidates a pending result.
+Cancel stops waiting and ignores late results; data already sent cannot be
+recalled and a provider charge may still occur. Unavailable authorization,
+invalid output or foreign refs leave the draft intact. Reopening a saved list
+never calls the organizer or refreshes its contents automatically.
 
 ### Correct and reuse a saved Skill
 
@@ -49,8 +87,8 @@ through ordinary text intake, then selected from the loaded catalog:
 - [Music selection Skill](examples/music-selection-skill.md)
 - [Research reading Skill](examples/research-reading-skill.md)
 
-They are instructions for an explicitly chosen external AI handoff, not
-executable Skills or automatic tag/list updates.
+They are instructions for the explicitly chosen organizer or external AI
+handoff, not executable Skills or automatic tag/list updates.
 
 ## Reopen and use
 

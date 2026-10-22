@@ -50,7 +50,7 @@ and a documented compiled contribution example. No successor batch is active. Th
 changes client priority, not core phase order or media/runtime admission.
 
 [F11](#f11) is now locally delivered after the S1–S3 continuation; [F12](#f12)
-remains conditional and needs its necessary contract/admission inside F12. F03 owns concrete
+has locally delivered owner-approved bounded ML-3 scope. F03 owns concrete
 retrieval gaps. F09/F10 remain delivered local baselines, reused without new
 independent test campaigns. Existing exact-identity and authorization behavior
 stays in place. No additional architecture or plugin-platform issue is created.
@@ -286,17 +286,17 @@ SHA-256 plus logical length; local development evidence is not release proof.
 ### F12 · [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) — Create a reviewable AI-organized list
 <a id="f12"></a><a id="r06"></a><a id="r05"></a><a id="r08"></a><a id="r10"></a><a id="r11"></a>
 
-**Baseline:** Integrated organizer is unimplemented and unadmitted; external copy/paste already works. **Outcome:** Explicitly select material and instructions, receive a real model candidate, review it, save and reuse without another model call.
+**Baseline:** The ML-3 organizer is implemented and locally validated with a real provider; external copy/paste remains usable. **Outcome:** Explicitly select material and instructions, receive a real model candidate, review it, save and reuse without another model call.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | External copy/paste | Usable | Reuse; do not duplicate it. |
-| Built-in real-model organization | Missing | Define exact inputs and execution location before implementation. |
-| Candidate references/reasons/editing | Missing | Present a candidate first; require human confirmation. |
-| Saved result reopen/play/takeout | Underlying use exists; integration missing | Reuse F09/F10. |
+| Built-in real-model organization | Locally delivered | Explicit draft/context/Skill disclosure through an installed host profile and live grant. |
+| Candidate references/reasons/editing | Locally delivered | Separate candidate with exact refs, frozen Skill, changes/reasons and explicit use in the editor. |
+| Saved result reopen/play/takeout | Locally integrated | Reuse F09/F10; real journey verified stored list/order/Skill and exact-original ZIP without another model call. |
 | Weighted facts, web research, automatic refresh | Out of scope for first delivery | Keep separate; do not imply admission. |
 
-**Reuse and steps:** AIL-9 remains an internal contract/admission step, not a separate active card. The [F12 proposal](../specs/2026-10-22-material-ai-candidates.md) now defines an explicit draft-only first input: labels, exact refs, copied/edited context and frozen Skill, without automatic original-body reads. Its narrow server candidate operation/profile/egress purpose awaits owner review. Reuse current prompt validation, editor and capture; do not implement before admission.
+**Reuse and steps:** AIL-9 remains an internal contract/admission step, not a separate active card. The owner-approved [F12 specification](../specs/2026-10-22-material-ai-candidates.md) defines an explicit draft-only first input: labels, exact refs, copied/edited context and frozen Skill, without automatic original-body reads. Its narrow server candidate operation/profile/egress purpose is now admitted as ML-3. Reuse current prompt validation, editor and capture under the [implementation plan](2026-10-22-material-ai-candidates.md); real-provider delivery is recorded in the existing [feature ledger](../../technical/product-experience-todo.md#f12-real-provider-delivery--2026-10-22).
 
 **Finished looks like:** With a real provider, authorize selected inputs, invoke, inspect/edit and confirm a candidate, reopen without AI, and use/take out originals; cancellation/refusal/stale input leaves prior material intact.
 

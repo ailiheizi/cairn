@@ -537,6 +537,30 @@ func configureDescribeBinding(resolved cairnconfig.ResolvedConfig, store *sqlite
 	return controlplane.WithDescribeProvider(provider, resolved.Config.Paths.Models), nil
 }
 
+// configureMaterialOrganizerBinding is optional: a bad or absent profile
+// keeps ordinary material-list authoring and capture available.
+func configureMaterialOrganizerBinding(resolved cairnconfig.ResolvedConfig, store *sqlite.Store) controlplane.DispatcherOption {
+	profileID := ""
+	if resolved.Config.Organizing != nil {
+		profileID = strings.TrimSpace(resolved.Config.Organizing.ProviderProfile)
+	}
+	if profileID == "" {
+		return controlplane.WithMaterialOrganizer(nil, resolved.Config.Paths.Models, "", "no organizer profile is selected")
+	}
+	profile, err := search.LoadOnlineOrganizeProfile(resolved.Config.Paths.Models, profileID)
+	if err != nil {
+		return controlplane.WithMaterialOrganizer(nil, resolved.Config.Paths.Models, profileID, "the selected organizer profile is unavailable or invalid")
+	}
+	provider, err := search.NewOnlineMaterialOrganizer(search.OnlineMaterialOrganizerOptions{
+		Profile: profile, AuditSink: controlplane.NewMaterialOrganizeEgressAuditSink(store),
+		Grants: controlplane.NewSemanticEgressGrantLookup(store),
+	})
+	if err != nil {
+		return controlplane.WithMaterialOrganizer(nil, resolved.Config.Paths.Models, profileID, "the selected organizer profile is unavailable or invalid")
+	}
+	return controlplane.WithMaterialOrganizer(provider, resolved.Config.Paths.Models, profileID, "")
+}
+
 func runWithOptions(ctx context.Context, options daemonOptions) error {
 	if options.recoveryReader {
 		return runRecoveryReader(ctx, options)
@@ -715,6 +739,7 @@ func runWithOptions(ctx context.Context, options daemonOptions) error {
 	if describeOption != nil {
 		dispatcherOptions = append(dispatcherOptions, describeOption)
 	}
+	dispatcherOptions = append(dispatcherOptions, configureMaterialOrganizerBinding(resolved, store))
 	dispatcher := controlplane.NewDispatcher(store, catalogPath, options.socketPath, dispatcherOptions...)
 	if semanticOption != nil || imageOption != nil {
 		if workspace, workspaceErr := store.GetWorkspaceByName(runCtx, "default"); workspaceErr == nil {

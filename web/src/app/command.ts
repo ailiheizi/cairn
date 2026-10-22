@@ -11,12 +11,17 @@ import type { UploadOutcome } from "../lib/types";
 
 export type Result = { status?: string; data?: any; reasons?: Array<{ message?: string }> };
 
-export async function command(operation: string, input: unknown): Promise<Result> {
+export async function command(operation: string, input: unknown, signal?: AbortSignal): Promise<Result> {
   const clientMessage = (message: string) => createTranslator(resolveInitialLocale())(message);
   let response: Response;
   try {
-    response = await fetch(endpoints.command, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation, input }) });
+    response = await fetch(endpoints.command, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation, input }), ...(signal ? { signal } : {}) });
   } catch {
+    if (signal?.aborted) {
+      const error = new Error("Request cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
     throw new Error(clientMessage("Could not connect to Cairn service. Start the service, then refresh."));
   }
   const raw = await response.text();

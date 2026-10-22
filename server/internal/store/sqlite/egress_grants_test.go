@@ -2,12 +2,115 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+// TestOrganizePurposeMigrationPreservesExistingGrants upgrades a concrete v27
+// catalog and proves that widening only the purpose CHECK preserves existing
+// DESCRIBE grant/revocation evidence and its integrity constraints.
+func TestOrganizePurposeMigrationPreservesExistingGrants(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "catalog-v27.sqlite")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open legacy database: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.ExecContext(ctx, `CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at_ns INTEGER NOT NULL) STRICT`); err != nil {
+		t.Fatalf("create migration ledger: %v", err)
+	}
+	for _, item := range migrations {
+		if item.version >= 28 {
+			break
+		}
+		if _, err := db.ExecContext(ctx, item.sql); err != nil {
+			t.Fatalf("apply migration %d (%s): %v", item.version, item.name, err)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO schema_migrations(version,name,checksum,applied_at_ns) VALUES(?,?,?,?)`, item.version, item.name, migrationChecksum(item), testEpoch.UnixNano()); err != nil {
+			t.Fatalf("record migration %d: %v", item.version, err)
+		}
+	}
+	workspaceID := testID(t, IDPrefixWorkspace)
+	grant := EgressGrant{ID: testID(t, IDPrefixEgressGrant), WorkspaceID: workspaceID, ProfileID: "legacy-describe", ProfileDigest: "sha256:" + strings.Repeat("a", 64), EndpointHost: "model.example.invalid", ModelID: "describe-v1", Purpose: EgressGrantPurposeDescribe, DataClasses: []string{"text.subject_context"}, SubjectClasses: []string{"EXACT_PROTECTED"}, MaxRequests: 3, MaxBytes: 4096, MaxSeconds: 30, ExpiresAt: testEpoch.Add(24 * time.Hour), GrantedBy: "operator-v27", CreatedAt: testEpoch}
+	revocation := EgressGrantRevocation{ID: testID(t, IDPrefixEgressRevocation), WorkspaceID: workspaceID, GrantID: grant.ID, Reason: "legacy key rotation", RevokedBy: "operator-v27", RevokedAt: testEpoch.Add(time.Hour)}
+	if _, err := db.ExecContext(ctx, `INSERT INTO workspaces(workspace_id,name,metadata_json,revision,created_at_ns,updated_at_ns) VALUES(?,?,?,?,?,?)`, workspaceID, "v27 fixture", `{}`, 1, testEpoch.UnixNano(), testEpoch.UnixNano()); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO egress_grants(grant_id,workspace_id,profile_id,profile_digest,endpoint_host,model_id,purpose,data_classes_json,subject_classes_json,max_requests,max_bytes,max_seconds,expires_at_ns,granted_by,created_at_ns) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, grant.ID, grant.WorkspaceID, grant.ProfileID, grant.ProfileDigest, grant.EndpointHost, grant.ModelID, grant.Purpose, `["text.subject_context"]`, `["EXACT_PROTECTED"]`, grant.MaxRequests, grant.MaxBytes, grant.MaxSeconds, grant.ExpiresAt.UnixNano(), grant.GrantedBy, grant.CreatedAt.UnixNano()); err != nil {
+		t.Fatalf("insert legacy grant: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO egress_grant_revocations(revocation_id,workspace_id,grant_id,reason,revoked_by,revoked_at_ns) VALUES(?,?,?,?,?,?)`, revocation.ID, revocation.WorkspaceID, revocation.GrantID, revocation.Reason, revocation.RevokedBy, revocation.RevokedAt.UnixNano()); err != nil {
+		t.Fatalf("insert legacy revocation: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close legacy database: %v", err)
+	}
+
+	store := openTestStore(t, path)
+	defer store.Close()
+	version, err := store.SchemaVersion(ctx)
+	if err != nil {
+		t.Fatalf("SchemaVersion: %v", err)
+	}
+	if want := migrations[len(migrations)-1].version; version != want {
+		t.Fatalf("schema version = %d, want %d", version, want)
+	}
+	loaded, err := store.GetEgressGrant(ctx, workspaceID, grant.ID)
+	if err != nil {
+		t.Fatalf("read preserved grant: %v", err)
+	}
+	if loaded.ID != grant.ID || loaded.WorkspaceID != grant.WorkspaceID || loaded.ProfileID != grant.ProfileID || loaded.ProfileDigest != grant.ProfileDigest || loaded.EndpointHost != grant.EndpointHost || loaded.ModelID != grant.ModelID || loaded.Purpose != grant.Purpose || strings.Join(loaded.DataClasses, ",") != strings.Join(grant.DataClasses, ",") || strings.Join(loaded.SubjectClasses, ",") != strings.Join(grant.SubjectClasses, ",") || loaded.MaxRequests != grant.MaxRequests || loaded.MaxBytes != grant.MaxBytes || loaded.MaxSeconds != grant.MaxSeconds || !loaded.ExpiresAt.Equal(grant.ExpiresAt) || loaded.GrantedBy != grant.GrantedBy || !loaded.CreatedAt.Equal(grant.CreatedAt) {
+		t.Fatalf("preserved grant differs: got %+v want %+v", loaded, grant)
+	}
+	revocations, err := store.ListEgressGrantRevocations(ctx, workspaceID)
+	if err != nil {
+		t.Fatalf("list preserved revocations: %v", err)
+	}
+	if len(revocations) != 1 || revocations[0].ID != revocation.ID || revocations[0].WorkspaceID != revocation.WorkspaceID || revocations[0].GrantID != revocation.GrantID || revocations[0].Reason != revocation.Reason || revocations[0].RevokedBy != revocation.RevokedBy || !revocations[0].RevokedAt.Equal(revocation.RevokedAt) {
+		t.Fatalf("preserved revocations = %+v, want %+v", revocations, revocation)
+	}
+	for name, statement := range map[string]string{
+		"grant update":      `UPDATE egress_grants SET max_requests=1 WHERE grant_id=?`,
+		"grant delete":      `DELETE FROM egress_grants WHERE grant_id=?`,
+		"revocation update": `UPDATE egress_grant_revocations SET reason='changed' WHERE revocation_id=?`,
+		"revocation delete": `DELETE FROM egress_grant_revocations WHERE revocation_id=?`,
+	} {
+		args := []any{grant.ID}
+		if strings.HasPrefix(name, "revocation") {
+			args = []any{revocation.ID}
+		}
+		if _, err := store.db.ExecContext(ctx, statement, args...); err == nil || !strings.Contains(err.Error(), "immutable") {
+			t.Fatalf("%s error = %v, want immutable trigger", name, err)
+		}
+	}
+	missingWorkspace := grant
+	missingWorkspace.ID = testID(t, IDPrefixEgressGrant)
+	missingWorkspace.WorkspaceID = testID(t, IDPrefixWorkspace)
+	if err := store.Update(ctx, func(tx *Tx) error { return tx.InsertEgressGrant(ctx, &missingWorkspace) }); err == nil {
+		t.Fatal("grant with missing workspace passed foreign-key constraint")
+	}
+	missingGrant := EgressGrantRevocation{ID: testID(t, IDPrefixEgressRevocation), WorkspaceID: workspaceID, GrantID: testID(t, IDPrefixEgressGrant), Reason: "must fail", RevokedBy: "operator", RevokedAt: testEpoch}
+	if err := store.Update(ctx, func(tx *Tx) error { return tx.InsertEgressGrantRevocation(ctx, &missingGrant) }); err == nil {
+		t.Fatal("revocation with missing grant passed foreign-key constraint")
+	}
+	organize := grant
+	organize.ID = testID(t, IDPrefixEgressGrant)
+	organize.ProfileID = "organizer-v1"
+	organize.Purpose = EgressGrantPurposeOrganize
+	organize.DataClasses = []string{"text.material_list"}
+	if err := store.Update(ctx, func(tx *Tx) error { return tx.InsertEgressGrant(ctx, &organize) }); err != nil {
+		t.Fatalf("insert ORGANIZE grant after migration: %v", err)
+	}
+	loadedOrganize, err := store.GetEgressGrant(ctx, workspaceID, organize.ID)
+	if err != nil || loadedOrganize.Purpose != EgressGrantPurposeOrganize {
+		t.Fatalf("read ORGANIZE grant = %+v, %v", loadedOrganize, err)
+	}
+}
 
 func testEgressGrant(t *testing.T, workspaceID string) EgressGrant {
 	return EgressGrant{

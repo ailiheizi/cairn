@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Clipboard, Download, Plus, Save, X } from "lucide-react";
 import type { Translator } from "../../i18n";
 import type { SearchHit } from "../../lib/types";
+import type { MaterialOrganizerController } from "../../app/useMaterialOrganizer";
+import { MATERIAL_ORGANIZER_LIMITS } from "../../lib/materialListOrganizer";
+import { summarizeMaterialListCandidate } from "../../lib/materialListOrganizer";
 import {
   applyMaterialListResult,
   MATERIAL_LIST_LIMITS,
@@ -12,15 +15,17 @@ import {
   type MaterialRef,
 } from "../../lib/materialList";
 import { buildMaterialListGuide, createMaterialList, materialListFiles, readMaterialListGuideFile } from "../../lib/materialListIO";
+import { sha256ContentID } from "../../lib/originalArchive";
 import "./materialList.css";
 
-export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, initialDocument, busy, onClose, onSaveFiles }: {
+export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, initialDocument, busy, organizer, onClose, onSaveFiles }: {
   t: Translator;
   workspaceID: string;
   subjects: SearchHit[];
   catalogItems: SearchHit[];
   initialDocument?: MaterialListDocument;
   busy: boolean;
+  organizer: MaterialOrganizerController;
   onClose: () => void;
   onSaveFiles: (files: File[]) => void;
 }) {
@@ -55,6 +60,17 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   const [importError, setImportError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [actionPending, setActionPending] = useState(false);
+  const [organizerDisclosure, setOrganizerDisclosure] = useState<{ document: MaterialListDocument; json: string; digest: string; contextKey: string; workspaceID: string; profileKey: string; grantID: string }>();
+  const [organizerPanelOpen, setOrganizerPanelOpen] = useState(false);
+  const [organizerConfirmed, setOrganizerConfirmed] = useState(false);
+  const [grantConfirmed, setGrantConfirmed] = useState(false);
+  const [organizerBusy, setOrganizerBusy] = useState(false);
+  const [organizerError, setOrganizerError] = useState("");
+  const [candidate, setCandidate] = useState<{ document: MaterialListDocument; baseJSON: string; baseDigest: string; contextKey: string; workspaceID: string; profileKey: string; profileID: string; grantID: string }>();
+  const organizerControllerRef = useRef<AbortController | null>(null);
+  const organizerTokenRef = useRef(0);
+  const organizerBusyRef = useRef(false);
+  useEffect(() => { setGrantConfirmed(false); }, [organizer.profileKey]);
   const guideCandidates = useMemo(() => catalogItems.filter((item) => item.entry_type === "REGULAR_FILE"
     && /\.(?:txt|md)$/iu.test(item.name ?? "")
     && typeof item.content_id === "string" && /^sha256:[0-9a-f]{64}$/.test(item.content_id)
@@ -69,6 +85,18 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   const guideBytes = new TextEncoder().encode(guideBody).byteLength;
   const importBytes = new TextEncoder().encode(importText).byteLength;
 
+  function invalidateOrganizer() {
+    organizerTokenRef.current += 1;
+    organizerControllerRef.current?.abort();
+    organizerControllerRef.current = null;
+    organizerBusyRef.current = false;
+    setOrganizerBusy(false);
+    setOrganizerDisclosure(undefined);
+    setOrganizerConfirmed(false);
+    setCandidate(undefined);
+    setOrganizerError("");
+  }
+
   useEffect(() => {
     const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     queueMicrotask(() => dialogRef.current?.focus());
@@ -82,6 +110,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   }
 
   useEffect(() => {
+    invalidateOrganizer();
     const controller = new AbortController();
     operationRef.current?.abort();
     operationRef.current = controller;
@@ -126,6 +155,10 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
     return () => {
       live = false;
       controller.abort();
+      organizerTokenRef.current += 1;
+      organizerControllerRef.current?.abort();
+      organizerControllerRef.current = null;
+      organizerBusyRef.current = false;
       operationRef.current?.abort();
       if (operationRef.current === controller) operationRef.current = null;
       actionPendingRef.current = false;
@@ -156,12 +189,14 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
     && operationRef.current === controller && contextKeyRef.current === key;
 
   function editItem(index: number, change: (item: MaterialListItem) => MaterialListItem) {
+    invalidateOrganizer();
     setDraft((current) => current ? { ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? change(item) : item) } : current);
     setError("");
     setFeedback("");
   }
 
   function moveItem(index: number, delta: number) {
+    invalidateOrganizer();
     setError("");
     setFeedback("");
     setDraft((current) => {
@@ -187,6 +222,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
 
   function chooseGuide(hit: SearchHit) {
     if (actionPendingRef.current) return;
+    invalidateOrganizer();
     setGuideHit(hit);
     setGuideLoading(true);
     setGuideError("");
@@ -195,6 +231,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
       try {
         const guide = await readMaterialListGuideFile(hit, workspaceIDRef.current, controller.signal);
         if (!operationIsCurrent(controller, key)) return;
+        invalidateOrganizer();
         setGuideName(guide.name);
         setGuideBody(guide.body);
         setGuideSource(guide.source);
@@ -245,6 +282,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
         if (!operationIsCurrent(controller, key)) return;
         const next = applyMaterialListResult(current, importText);
         if (!operationIsCurrent(controller, key)) return;
+        invalidateOrganizer();
         setDraft(next);
         setGuideFrom(next);
         setImportText("");
@@ -254,6 +292,118 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
         if (operationIsCurrent(controller, key)) setImportError(t(reason instanceof Error ? reason.message : "The imported result is invalid."));
       }
     });
+  }
+
+  async function prepareOrganizerDisclosure() {
+    if (organizerBusyRef.current || organizer.snapshot.state !== "READY" || !organizer.snapshot.profile || !organizer.snapshot.grant || !draft) return;
+    const token = organizerTokenRef.current;
+    const capturedContextKey = contextKeyRef.current;
+    const capturedWorkspace = workspaceIDRef.current;
+    setOrganizerError("");
+    try {
+      const document = await currentDocument();
+      const json = serializeMaterialList(document);
+      const bytes = new TextEncoder().encode(json).byteLength;
+      const profileLimit = organizer.snapshot.profile.max_input_bytes ?? MATERIAL_ORGANIZER_LIMITS.inputBytes;
+      const inputLimit = Math.min(MATERIAL_ORGANIZER_LIMITS.inputBytes, profileLimit);
+      if (document.items.length > MATERIAL_ORGANIZER_LIMITS.items) throw new Error(t("Model organization is limited to {{count}} items; reduce this draft before sending.", { count: MATERIAL_ORGANIZER_LIMITS.items }));
+      if (bytes > inputLimit) throw new Error(t("This exact draft is {{bytes}} bytes; the current request limit is {{limit}} bytes. Reduce the material or context before sending.", { bytes, limit: inputLimit }));
+      const digest = await sha256ContentID(new TextEncoder().encode(json));
+      if (token !== organizerTokenRef.current || contextKeyRef.current !== capturedContextKey || workspaceIDRef.current !== capturedWorkspace) throw new Error(t("The material list changed while preparing the disclosure. Review it again."));
+      const profileKey = organizer.profileKey;
+      const grantID = organizer.snapshot.grant.grant_id;
+      if (!profileKey || !organizer.isCurrentProfile(profileKey)) throw new Error(t("The material organizer profile changed. Review availability and try again."));
+      setOrganizerDisclosure({ document, json, digest, contextKey: capturedContextKey, workspaceID: capturedWorkspace, profileKey, grantID });
+      setOrganizerPanelOpen(true);
+      setOrganizerConfirmed(false);
+      setCandidate(undefined);
+    } catch (reason) {
+      setOrganizerError(t(reason instanceof Error ? reason.message : "Could not prepare the exact material disclosure."));
+    }
+  }
+
+  async function sendOrganizerRequest() {
+    const disclosure = organizerDisclosure;
+    const profile = organizer.snapshot.profile;
+    if (!disclosure || !profile || !organizer.snapshot.grant || !organizerConfirmed || organizerBusyRef.current) return;
+    const token = ++organizerTokenRef.current;
+    const controller = new AbortController();
+    organizerControllerRef.current = controller;
+    organizerBusyRef.current = true;
+    setOrganizerBusy(true);
+    setOrganizerError("");
+    try {
+      const current = await currentDocument();
+      const json = serializeMaterialList(current);
+      if (contextKeyRef.current !== disclosure.contextKey || workspaceIDRef.current !== disclosure.workspaceID
+        || token !== organizerTokenRef.current || json !== disclosure.json || !organizer.isCurrentProfile(disclosure.profileKey)
+        || organizer.snapshot.grant.grant_id !== disclosure.grantID) throw new Error(t("The draft, workspace, profile, or grant changed. Review the exact disclosure again."));
+      const result = await organizer.organize(disclosure.json, disclosure.digest, disclosure.grantID, controller.signal);
+      if (controller.signal.aborted || token !== organizerTokenRef.current) return;
+      const receivedDraft = await currentDocument();
+      if (serializeMaterialList(receivedDraft) !== disclosure.json) throw new Error(t("The draft, workspace, or profile changed before the candidate arrived."));
+      if (controller.signal.aborted || token !== organizerTokenRef.current) return;
+      const currentAuthorization = await organizer.refresh(disclosure.workspaceID);
+      if (controller.signal.aborted || token !== organizerTokenRef.current) return;
+      if (contextKeyRef.current !== disclosure.contextKey || workspaceIDRef.current !== disclosure.workspaceID
+        || !currentAuthorization.profile || JSON.stringify([currentAuthorization.profile.profile_id, currentAuthorization.profile.profile_digest, currentAuthorization.profile.endpoint_host, currentAuthorization.profile.model_id]) !== disclosure.profileKey
+        || !organizer.isCurrentProfile(disclosure.profileKey)) throw new Error(t("The draft, workspace, or profile changed before the candidate arrived."));
+      const next = applyMaterialListResult(disclosure.document, result.candidate_json);
+      const normalized = serializeMaterialList(next);
+      const resultBytes = new TextEncoder().encode(normalized).byteLength;
+      const outputLimit = Math.min(MATERIAL_ORGANIZER_LIMITS.outputBytes, profile.max_output_bytes);
+      if (next.items.length > MATERIAL_ORGANIZER_LIMITS.items) throw new Error(t("The candidate exceeds the {{count}} item limit and was not used.", { count: MATERIAL_ORGANIZER_LIMITS.items }));
+      if (resultBytes > outputLimit) throw new Error(t("The candidate exceeds the {{limit}} byte output limit and was not used.", { limit: outputLimit }));
+      setCandidate({ document: next, baseJSON: disclosure.json, baseDigest: disclosure.digest, contextKey: disclosure.contextKey, workspaceID: disclosure.workspaceID, profileKey: disclosure.profileKey, profileID: result.profile_id, grantID: disclosure.grantID });
+      setOrganizerDisclosure(undefined);
+      setOrganizerConfirmed(false);
+      setOrganizerPanelOpen(false);
+    } catch (reason) {
+      if (!controller.signal.aborted && token === organizerTokenRef.current) setOrganizerError(t(reason instanceof Error ? reason.message : "The material organizer request did not return a usable candidate."));
+    } finally {
+      if (token === organizerTokenRef.current) {
+        organizerControllerRef.current = null;
+        organizerBusyRef.current = false;
+        setOrganizerBusy(false);
+      }
+    }
+  }
+
+  async function useOrganizerCandidate() {
+    const reviewed = candidate;
+    if (!reviewed) return;
+    const token = organizerTokenRef.current;
+    try {
+      const current = await currentDocument();
+      const json = serializeMaterialList(current);
+      const digest = await sha256ContentID(new TextEncoder().encode(json));
+      const authorization = await organizer.refresh(reviewed.workspaceID);
+      if (token !== organizerTokenRef.current) throw new Error(t("The draft, workspace, profile, or grant changed. This candidate is stale and was not used."));
+      const latestDocument = await currentDocument();
+      const latestJSON = serializeMaterialList(latestDocument);
+      if (contextKeyRef.current !== reviewed.contextKey || workspaceIDRef.current !== reviewed.workspaceID
+        || json !== reviewed.baseJSON || digest !== reviewed.baseDigest || latestJSON !== reviewed.baseJSON || !organizer.isCurrentProfile(reviewed.profileKey)
+        || !authorization.profile || JSON.stringify([authorization.profile.profile_id, authorization.profile.profile_digest, authorization.profile.endpoint_host, authorization.profile.model_id]) !== reviewed.profileKey) throw new Error(t("The draft, workspace, profile, or grant changed. This candidate is stale and was not used."));
+      const normalized = applyMaterialListResult(current, serializeMaterialList(reviewed.document));
+      invalidateOrganizer();
+      setDraft(normalized);
+      setGuideFrom(normalized);
+      setFeedback(t("Candidate applied to the editor. Review and save it through the existing capture flow."));
+      setError("");
+    } catch (reason) {
+      setOrganizerError(t(reason instanceof Error ? reason.message : "This candidate could not be used."));
+    }
+  }
+
+  function cancelOrganizerRequest() {
+    organizerTokenRef.current += 1;
+    organizerControllerRef.current?.abort();
+    organizerControllerRef.current = null;
+    organizerBusyRef.current = false;
+    setOrganizerBusy(false);
+    setOrganizerDisclosure(undefined);
+    setOrganizerConfirmed(false);
+    setOrganizerError(t("Request cancelled. Bytes already sent cannot be recalled, and provider charges cannot be ruled out."));
   }
 
   function downloadJSON() {
@@ -293,6 +443,70 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   return <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="material-list-title" className="material-list-panel" data-material-list="composer">
     <header className="material-list-header"><div><p className="eyebrow">{t("ORDINARY MATERIAL")}</p><h2 id="material-list-title">{t("Create a list")}</h2></div><button type="button" className="icon-button" aria-label={t("Close list editor")} onClick={onClose}><X size={17} /></button></header>
     <p className="material-list-intro">{t("Arrange exact saved files into a readable list. Notes and instructions are copied as context; originals and Notes are not changed.")}</p>
+    <section className="material-list-organizer" aria-labelledby="material-list-organizer-title">
+      <details className="material-list-organizer-options" open={organizerPanelOpen || Boolean(organizerDisclosure)} onToggle={(event) => setOrganizerPanelOpen(event.currentTarget.open)}>
+      <summary id="material-list-organizer-title">{t("Organize with AI")}</summary>
+      <div className="material-list-organizer-body"><p className="material-list-muted">{t("Nothing is sent until you review the exact disclosure and confirm one request. The returned candidate stays separate until you choose to use it.")}</p>
+        {organizerBusy && <button type="button" className="secondary-button compact" onClick={cancelOrganizerRequest}>{t("Cancel request")}</button>}
+      {organizer.snapshot.state === "CHECKING" ? <p className="material-list-status" role="status">{t("Checking material organizer availability…")}</p>
+        : organizer.snapshot.profile && <>
+          <p className="material-list-organizer-profile">{t("Profile {{profile}} ({{provider}}) · destination {{destination}} · model {{model}}", { profile: organizer.snapshot.profile.profile_id, provider: organizer.snapshot.profile.provider, destination: organizer.snapshot.profile.endpoint_host, model: organizer.snapshot.profile.model_id })}</p>
+          {organizer.snapshot.state === "UNAVAILABLE" && <p className="material-list-muted">{organizer.snapshot.reason}</p>}
+          {organizer.snapshot.grant && !organizerDisclosure && !candidate && <button type="button" className="secondary-button compact" onClick={prepareOrganizerDisclosure} disabled={busy || loading || actionPending || !draft || organizerBusy}>{t("Review exact disclosure")}</button>}
+          {!organizer.snapshot.grant && !candidate && <div className="material-list-grant-confirm">
+            <p>{t("Create a separate bounded organizer grant for this exact profile before any material is sent.")}</p>
+            <ul className="material-list-disclosure-facts">
+              <li>{t("Purpose ORGANIZE · data class text.material_list")}</li>
+              <li>{t("Subject classes: {{classes}}", { classes: organizer.snapshot.profile.allowed_subject_classes.join(", ") })}</li>
+              <li>{t("Maximum one request per generation · {{bytes}} bytes · {{seconds}} seconds · expires within 24 hours", { bytes: Math.min(organizer.snapshot.profile.max_bytes ?? MATERIAL_ORGANIZER_LIMITS.inputBytes + MATERIAL_ORGANIZER_LIMITS.outputBytes, MATERIAL_ORGANIZER_LIMITS.inputBytes + MATERIAL_ORGANIZER_LIMITS.outputBytes), seconds: Math.min(organizer.snapshot.profile.max_seconds ?? 90, 90, Math.ceil(organizer.snapshot.profile.timeout_ms / 1000)) })}</li>
+              <li>{t("Profile expires {{expiry}}", { expiry: organizer.snapshot.profile.expiry })}</li>
+            </ul>
+            <label className="material-list-organizer-confirm"><input type="checkbox" checked={grantConfirmed} onChange={(event) => setGrantConfirmed(event.target.checked)} disabled={organizer.authorizing} />{t("I authorize creation of this bounded ORGANIZE grant. This does not send the draft.")}</label>
+            <button type="button" className="secondary-button compact" disabled={!grantConfirmed || organizer.authorizing} onClick={() => { void organizer.authorizeOrganizer().then(() => setGrantConfirmed(false)).catch(() => {}); }}>{organizer.authorizing ? t("Creating ORGANIZE grant…") : t("Authorize this organizer")}</button>
+            {organizer.authorizationError && <p className="material-list-error" role="alert">{organizer.authorizationError}</p>}
+          </div>}
+        </>}
+      {organizer.snapshot.state === "UNAVAILABLE" && !organizer.snapshot.profile && <p className="material-list-muted">{organizer.snapshot.reason}</p>}
+      {organizerDisclosure && <div className="material-list-disclosure">
+        <p>{t("One request includes this exact material-list JSON, copied labels, Notes/Tags context, and complete embedded Skill text when present, combined with the host's fixed organizing instruction. Purpose ORGANIZE · data class text.material_list. No original bytes are included.")}</p>
+        <ul className="material-list-disclosure-facts">
+          <li>{t("Profile {{profile}} ({{provider}}) · destination {{destination}} · model {{model}}", { profile: organizer.snapshot.profile?.profile_id ?? "", provider: organizer.snapshot.profile?.provider ?? "", destination: organizer.snapshot.profile?.endpoint_host ?? "", model: organizer.snapshot.profile?.model_id ?? "" })}</li>
+          <li>{t("Profile digest {{digest}} · model revision {{revision}}", { digest: organizer.snapshot.profile?.profile_digest ?? "", revision: organizer.snapshot.profile?.model_revision ?? "" })}</li>
+          <li>{t("Profile scope · data classes {{dataClasses}} · subject classes {{subjectClasses}}", { dataClasses: organizer.snapshot.profile?.disclosed_data_classes.join(", ") ?? "", subjectClasses: organizer.snapshot.profile?.allowed_subject_classes.join(", ") ?? "" })}</li>
+          <li>{t("One request · {{items}} of {{itemLimit}} occurrences · {{bytes}} of {{byteLimit}} UTF-8 bytes", { items: organizerDisclosure.document.items.length, itemLimit: MATERIAL_ORGANIZER_LIMITS.items, bytes: new TextEncoder().encode(organizerDisclosure.json).byteLength, byteLimit: Math.min(MATERIAL_ORGANIZER_LIMITS.inputBytes, organizer.snapshot.profile?.max_input_bytes ?? MATERIAL_ORGANIZER_LIMITS.inputBytes) })}</li>
+          <li>{t("Live grant {{grant}} · {{requests}} request(s) per generation · {{bytes}} bytes · {{seconds}} seconds · expires {{expiry}}", { grant: organizerDisclosure.grantID, requests: organizer.snapshot.grant?.max_requests ?? 0, bytes: organizer.snapshot.grant?.max_bytes ?? 0, seconds: organizer.snapshot.grant?.max_seconds ?? 0, expiry: organizer.snapshot.grant?.expires_at ?? "" })}</li>
+          <li>{t("Grant scope · data classes {{dataClasses}} · subject classes {{subjectClasses}}", { dataClasses: organizer.snapshot.grant?.data_classes.join(", ") ?? "", subjectClasses: organizer.snapshot.grant?.subject_classes.join(", ") ?? "" })}</li>
+          <li>{t("Candidate output limit {{bytes}} bytes · request deadline {{seconds}} seconds", { bytes: Math.min(MATERIAL_ORGANIZER_LIMITS.outputBytes, organizer.snapshot.profile?.max_output_bytes ?? MATERIAL_ORGANIZER_LIMITS.outputBytes), seconds: Math.min(90, Math.ceil((organizer.snapshot.profile?.timeout_ms ?? 90_000) / 1000)) })}</li>
+          <li>{t("Exact draft digest {{digest}}", { digest: organizerDisclosure.digest })}</li>
+        </ul>
+        <details><summary>{t("Show exact JSON to be sent")}</summary><pre className="material-list-disclosure-json">{organizerDisclosure.json}</pre></details>
+        <details><summary>{t("Review the list context and embedded Skill text")}</summary><pre className="material-list-disclosure-json">{materialListPrompt(organizerDisclosure.document)}</pre><small>{t("The host combines this disclosed material with its fixed organizing instruction.")}</small></details>
+        <label className="material-list-organizer-confirm"><input type="checkbox" checked={organizerConfirmed} onChange={(event) => setOrganizerConfirmed(event.target.checked)} disabled={organizerBusy} />{t("I reviewed this exact draft and authorize one request to this profile under the listed live grant.")}</label>
+        <div className="material-list-organizer-actions"><button type="button" className="secondary-button compact" onClick={() => { setOrganizerDisclosure(undefined); setOrganizerConfirmed(false); setOrganizerPanelOpen(false); }}>{t("Back to editing")}</button><button type="button" className="primary-button compact" onClick={sendOrganizerRequest} disabled={!organizerConfirmed || organizerBusy}>{organizerBusy ? t("Sending one request…") : t("Send one request")}</button></div>
+      </div>}
+      {organizerError && <p className="material-list-error" role="alert">{organizerError}</p>}
+      </div>
+      </details>
+      {candidate && <section className="material-list-candidate" aria-labelledby="material-list-candidate-title">
+        <div className="material-list-candidate-heading"><div><h4 id="material-list-candidate-title">{t("Review organizer candidate")}</h4><p className="material-list-muted">{t("Transient candidate from profile {{profile}}. It has not changed or saved your draft.", { profile: candidate.profileID })}</p></div><button type="button" className="text-button" onClick={() => setCandidate(undefined)}>{t("Reject candidate")}</button></div>
+        {(() => {
+          const summary = summarizeMaterialListCandidate(organizerDisclosure?.document ?? draft ?? candidate.document, candidate.document);
+          return <>
+            <ul className="material-list-candidate-changes">
+              <li>{t("Title: {{original}} → {{candidate}}", { original: draft?.title ?? "", candidate: candidate.document.title })}</li>
+              {summary.titleChanged ? <li>{t("Title changed.")}</li> : <li>{t("Title unchanged.")}</li>}
+              <li>{summary.orderChanged ? t("Order or occurrence set changed.") : t("Order and occurrence set unchanged.")}</li>
+              <li>{summary.contextChanged ? t("Item context changed.") : t("Item context unchanged.")}</li>
+              {summary.labelsChanged && <li>{t("One or more material labels changed.")}</li>}
+              <li>{t("Omitted {{count}} submitted occurrence(s); added {{repeated}} repeated occurrence(s).", { count: summary.omitted, repeated: summary.repeated })}</li>
+              <li>{candidate.document.guide ? t("The original embedded Skill is retained unchanged.") : t("No embedded Skill was present in the original draft.")}</li>
+            </ul>
+            <ol className="material-list-candidate-items">{candidate.document.items.map((item, index) => <li key={`${index}:${item.ref.content_id}:${item.ref.logical_size}`}><strong>{index + 1}. {item.label || t("Untitled material")}</strong><small>{item.ref.content_id} · {item.ref.logical_size} bytes</small>{item.context && <pre>{JSON.stringify(item.context, null, 2)}</pre>}</li>)}</ol>
+          </>;
+        })()}
+        <button type="button" className="primary-button compact" onClick={useOrganizerCandidate}>{t("Use candidate in editor")}</button>
+      </section>}
+    </section>
     <fieldset className="material-list-content" disabled={busy || loading || actionPending || guideLoading}>
     {loading ? <p className="material-list-status" role="status">{t("Reading selected files and Notes…")}</p> : error && !draft ? <div className="material-list-error" role="alert"><p>{error}</p><button type="button" className="secondary-button compact" onClick={() => {
       setError(""); setLoading(true);
@@ -302,7 +516,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
         finally { if (!controller.signal.aborted && contextKeyRef.current === key) setLoading(false); }
       });
     }}>{t("Retry reading selected material")}</button></div> : draft && <>
-      <label className="material-list-title-field">{t("List name")}<input value={draft.title} onChange={(event) => { setDraft((current) => current ? { ...current, title: event.target.value } : current); setError(""); }} /></label>
+      <label className="material-list-title-field">{t("List name")}<input value={draft.title} onChange={(event) => { invalidateOrganizer(); setDraft((current) => current ? { ...current, title: event.target.value } : current); setError(""); }} /></label>
       <div className="material-list-items-heading"><strong>{t("Ordered items")}</strong><small>{t("{{count}} of {{limit}} occurrences", { count: draft.items.length, limit: MATERIAL_LIST_LIMITS.items })}</small></div>
       <ol className="material-list-items">
         {draft.items.map((item, index) => <li className="material-list-item" key={`${index}:${item.ref.content_id}`}>
@@ -314,7 +528,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
             <label>{t("User-authored Notes")}<textarea value={item.context?.notes ?? ""} onChange={(event) => setContext(index, "notes", event.target.value)} /></label>
             <label>{t("Tags as context")}<input value={item.context?.tags ?? ""} onChange={(event) => setContext(index, "tags", event.target.value)} /></label>
           </details>
-          <div className="material-list-item-actions"><button type="button" className="text-button" onClick={() => { setError(""); setFeedback(""); setDraft((current) => current && current.items.length < MATERIAL_LIST_LIMITS.items ? { ...current, items: [...current.items.slice(0, index + 1), { ...item, ref: { ...item.ref }, ...(item.context ? { context: { ...item.context } } : {}) }, ...current.items.slice(index + 1)] } : current); }} disabled={draft.items.length >= MATERIAL_LIST_LIMITS.items}><Plus size={13} />{t("Repeat item")}</button><button type="button" className="text-button danger" onClick={() => { setError(""); setFeedback(""); setDraft((current) => current ? { ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) } : current); }}><X size={13} />{t("Remove")}</button></div>
+          <div className="material-list-item-actions"><button type="button" className="text-button" onClick={() => { invalidateOrganizer(); setError(""); setFeedback(""); setDraft((current) => current && current.items.length < MATERIAL_LIST_LIMITS.items ? { ...current, items: [...current.items.slice(0, index + 1), { ...item, ref: { ...item.ref }, ...(item.context ? { context: { ...item.context } } : {}) }, ...current.items.slice(index + 1)] } : current); }} disabled={draft.items.length >= MATERIAL_LIST_LIMITS.items}><Plus size={13} />{t("Repeat item")}</button><button type="button" className="text-button danger" onClick={() => { invalidateOrganizer(); setError(""); setFeedback(""); setDraft((current) => current ? { ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) } : current); }}><X size={13} />{t("Remove")}</button></div>
         </li>)}
       </ol>
       {draft.items.length === 0 && <p className="material-list-muted">{t("This is an intentionally empty list.")}</p>}
@@ -324,10 +538,10 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
         <label>{t("Choose a saved .txt or .md file")}<select value={selectedGuideEntryID} disabled={guideLoading || busy} onChange={(event) => { const hit = guideCandidates.find((candidate) => candidate.entry_id === event.target.value); if (hit) chooseGuide(hit); }}><option value="" disabled>{t("Choose from loaded files")}</option>{guideCandidates.map((hit) => <option key={`${hit.entry_id}:${hit.content_id}`} value={hit.entry_id}>{hit.name}</option>)}</select></label>
         {guideLoading && <p role="status">{t("Reading and checking the selected Skill…")}</p>}
         {guideError && <div className="material-list-error" role="alert"><p>{guideError}</p>{guideHit && <button type="button" className="text-button" onClick={() => chooseGuide(guideHit)} disabled={guideLoading}>{t("Retry reading selected Skill")}</button>}</div>}
-        <label>{t("Skill name")}<input value={guideName} onChange={(event) => { setGuideName(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
-        <label>{t("Skill instructions")}<textarea value={guideBody} onChange={(event) => { setGuideBody(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
+        <label>{t("Skill name")}<input value={guideName} onChange={(event) => { invalidateOrganizer(); setGuideName(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
+        <label>{t("Skill instructions")}<textarea value={guideBody} onChange={(event) => { invalidateOrganizer(); setGuideBody(event.target.value); setGuideSource(undefined); setGuideError(""); }} /></label>
         <small>{t("Skill text size: {{bytes}} / {{limit}} UTF-8 bytes.", { bytes: guideBytes, limit: MATERIAL_LIST_LIMITS.guideBytes })} {t("Saving revised instructions creates a new Skill file; earlier lists keep their original instructions.")}</small>
-        {(guideBody || guideName || guideSource) && <button type="button" className="text-button" onClick={() => { setGuideBody(""); setGuideName(""); setGuideSource(undefined); setGuideHit(undefined); }}>{t("Remove instructions")}</button>}
+        {(guideBody || guideName || guideSource) && <button type="button" className="text-button" onClick={() => { invalidateOrganizer(); setGuideBody(""); setGuideName(""); setGuideSource(undefined); setGuideHit(undefined); }}>{t("Remove instructions")}</button>}
       </details>
       <details className="material-list-import">
         <summary>{t("Import an organized JSON result")}</summary>

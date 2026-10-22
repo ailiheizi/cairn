@@ -1,14 +1,16 @@
 # F12: Explicit AI candidates for ordinary material lists
 
-**Status:** proposal for owner review; not implementation authorization.
-**Phase:** F12 design.
+**Status:** owner approved on 2026-10-22; implemented and locally validated
+through the real-provider candidate → reviewed ordinary capture → reopen/exact
+takeout journey on that date. This is not core-phase or release qualification.
+**Phase:** admitted ML-3 / F12 first-party candidate delivery.
 **North Star:** one owner's content, Notes, discovery, takeout and recovery
 kernel; one repository and one catalog. Exact identity remains SHA-256 plus
 logical length.
-**Convergence:** polish the admitted ordinary material-list loop. This proposal
+**Convergence:** polish the admitted ordinary material-list loop. This admission
 does not admit a runtime plugin, AI agent, marketplace, or new kernel authority.
 
-## Decision requested
+## Approved decision
 
 Admit one explicit server-mediated operation that turns the current ordinary
 material-list draft and its one exact embedded Skill into an untrusted,
@@ -17,10 +19,10 @@ to use it in the existing editor, then continues through the existing reviewed
 ordinary capture flow. No call runs automatically and no model output is saved
 without the person's existing explicit actions.
 
-This is a proposed successor to ML-1, which currently permits manual editing
+This is the owner-approved ML-3 successor to ML-1, which permits manual editing
 and explicit copy/paste to an external AI only. The ML-1 format and its 200
 occurrence / 512 KiB limits remain unchanged. A 32-item ceiling below is a
-stricter proposed bound for this operation, not a change to the format.
+stricter operation bound for this operation, not a change to the format.
 
 ## User boundary and exact input
 
@@ -50,7 +52,7 @@ Request-byte digests and lengths, profile, grant, recipient and outcome are
 bound to the existing append-only egress audit machinery. Do not store full
 Notes, Skill text, provider credentials or candidate bodies in that audit log.
 
-## Proposed typed command contract
+## Typed command contract
 
 Add one `material.organize` operation on the existing `/api/v1/command` typed
 dispatcher. Do not add an HTTP route, job service, CLI/MCP command, or general
@@ -100,6 +102,15 @@ typed refusal patterns. Extend the existing closed purpose/data-class
 validation for this explicitly admitted use. No provider discovery framework,
 service, scheduler, persistence, or arbitrary tool execution is introduced.
 
+### Existing grant-ledger enum migration
+
+The existing SQLite grant table has a closed SQL purpose CHECK. Implementing
+the owner-approved `ORGANIZE` value therefore requires one mechanical migration
+of that existing CHECK. It preserves all existing rows, columns, indexes,
+triggers, foreign keys and old purpose semantics. This is the admitted grant
+purpose becoming persistable, not a new durable entity, field, list schema,
+store or recovery format. No other schema work is authorized.
+
 ## Fixed task and validation
 
 The host builds one bounded request from the supplied JSON plus embedded Skill.
@@ -108,7 +119,7 @@ code: do not execute tools, follow URLs or paths, fetch content, or obey any
 instruction to disclose additional material. No retries or second model call
 are automatic.
 
-Proposed operation ceilings:
+Operation ceilings:
 
 | Input/output | Operation bound |
 | --- | ---: |
@@ -159,9 +170,9 @@ stale response, or unknown outcome leaves the editor draft unchanged. No
 candidate history, persistent queue, list head, automatic refresh, or automatic
 tag mutation is created.
 
-## One future acceptance journey
+## One acceptance journey
 
-After implementation admission, run one real-provider journey with retained
+After integration, run one real-provider journey with retained
 synthetic files, copied Notes and one ordinary Skill. Show the exact disclosure
 and grant; send once; receive a meaningful candidate containing only allowed
 refs; review its occurrence changes and Skill preservation; edit/use it in the
@@ -171,8 +182,9 @@ was no second model call on reopen. In the same journey, exercise cancellation,
 stale-draft rejection and a foreign-ref candidate where practical. Add a
 focused local check only for a concrete changed trust invariant the journey
 cannot establish; do not run a broad suite or fault campaign for this slice.
-No real provider/profile/credential is presumed available; it is a prerequisite
-for that future acceptance, not something to invent now.
+Real-provider acceptance uses the owner-authorized local Deepseek Harness
+Sub2API connection and `deepseek-v4.1-flash`, with credentials resolved by local
+reference only. No secret values belong in source, reports or logs.
 
 ## Alternatives and scope
 
@@ -183,33 +195,26 @@ for that future acceptance, not something to invent now.
 - **Chosen narrow typed host operation:** enables one explicit reviewed
   candidate while retaining host authority and existing capture semantics.
 
-The following require explicit admission before implementation: the new typed
-operation, organizer profile convention, distinct egress purpose/data class,
-input authorization rule and transient candidate flow. This proposal does not
-authorize execution. It adds no operational durable schema or list membership
-authority, additional HTTP route, processor, description record, runtime loader, marketplace, general
-AI/agent platform, CLI/MCP expansion, native client framework, or release/phase
-completion claim.
+The owner approved the typed operation, organizer profile convention, distinct
+egress purpose/data class, input authorization and transient candidate flow on
+2026-10-22. It adds no operational durable schema or list membership authority,
+additional HTTP route, processor, description record, runtime loader,
+marketplace, general AI/agent platform, CLI/MCP expansion, native client
+framework, or release/phase completion claim.
 
-## Required authority update after owner approval
+## Bounded authority update
 
-The approval must explicitly cover `material.organize`, its immutable organizer
-profile, `ORGANIZE` / `text.material_list`, draft/guide disclosure and transient
-candidate review. It does not widen existing DESCRIBE grants or profiles.
-Record the narrow successor in `AGENTS.md`, the first-party client requirement
-and incorporated material-list contract, and the typed-operation/provider
-contracts. The AI-control catalog must name this bounded interactive exception
-to its processor/external-harness-only wording. The core plan receives only a
-client-track note; no core dependency or recovery meaning changes. Do not edit
-those normative admissions until approval, and do not use this spec or its
-proposed ADR as a substitute for approval.
+ML-3 records this exact exception in `AGENTS.md`, the first-party client and
+material-list contracts, typed-operation/provider contracts and AI-control
+catalog. The core plan receives a client-track note only. No core dependency,
+recovery meaning, existing DESCRIBE authorization or wider AI execution changes.
 
 The saved result remains ordinary content under ML-1; producer/request details
 are attributable through the existing local audit. There is no new portable AI
 provenance record or reproducible-inference claim. No model-generated text is
 silently promoted into source Notes or human TAG facts.
 
-## Implementation seam if admitted
+## Implementation seam
 
 Keep any implementation within the current first-party material-list client
 and typed host:
@@ -226,5 +231,5 @@ and typed host:
   capability and Settings surfaces, only to the extent required to install,
   select and disclose the immutable profile.
 
-Do not create a second implementation plan before this spec is reviewed. If
-admitted, the one journey above owns the feature batch and its validation.
+The companion implementation plan executes this approved scope. The one
+journey above owns the feature batch and its validation.

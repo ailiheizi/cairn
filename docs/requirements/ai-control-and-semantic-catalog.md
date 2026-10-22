@@ -11,6 +11,13 @@ AI participates through two ordinary boundaries:
 
 Exact ingest, storage, verification, restore, and lexical/structured degraded discovery remain useful when learned processors are unavailable. A qualified `RW-MVP-1` default discovery installation nevertheless includes the pinned local text-embedding processor and zvec generation; disabling them is an explicit degraded state, not an alternate completed default.
 
+The owner-approved [ML-3 interactive list task](first-party-client-experiences.md#ml-3-explicit-model-candidate-for-a-current-material-list)
+is one narrow additional host call over explicitly supplied ordinary draft
+text. It returns an untrusted transient candidate, invokes no tools/content
+processors, and writes no annotations or domain state. Separate disclosure,
+profile/grant purpose and human editor acceptance are mandatory. This exception
+does not admit a general LLM runtime, agent loop or autonomous organization.
+
 This is the operator-facing catalog, annotation, and AI-authority profile. Provider capability schemas, semantic artifact envelopes, lifecycle identifiers, feature-space identity, index-generation protocol, and query wire contracts are defined by [External AI and Semantic Extension Requirements](external-ai-and-semantic-extensions.md). Processor mechanics are defined by [Extension System Requirements](plugin-system.md) and [Driver and Processor Interface Requirements](driver-and-processor-interfaces.md). Client transport behavior is defined by [CLI and MCP Contract](cli-and-mcp-contract.md).
 
 This document does not define a second processor, artifact, index, or query protocol. The provider and artifact contracts in the external-extension requirements govern those technical details; this profile governs what operators can expect to see, preserve, control, and authorize.

@@ -45,12 +45,13 @@ const (
 	EgressPurposeDocument = string(SemanticEmbeddingDocument)
 	EgressPurposeQuery    = string(SemanticEmbeddingQuery)
 	EgressPurposeDescribe = "DESCRIBE"
+	EgressPurposeOrganize = "ORGANIZE"
 )
 
 // ValidEgressPurpose reports whether value is a grant purpose this build
 // admits.
 func ValidEgressPurpose(value string) bool {
-	return value == EgressPurposeDocument || value == EgressPurposeQuery || value == EgressPurposeDescribe
+	return value == EgressPurposeDocument || value == EgressPurposeQuery || value == EgressPurposeDescribe || value == EgressPurposeOrganize
 }
 
 // EgressDataClassForPurpose maps one admitted purpose onto the data class the
@@ -58,6 +59,9 @@ func ValidEgressPurpose(value string) bool {
 func EgressDataClassForPurpose(purpose string) string {
 	if purpose == EgressPurposeQuery {
 		return EgressDataClassTextQuery
+	}
+	if purpose == EgressPurposeOrganize {
+		return EgressDataClassTextMaterialList
 	}
 	return EgressDataClassTextSegment
 }

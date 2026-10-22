@@ -2949,12 +2949,12 @@ See the [detailed design and functional checklists](../superpowers/specs/2026-10
 and [current function plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
 
 
-## ADR-071: Propose one explicit material-list AI candidate operation
+## ADR-071: Admit one explicit material-list AI candidate operation
 
-**Date:** 2026-10-22. **Status:** Proposed for owner review; not implementation
-admission. F11 correction/reuse is delivered locally; F12 remains unimplemented.
+**Date:** 2026-10-22. **Status:** Accepted by the owner for bounded ML-3
+implementation. F12 implementation and real-provider acceptance are pending.
 
-**Proposed decision:** Add a bounded `material.organize` typed operation over the
+**Decision:** Add a bounded `material.organize` typed operation over the
 existing local command route. The server sends only an explicitly reviewed
 ordinary-list draft and its frozen Skill to one operator-selected online
 profile; a valid response is a transient candidate. The person explicitly uses
@@ -2970,23 +2970,28 @@ persistence. Browser-held provider keys would bypass the existing host grant
 and protection boundaries. A separate narrow task reuses those boundaries
 without adding an agent platform, database, scheduler or tool execution.
 
-**Proposed bounds:** At most 32 input/candidate occurrences, 128 KiB serialized
+**Bounds:** At most 32 input/candidate occurrences, 128 KiB serialized
 input, 512 KiB candidate, existing 64 KiB Skill limit, one provider request and
 90 seconds, further restricted by the configured profile/grant. No implicit
 original-body/EXTRACT/image/audio reads. Input snapshots, exact refs and guide
 identity bind review; foreign refs, stale/cancelled results and invalid JSON
 leave the editor draft intact. Existing ML-1 200-item content format is unchanged.
 
-**Admission needed:** One immutable organizer profile, distinct `ORGANIZE`
-purpose and `text.material_list` class, typed-operation contract and bounded
-interactive exception in the AI-control/client requirements. Current ML-1
-copy/paste admission does not authorize this model call. Existing DESCRIBE
-profiles/grants do not automatically cover it. No normative gate is changed
-by recording this proposal.
+**Admission:** The owner explicitly approved one immutable organizer profile,
+distinct `ORGANIZE` purpose and `text.material_list` class, typed operation and
+bounded interactive client exception. Existing DESCRIBE profiles/grants do not
+authorize it. Phase order, recovery authority and all unrelated gates remain.
 
 **Delivery:** The [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
-defines request/review/exit behavior. After approval, Luna implements the whole
+defines request/review/exit behavior. Luna implements the whole
 selected flow, root reviews, and one real-provider journey demonstrates
 candidate → human review/edit → single confirmed capture → reopen/use with
 unchanged originals and no model call on reopen. A design, interface or fixture
 response is not F12 delivery or release qualification.
+
+**ML-3 persistence clarification:** The existing grant table enforces a closed
+SQL purpose CHECK. The admitted ORGANIZE purpose includes one mechanical
+CHECK-widening migration of that same ledger, preserving all records, fields,
+indexes, triggers and foreign keys. It does not introduce a durable list schema,
+new record kind, metadata service or recovery format. The existing-DB journey
+must establish old grants remain intact while the new purpose can be used.

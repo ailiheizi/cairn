@@ -56,6 +56,21 @@ for unique file targets, with repeated targets visibly described as exported
 once. It MUST NOT claim ordered or occurrence-preserving export. No new kernel
 format, endpoint, provider, processor, list head or persistence is admitted.
 
+### ML-3: Explicit model candidate for a current material list
+
+The owner's 2026-10-22 approval admits only the F12 scope in the
+[approved specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
+and incorporated [ML-3 client contract](../technical/material-list-client-contract.md#explicit-ai-candidates-ml-3).
+A person reviews the exact current draft/Skill disclosure and invokes the
+host's `material.organize` operation through a separately authorized organizer
+profile. The result MUST remain transient until explicitly used in the editor;
+ordinary reviewed capture is still the only save. No original/EXTRACT/media
+reads, automatic scope selection, source Notes/TAG writes, tool execution,
+background refresh or durable candidate/head are admitted. The 32-occurrence,
+128 KiB input, 512 KiB candidate, 64 KiB Skill, one-request and 90-second bounds
+intersect with stricter profile/grant limits. This exception adds no kernel
+membership authority, operational schema, recovery record or phase credit.
+
 ## 2. Shared authority and migration analysis
 
 All content, subject/file-version resolution, protection, facts, tags, Notes,

@@ -132,14 +132,14 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
   const sectionConfigParts: Record<SettingsSection, unknown[]> = {
     storage: [config.storage ?? {}, config.paths ?? {}],
     search: [config.semantic ?? {}],
-    descriptions: [config.descriptions ?? {}],
+    descriptions: [config.descriptions ?? {}, config.organizing ?? {}],
     recovery: [config.recovery ?? {}],
     service: [config.api ?? {}],
   };
   const savedSectionConfigParts: Record<SettingsSection, unknown[]> = {
     storage: [savedConfig.storage ?? {}, savedConfig.paths ?? {}],
     search: [savedConfig.semantic ?? {}],
-    descriptions: [savedConfig.descriptions ?? {}],
+    descriptions: [savedConfig.descriptions ?? {}, savedConfig.organizing ?? {}],
     recovery: [savedConfig.recovery ?? {}],
     service: [savedConfig.api ?? {}],
   };
@@ -256,6 +256,7 @@ export function SettingsDialog({ t, locale, settings, appearance, libraryViews, 
                     : t("No installed description provider profile is available. On-demand generation remains unavailable.")}</ConfigNotice>
                   : <ConfigNotice>{t("Installed profile metadata does not prove credentials or provider health. A separate DESCRIBE grant is required, and each description still needs your confirmation.")}</ConfigNotice>}
               <ConfigGroup title={t("Notes storage")} copy={t("Your notes are always available; imported, extracted, and AI-created text appears in this same Notes list.")}><div className="form-grid two"><ConfigToggle label={t("Keep additional notes")} copy={t("Keep imported, extracted, and generated text alongside your notes.")} checked={Boolean(config.descriptions?.enabled)} onChange={(value) => { settings.setConfigField("descriptions", "enabled", value); settings.setConfigField("descriptions", "generate", value ? "on_demand" : "disabled"); if (value) settings.setConfigField("descriptions", "retain_full_text", true); }} /><ConfigSelect label={t("Generation")} value={config.descriptions?.generate} onChange={(value) => settings.setConfigField("descriptions", "generate", value)} options={config.descriptions?.generate === "on_ingest" ? [{ value: "on_ingest", label: t("on_ingest (recorded; this build does not run it)") }] : [{ value: "disabled", label: t("Disabled") }, { value: "on_demand", label: t("On demand") }]} disabled={!config.descriptions?.enabled} /><ConfigInput label={t("Provider profile")} value={config.descriptions?.provider_profile} placeholder="optional-describe-profile" onChange={(value) => settings.setConfigField("descriptions", "provider_profile", value)} disabled={!config.descriptions?.enabled || config.descriptions?.generate === "disabled"} /><ConfigInput label={t("Credential reference")} value={config.descriptions?.credential_ref} placeholder="keychain://cairn/notes" onChange={(value) => settings.setConfigField("descriptions", "credential_ref", value)} disabled={!config.descriptions?.enabled || config.descriptions?.generate === "disabled"} /><ConfigToggle label={t("Retain full text")} copy={t("Required when model-generated notes are enabled.")} checked={Boolean(config.descriptions?.retain_full_text)} onChange={(value) => settings.setConfigField("descriptions", "retain_full_text", value)} disabled={config.descriptions?.enabled && config.descriptions?.generate !== "disabled"} /></div></ConfigGroup>
+              <ConfigGroup title={t("Material-list organizer")} copy={t("Install the immutable organizer profile on the service, then select its profile name here. Restart Cairn after changing it. The installed profile stores only a credential reference; the service resolves the secret. Never enter keys in the browser.")}><div className="form-grid"><ConfigInput label={t("Installed organizer profile name")} value={config.organizing?.provider_profile} placeholder="organizer-profile-id" onChange={(value) => settings.setConfigField("organizing", "provider_profile", value)} wide /></div></ConfigGroup>
               <ConfigGroup title={t("Installed description profiles")} copy={t("This read-only list uses the configured models path. It does not resolve credentials, contact a provider, or activate a profile.")}>
                 {egressFacts.state === "UNAVAILABLE" && <ConfigNotice kind="warning">{t("Egress grant facts are unavailable; grant actions are disabled: {{reason}}", { reason: egressFacts.reason || t("reason not reported") })}</ConfigNotice>}
                 {egressFacts.state === "LOADING" && <p role="status">{t("Reading installed description profiles…")}</p>}

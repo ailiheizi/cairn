@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { createTranslator, resolveInitialLocale } from "./i18n";
-import type { Locale } from "./i18n";
+import type { Locale, Translator } from "./i18n";
 import { command } from "./app/command";
 import { endpoints, operations } from "./lib/operations";
 import { parseHashView, writeHashView } from "./lib/hashView";
@@ -29,6 +29,7 @@ import { useAudioPlayback } from "./app/useAudioPlayback";
 import { useMusicMetadata } from "./app/useMusicMetadata";
 import { useFavorites } from "./app/useFavorites";
 import { useOriginalTakeout } from "./app/useOriginalTakeout";
+import { useMaterialOrganizer } from "./app/useMaterialOrganizer";
 import { resolveArchiveSelectionSizes } from "./lib/originalArchive";
 import { projectMaterialListActions, type MaterialListAction } from "./lib/materialListActions";
 import { downloadOriginal } from "./lib/contentDownload";
@@ -67,6 +68,22 @@ import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummar
 const semanticDimension = "semantic-embedding";
 const lexicalDimension = "lexical-metadata-fts";
 const semanticProvider = "query.semantic.onnx-bge-zvec.v1";
+
+type MaterialListComposerHostProps = {
+  t: Translator;
+  workspaceID: string;
+  subjects: SearchHit[];
+  catalogItems: SearchHit[];
+  initialDocument?: MaterialListDocument;
+  busy: boolean;
+  onClose: () => void;
+  onSaveFiles: (files: File[]) => void;
+};
+
+function MaterialListComposerHost(props: MaterialListComposerHostProps) {
+  const organizer = useMaterialOrganizer(props.workspaceID, props.t);
+  return <MaterialListComposer {...props} organizer={organizer} />;
+}
 
 function App() {
   const [locale, setLocale] = useState<Locale>(resolveInitialLocale);
@@ -1306,7 +1323,7 @@ function App() {
       onDismissNotice={() => setNotice(undefined)}
     />}
     {materialListEditorOpen && materialListEditor && <div className="settings-backdrop" style={{ zIndex: 42 }} onMouseDown={(event) => { if (event.target === event.currentTarget) setMaterialListEditor(undefined); }}>
-      <MaterialListComposer
+      <MaterialListComposerHost
         t={t}
         workspaceID={materialListEditor.workspaceID}
         subjects={materialListEditor.subjects}

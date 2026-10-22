@@ -435,12 +435,12 @@ func TestSemanticEgressOutputDigestIsDeterministicAndBound(t *testing.T) {
 }
 
 func TestEgressScopeVocabularyIsClosed(t *testing.T) {
-	// The closed data-class vocabulary is the two embedding classes plus the
-	// two additive describe-family classes.
-	if len(EgressDataClasses()) != 4 {
+	// The closed data-class vocabulary includes the embedding, describe, image,
+	// and admitted material-list organizer classes.
+	if len(EgressDataClasses()) != 5 {
 		t.Fatalf("data classes = %+v", EgressDataClasses())
 	}
-	for _, class := range []string{EgressDataClassTextSegment, EgressDataClassTextQuery, EgressDataClassTextSubjectContext, EgressDataClassImageBytes} {
+	for _, class := range []string{EgressDataClassTextSegment, EgressDataClassTextQuery, EgressDataClassTextSubjectContext, EgressDataClassImageBytes, EgressDataClassTextMaterialList} {
 		if !ValidEgressDataClass(class) {
 			t.Fatalf("data class %q must be valid", class)
 		}
@@ -455,11 +455,12 @@ func TestEgressScopeVocabularyIsClosed(t *testing.T) {
 		t.Fatal("an unknown subject class must be refused")
 	}
 	if !ValidEgressPurpose(EgressPurposeDocument) || !ValidEgressPurpose(EgressPurposeQuery) ||
-		!ValidEgressPurpose(EgressPurposeDescribe) || ValidEgressPurpose("OTHER") {
-		t.Fatal("purpose vocabulary must be exactly DOCUMENT, QUERY, and DESCRIBE")
+		!ValidEgressPurpose(EgressPurposeDescribe) || !ValidEgressPurpose(EgressPurposeOrganize) || ValidEgressPurpose("OTHER") {
+		t.Fatal("purpose vocabulary must be exactly DOCUMENT, QUERY, DESCRIBE, and ORGANIZE")
 	}
 	if EgressDataClassForPurpose(EgressPurposeQuery) != EgressDataClassTextQuery ||
-		EgressDataClassForPurpose(EgressPurposeDocument) != EgressDataClassTextSegment {
+		EgressDataClassForPurpose(EgressPurposeDocument) != EgressDataClassTextSegment ||
+		EgressDataClassForPurpose(EgressPurposeOrganize) != EgressDataClassTextMaterialList {
 		t.Fatal("data class mapping does not match the purpose vocabulary")
 	}
 }

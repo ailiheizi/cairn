@@ -49,7 +49,7 @@ func (d *Dispatcher) handleEgressGrantCreate(ctx context.Context, env command.En
 	}
 	purpose := strings.ToUpper(strings.TrimSpace(input.Purpose))
 	if !search.ValidEgressPurpose(purpose) {
-		return invalidInputResult(env, started, fmt.Errorf("purpose %q must be DOCUMENT, QUERY, or DESCRIBE", input.Purpose))
+		return invalidInputResult(env, started, fmt.Errorf("purpose %q must be DOCUMENT, QUERY, DESCRIBE, or ORGANIZE", input.Purpose))
 	}
 	if err := validateEgressGrantClasses(input.DataClasses, search.ValidEgressDataClass, "data_classes"); err != nil {
 		return invalidInputResult(env, started, err)
@@ -69,7 +69,7 @@ func (d *Dispatcher) handleEgressGrantCreate(ctx context.Context, env command.En
 	if !expiresAt.UTC().After(now) {
 		return invalidInputResult(env, started, errors.New("expires_at must be in the future"))
 	}
-	if d == nil || (strings.TrimSpace(d.onlineProviderModelsRoot) == "" && strings.TrimSpace(d.describeModelsRoot) == "") {
+	if d == nil || (strings.TrimSpace(d.onlineProviderModelsRoot) == "" && strings.TrimSpace(d.describeModelsRoot) == "" && strings.TrimSpace(d.materialOrganizeModelsRoot) == "") {
 		return failed(env, started, newReason(ReasonCodeUnavailable,
 			"no models root is configured; the grant cannot be verified against an installed provider profile"))
 	}
@@ -77,7 +77,7 @@ func (d *Dispatcher) handleEgressGrantCreate(ctx context.Context, env command.En
 	// never a free-floating destination decision. The installed profile may be
 	// an online embedding profile or a describe profile; both families share
 	// the same egress scope shape and the same durable grant ledger.
-	target, found, err := d.resolveEgressGrantProfile(profileID)
+	target, found, err := d.resolveEgressGrantProfile(profileID, purpose)
 	if err != nil {
 		return failed(env, started, newReason(ReasonCodeUnavailable, "reading the installed provider profile: "+err.Error()))
 	}
@@ -160,7 +160,35 @@ type egressGrantProfileTarget struct {
 // The online embedding family is tried first; a describe profile is admitted
 // as the second family so one durable grant ledger serves both. A profile that
 // is installed in neither root is reported as not found.
-func (d *Dispatcher) resolveEgressGrantProfile(profileID string) (egressGrantProfileTarget, bool, error) {
+// purpose-specific profile binding prevents a same-named profile from a
+// different provider family from authorizing this grant.
+func (d *Dispatcher) resolveEgressGrantProfile(profileID, purpose string) (egressGrantProfileTarget, bool, error) {
+	if purpose == search.EgressPurposeOrganizeMaterialList {
+		if strings.TrimSpace(d.materialOrganizeModelsRoot) == "" {
+			return egressGrantProfileTarget{}, false, nil
+		}
+		profile, err := search.LoadOnlineOrganizeProfile(d.materialOrganizeModelsRoot, profileID)
+		if err != nil {
+			if !errors.Is(err, search.ErrInvalidOnlineOrganizeProfile) || !strings.Contains(err.Error(), "is not installed") {
+				return egressGrantProfileTarget{}, false, err
+			}
+			return egressGrantProfileTarget{}, false, nil
+		}
+		return egressGrantProfileTarget{digest: profile.ProviderProfileDigest(), endpointHost: profile.EndpointHost(), modelID: profile.ModelID, egress: profile.Egress}, true, nil
+	}
+	if purpose == search.EgressPurposeDescribe {
+		if strings.TrimSpace(d.describeModelsRoot) == "" {
+			return egressGrantProfileTarget{}, false, nil
+		}
+		profile, err := search.LoadOnlineDescribeProfile(d.describeModelsRoot, profileID)
+		if err != nil {
+			if !errors.Is(err, search.ErrInvalidOnlineDescribeProfile) || !strings.Contains(err.Error(), "is not installed") {
+				return egressGrantProfileTarget{}, false, err
+			}
+			return egressGrantProfileTarget{}, false, nil
+		}
+		return egressGrantProfileTarget{digest: profile.ProviderProfileDigest(), endpointHost: profile.EndpointHost(), modelID: profile.ModelID, egress: profile.Egress}, true, nil
+	}
 	if strings.TrimSpace(d.onlineProviderModelsRoot) != "" {
 		profile, err := search.LoadOnlineEmbeddingProfile(d.onlineProviderModelsRoot, profileID)
 		if err == nil {
@@ -170,18 +198,6 @@ func (d *Dispatcher) resolveEgressGrantProfile(profileID string) (egressGrantPro
 			}, true, nil
 		}
 		if !errors.Is(err, search.ErrInvalidOnlineEmbeddingProfile) || !strings.Contains(err.Error(), "is not installed") {
-			return egressGrantProfileTarget{}, false, err
-		}
-	}
-	if strings.TrimSpace(d.describeModelsRoot) != "" {
-		profile, err := search.LoadOnlineDescribeProfile(d.describeModelsRoot, profileID)
-		if err == nil {
-			return egressGrantProfileTarget{
-				digest: profile.ProviderProfileDigest(), endpointHost: profile.EndpointHost(),
-				modelID: profile.ModelID, egress: profile.Egress,
-			}, true, nil
-		}
-		if !errors.Is(err, search.ErrInvalidOnlineDescribeProfile) || !strings.Contains(err.Error(), "is not installed") {
 			return egressGrantProfileTarget{}, false, err
 		}
 	}

@@ -23,7 +23,7 @@ The Core MVP Execution Plan still owns core phase order.
 | Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
 | Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
 | Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
-| Proposed next feature | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | Concrete candidate-flow spec / ADR-071 awaiting owner review; unimplemented |
+| Locally delivered | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | ML-3 real-model candidate → reviewed capture → reopen / exact takeout; no phase or release credit |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
 The owner clarified the 2026-10-22 direction: build the Web application once,
@@ -77,14 +77,13 @@ operation returns an ephemeral material-list candidate: `description.generate`
 writes a subject description and cannot be repurposed for this task.
 
 The [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
-and [proposed ADR-071](build-stack-and-architecture-selection.md#adr-071-propose-one-explicit-material-list-ai-candidate-operation)
+and [ADR-071](build-stack-and-architecture-selection.md#adr-071-admit-one-explicit-material-list-ai-candidate-operation)
 define one explicit server-mediated candidate from the current draft and Skill,
 followed by human editor acceptance and ordinary capture. They name the needed
 new typed operation, immutable organizer profile and separate egress purpose /
 data class. No model call, application build or test ran; this is design, not a
-delivered capability. Current normative admissions and core phase gates are
-unchanged. Owner review and a real operator-selected profile are prerequisites
-for implementation and real-provider acceptance respectively.
+delivered capability. This design checkpoint preceded the owner approval
+recorded below; the core phase gates remain unchanged.
 
 ## F11 Skill correction and reuse — 2026-10-22
 
@@ -368,3 +367,61 @@ These aliases keep existing repository links working. Each takes readers to the 
 <a id="saved-retrieval-and-restore-continuation--2026-10-19"></a>
 
 - [Saved retrieval and restore continuation](../history/product-experience-ledger-through-20261020.md#saved-retrieval-and-restore-continuation--2026-10-19)
+
+## F12 implementation admission — 2026-10-22
+
+The owner approved the exact F12 scope, including the new typed operation,
+organizer profile and distinct egress boundary. ML-3 is recorded in the agent,
+client, provider and operation contracts. Backend and client implementation run
+in parallel under the [single implementation plan](../superpowers/plans/2026-10-22-material-ai-candidates.md).
+The owner authorized the existing local DSH Sub2API `deepseek-v4.1-flash`
+connection for real-provider acceptance, using a credential reference only.
+Connection metadata was found; no model call or feature acceptance has occurred.
+No implementation or phase completion credit is awarded by these documents.
+
+## F12 real-provider delivery — 2026-10-22
+
+Implemented and locally validated: select ordinary exact saved material,
+copy/edit Notes context and one Skill, explicitly inspect/authorize disclosure,
+receive a separate AI candidate, use it in the ordinary editor, confirm one
+capture, reopen the result and take out the exact originals. Settings > Notes
+selects the installed organizer profile; private credentials stay server-side
+references. Manual and external copy/paste organization remain available.
+
+The real route was the owner-authorized local DSH Sub2API connection,
+`deepseek-v4.1-flash`, with an honest `not-reported-by-provider` revision.
+The passing journey used an immutable 8,192-output-token / 90-second profile,
+explicit `ORGANIZE` / `text.material_list` grant, retained Source-A/B and their
+copied Note, and an exact 573-byte corrected Skill. The candidate followed the
+explicit requested title and B→A order, added request-based reasons, retained
+the Note and Skill, and introduced no foreign refs. Candidate acceptance did
+not save automatically. One `plan.apply` saved the 1,947-byte ordinary list and
+573-byte ordinary Skill. Reopening did not invoke AI. Reading stored list bytes
+through `content.open` → `content.read` verified SHA-256/length, title, order,
+Skill and context. ZIP takeout independently matched Source-A (107 bytes) and
+Source-B (103 bytes); source annotations remained unchanged.
+
+Existing ignored evidence is in `dist/material-ai-20261022/acceptance/`:
+`organize-success-05.json`, `capture-success-05.json`, `journey-success-05.json`,
+`original-takeout-05.zip`, the saved-byte readback and local boundary-check
+records, and `screenshots/f12-final-reader-with-reasons.png`. The boundary
+continuation used local response interception only: cancellation/late response,
+edited-draft staleness and foreign refs left the draft unchanged and created no
+capture or actual provider request. It is client evidence, not real inference.
+
+Four real provider requests occurred during development: a malformed response,
+a valid but unchanged candidate from ambiguous instructions, a provider HTTP
+520, and the passing explicit-Skill journey. The earlier protection-class
+refusal sent nothing. No automatic retry or model call on reopen is claimed.
+The upstream 520 remains a possible external failure; it is reported without
+changing the draft or saving a candidate. Grants are per-run budgets and remain
+live until expiry/revocation, not single-use tokens.
+
+The existing grant-ledger CHECK-only migration was additionally checked with
+one focused genuine-v27 migration test because the journey fixture had no old
+grants to preserve. The test retained a prior DESCRIBE grant/revocation and
+constraints while permitting ORGANIZE; the existing closed-vocabulary check
+also passed. No broad Go/E2E suite, new test framework, model fixture claim,
+core-phase closure or release qualification follows. The current ref resolver
+uses the existing latest-workspace listing; its lookup cost can grow with the
+catalog and is not a new indexed lookup capability.

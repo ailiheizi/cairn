@@ -35,6 +35,9 @@ const (
 	// DESCRIBE_SUBJECT request may carry as a base64 data URL part. The class
 	// lives in the describe family; an embedding request never carries it.
 	EgressDataClassImageBytes = "image.bytes"
+	// EgressDataClassTextMaterialList names user-submitted list JSON and its
+	// embedded Skill, including copied Notes. It is never subject EXTRACT text.
+	EgressDataClassTextMaterialList = "text.material_list"
 )
 
 // EgressDataClasses returns the closed data-class vocabulary in stable order.
@@ -45,7 +48,7 @@ const (
 func EgressDataClasses() []string {
 	return []string{
 		EgressDataClassTextSegment, EgressDataClassTextQuery,
-		EgressDataClassTextSubjectContext, EgressDataClassImageBytes,
+		EgressDataClassTextSubjectContext, EgressDataClassImageBytes, EgressDataClassTextMaterialList,
 	}
 }
 

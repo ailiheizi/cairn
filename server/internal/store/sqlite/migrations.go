@@ -1855,6 +1855,94 @@ END;
 PRAGMA user_version = 27;
 `,
 	},
+	{
+		version: 28,
+		name:    "egress_grants_organize_purpose",
+		sql: `
+-- ORGANIZE adds one admitted purpose to the existing immutable egress-grant
+-- vocabulary. This rebuild preserves every grant and revocation field and
+-- row; no durable entity, field, or recovery meaning is added.
+DROP TRIGGER egress_grants_no_update;
+DROP TRIGGER egress_grants_no_delete;
+DROP TRIGGER egress_grant_revocations_no_update;
+DROP TRIGGER egress_grant_revocations_no_delete;
+
+CREATE TABLE egress_grants_new (
+    grant_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    profile_digest TEXT NOT NULL,
+    endpoint_host TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    purpose TEXT NOT NULL CHECK (purpose IN ('DOCUMENT', 'QUERY', 'DESCRIBE', 'ORGANIZE')),
+    data_classes_json TEXT NOT NULL CHECK (json_valid(data_classes_json)),
+    subject_classes_json TEXT NOT NULL CHECK (json_valid(subject_classes_json)),
+    max_requests INTEGER NOT NULL CHECK (max_requests > 0),
+    max_bytes INTEGER NOT NULL CHECK (max_bytes > 0),
+    max_seconds INTEGER NOT NULL CHECK (max_seconds > 0),
+    expires_at_ns INTEGER NOT NULL,
+    granted_by TEXT NOT NULL,
+    created_at_ns INTEGER NOT NULL,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+    UNIQUE (workspace_id, grant_id)
+) STRICT;
+
+CREATE TABLE egress_grant_revocations_new (
+    revocation_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    grant_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    revoked_by TEXT NOT NULL,
+    revoked_at_ns INTEGER NOT NULL,
+    FOREIGN KEY (workspace_id, grant_id) REFERENCES egress_grants_new(workspace_id, grant_id) ON DELETE RESTRICT,
+    UNIQUE (workspace_id, revocation_id),
+    UNIQUE (workspace_id, grant_id)
+) STRICT;
+
+INSERT INTO egress_grants_new(
+    grant_id, workspace_id, profile_id, profile_digest, endpoint_host, model_id,
+    purpose, data_classes_json, subject_classes_json, max_requests, max_bytes,
+    max_seconds, expires_at_ns, granted_by, created_at_ns
+) SELECT
+    grant_id, workspace_id, profile_id, profile_digest, endpoint_host, model_id,
+    purpose, data_classes_json, subject_classes_json, max_requests, max_bytes,
+    max_seconds, expires_at_ns, granted_by, created_at_ns
+FROM egress_grants;
+
+INSERT INTO egress_grant_revocations_new(
+    revocation_id, workspace_id, grant_id, reason, revoked_by, revoked_at_ns
+) SELECT
+    revocation_id, workspace_id, grant_id, reason, revoked_by, revoked_at_ns
+FROM egress_grant_revocations;
+
+DROP TABLE egress_grant_revocations;
+DROP TABLE egress_grants;
+ALTER TABLE egress_grants_new RENAME TO egress_grants;
+ALTER TABLE egress_grant_revocations_new RENAME TO egress_grant_revocations;
+
+CREATE TRIGGER egress_grants_no_update
+BEFORE UPDATE ON egress_grants BEGIN
+    SELECT RAISE(ABORT, 'egress grants are immutable; revoke by appending a revocation');
+END;
+
+CREATE TRIGGER egress_grants_no_delete
+BEFORE DELETE ON egress_grants BEGIN
+    SELECT RAISE(ABORT, 'egress grants are immutable');
+END;
+
+CREATE TRIGGER egress_grant_revocations_no_update
+BEFORE UPDATE ON egress_grant_revocations BEGIN
+    SELECT RAISE(ABORT, 'egress grant revocations are immutable');
+END;
+
+CREATE TRIGGER egress_grant_revocations_no_delete
+BEFORE DELETE ON egress_grant_revocations BEGIN
+    SELECT RAISE(ABORT, 'egress grant revocations are immutable');
+END;
+
+PRAGMA user_version = 28;
+`,
+	},
 }
 
 func (s *Store) migrate(ctx context.Context) error {

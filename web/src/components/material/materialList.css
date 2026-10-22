@@ -48,6 +48,30 @@
 .material-list-intro,
 .material-list-save-note { margin: 0; line-height: 1.5; }
 .material-list-content { min-width: 0; margin: 0; padding: 0; border: 0; }
+.material-list-organizer { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line, #d9e0e7); border-radius: 10px; background: var(--surface-soft, #f8fafc); }
+.material-list-organizer-options > summary { width: fit-content; cursor: pointer; font-weight: 600; }
+.material-list-organizer-body { display: grid; gap: 10px; padding-top: 10px; }
+.material-list-organizer-heading,
+.material-list-candidate-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.material-list-organizer h3,
+.material-list-candidate h4 { margin: 0; }
+.material-list-organizer p,
+.material-list-candidate p { margin: 0; line-height: 1.45; }
+.material-list-organizer-profile { overflow-wrap: anywhere; font-size: .9rem; }
+.material-list-disclosure,
+.material-list-grant-confirm,
+.material-list-candidate { display: grid; gap: 9px; padding-top: 10px; border-top: 1px solid var(--line, #d9e0e7); }
+.material-list-disclosure-facts,
+.material-list-candidate-changes { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: .9rem; }
+.material-list-disclosure details summary { cursor: pointer; color: var(--muted, #617080); }
+.material-list-disclosure-json { max-height: 300px; overflow: auto; margin: 8px 0 0; padding: 10px; border-radius: 8px; background: var(--surface, #fff); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; }
+.material-list-organizer-confirm { display: flex !important; grid-template-columns: auto 1fr; align-items: flex-start; gap: 8px !important; line-height: 1.4; }
+.material-list-organizer-confirm input { width: auto; margin-top: 3px; }
+.material-list-organizer-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.material-list-candidate-items { display: grid; gap: 7px; max-height: 240px; overflow: auto; margin: 0; padding-left: 24px; }
+.material-list-candidate-items li { overflow-wrap: anywhere; }
+.material-list-candidate-items small { display: block; color: var(--muted, #617080); }
+.material-list-candidate-items pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
 .material-list-title-field,
 .material-list-panel label { display: grid; gap: 6px; font-size: .92rem; }
 .material-list-panel input,
@@ -142,6 +166,10 @@
   .material-list-panel { max-height: 94vh; padding: 16px; }
   .material-list-actions { justify-content: stretch; }
   .material-list-actions button { flex: 1 1 auto; justify-content: center; }
+  .material-list-organizer-heading,
+  .material-list-candidate-heading { align-items: stretch; flex-direction: column; }
+  .material-list-organizer-actions { justify-content: stretch; }
+  .material-list-organizer-actions button { flex: 1 1 auto; }
   .material-list-reader-item { flex-direction: column; }
   .material-list-reader-item > button { align-self: flex-start; }
   .material-list-use-primary { align-items: stretch; }

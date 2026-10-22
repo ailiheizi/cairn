@@ -912,3 +912,19 @@ Optional packs MAY add media parsing, OCR, ASR, acoustic fingerprints, CLIP-comp
 12. The reference distribution remains useful with all learned and generative processors disabled.
 13. Deleting and rebuilding every index loses no durable tag or note revision.
 14. External presentation tools can consume export manifests and `FileAccess` without changing `SnapshotTree`, namespace identity, or repository layout. Cairn does not define or ship a mount adapter.
+
+## Interactive material organizer exception (ML-3)
+
+The owner-approved ML-3 host task `ORGANIZE_MATERIAL_LIST` is not a file
+processor or a `DescribeProvider`. A narrow organizer provider consumes the
+explicit ordinary draft/Skill snapshot and returns an untrusted candidate.
+Its immutable `cairn.online-organize-profile.v1` profile binds the endpoint,
+model/revision, fixed task instruction, credential reference and finite
+budgets; it uses the existing credential, protection, grant, audit and bounded
+HTTP mechanisms. Egress purpose `ORGANIZE` and class `text.material_list` are
+separate from all existing profiles/grants. Optional configuration is
+`organizing.provider_profile`; absent configuration preserves prior config
+serialization and reports unavailable without blocking exact capture.
+See the approved [F12 specification](../superpowers/specs/2026-10-22-material-ai-candidates.md)
+for exact bounds and validation. This admits no general AI runner, content
+processor, tool execution, durable candidate record or runtime loader.
