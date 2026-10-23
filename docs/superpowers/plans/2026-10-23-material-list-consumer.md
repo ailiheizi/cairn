@@ -39,7 +39,7 @@ Repeated references must not collapse; same-name wrong bytes must not match; loc
 - [x] Document ordinary exported-list and optional original-file use, example output, exit statuses, and the difference between offline bytes and host-local authorization. Link the runnable example from the Wiki.
 - [x] Self-review against the existing parser/contract; root reads the diff and a separate Luna checks spec and quality.
 - [x] Acceptance owner runs one combined offline journey on retained F12 saved list/original export bytes, controlled repeated/missing/wrong-byte variants, and malformed guide/over-budget refusal. Record input hashes before/after and observed output; fix only observed failures.
-- [ ] Root updates F13 delivery evidence and Linear, runs diff check, commits, integrates and pushes the accepted batch.
+- [x] Root updates F13 delivery evidence and Linear, runs diff check, commits, integrates and pushes the accepted batch.
 
 **Acceptance evidence (2026-10-23):** primary-checkout
 `dist/material-list-consumer-20261023/journey-result.json` records the exact
@@ -49,3 +49,9 @@ context and exact Skill; local variants preserved B → A → B and visible miss
 or mismatched originals. Reviewed parser corrections passed in the same run.
 Script SHA-256: `056e3fe623919698d2cb033cfd382f45af1a3c1b2fb0d16881bad7833d4177dd`.
 No model call, new capture/export or broad application tests were needed.
+
+**Integration:** implementation commit `a560d1f` is merged and pushed to
+`main`; AIL-35 is Done and the existing Chinese functional overview reflects
+the delivered scope. Root independently checked retained consumer output
+against saved-list content and original hashes. The completion record itself
+is documentation-only and does not require another application journey.
