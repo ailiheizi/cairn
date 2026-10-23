@@ -55,6 +55,11 @@ retrieval gaps. F09/F10 remain delivered local baselines, reused without new
 independent test campaigns. Existing exact-identity and authorization behavior
 stays in place. No additional architecture or plugin-platform issue is created.
 
+**2026-10-23 continuation:** [F13](#f13) now has a runnable offline consumer
+and local acceptance using retained F12 saved content and original exports.
+Programs can read ordered context and match explicitly supplied bytes without
+AI. This is the selected file-example scope, not a host-connected SDK.
+
 The [detailed staged todo](2026-10-22-desktop-web-delivery.md) is the execution
 companion: S1 Music, S2 Photos, S3 interface choice, with files, callback
 handoffs, step checklists and one complete journey per feature. S4 desktop
@@ -305,16 +310,16 @@ SHA-256 plus logical length; local development evidence is not release proof.
 ### F13 · [AIL-35](https://linear.app/ailiheizi/issue/AIL-35) — Let programs read saved results without AI
 <a id="f13"></a><a id="r09"></a>
 
-**Baseline:** Ordinary JSON is readable; ML-2 resolution is within loaded scope. No cross-instance SDK or authorization contract is claimed. **Outcome:** A small external consumer reads order/context/references and reports unavailable members.
+**Baseline:** The standalone Python consumer is implemented and locally validated with the retained saved F12 list and original exports. ML-2 host resolution remains within loaded scope. **Outcome:** A small external consumer reads order/context/references and reports which explicitly supplied originals match.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | Ordinary JSON result | Usable | Keep the existing file. |
-| Standalone consumer example | Missing | Add the smallest program using current format. |
-| Local reference/access semantics | Partial | Explain local lookup hints and host authorization. |
+| Standalone consumer example | Locally delivered | Standard-library Python reads the unchanged format and preserves repeated occurrences, context and exact Skill. |
+| Local reference/access semantics | Documented and locally demonstrated | Match explicitly supplied files by full SHA-256 and length; unavailable rows remain visible. This grants no host-local access. |
 | New API/SDK/live subscription | Out of scope | First show whether ordinary files suffice. |
 
-**Reuse and steps:** Document current format and unresolved-member behavior; distinguish portable content from local lookup hints; defer a new interface until an observed consumer cannot use the file.
+**Reuse and steps:** The [runnable example](../../../examples/material-list/README.md) consumes ordinary files, streams explicitly supplied originals and emits a transient JSON report. No directory scan, model call or host lookup occurs. See the [bounded plan](2026-10-23-material-list-consumer.md) and [delivery evidence](../../technical/product-experience-todo.md#f13-offline-program-consumption--2026-10-23). A new interface remains deferred until an observed consumer cannot use ordinary files.
 
 **Finished looks like:** A small non-AI program reads an exported list, preserves repeats/order and reports inaccessible members without claiming cross-instance resolution.
 

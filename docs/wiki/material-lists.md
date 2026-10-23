@@ -131,24 +131,14 @@ The JSON uses `format: "cairn.material-list.v1"`, a `title`, optional `guide`,
 and ordered `items`. Each item has a display `label`, an exact `ref`, and
 optional string-valued `context`. Repeated references remain repeated items.
 
-For example, a program can read an exported result using Python's standard
-library, without AI:
-
-```python
-import json
-
-with open("reading-list.cairn-list.json", encoding="utf-8-sig") as source:
-    result = json.load(source)
-if result.get("format") != "cairn.material-list.v1":
-    raise ValueError("Unsupported material-list format")
-for position, item in enumerate(result["items"], 1):
-    print(position, item["label"], item.get("context", {}).get("reason", ""))
-```
-
-To resolve originals, compare both `content_id` and `logical_size` with Cairn's
-content listing and use the existing verified original-download operation.
-Optional entry/subject IDs are local hints, not portable identity or authority
-to read a path. A missing match is an explicit unavailable outcome.
+The standalone [Python reader example](../../examples/material-list/README.md)
+validates an exported snapshot, preserves every ordered occurrence, and can
+check explicitly supplied local originals against complete SHA-256 digests and
+logical lengths. It runs offline with Python's standard library and never
+scans directories or follows paths from list content. Its local byte match is
+not a Cairn catalog resolution or authorization to read or download a server
+original; use the host's existing verified original-download operation for
+that.
 
 Limits are 200 occurrences, 512 KiB of UTF-8 JSON and 64 KiB of Skill text.
 Over-budget input is refused rather than silently shortened. Full format and

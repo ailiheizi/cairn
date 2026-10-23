@@ -4,7 +4,7 @@
 
 ## Current direction
 
-### Function-level delivery and board (updated 2026-10-22)
+### Function-level delivery and board (updated 2026-10-23)
 
 Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536),
 [function delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md),
@@ -24,6 +24,7 @@ The Core MVP Execution Plan still owns core phase order.
 | Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
 | Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
 | Locally delivered | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | ML-3 real-model candidate → reviewed capture → reopen / exact takeout; no phase or release credit |
+| Locally delivered | F13 / [AIL-35](https://linear.app/ailiheizi/issue/AIL-35) | Offline program reads saved order/context/Skill and verifies explicitly supplied original bytes |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
 The owner clarified the 2026-10-22 direction: build the Web application once,
@@ -68,6 +69,36 @@ After the repository review, the owner selected the bounded material/Notes/Skill
 The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
 
 The earlier Photos/Music interaction-polish record is historical; current S1/S2 delivery is recorded below. Earlier acceptance and remaining unrelated scope are preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+
+## F13 offline program consumption — 2026-10-23
+
+Implemented and locally validated: **saved ordinary list → offline program →
+ordered context and explicitly supplied original matches**, without another
+model call. The [Python standard-library example](../../examples/material-list/README.md)
+keeps every occurrence, including repeats and unavailable members, and retains
+the full parsed document and exact embedded Skill. Complete SHA-256 plus
+logical length determines a local match; filenames and local subject hints do
+not. A match describes supplied bytes at read time, not catalog availability,
+server authorization or a signed recovery proof.
+
+One combined offline journey used the retained 1,947-byte F12 saved list
+(`cef1d8aaf6669ad3edffafaae9f3c8c5b84166f7b6e5bfcb0b6467a0b3d81ffd`)
+whose identity had already been verified by saved-content readback, and the
+previously exported Source-A/B originals. It read B → A with original context
+and the 573-byte Skill intact. Labelled local variants demonstrated B → A → B
+without deduplicating occurrences, visible missing members, rejection of
+same-name wrong bytes, and clean malformed-guide/over-budget outcomes. The
+same journey covered the two parser gaps found during review: deeply nested
+invalid JSON and valid integer-valued numeric lengths. All retained inputs
+were unchanged. No new capture, export or provider request was made.
+
+Evidence: `dist/material-list-consumer-20261023/journey-result.json` and
+adjacent per-case stdout/stderr; script SHA-256
+`056e3fe623919698d2cb033cfd382f45af1a3c1b2fb0d16881bad7833d4177dd`.
+Root inspected the diff and evidence; independent Luna review passed after
+the bounded corrections. Only the selected consumer journey and diff checks
+ran. No application build, broad suite, SDK, endpoint or durable format was
+added; this grants no core-phase or release qualification.
 
 ## F12 candidate-flow design checkpoint — 2026-10-22
 
