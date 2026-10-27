@@ -1,4 +1,7 @@
 export const musicExperience: Record<string, string> = {
+  "More playback actions": "更多播放操作",
+  "Shuffle selected ({{count}})": "随机播放已选曲目（{{count}}）",
+  "Shuffle these tracks ({{count}})": "随机播放这些曲目（{{count}}）",
   "Music library": "音乐库", "Play and organize original audio files from your library.": "播放并整理音乐库中的原始音频文件。",
   "Filename suffix": "文件名后缀", "No filename extension": "无文件扩展名", "{{count}} loaded tracks": "已加载 {{count}} 首曲目", "A filename suffix is only a format clue; it does not verify the file bytes or codec.": "文件名后缀仅提示格式，不代表已验证文件字节或编解码器。", "Active local filters": "当前本地筛选条件", "Search: {{value}}": "搜索：{{value}}", "Availability: {{value}}": "可用性：{{value}}", "Format: {{value}}": "格式：{{value}}", "Selected tracks only": "仅显示已选曲目", "Tag: {{tag}}": "标签：{{tag}}", "Remove search filter": "移除搜索筛选", "Remove availability filter": "移除可用性筛选", "Remove filename suffix filter": "移除文件名后缀筛选", "Remove selected tracks filter": "移除仅显示已选曲目的筛选", "No tracks match this filename suffix filter": "没有曲目符合此文件名后缀筛选", "Use the arrow keys to move through visible tracks; Space selects and Enter opens the focused track. Shift+Space selects the visible range.": "使用方向键浏览可见曲目；空格选择，回车打开焦点曲目。Shift+空格选择可见范围。",
   "{{count}} tracks": "{{count}} 首",

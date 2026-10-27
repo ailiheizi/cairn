@@ -54,8 +54,9 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { MaterialListComposer } from "./components/material/MaterialListComposer";
 import type { MaterialListDocument } from "./lib/materialList";
 import "./styles/index.css";
+import "./components/PrivateSpaceShell.css";
 import "antd/dist/reset.css";
-import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary, ViewMode } from "./lib/types";
+import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary, UploadFileRow, ViewMode } from "./lib/types";
 
 // The application shell.
 //
@@ -344,6 +345,14 @@ function App() {
   const library = useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewMode: view.viewMode, scopeViewMode, presentationMode: view.presentationMode, selected, setViewMode: view.setViewMode, setPresentationMode: view.setPresentationMode, sortField: view.sortField, sortDirection: view.sortDirection, setQuery, setLastExecutedQuery, setSelected, setBusy, notify: setNotice, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts, hasDetailDrafts: drafts.detailDraftIsDirty, detailDraftFingerprint: drafts.detailDraftFingerprint, discardDetailDrafts: drafts.discardDetailDrafts });
   const details = useDetails({ t, workspaceID, selected, setSelected, drafts, library, browsePositionRegistry: browsePositionRegistryRef.current, getBrowseContextIdentity: () => JSON.stringify([workspaceID, browseSessionScopeRef.current, view.viewMode, view.presentationMode]), annotationStorageReady, catalogStorageMessage, refreshCapabilities, busy, setBusy, notify: setNotice });
   const selection = useSelection({ t, workspaceID, hits: library.scopeHits, renderedHits: library.renderedHits, selected, details, library, annotationStorageReady, catalogStorageMessage, refreshCapabilities, setBusy, notify: setNotice, libraryListRef });
+  const selectedIdentityRef = useRef("");
+  selectedIdentityRef.current = selected ? JSON.stringify([selected.subject_ref, selected.entry_id, selected.content_id]) : "";
+  const selectionRefsRef = useRef(selection.selectionRefs);
+  selectionRefsRef.current = selection.selectionRefs;
+  const currentViewModeRef = useRef(view.viewMode);
+  currentViewModeRef.current = view.viewMode;
+  const currentPresentationModeRef = useRef(view.presentationMode);
+  currentPresentationModeRef.current = view.presentationMode;
   const busyRef = useRef(busy);
   busyRef.current = busy;
   const selectionChangeRef = useRef(selection.changeScopeSelection);
@@ -351,11 +360,11 @@ function App() {
   const sources = useSources({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, refresh, refreshGenerationRef, lastPlannedSource: recents.lastPlannedSource, rememberLastSourcePath: recents.rememberLastSourcePath, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setRestoreOpen(false); setExportOpen(false); setSettingsOpen(false); }, setAddOpen, library, rememberWorkspace });
   const sourcePlanIDRef = useRef(String(sources.plan?.plan_id ?? ""));
   sourcePlanIDRef.current = String(sources.plan?.plan_id ?? "");
-  const pendingSavedSourceOpenRef = useRef<{ workspaceID: string; planID: string } | undefined>(undefined);
+  const pendingSavedSourceOpenRef = useRef<{ workspaceID: string; planID: string; uploadBatch?: { stagingDir: string; rows: UploadFileRow[]; receiptComplete: boolean } } | undefined>(undefined);
   const restore = useRestore({ t, snapshotRef, isConnected, coreStorageReady, coreStorageMessage, isUnavailable, busy, setBusy, notify: setNotice, pushRecentDestination: recents.pushRecentDestination, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setExportOpen(false); setSettingsOpen(false); }, setRestoreOpen });
   const savedViewFlow = useSavedViews({ t, workspaceID, viewMode: view.viewMode, lastExecutedQuery, library, selection, drafts, setQuery, setLastExecutedQuery, setSelected, setViewMode: view.setViewMode, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, canLeaveDetailDrafts: drafts.canLeaveDetailDrafts });
   const exportFlow = useExport({ t, workspaceID, isConnected, coreStorageReady, coreStorageMessage, exportOpen, viewMode: view.viewMode, presentationMode: view.presentationMode, lastExecutedQuery, activeTags: library.activeTags, activeSystemFacets: library.activeSystemFacets, activeTimelineMonth: library.activeTimelineMonth, selected, selection, library, savedViews: savedViewFlow, setBusy, notify: setNotice, canLeaveSettings: settings.canLeaveSettings, rememberDrawerTrigger, closeOtherDrawers: () => { setAddOpen(false); sources.setRecheckSourceRef(""); setRestoreOpen(false); setSettingsOpen(false); }, setExportOpen });
-  const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration: refreshGenerationRef.current, viewMode: view.viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode });
+  const search = useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration: refreshGenerationRef.current, viewMode: view.viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify: setNotice, markConnected: () => setStatus("Connected"), recents, drafts, canLeaveSettings: settings.canLeaveSettings, exportFlow, library, setSelected, setViewMode: view.setViewMode, clearSelection: selection.clearSelection });
   const topBarSearch = {
     ...search,
     async runSearch(event?: Parameters<typeof search.runSearch>[0], explicitQuery?: string) {
@@ -397,11 +406,9 @@ function App() {
   };
   const audioPlayback = useAudioPlayback(workspaceID);
   // Recorded audio facts feed exactly two presentations: the Music page and the
-  // mixed Content overview. Neither is the screen an operator gets by default,
-  // and `audio.list` walks every admitted processor artifact the workspace
-  // holds, so reading it before the library listing turns a page nobody opened
-  // into a request that competes with the first screen. The read starts when
-  // one of those pages is actually selected; the Music page already reports the
+  // private-space homepage. `audio.list` walks every admitted processor
+  // artifact the workspace holds, so defer it until a presentation that uses
+  // the facts is selected. The Music page already reports the
   // read as "Loading recorded audio facts" and keeps filenames and tags
   // visible, so a deferred read is shown as pending rather than as absent
   // facts. Details still reads the same projection on demand for one subject.
@@ -412,15 +419,17 @@ function App() {
   const originalTakeoutBusy = ["planning", "downloading", "preparing"].includes(originalTakeout.status);
   const presentationRoot = libraryPageForMode(view.presentationMode);
   const presentationRootKey = presentationRoot ? libraryPageRoot(presentationRoot)?.id ?? presentationRoot.id : "content";
-  // Only the active library projection may select immersive/focused chrome. A
-  // workspace view (sources/activity/tags/notes/duplicates) keeps its normal
-  // shell even when a domain presentation is still remembered, so the focused
-  // host header can never mount the same rail the frame or panel already owns.
+  // Only loaded content browse scopes receive the shared content-space shell.
+  // Workspace views (sources/activity/Tags/Notes/duplicates) retain their own
+  // frame and rail even when a domain presentation is still remembered.
   const activePresentationPage = (view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || Boolean(libraryPageForMode(view.viewMode))) ? libraryPageForMode(view.presentationMode) : undefined;
   // Page metadata controls the content frame and rail ownership. Every host
   // destination shares the same header; management screens belong to Library
   // even when a domain presentation is remembered.
   const focusedChrome = activePresentationPage?.composition === "focused";
+  const contentSpace = view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" || Boolean(libraryPageForMode(view.viewMode));
+  const privateSpaceHome = contentSpace && activePresentationPage?.id === "cairn:overview";
+  const contentSpaceDestination = privateSpaceHome ? "Home" : activePresentationPage?.mediaClass === "image" ? "Photos" : activePresentationPage?.mediaClass === "audio" ? "Music" : activePresentationPage?.mediaClass === "video" ? "Videos" : "Library";
   const headerDestination = activePresentationPage || view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path" ? view.presentationMode : "content";
   // Domain-page choices belong to the current shared result context, never to
   // its Photos/Music rendering. Management screens leave that context intact.
@@ -455,7 +464,11 @@ function App() {
   // the restored view is always derived from the daemon, never from the hash.
   // Every later change replaces the hash (replaceState, never pushState), so
   // a refresh lands where the user was without spamming session history.
-  const pendingHashView = useRef(parseHashView(window.location.hash));
+  const pendingHashView = useRef(parseHashView(window.location.hash.replace(/^#/, "")
+    ? window.location.hash
+    : isLibraryViewEnabled("page:cairn:overview", libraryViews.enabledViewIds)
+      ? "#v=content&presentation=overview"
+      : ""));
   const [hashViewApplied, setHashViewApplied] = useState(false);
   const [hashRestoreComplete, setHashRestoreComplete] = useState(!pendingHashView.current.mode);
   const hashRestoreFailedRef = useRef(false);
@@ -874,7 +887,7 @@ function App() {
   // The rail has one Library destination; its internal views stay local to the
   // already-loaded set, while a true return from other workspaces reloads it.
   function openLibrary(event: { currentTarget: EventTarget | null }) {
-    if (libraryPageForMode(view.viewMode) || (view.viewMode === "content" && view.presentationMode !== "content")) { openLibrarySurface("content"); return; }
+    if (libraryPageForMode(view.viewMode) || ((view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag") && view.presentationMode !== "content")) { openLibrarySurface("content"); return; }
     if (view.viewMode === "path") {
       if (workspaceID) void library.loadContentLibrary(workspaceID, refreshGenerationRef.current, true, true);
       return;
@@ -958,7 +971,7 @@ function App() {
     return settings.rebuildSearch(requestedWorkspaceID);
   }
   function reloadLibrary() { if (workspaceID) void library.loadContentLibrary(workspaceID, refreshGenerationRef.current, true); }
-  async function viewSavedSource() {
+  async function viewSavedSource(uploadBatch?: { stagingDir: string; rows: UploadFileRow[]; receiptComplete: boolean }) {
     if (busy) {
       const plan = sources.plan;
       const planID = typeof plan?.plan_id === "string" ? plan.plan_id : "";
@@ -974,7 +987,7 @@ function App() {
         // The successful apply can still be refreshing the shared library.
         // Preserve this explicit navigation intent and open the saved source
         // once that refresh releases the host busy flag.
-        pendingSavedSourceOpenRef.current = { workspaceID, planID };
+        pendingSavedSourceOpenRef.current = { workspaceID, planID, uploadBatch };
         return;
       }
       setNotice({ kind: "warning", text: t("The source operation is still finishing. Try opening it again shortly.") });
@@ -1009,7 +1022,59 @@ function App() {
       setNotice({ kind: "warning", text: t("The save is confirmed, but its source could not be opened. Showing all content.") });
       return;
     }
-    const stillThisSavedSource = () => addOpenRef.current && sourcePlanIDRef.current === planID;
+    const batchMatchesPlan = Boolean(uploadBatch && uploadBatch.stagingDir.trim() && uploadBatch.stagingDir.trim() === sources.source.trim());
+    const capturedRefreshGeneration = refreshGenerationRef.current;
+    const detailDraftFingerprint = drafts.detailDraftFingerprint();
+    const capturedViewMode = view.viewMode;
+    const capturedPresentationMode = view.presentationMode;
+    const capturedSelectedIdentity = selectedIdentityRef.current;
+    const capturedSelectionRefs = JSON.stringify(selectionRefsRef.current);
+    const capturedSearchIntentVersion = library.searchIntentVersion();
+    const stillThisSavedBatch = () => addOpenRef.current
+      && workspaceIDRef.current === planWorkspaceID
+      && refreshGenerationRef.current === capturedRefreshGeneration
+      && sourcePlanIDRef.current === planID
+      && currentViewModeRef.current === capturedViewMode
+      && currentPresentationModeRef.current === capturedPresentationMode
+      && JSON.stringify(selectionRefsRef.current) === capturedSelectionRefs
+      && selectedIdentityRef.current === capturedSelectedIdentity
+      && library.searchIntentVersion() === capturedSearchIntentVersion;
+    if (uploadBatch && !drafts.canLeaveDetailDrafts()) return;
+    if (uploadBatch && !uploadBatch.receiptComplete) {
+      setNotice({ kind: "warning", text: t("The original upload report was incomplete. Opening the saved source; select files manually.") });
+    } else if (uploadBatch && batchMatchesPlan) {
+      setBusy(true);
+      try {
+        const savedHits = await library.resolveSavedUploadBatch(planWorkspaceID, rootID, uploadBatch.rows, () => stillThisSavedBatch() && drafts.detailDraftFingerprint() === detailDraftFingerprint);
+        if (!stillThisSavedBatch() || drafts.detailDraftFingerprint() !== detailDraftFingerprint) return;
+        if (!drafts.canLeaveDetailDrafts()) return;
+        drafts.discardDetailDrafts();
+        setQuery("");
+        setLastExecutedQuery("");
+        library.setHits(savedHits);
+        library.setJustSavedBatch(true);
+        library.setBrowseRootID("");
+        library.setBrowseCrumbs([]);
+        library.setActiveTags([]);
+        library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" });
+        library.setActiveTimelineMonth("");
+        selection.clearSelection();
+        selection.setSelectionRefs(savedHits.map((hit) => hit.subject_ref!).filter(Boolean));
+        selection.setSelectionAnchor(savedHits.at(-1)?.subject_ref ?? "");
+        setSelected(undefined);
+        view.setPresentationMode("content");
+        view.setViewMode("path");
+        sources.closeAdd();
+        completeUserNavigation();
+        return;
+      } catch {
+        if (!stillThisSavedBatch() || drafts.detailDraftFingerprint() !== detailDraftFingerprint) return;
+        setNotice({ kind: "warning", text: t("The full saved upload could not be matched to its receipt. Opening the source; select files manually.") });
+      } finally { setBusy(false); }
+    } else if (uploadBatch) {
+      setNotice({ kind: "warning", text: t(batchMatchesPlan ? "The full saved upload could not be matched to its receipt. Opening the source; select files manually." : "The saved upload no longer matches this source. Opening the source instead.") });
+    }
+    const stillThisSavedSource = () => addOpenRef.current && workspaceIDRef.current === planWorkspaceID && sourcePlanIDRef.current === planID;
     setBusy(true);
     try {
       const opened = await library.loadNamespace(planWorkspaceID, rootID, "", [], stillThisSavedSource);
@@ -1032,7 +1097,7 @@ function App() {
     if (busy) return;
     pendingSavedSourceOpenRef.current = undefined;
     if (pending.workspaceID !== workspaceID || pending.planID !== sourcePlanIDRef.current) return;
-    void viewSavedSource();
+    void viewSavedSource(pending.uploadBatch);
   }, [addOpen, busy, workspaceID, sources.plan?.plan_id]);
   // The workspace layout and the library's first-source empty state describe
   // the same condition, so the shell computes it once and passes it down.
@@ -1076,16 +1141,17 @@ function App() {
     />
   </WorkspaceRailPanel>;
 
-  return <ClientBrowseSessionProvider workspaceID={workspaceID} scopeKey={browseSessionScopeRef.current} positionRegistry={browsePositionRegistryRef.current}><div className="app-shell client-host">
+  return <ClientBrowseSessionProvider workspaceID={workspaceID} scopeKey={browseSessionScopeRef.current} positionRegistry={browsePositionRegistryRef.current}><div className={`app-shell client-host${contentSpace ? " cairn-content-space" : ""}`}>
     <InterfaceRenderBoundary
       interfaceId={appearance.preference.interfaceId}
       immersive={activePresentationPage?.chrome === "immersive"}
       focused={focusedChrome}
+      contentSpace={contentSpace}
       onFallbackToWorkspace={() => appearance.updatePreference({ ...appearance.preference, interfaceId: "workspace" })}
       onOpenSettings={(trigger) => openSettings(trigger)}
       header={<TopBar
         t={t}
-        onHome={() => openLibrarySurface("content")}
+        onHome={() => openLibrarySurface(isLibraryViewEnabled("page:cairn:overview", libraryViews.enabledViewIds) ? "page:cairn:overview" : "content")}
         query={query}
         busy={busy}
         status={status}
@@ -1099,6 +1165,8 @@ function App() {
         compact={compactLayout}
         focused={focusedChrome}
         destinationHeader
+        contentSpace={contentSpace}
+        currentDestinationLabel={contentSpaceDestination}
         presentationNavigation={<LibraryPresentationNavigation t={t} mode={headerDestination} enabledPageIds={libraryViews.enabledViewIds} onNavigate={openLibrarySurface} variant="domains" />}
         navigation={rail}
         onOpenRail={openRail}
@@ -1156,6 +1224,8 @@ function App() {
           lastExecutedQuery={lastExecutedQuery}
           keywordBrowse={search.keywordBrowse}
           onRunKeywordBrowseAction={() => void search.runKeywordBrowseAction()}
+          canReturnToRanked={search.canReturnToRanked}
+          onReturnToRanked={() => search.returnToRanked()}
           onInvalidateKeywordBrowse={search.invalidateKeywordBrowse}
           sortAvailable={view.sortAvailable}
           canOpenExport={exportFlow.canOpenExport}
@@ -1298,7 +1368,7 @@ function App() {
       return true;
     }} />
     <OriginalTakeoutStatus takeout={originalTakeout} t={t} workspaceID={workspaceID} exportOpen={exportOpen} fallbackActionsReady={Boolean(workspaceID && isConnected && coreStorageReady)} fallbackActionsMessage={coreStorageMessage} onOpenServerExport={(subjects, trigger) => exportFlow.openExport(trigger, subjects)} onDownloadOriginal={(entryID, filename) => downloadOriginal(workspaceID, entryID, filename)} />
-    {compactLayout && !focusedChrome && railOpen && railPanel}
+    {compactLayout && !contentSpace && !focusedChrome && railOpen && railPanel}
     {settingsOpen && <SettingsDialog
       t={t}
       locale={locale}
@@ -1351,7 +1421,7 @@ function App() {
       onPendingFilesConsumed={() => { setPendingUploadFiles([]); pendingPasteFilesRef.current = false; }}
       onStaged={() => void refresh()}
       onClose={() => { pendingSavedSourceOpenRef.current = undefined; sources.closeAdd(); }}
-      onDone={() => { void viewSavedSource(); }}
+      onDone={(uploadBatch) => { void viewSavedSource(uploadBatch); }}
     />}
     {restoreOpen && <RestoreDrawer
       t={t}

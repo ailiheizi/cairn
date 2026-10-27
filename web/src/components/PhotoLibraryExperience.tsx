@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, SlidersHorizontal } from "lucide-react";
 import type { DragEvent as ReactDragEvent, FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useClientBrowseValue } from "../app/ClientBrowseSession";
 import { useBrowsePosition } from "../app/useBrowsePosition";
@@ -883,7 +883,10 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
         {onVisualTextSearch && searchScope === "visual" && <p className="photo-library__search-hint">{t("Search indexed photos by what they show.")}</p>}
       </section>
       <details className="photo-library__format-filter">
-        <summary><span>{t("Filter and display")}</span><strong>{activeFilterCount ? t("{{count}} active filters", { count: activeFilterCount }) : t("All loaded photos")} · {activeSortLabel}{photoSort === "library" ? "" : ` · ${activeSortDirectionLabel}`}</strong></summary>
+        <summary aria-label={activeFilterCount ? `${t("Filter and display")}: ${t("{{count}} active filters", { count: activeFilterCount })}` : t("Filter and display")} title={t("Filter and display")}>
+          <SlidersHorizontal aria-hidden="true" /><span className="sr-only">{t("Filter and display")}</span>
+          {activeFilterCount > 0 && <span className="photo-library__filter-badge" aria-hidden="true">{activeFilterCount}</span>}
+        </summary>
         <div className="photo-library__filters">
           <label className="photo-library__density">
             <span>{t("Wall density")}</span>

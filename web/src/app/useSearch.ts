@@ -47,7 +47,7 @@ export type KeywordBrowsePhase = "available" | "loading-first" | "more" | "loadi
 export type KeywordBrowseState = { query: string; phase: KeywordBrowsePhase; loaded: number; error: string };
 
 type KeywordBrowseCapture = { query: string; request: SearchPlan["request"]; plan: SearchPlan; workspaceID: string; refreshGeneration: number };
-type KeywordBrowseChain = { capture: KeywordBrowseCapture; token: string; loaded: number; phase: KeywordBrowsePhase };
+type KeywordBrowseChain = { capture: KeywordBrowseCapture; token: string; loaded: number; phase: KeywordBrowsePhase; rankedHits?: SearchHit[] };
 const KEYWORD_BROWSE_PAGE_SIZE = 200;
 const KEYWORD_BROWSE_DIMENSION = "lexical-metadata-fts";
 
@@ -126,6 +126,8 @@ export type SearchFlow = {
   runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<boolean>;
   keywordBrowse: KeywordBrowseState | undefined;
   runKeywordBrowseAction: () => Promise<void>;
+  canReturnToRanked: boolean;
+  returnToRanked: () => boolean;
   invalidateKeywordBrowse: () => void;
   /** Submits search.query with one selected image as the query material (search by image). */
   runImageSearch: (subjectRef: string) => Promise<void>;
@@ -217,7 +219,7 @@ export function narrowSearchHits(hits: SearchHit[], plan: SearchPlan, context: {
   return { hits: hits.filter(keeps), unavailable };
 }
 
-export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration, viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify, markConnected, recents, drafts, canLeaveSettings, exportFlow, library, setSelected, setViewMode }: {
+export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceID, refreshGeneration, viewMode, isConnected, catalogHealthy, catalogStorageMessage, drawerOpen, settingsOpen, setBusy, notify, markConnected, recents, drafts, canLeaveSettings, exportFlow, library, setSelected, setViewMode, clearSelection }: {
   t: Translator;
   query: string;
   setQuery: (value: string) => void;
@@ -240,6 +242,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   library: LibraryFlow;
   setSelected: (hit: SearchHit | undefined) => void;
   setViewMode: (mode: ViewMode) => void;
+  clearSelection: () => void;
 }): SearchFlow {
   // Recent searches and the search field's interaction state are browser
   // convenience only: they never record a query as a durable saved view, and
@@ -252,6 +255,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   const [editing, setEditing] = useState<PredicateEdit | undefined>(undefined);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [keywordBrowse, setKeywordBrowse] = useState<KeywordBrowseState>();
+  const [canReturnToRanked, setCanReturnToRanked] = useState(false);
   const keywordBrowseRef = useRef<KeywordBrowseChain | null>(null);
   const keywordBrowseRequestRef = useRef(0);
   const imageSearchInFlightRef = useRef(false);
@@ -309,6 +313,26 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     keywordBrowseRequestRef.current += 1;
     keywordBrowseRef.current = null;
     setKeywordBrowse(undefined);
+    setCanReturnToRanked(false);
+  }
+
+  function returnToRanked() {
+    const chain = keywordBrowseRef.current;
+    const context = currentBrowseContextRef.current;
+    if (!canReturnToRanked || !chain?.rankedHits || context.viewMode !== "search"
+      || context.workspaceID !== chain.capture.workspaceID || context.refreshGeneration !== chain.capture.refreshGeneration
+      || exportFlow.recalledView || !canLeaveSettings() || !drafts.canLeaveDetailDrafts()) return false;
+    drafts.discardDetailDrafts();
+    clearSelection();
+    setSelected(undefined);
+    library.setHits(chain.rankedHits);
+    library.setJustSavedBatch(false);
+    setQuery(chain.capture.query);
+    keywordBrowseRequestRef.current += 1;
+    keywordBrowseRef.current = { ...chain, token: "", loaded: 0, phase: "available" };
+    setKeywordBrowse({ query: chain.capture.query, phase: "available", loaded: 0, error: "" });
+    setCanReturnToRanked(false);
+    return true;
   }
 
   useEffect(() => {
@@ -578,7 +602,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
 
     const requestSequence = ++keywordBrowseRequestRef.current;
     if (firstPage) {
-      chain = { ...chain, token: "", loaded: 0 };
+      chain = { ...chain, token: "", loaded: 0, rankedHits: chain.rankedHits ?? [...library.hits] };
       keywordBrowseRef.current = chain;
     }
     chain.phase = firstPage ? "loading-first" : "loading-more";
@@ -637,7 +661,11 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
           return;
         }
         drafts.discardDetailDrafts();
+        clearSelection();
+        setSelected(undefined);
+        library.setJustSavedBatch(false);
         library.setHits(visibleHits);
+        setCanReturnToRanked(true);
       } else {
         // The daemon's opaque token advances one exact lexical chain. Preserve
         // its order and every returned subject; it owns exact-once paging.
@@ -711,6 +739,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       });
       if (narrowed.unavailable.length > 0) throw new Error(localProjectionError(narrowed.unavailable));
       drafts.discardDetailDrafts();
+      library.setJustSavedBatch(false);
       library.setHits(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
       setLastExecutedQuery(submittedQuery);
       // A submitted query that the daemon answered is recorded exactly once:
@@ -850,6 +879,8 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     runSearch,
     keywordBrowse,
     runKeywordBrowseAction,
+    canReturnToRanked,
+    returnToRanked,
     invalidateKeywordBrowse,
     runImageSearch,
     runVisualTextSearch,

@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowDown, ArrowUp, Calendar, Check, ChevronRight, Download as DownloadIcon, Folder, HardDrive, Home, Image, LayoutGrid, Hash, List as ListIcon, Music2, Plus, RefreshCw, Server, ShieldCheck, Sparkles, Tag, X } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Calendar, Check, ChevronRight, Download as DownloadIcon, Folder, HardDrive, Home, Image, LayoutGrid, Hash, List as ListIcon, MoreHorizontal, Music2, Plus, RefreshCw, Server, ShieldCheck, Sparkles, Tag, X } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import type { Locale, Translator } from "../i18n";
@@ -16,7 +16,7 @@ import { SelectionBar } from "./SelectionBar";
 import { SourcesSurface } from "./SourcesSurface";
 import { TimelineStrip } from "./TimelineStrip";
 import { sourceButtonLabel } from "../lib/format";
-import { formatBytes, formatDedupFacet, formatEntryType, mediaContentItems, spaceReportProjection } from "../lib/format";
+import { formatBytes, formatDedupFacet, formatEntryType, formatFacetValue, mediaClassFromSuffix, mediaContentItems, spaceReportProjection } from "../lib/format";
 import { allLibraryViewIds, libraryPageForMode, type LibraryViewId } from "../lib/libraryViews";
 import { parseSearchQuery, searchPlan } from "../lib/searchops";
 import type { LibraryFlow } from "../app/useLibrary";
@@ -32,7 +32,7 @@ import "./LibraryWorkflow.css";
 // Every control here changes a browser projection or opens a drawer; none of
 // them writes durable state directly.
 
-export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, onFocusSubject, retrievalFlow }: {
+export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, onFocusSubject, retrievalFlow }: {
   t: Translator;
   locale: Locale;
   workspaceID: string;
@@ -51,6 +51,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   lastExecutedQuery: string;
   keywordBrowse?: KeywordBrowseState;
   onRunKeywordBrowseAction?: () => void;
+  canReturnToRanked?: boolean;
+  onReturnToRanked?: () => boolean;
   onInvalidateKeywordBrowse: () => void;
   sortAvailable: boolean;
   canOpenExport: boolean;
@@ -131,7 +133,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const exhibitionReturnLabel = t(returnToPhotoWall ? "Return to photo wall" : "All types");
   const isPhotoView = pageDefinition?.mediaClass === "image";
   const isMusicView = pageDefinition?.mediaClass === "audio";
-  const domainOwnsSelection = presentationMode === "photos" || presentationMode === "music";
+  const isVideoView = pageDefinition?.mediaClass === "video";
+  const domainOwnsSelection = presentationMode === "photos" || presentationMode === "music" || isVideoView;
   const isMediaView = Boolean(pageDefinition);
   const wasMediaViewRef = useRef(isMediaView);
   useLayoutEffect(() => {
@@ -146,7 +149,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const scopeCount = library.scopeHits.length;
   const photoScopeCount = mediaContentItems(library.scopeHits, "image").length;
   const musicScopeCount = mediaContentItems(library.scopeHits, "audio").length;
-  const otherScopeCount = scopeCount - photoScopeCount - musicScopeCount;
+  const videoScopeCount = library.scopeHits.filter((hit) => hit.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(hit)) === "video").length;
+  const otherScopeCount = scopeCount - photoScopeCount - musicScopeCount - videoScopeCount;
   // The walls are fed one bounded `content.list` page at a time. A wall that
   // projects the loaded library (not a search result set or a namespace path)
   // can continue that chain when the operator reaches the loaded edge.
@@ -187,6 +191,9 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   // incomplete-listing statements stay outside the closed disclosure, so a
   // collapsed tool never hides an active query, tag or partial listing.
   const focusedComposition = pageDefinition?.composition === "focused";
+  const privateSpaceHome = presentationMode === "page:cairn:overview" && viewMode === "content"
+    && !library.hasActiveFilters && selection.selectionRefs.length === 0 && !selection.tagMutationProgress && !notice
+    && !isUnavailable && coreStorageReady && !scopeRestoring && !scopeRestoreFailed;
   const favoritesToggle = library.libraryLoaded && viewMode !== "sources"
     ? <button type="button" className="library-return" aria-pressed={activeTags.includes(FAVORITE_TAG)} disabled={favoriteControls?.status !== "ready"} title={t("Favorites use the visible Favorite tag shared across your library.")} onClick={() => library.toggleTagFilter(FAVORITE_TAG)}>{t("Only favorites")}</button>
     : null;
@@ -299,6 +306,18 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const tagBrowser = showLibraryFacets ? <section className="tag-browser" aria-label={t("Filter by tags")}>
     {tagBrowserItems}
   </section> : null;
+  const focusedLibraryTools = <div className="library-focused-bar">
+    {!privateSpaceHome && showLibraryViewSwitch && <LibraryPresentationNavigation t={t} mode={presentationMode} enabledPageIds={enabledViews} onNavigate={onLibraryView} variant="presentations" />}
+    {resultCount}
+    <details className="library-tools">
+      <summary className="library-tools-summary" aria-label={t("More options")} title={t("More options")}><MoreHorizontal size={18} aria-hidden="true" /><span className="sr-only">{t("More options")}</span></summary>
+      <div className="library-tools-body">
+        {headingActions}
+        {secondaryTools}
+        {tagBrowser}
+      </div>
+    </details>
+  </div>;
   // Standard (non-focused) workflow disclosures. The Filters disclosure holds
   // the normal tag/system browser; More tools holds the secondary saved
   // retrieval, export, space report and timeline. Both keep every callback
@@ -325,7 +344,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   const moreToolsDisclosure = viewMode !== "sources" && (Boolean(workspaceID) || Boolean(secondaryTools))
     ? <details className="library-workflow-disclosure library-more-tools">
         <summary><span>{t("More tools")}</span><ChevronRight size={14} /></summary>
-        <div className="library-workflow-disclosure-body">{selectAllVisibleButton}{exportActions}{secondaryTools}</div>
+        <div className="library-workflow-disclosure-body">{selectAllVisibleButton}{savedRetrievalAction}{exportActions}{secondaryTools}</div>
       </details>
     : null;
   if (scopeRestoring || scopeRestoreFailed) {
@@ -370,26 +389,14 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
     {!isMediaView && <div className="workspace-heading">
       <div>
         <p className="eyebrow">{t(viewMode === "sources" ? "CONTENT" : "YOUR LIBRARY")}</p>
-        <h1>{isPhotoView ? t("Photos") : isMusicView ? t("Audio") : viewMode === "sources" ? t("Sources") : viewMode === "search" ? searchHeading : viewMode === "tag" ? tagHeading : viewMode === "path" ? browseCrumbs.at(-1)?.name || t("Source paths") : t("All content")}</h1>
-        {viewMode === "content" && <p className="library-summary">{t("Find saved content, select what you need, and export a verified copy.")}</p>}
+        <h1>{isPhotoView ? t("Photos") : isMusicView ? t("Audio") : viewMode === "sources" ? t("Sources") : viewMode === "search" ? searchHeading : viewMode === "tag" ? tagHeading : viewMode === "path" ? library.justSavedBatch ? t("Just saved") : browseCrumbs.at(-1)?.name || t("Source paths") : t("All content")}</h1>
+        {viewMode === "path" && library.justSavedBatch && <p className="library-summary">{t("These are the exact files confirmed in the latest save. Select or open them to continue.")}</p>}
       </div>
     </div>}
     {library.libraryLoaded && library.tagStatus !== "ready" && <div className={`notice ${library.tagStatus === "unavailable" ? "warning" : "info"}`} role="status">{t(library.tagStatus === "unavailable" ? "Tags and favorites could not be read. Retry before editing them." : "Loading tags and favorites…")}{library.tagStatus === "unavailable" && <button type="button" className="secondary-button compact" onClick={() => { void library.loadTagVocabulary(workspaceID); }}>{t("Reload tags and favorites")}</button>}</div>}
     <div className={`library-controls${focusedComposition ? " library-controls--focused" : ""}`}>
       {focusedComposition ? <>
-        <div className="library-focused-bar">
-          {showLibraryViewSwitch && <LibraryPresentationNavigation t={t} mode={presentationMode} enabledPageIds={enabledViews} onNavigate={onLibraryView} variant="presentations" />}
-          {favoritesToggle}
-          <details className="library-tools">
-            <summary className="library-tools-summary">{t("Library tools")}</summary>
-            <div className="library-tools-body">
-              {resultCount}
-              {headingActions}
-              {secondaryTools}
-              {tagBrowser}
-            </div>
-          </details>
-        </div>
+        {!privateSpaceHome && focusedLibraryTools}
         {listingProgress}
         {filterSummary}
       </> : viewMode === "sources" ? <>
@@ -398,7 +405,6 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
         <div className="library-workflow-bar" data-workflow="standard">
           {filterActions}
           {resultCount}
-          {!isPhotoView && !isMusicView && savedRetrievalAction}
           {viewOptionsDisclosure}
           {filtersDisclosure}
           {moreToolsDisclosure}
@@ -409,22 +415,22 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
     </div>
     {retrievalOpen && <div id="saved-retrieval-panel">{savedRetrievalPanel}</div>}
     {(viewMode === "search" || viewMode === "tag") && <section className={`library-result-scope${isMediaView ? " library-result-scope--media" : ""}`} aria-label={t("Current result scope")}>
-      {isMediaView && <strong>{viewMode === "search" ? (lastExecutedQuery.trim() ? t("Results for \"{{query}}\"", { query: lastExecutedQuery }) : t("Image search results")) : tagHeading}</strong>}
+      {isMediaView && <strong>{viewMode === "search" ? (lastExecutedQuery.trim() ? t("Results for \"{{query}}\"", { query: lastExecutedQuery }) : t(isVideoView ? "Video search results" : isMusicView ? "Audio search results" : "Image search results")) : tagHeading}</strong>}
       {isMediaView ? <>
-        <p>{t("{{count}} items in this result view", { count: isPhotoView ? photoScopeCount : isMusicView ? musicScopeCount : scopeCount })}{viewMode === "search" && <> · {t("Returned results may be limited.")}</>}</p>
+        <p>{t("{{count}} items in this result view", { count: isPhotoView ? photoScopeCount : isMusicView ? musicScopeCount : isVideoView ? videoScopeCount : scopeCount })}{viewMode === "search" && <> · {t("Returned results may be limited.")}</>}</p>
         {viewMode === "search" && <button type="button" className="library-return" onClick={library.clearSearchScope}><X size={14} />{t("Clear search")}</button>}
         <details className="library-result-scope-details"><summary>{t("About these results")}</summary>
-          <p>{t(viewMode === "search" ? "Among returned results: {{photos}} photos, {{music}} audio, {{other}} other items. Display changes keep this query and relevance order." : "Within this filtered listing: {{photos}} photos, {{music}} audio, {{other}} other items.", { photos: photoScopeCount, music: musicScopeCount, other: otherScopeCount })}</p>
+          <p>{t(viewMode === "search" ? "Among returned results: {{photos}} photos, {{music}} audio, {{videos}} videos, {{other}} other items. Display changes keep this query and relevance order." : "Within this filtered listing: {{photos}} photos, {{music}} audio, {{videos}} videos, {{other}} other items.", { photos: photoScopeCount, music: musicScopeCount, videos: videoScopeCount, other: otherScopeCount })}</p>
           {viewMode === "search" && <small>{t("These counts cover the returned results, which may be limited; they are not full-library matching totals.")}</small>}
         </details>
       </> : <>
-        <p>{t(viewMode === "search" ? "Among returned results: {{photos}} photos, {{music}} audio, {{other}} other items. Display changes keep this query and relevance order." : "Within this filtered listing: {{photos}} photos, {{music}} audio, {{other}} other items.", { photos: photoScopeCount, music: musicScopeCount, other: otherScopeCount })}</p>
+        <p>{t(viewMode === "search" ? "Among returned results: {{photos}} photos, {{music}} audio, {{videos}} videos, {{other}} other items. Display changes keep this query and relevance order." : "Within this filtered listing: {{photos}} photos, {{music}} audio, {{videos}} videos, {{other}} other items.", { photos: photoScopeCount, music: musicScopeCount, videos: videoScopeCount, other: otherScopeCount })}</p>
         {viewMode === "search" && <small>{t("These counts cover the returned results, which may be limited; they are not full-library matching totals.")}</small>}
       </>}
       {viewMode === "search" && keywordBrowse && <div className="keyword-browse" role="status" aria-live="polite">
         <div>
           <strong>{keywordPageApplied ? (keywordBrowse.query.trim() ? t("Matching results for \"{{query}}\"", { query: keywordBrowse.query }) : t("Matching results")) : t("More matching results")}</strong>
-          {keywordBrowse.phase === "available" && <small>{t("Browse keyword and filter matches for this search. Opening this view replaces the displayed results.")}</small>}
+          {keywordBrowse.phase === "available" && <small>{t("Browse keyword and filter matches for this search. Opening this view replaces the displayed results; return to restore the ranked results.")}</small>}
           {keywordBrowse.phase === "loading-first" && <small>{t("Loading matching results…")}</small>}
           {keywordBrowse.phase === "more" && <small>{t("{{count}} matching results loaded. More are available.", { count: keywordBrowse.loaded })}</small>}
           {keywordBrowse.phase === "loading-more" && <small>{t("Loading the next page of matching results…")}</small>}
@@ -444,8 +450,9 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
           {keywordBrowse.phase === "more-error" && t("Retry matching results page")}
           {keywordBrowse.phase === "stale" && t("Restart matching results")}
         </button>}
+        {canReturnToRanked && <button type="button" className="secondary-button compact" disabled={busy} onClick={onReturnToRanked}>{t("Return to ranked results")}</button>}
       </div>}
-      {(isPhotoView || isMusicView) && renderedHits.length === 0 && <div className="library-result-scope__empty" role="status"><span>{t(isPhotoView ? "No photos among these {{count}} scoped results." : "No audio among these {{count}} scoped results.", { count: scopeCount })}</span><button type="button" className="secondary-button compact" onClick={() => onLibraryView("content")}>{t("Show all returned types")}</button></div>}
+      {(isPhotoView || isMusicView || isVideoView) && renderedHits.length === 0 && <div className="library-result-scope__empty" role="status"><span>{t(isPhotoView ? "No photos among these {{count}} scoped results." : isMusicView ? "No audio among these {{count}} scoped results." : "No videos among these {{count}} scoped results.", { count: scopeCount })}</span><button type="button" className="secondary-button compact" onClick={() => onLibraryView("content")}>{t("Show all returned types")}</button></div>}
     </section>}
     {activeRecalledView && <div className={`recall-caption ${activeRecalledView.state.toLowerCase()}${activeRecalledView.pageState === "stale" ? " stale" : ""}`} role={activeRecalledView.state === "DEGRADED" || activeRecalledView.pageState === "stale" ? "alert" : "status"}>
       <Sparkles size={15} /><div>

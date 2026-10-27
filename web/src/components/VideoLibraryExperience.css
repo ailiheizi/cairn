@@ -1,0 +1,37 @@
+.video-library { display: grid; gap: 20px; min-width: 0; color: var(--sp-ink, var(--ink)); }
+.video-library__heading { min-width: 0; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.video-library__heading h1 { margin: 2px 0 0; font-size: clamp(24px, 3vw, 36px); letter-spacing: -.035em; }
+.video-library__heading > p { margin: 0; color: var(--sp-muted, var(--muted)); font-size: 12px; }
+.video-library__stage { min-width: 0; display: grid; gap: 10px; padding: clamp(12px, 2.5vw, 22px); border: 1px solid var(--sp-line, var(--line)); border-radius: 20px; background: var(--sp-paper, var(--surface)); }
+.video-library__stage-heading { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.video-library__stage-heading > div { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.video-library__stage-heading strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.video-library__stage-heading svg { flex: 0 0 auto; color: var(--sp-green, var(--accent)); }
+.video-library__close { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; border: 1px solid var(--sp-line, var(--line)); border-radius: 10px; padding: 6px 10px; color: var(--sp-ink, var(--ink)); background: var(--sp-raised, var(--surface-raised)); cursor: pointer; }
+.video-library__player { display: block; width: 100%; max-height: min(64vh, 720px); border-radius: 12px; background: #101512; }
+.video-library__status, .video-library__verified { margin: 0; color: var(--sp-muted, var(--muted)); font-size: 12px; line-height: 1.5; }
+.video-library__status.is-error { color: var(--coral, #b34e41); }
+.video-library__verified { font-size: 11px; }
+.video-library__choices { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.video-library__choice { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 15px; border: 1px solid var(--sp-line, var(--line)); border-radius: 16px; background: var(--sp-paper, var(--surface)); }
+.video-library__choice.is-active { border-color: var(--sp-green, var(--accent)); }
+.video-library__choice-info { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.video-library__choice-info > svg { flex: 0 0 auto; color: var(--sp-green, var(--accent)); }
+.video-library__choice-info > div { min-width: 0; }
+.video-library__choice-info h2 { overflow: hidden; margin: 0; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.video-library__choice-info p { margin: 4px 0 0; color: var(--sp-muted, var(--muted)); font-size: 11px; }
+.video-library__choice-info small { display: block; margin-top: 5px; color: var(--sp-muted, var(--muted)); font-size: 10px; line-height: 1.4; }
+.video-library__choice-actions { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.video-library__choice-actions > button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.video-library__choice-actions > .primary-button { border-radius: 10px; padding: 7px 11px; color: var(--sp-green-ink, var(--primary-ink)); background: var(--sp-green, var(--primary)); }
+.video-library__choice-actions > .primary-button:disabled { opacity: .5; cursor: not-allowed; }
+.video-library__empty { display: grid; justify-items: center; gap: 8px; padding: 44px 16px; border: 1px dashed var(--sp-line, var(--line)); border-radius: 18px; color: var(--sp-muted, var(--muted)); text-align: center; }
+.video-library__empty > svg { color: var(--sp-green, var(--accent)); }
+.video-library__empty h2 { margin: 0; color: var(--sp-ink, var(--ink)); font-size: 16px; }
+.video-library__empty p { margin: 0; max-width: 480px; font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 740px) {
+  .video-library__heading { align-items: flex-start; flex-direction: column; }
+  .video-library__choice { align-items: stretch; flex-direction: column; gap: 12px; }
+  .video-library__choice-actions { justify-content: flex-start; flex-wrap: wrap; }
+}

@@ -77,7 +77,7 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
   /** Called after files landed in the staging inbox so the shell can refresh the staging projection. */
   onStaged?: () => void;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (uploadBatch?: { stagingDir: string; rows: UploadFileRow[]; receiptComplete: boolean }) => void;
 }) {
   const { source, recheckSourceRef, plan, planAction, planCheckBusy, pathSuggestions, sourceBarState, sourceBarReason, sourceSaveLabel, sourcePreviewDisabled, sourceSaveDisabled, sourceSuggestionDisabled, sourceLooksRemote } = sources;
   const [mode, setMode] = useState<UploadMode>(sources.pastedTextDraft.locked ? "upload" : recheckSourceRef || source.trim() ? "path" : "upload");
@@ -652,8 +652,8 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
           {searchPreparation.message || t(searchPreparation.state === "RUNNING" ? "Preparing search…" : "Search preparation completed.")}
         </div>}
       </div>}
-      {mode === "path" && <DrawerActionBar state={sourceBarState} reason={sourceBarReason} groupLabel={t("Source action")} previewLabel={t("Preview storage plan")} previewBusyLabel={t("Inspecting...")} previewBusy={planAction === "INSPECTING"} previewDisabled={sourcePreviewDisabled} confirmLabel={sourceSaveLabel} confirmBusyLabel={t("Saving content...")} confirmBusy={planAction === "PROTECTING"} confirmDisabled={sourceSaveDisabled} doneLabel={sourceBarState === "UP_TO_DATE" ? t("All content") : t("View saved source")} formID={sourceFormID} t={t} onApply={() => void sources.applyPlan()} onDone={onDone} onClose={onClose} />}
-      {mode !== "path" && stagedPlanActive && <DrawerActionBar state={sourceBarState} reason={sourceBarReason} groupLabel={t("Source action")} previewLabel={t("Preview storage plan")} previewBusyLabel={t("Inspecting...")} previewBusy={planAction === "INSPECTING"} previewDisabled={sourcePreviewDisabled} confirmLabel={sourceSaveLabel} confirmBusyLabel={t("Saving content...")} confirmBusy={planAction === "PROTECTING"} confirmDisabled={sourceSaveDisabled} doneLabel={sourceBarState === "UP_TO_DATE" ? t("All content") : t("View saved source")} formID={sourceFormID} t={t} onApply={() => void sources.applyPlan()} onDone={onDone} onClose={onClose} />}
+      {mode === "path" && <DrawerActionBar state={sourceBarState} reason={sourceBarReason} groupLabel={t("Source action")} previewLabel={t("Preview storage plan")} previewBusyLabel={t("Inspecting...")} previewBusy={planAction === "INSPECTING"} previewDisabled={sourcePreviewDisabled} confirmLabel={sourceSaveLabel} confirmBusyLabel={t("Saving content...")} confirmBusy={planAction === "PROTECTING"} confirmDisabled={sourceSaveDisabled} doneLabel={sourceBarState === "UP_TO_DATE" ? t("All content") : t("View saved source")} formID={sourceFormID} t={t} onApply={() => void sources.applyPlan()} onDone={() => onDone()} onClose={onClose} />}
+      {mode !== "path" && stagedPlanActive && <DrawerActionBar state={sourceBarState} reason={sourceBarReason} groupLabel={t("Source action")} previewLabel={t("Preview storage plan")} previewBusyLabel={t("Inspecting...")} previewBusy={planAction === "INSPECTING"} previewDisabled={sourcePreviewDisabled} confirmLabel={sourceSaveLabel} confirmBusyLabel={t("Saving content...")} confirmBusy={planAction === "PROTECTING"} confirmDisabled={sourceSaveDisabled} doneLabel={sourceBarState === "UP_TO_DATE" ? t("All content") : uploadSaved && !uploadPartial ? t("View saved files") : t("View saved source")} formID={sourceFormID} t={t} onApply={() => void sources.applyPlan()} onDone={() => onDone(uploadSaved && uploadStagingDir ? { stagingDir: uploadStagingDir, rows: acceptedRows, receiptComplete: !uploadPartial } : undefined)} onClose={onClose} />}
     </aside>
   </div>;
 }

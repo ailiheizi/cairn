@@ -1,5 +1,5 @@
 import type { Translator } from "../i18n";
-import { Home, Image, LayoutGrid, Music2 } from "lucide-react";
+import { Home, Image, LayoutGrid, Music2, Video } from "lucide-react";
 import { enabledLibraryPageGroups, type LibraryPageId } from "../lib/libraryViews";
 import type { LibraryPageMode, ViewMode } from "../lib/types";
 
@@ -25,7 +25,8 @@ export function LibraryPresentationNavigation({ t, mode, enabledPageIds, onNavig
 }) {
   const groups = enabledLibraryPageGroups(enabledPageIds);
   const domains = groups.filter((group) => group.root.navigationKind !== "layout");
-  const layouts = groups.filter((group) => group.root.navigationKind === "layout");
+  const home = groups.find((group) => group.root.id === "cairn:overview");
+  const layouts = groups.filter((group) => group.root.navigationKind === "layout" && group !== home);
   const activeGroup = domains.find((group) => group.presentations.some((page) => page.mode === mode));
   const libraryActive = mode === "content" || layouts.some((group) => group.presentations.some((page) => page.mode === mode));
 
@@ -39,12 +40,14 @@ export function LibraryPresentationNavigation({ t, mode, enabledPageIds, onNavig
   function destinationIcon(mode: string, layout = false) {
     if (mode === "photos") return <Image size={15} aria-hidden="true" />;
     if (mode === "music") return <Music2 size={15} aria-hidden="true" />;
+    if (mode === "page:cairn:videos") return <Video size={15} aria-hidden="true" />;
     if (layout) return <LayoutGrid size={15} aria-hidden="true" />;
     return <LayoutGrid size={15} aria-hidden="true" />;
   }
 
   const domainButtons = <div className="library-presentation-navigation__domains" role="group" aria-label={t("Content apps")}>
-    <button type="button" className={`library-presentation-navigation__domain library-presentation-navigation__domain--library ${libraryActive ? "is-active" : ""}`} aria-current={libraryActive ? "page" : undefined} aria-pressed={libraryActive} onClick={() => onNavigate("content")}><Home size={15} aria-hidden="true" /><span>{t("Library")}</span></button>
+    {home && <button type="button" className={`library-presentation-navigation__domain ${mode === targetFor(home) ? "is-active" : ""}`} data-domain="cairn:overview" aria-current={mode === targetFor(home) ? "page" : undefined} aria-pressed={mode === targetFor(home)} onClick={() => onNavigate(targetFor(home))}><Home size={15} aria-hidden="true" /><span>{t("Private space")}</span></button>}
+    <button type="button" className={`library-presentation-navigation__domain library-presentation-navigation__domain--library ${libraryActive ? "is-active" : ""}`} aria-current={libraryActive ? "page" : undefined} aria-pressed={libraryActive} onClick={() => onNavigate("content")}><LayoutGrid size={15} aria-hidden="true" /><span>{t("Library")}</span></button>
     {domains.map((group) => {
       const active = group === activeGroup;
       return <button type="button" key={group.root.id} className={`library-presentation-navigation__domain ${active ? "is-active" : ""}`} data-domain={group.root.id} aria-current={active ? "page" : undefined} aria-pressed={active} onClick={() => onNavigate(targetFor(group))}>{destinationIcon(group.root.mode)}<span>{t(group.root.label)}</span></button>;

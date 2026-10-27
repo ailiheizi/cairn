@@ -188,6 +188,7 @@
 
 /* A registered page can request a quieter composition without owning flows. */
 .interface-immersive { min-height: 100vh; color: var(--ink); background: var(--surface); }
+.interface-immersive--content-space { min-height: 100vh; color: var(--sp-ink); background: var(--sp-canvas); }
 .immersive-navigation { margin: 10px var(--page-gutter) 0; max-width: 1300px; }
 .immersive-navigation > summary { width: fit-content; cursor: pointer; padding: 7px 12px; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); background: var(--surface-container-low); }
 .immersive-navigation-content { padding: 12px; border: 1px solid var(--hairline); border-radius: var(--card-radius-sm); }
@@ -198,6 +199,16 @@
    header. Scoped to the focused composition; every other immersive page keeps
    its own "Browse tools" disclosure and 16px top padding. */
 .interface-immersive[data-composition="focused"] .immersive-workspace { padding-top: 10px; gap: 16px; }
+.interface-immersive--content-space .immersive-workspace {
+  width: 100%;
+  max-width: min(1320px, calc(100% - 2 * clamp(20px, 4vw, 48px)));
+  padding-right: 0;
+  padding-left: 0;
+  background: var(--sp-canvas);
+}
+.interface-immersive--content-space .immersive-content,
+.interface-immersive--content-space .immersive-details,
+.interface-immersive--content-space .content-column { background-color: var(--sp-canvas); }
 .immersive-content, .immersive-details { min-width: 0; }
 .immersive-content > .content-column { width: 100%; max-width: none; margin: 0; }
 .immersive-details { max-width: 800px; width: 100%; justify-self: center; }

@@ -181,6 +181,8 @@ selection bar, and the details inspector column. */
 .result-open-copy:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.72); outline-offset: 3px; border-radius: 4px; }
 .result-match { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #aeb4bd; font-size: 11px; line-height: 1.35; }
 .result-match b { margin-right: 5px; color: #a78bfa; font-size: 10px; font-weight: 760; }
+.result-match-open { flex: 0 0 auto; border: 0; padding: 4px 6px; color: var(--primary); background: transparent; font-size: 11px; font-weight: 650; cursor: pointer; }
+.result-match-open:hover, .result-match-open:focus-visible { color: #fff; text-decoration: underline; }
 .identity-weave {
   height: 72px;
   display: flex;
@@ -802,6 +804,7 @@ selection bar, and the details inspector column. */
   color: var(--muted); font-size: 11px; line-height: 1.3;
   text-align: left; text-overflow: ellipsis; white-space: nowrap;
 }
+.result-list .result-match-open { justify-self: start; padding: 2px; font-size: 10px; }
 .result-list .result-row.selected .file-icon {
   color: var(--accent); background: var(--surface-dim);
 }
@@ -1468,26 +1471,26 @@ selection bar, and the details inspector column. */
 }
 .library-focused-bar > .library-presentation-navigation { flex: 0 1 auto; width: auto; }
 .library-focused-bar > .result-count { margin: 0; }
-.library-tools { min-width: 0; flex: 0 1 auto; }
+.library-tools { min-width: 0; flex: 0 0 auto; }
 /* An opened tools panel takes its own full row instead of crowding the bar. */
 .library-tools[open] { flex: 1 1 100%; }
 .library-tools-summary {
-  width: fit-content;
-  min-height: 32px;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
   border: 1px solid var(--hairline-strong);
   border-radius: var(--card-radius-sm);
-  padding: 6px 13px;
-  color: var(--ink);
+  padding: 0;
+  color: var(--muted);
   background: var(--surface-container-low);
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
   cursor: pointer;
   list-style: none;
 }
+.library-tools-summary:hover, .library-tools[open] > .library-tools-summary { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .library-tools-summary::-webkit-details-marker { display: none; }
 .library-tools-summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 58%, transparent); outline-offset: 2px; }
 .library-tools-body {
@@ -1521,7 +1524,7 @@ selection bar, and the details inspector column. */
 
 /* Focused media surfaces keep technical library tools secondary while query,
    active filters and incomplete-result information remain visible. */
-.library-focused-bar > .library-tools { margin-left: auto; }
+.library-focused-bar > .library-tools { margin-left: 0; }
 .library-result-scope--media { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px; margin: 4px 0 10px; }
 .library-result-scope--media > p { margin: 0; color: var(--muted); }
 .library-result-scope-details { margin-left: auto; min-width: 0; font-size: 11px; color: var(--muted); }

@@ -4,25 +4,32 @@ The ordinary flow is deliberately small:
 
 ```text
 configure
-→ inspect a local or mounted server path
+→ add files, a folder, text or a server path
 → review the exact-storage plan
 → confirm and save
 → search, add Notes or tags
 → verify or restore when needed
 ```
 
-The current browser flow accepts a path visible to the Cairn host. A
-future browser-upload flow may add a temporary upload stage, but it is not the
-same thing as accepting a URL and it does not change the recovery model.
+The browser accepts file selection, drag-and-drop, folder selection and plain
+text. Advanced intake accepts a path visible to the Cairn host. Uploads are
+temporary until you review and confirm the save; staging is not protection.
 
 ## Saving a file
 
-1. Choose the configured storage scheme (the current profile is preselected).
+1. Open **Add**, choose files/a folder or write text. The configured storage
+   scheme is preselected.
 2. Review the file count, logical bytes, exact duplicates, and any blocked
    entries.
 3. Confirm the plan.
-4. Cairn stores or reuses the exact content and keeps the original path
-   as provenance.
+4. Cairn stores or reuses the exact content and keeps the original path as
+   provenance. Choose **View saved files** to see and select the confirmed
+   upload batch, ready for existing Notes, tags and takeout actions.
+
+The saved batch is temporary, not a new collection. If Cairn cannot match every
+accepted upload to its saved path, digest and length, it opens the source with
+a notice instead of selecting a partial or uncertain batch. Server-path intake
+continues to open the saved source.
 
 Optional analysis can run after the exact save. A model or index failure leaves
 the saved bytes and keyword search usable.
@@ -33,6 +40,12 @@ Search combines names, paths, metadata, Notes, tags, extracted text, and any
 available semantic generation. A result always points back to the same stable
 file subject; a similarity score never changes file identity or authorizes
 deletion.
+
+Open **View matches** beside a result to inspect its returned evidence in
+Details. You can browse keyword-only matches and then return to the original
+ranked results without running the meaning search again. Keyword pages do not
+include semantic-only suggestions. A new search, refreshed catalog or changed
+workspace invalidates the old return snapshot.
 
 ## Adding context
 

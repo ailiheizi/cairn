@@ -60,6 +60,8 @@ import { photoSlideshow } from "./i18n/photoSlideshow";
 import { immersiveMusic } from "./i18n/immersiveMusic";
 import { visualSearch } from "./i18n/visualSearch";
 import { materialList } from "./i18n/materialList";
+import { privateSpaceShell } from "./i18n/privateSpaceShell";
+import { videoExperience } from "./i18n/videoExperience";
 
 import { photoVerticalPolish } from "./i18n/photoVerticalPolish";
 
@@ -127,6 +129,8 @@ const chinese: Record<string, string> = {
   ...immersiveMusic,
   ...visualSearch,
   ...materialList,
+  ...privateSpaceShell,
+  ...videoExperience,
 };
 
 export function resolveInitialLocale(): Locale {

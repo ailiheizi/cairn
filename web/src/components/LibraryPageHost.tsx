@@ -6,6 +6,7 @@ import { ContentPreview } from "./ContentPreview";
 import { ResultList } from "./ResultList";
 import { PhotoLibraryExperience } from "./PhotoLibraryExperience";
 import { MusicLibraryExperience } from "./MusicLibraryExperience";
+import { VideoLibraryExperience } from "./VideoLibraryExperience";
 import { PhotoExhibition } from "./PhotoExhibition";
 import { PhotoThumbnail } from "./PhotoThumbnail";
 import { OverviewExperience } from "./OverviewExperience";
@@ -105,6 +106,16 @@ function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, mus
   />;
 }
 
+function renderVideos({ resultProps, onOpenHit, musicQueueControls }: LibraryPageHostProps) {
+  return <VideoLibraryExperience
+    t={resultProps.t}
+    workspaceID={resultProps.workspaceID}
+    hits={resultProps.hits}
+    onOpenHit={onOpenHit}
+    queueControls={musicQueueControls}
+  />;
+}
+
 function renderLibraryThumbnail(hit: SearchHit, resultProps: LibraryResultProps): ReactNode {
     const { command, locale, workspaceID, t } = resultProps;
     const name = hit.name || hit.path?.split(/[\\/]/).at(-1) || "";
@@ -146,9 +157,9 @@ function renderExhibition({ resultProps, onOpenHit, focusedSubjectRef, onFocusSu
   return <PhotoExhibition {...props} />;
 }
 
-function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, musicMetadata, onPlayTrack, onQueueTrack, onPlayTracks, favoriteControls, onSelectSubjects }: LibraryPageHostProps) {
+function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, musicMetadata, musicQueueControls, onPlayTrack, onQueueTrack, onPlayTracks, favoriteControls, onSelectSubjects }: LibraryPageHostProps) {
   const groups = enabledLibraryPageGroups(enabledPageIds ?? allLibraryPageIds);
-  const destination = (mediaClass: "image" | "audio") => {
+  const destination = (mediaClass: "image" | "audio" | "video") => {
     const group = groups.find((candidate) => candidate.root.navigationKind !== "layout" && candidate.root.mediaClass === mediaClass);
     return group?.presentations.find((page) => page.id === group.root.id)?.mode ?? group?.presentations[0]?.mode;
   };
@@ -162,8 +173,10 @@ function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, mu
     tagsBySubject={resultProps.tagsBySubject}
     metadata={musicMetadata}
     favoriteControls={favoriteControls}
+    queueControls={musicQueueControls}
     photoDestination={destination("image")}
     musicDestination={destination("audio")}
+    videoDestination={destination("video")}
     renderThumbnail={(hit) => renderLibraryThumbnail(hit, resultProps)}
     onToggleSelection={resultProps.onToggleSelection}
     onSelectSubjects={onSelectSubjects}
@@ -178,6 +191,7 @@ function renderOverview({ resultProps, enabledPageIds, onOpenHit, onNavigate, mu
 const rendererEntries: ReadonlyArray<readonly [LibraryPageId, PageRenderer]> = [
   ["cairn:photos", renderPhotos],
   ["cairn:music", renderMusic],
+  ["cairn:videos", renderVideos],
   ["cairn:exhibition", renderExhibition],
   ["cairn:overview", renderOverview],
 ];

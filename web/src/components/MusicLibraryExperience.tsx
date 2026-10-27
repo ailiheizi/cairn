@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useBrowsePositionScopeIdentity, useClientBrowseValue } from "../app/ClientBrowseSession";
 import { useBrowsePosition } from "../app/useBrowsePosition";
-import { Music2, Search, Shuffle } from "lucide-react";
+import { MoreHorizontal, Music2, Search } from "lucide-react";
 import type { AudioTrack } from "../lib/audioPlayback";
 import { mediaClassFromSuffix } from "../lib/format";
 import { materialListSelectionEligible } from "../lib/materialListIO";
@@ -388,7 +388,6 @@ export function MusicLibraryExperience(props: Props) {
         <h1>{t("Music")}</h1>
         {!groupFactsPending && <p className="music-library-heading__count">{t("{{count}} tracks in this view", { count: artistAlbumLanding ? artistTrackRows.length : trackRows.length })}</p>}
       </div>
-      {props.onNavigate && <button type="button" className="music-library-heading__saved-lists" onClick={() => props.onNavigate?.("content")}>{t("Find saved lists in Library")}</button>}
     </header>
     <div className="music-library__toolbar">
       <nav className="music-browse-modes" aria-label={t("Browse music")}>
@@ -423,24 +422,6 @@ export function MusicLibraryExperience(props: Props) {
           </fieldset> : <p>{t("No tags are available in the loaded music view.")}</p> : null}
           <button type="button" disabled={!selectedTagFilters.length && !onlySelectedTracks} onClick={() => { setSelectedTagFilters([]); setOnlySelectedTracks(false); }}>{t("Clear tag and selection filters")}</button>
           {props.metadata?.reload && <button type="button" className="music-refresh-facts" disabled={props.metadata.status === "loading"} onClick={props.metadata.reload}>{t("Refresh music facts")}</button>}
-          {showingTrackRows && (props.onSelectSubjects || props.onDownloadOriginals || props.onCreateMaterialList) && <details className="music-scope-actions">
-            <summary>{t("Selection and original takeout")}</summary>
-            <div className="music-scope-actions__menu">
-              {props.onCreateMaterialList && <>
-                <button type="button" disabled={!selectedDisplayedHits.length || !materialListSelectionValid || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(selectedDisplayedHits)}>{t("Save selected tracks as list ({{count}})", { count: selectedDisplayedHits.length })}</button>
-                <button type="button" disabled={!materialListSelectionEligible(displayedTrackHits) || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(displayedTrackHits)}>{t("Save displayed tracks as list ({{count}})", { count: displayedTrackHits.length })}</button>
-              </>}
-              {props.onSelectSubjects && <>
-                <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "add")}>{t("Select current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
-                <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "invert")}>{t("Invert selection in current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
-                <button type="button" disabled={!selectedDisplayedHits.length} onClick={() => props.onSelectSubjects?.(selectedDisplayedHits, "remove")}>{t("Clear selection in current tracks ({{count}})", { count: selectedDisplayedHits.length })}</button>
-              </>}
-              {props.onDownloadOriginals && <>
-                <button type="button" disabled={!selectedDisplayedHits.length || props.originalTakeoutBusy} onClick={() => props.onDownloadOriginals?.(selectedDisplayedHits)}>{t("Download selected originals ZIP ({{count}})", { count: selectedDisplayedHits.length })}</button>
-                <button type="button" disabled={!displayedTrackHits.length || props.originalTakeoutBusy} onClick={() => props.onDownloadOriginals?.(displayedTrackHits)}>{t("Download current originals ZIP ({{count}})", { count: displayedTrackHits.length })}</button>
-              </>}
-            </div>
-          </details>}
         </div>
       </details>
     </div>
@@ -476,6 +457,7 @@ export function MusicLibraryExperience(props: Props) {
       {!trackRows.length && eligibilityFilter !== "all" && <button type="button" className="music-clear-group-filter" onClick={() => setEligibilityFilter("all")}>{t("Clear availability filter")}</button>}
     </header>}
     {currentPlayback && <aside className="music-current-playback" aria-label={t("Current track")}>
+      {currentPlayback.artworkURL && <img className="music-current-playback__artwork" src={currentPlayback.artworkURL} alt="" aria-hidden="true" />}
       <div className="music-current-playback__copy">
         <span>{t("Current track")}</span>
         <strong>{currentPlayback.name}</strong>
@@ -484,37 +466,45 @@ export function MusicLibraryExperience(props: Props) {
       {currentRow && <button type="button" onClick={locateCurrentTrack}>{t("Show current track")}</button>}
       {currentLoadedHit && !currentRow && <button type="button" onClick={clearMusicFiltersAndShowCurrentTrack}>{t("Clear music filters and show current track")}</button>}
     </aside>}
-    {/* Keep actions ahead of the rows; selection chooses the primary Play action,
-        while the complete displayed set stays available in a native disclosure. */}
+    {/* One primary Play action stays visible; queue, shuffle, batch and takeout
+        actions remain available in the closed menu. */}
     <div className="music-queue-actions" role="group" aria-label={t("Music queue actions")}>
-      {showingTrackRows && <div className="music-action-group">
-        {selectedPlayable.length > 0 ? <>
-          <button className="music-play-displayed" type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(selectedPlayable)}>{t("Play selected ({{count}})", { count: selectedPlayable.length })}</button>
-          <button type="button" disabled={!props.onPlayTracks} onClick={() => randomize(selectedPlayable)}><Shuffle aria-hidden="true" /> {t("Shuffle selected ({{count}})", { count: selectedPlayable.length })}</button>
-        </> : displayedPlayable.length > 0 && <>
-          <button className="music-play-displayed" type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(displayedPlayable)}>{t("Play these tracks ({{count}})", { count: displayedPlayable.length })}</button>
-          <button type="button" disabled={!props.onPlayTracks} onClick={() => randomize(displayedPlayable)}><Shuffle aria-hidden="true" /> {t("Shuffle these tracks ({{count}})", { count: displayedPlayable.length })}</button>
-        </>}
-        {props.onCreateMaterialList && <button className="music-save-list" type="button" disabled={!materialListSelectionValid || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(materialListSubjects)}>{t(selectedDisplayedHits.length ? "Save selected tracks as list ({{count}})" : "Save displayed tracks as list ({{count}})", { count: materialListSubjects.length })}</button>}
-        {props.onCreateMaterialList && <small className="music-list-scope-note">{t("Lists use selected or displayed tracks only, up to 200; off-view selections and repeated queue entries are excluded.")}</small>}
+      {showingTrackRows && (selectedPlayable.length > 0 || displayedPlayable.length > 0) && <div className="music-action-group">
+        {selectedPlayable.length > 0
+          ? <button className="music-play-displayed" type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(selectedPlayable)}>{t("Play selected ({{count}})", { count: selectedPlayable.length })}</button>
+          : <button className="music-play-displayed" type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(displayedPlayable)}>{t("Play these tracks ({{count}})", { count: displayedPlayable.length })}</button>}
       </div>}
       <div className="music-queue-secondary">
-        {displayedPlayable.length > 0 && <details className="music-displayed-actions">
-          <summary>{t("More playback actions")}</summary>
+        {(props.queueControls || (showingTrackRows && (displayedPlayable.length > 0 || displayedTrackHits.length > 0) && (props.onCreateMaterialList || props.onDownloadOriginals || displayedPlayable.length > 0))) && <details className="music-displayed-actions">
+          <summary aria-label={t("More playback actions")} title={t("More playback actions")}><MoreHorizontal size={18} aria-hidden="true" /><span className="sr-only">{t("More playback actions")}</span></summary>
           <div className="music-displayed-actions__menu">
-            {selectedPlayable.length > 0 && <>
-              <button type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(displayedPlayable)}>{t("Play these tracks ({{count}})", { count: displayedPlayable.length })}</button>
-              <button type="button" disabled={!props.onPlayTracks} onClick={() => randomize(displayedPlayable)}>{t("Shuffle these tracks ({{count}})", { count: displayedPlayable.length })}</button>
+            {displayedPlayable.length > 0 && selectedPlayable.length > 0 && <button type="button" disabled={!props.onPlayTracks} onClick={() => props.onPlayTracks?.(displayedPlayable)}>{t("Play these tracks ({{count}})", { count: displayedPlayable.length })}</button>}
+            {displayedPlayable.length > 0 && <button type="button" disabled={!props.onPlayTracks} onClick={() => randomize(selectedPlayable.length > 0 ? selectedPlayable : displayedPlayable)}>{t(selectedPlayable.length > 0 ? "Shuffle selected ({{count}})" : "Shuffle these tracks ({{count}})", { count: selectedPlayable.length > 0 ? selectedPlayable.length : displayedPlayable.length })}</button>}
+            {displayedPlayable.length > 0 && <>
+              <button type="button" disabled={!props.queueControls} onClick={() => props.queueControls?.addTracks(displayedPlayable)}>{t("Add to queue ({{count}})", { count: displayedPlayable.length })}</button>
+              <button type="button" disabled={!props.queueControls?.addNextTracks} onClick={() => props.queueControls?.addNextTracks?.(displayedPlayable)}>{t("Play these tracks next ({{count}})", { count: displayedPlayable.length })}</button>
             </>}
-            <button type="button" disabled={!props.queueControls} onClick={() => props.queueControls?.addTracks(displayedPlayable)}>{t("Add to queue ({{count}})", { count: displayedPlayable.length })}</button>
-            <button type="button" disabled={!props.queueControls?.addNextTracks} onClick={() => props.queueControls?.addNextTracks?.(displayedPlayable)}>{t("Play these tracks next ({{count}})", { count: displayedPlayable.length })}</button>
             {selectedPlayable.length > 0 && <>
               <button type="button" disabled={!props.queueControls} onClick={() => props.queueControls?.addTracks(selectedPlayable)}>{t("Add selected to queue ({{count}})", { count: selectedPlayable.length })}</button>
               <button type="button" disabled={!props.queueControls?.addNextTracks} onClick={() => props.queueControls?.addNextTracks?.(selectedPlayable)}>{t("Play next selected ({{count}})", { count: selectedPlayable.length })}</button>
             </>}
+            {props.onSelectSubjects && showingTrackRows && <>
+              <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "add")}>{t("Select current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
+              <button type="button" disabled={!displayedTrackHits.length} onClick={() => props.onSelectSubjects?.(displayedTrackHits, "invert")}>{t("Invert selection in current tracks ({{count}})", { count: displayedTrackHits.length })}</button>
+              <button type="button" disabled={!selectedDisplayedHits.length} onClick={() => props.onSelectSubjects?.(selectedDisplayedHits, "remove")}>{t("Clear selection in current tracks ({{count}})", { count: selectedDisplayedHits.length })}</button>
+            </>}
+            {props.onCreateMaterialList && showingTrackRows && <>
+              <button className="music-save-list" type="button" disabled={!selectedDisplayedHits.length || !materialListSelectionValid || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(selectedDisplayedHits)}>{t("Save selected tracks as list ({{count}})", { count: selectedDisplayedHits.length })}</button>
+              <button className="music-save-list" type="button" disabled={!materialListSelectionEligible(displayedTrackHits) || props.materialListCreationDisabled} onClick={() => props.onCreateMaterialList?.(displayedTrackHits)}>{t("Save displayed tracks as list ({{count}})", { count: displayedTrackHits.length })}</button>
+              <small className="music-list-scope-note">{t("Lists use selected or displayed tracks only, up to 200; off-view selections and repeated queue entries are excluded.")}</small>
+            </>}
+            {props.onDownloadOriginals && showingTrackRows && <>
+              <button type="button" disabled={!selectedDisplayedHits.length || props.originalTakeoutBusy} onClick={() => props.onDownloadOriginals?.(selectedDisplayedHits)}>{t("Download selected originals ZIP ({{count}})", { count: selectedDisplayedHits.length })}</button>
+              <button type="button" disabled={!displayedTrackHits.length || props.originalTakeoutBusy} onClick={() => props.onDownloadOriginals?.(displayedTrackHits)}>{t("Download current originals ZIP ({{count}})", { count: displayedTrackHits.length })}</button>
+            </>}
+            {props.queueControls && <button type="button" className="music-open-queue" onClick={() => props.queueControls?.show()}>{t("Queue ({{count}})", { count: props.queueControls?.count ?? 0 })}</button>}
           </div>
         </details>}
-        <button type="button" className="music-open-queue" disabled={!props.queueControls} onClick={() => props.queueControls?.show()}>{t("Queue ({{count}})", { count: props.queueControls?.count ?? 0 })}</button>
       </div>
       {showingTrackRows && (displayedPlayable.length < trackRows.length || selectedDisplayedRows.length > selectedPlayable.length || selectionOutsideDisplayedCount > 0) && <div className="music-action-notes">
         {displayedPlayable.length < trackRows.length && <small>{t("Skipped {{count}} unsupported or unavailable displayed tracks", { count: trackRows.length - displayedPlayable.length })}</small>}

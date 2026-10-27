@@ -2,9 +2,13 @@
 export const intakeContinuation: Record<string, string> = {
   "Continue adding": "继续添加",
   "View saved source": "查看已保存来源",
+  "View saved files": "查看已保存文件",
   "The source operation is still finishing. Try opening it again shortly.": "来源操作仍在完成，请稍后再试。",
   "This save is not confirmed yet. Check its status before opening the source.": "此项保存尚未确认。请先检查状态，再打开来源。",
   "The save is confirmed, but its source could not be opened. Showing all content.": "保存已确认，但无法打开其来源。正在显示全部内容。",
+  "The full saved upload could not be matched to its receipt. Opening the source; select files manually.": "无法将完整的已保存上传批次与收据匹配。正在打开来源，请手动选择文件。",
+  "The saved upload no longer matches this source. Opening the source instead.": "已保存的上传批次与此来源不再匹配。改为打开来源。",
+  "The original upload report was incomplete. Opening the saved source; select files manually.": "原始上传报告不完整。正在打开已保存来源，请手动选择文件。",
   "Prepare search for saved content": "为已保存内容准备搜索",
   "Update search for the current library, including this saved batch. This does not change the saved originals.": "更新当前资料库的搜索索引，包括本次保存的内容。此操作不会更改已保存的原件。",
   "Prepare search": "准备搜索",

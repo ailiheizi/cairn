@@ -1,4 +1,4 @@
-import { dedupFacetValue, formatFacetValue, itemInMonth, mediaContentItems } from "./format";
+import { dedupFacetValue, formatFacetValue, itemInMonth, mediaClassFromSuffix, mediaContentItems } from "./format";
 import { libraryPageForMode } from "./libraryViews";
 import type { LibraryPageMode, SearchHit, SystemFacetState, ViewMode } from "./types";
 
@@ -10,6 +10,7 @@ export function resultScopeSource(viewMode: ViewMode, searchHits: SearchHit[], l
 /** Apply only the registered page's deterministic media suffix projection, preserving order and row identity. */
 export function projectResultScope(hits: SearchHit[], presentationMode: "content" | LibraryPageMode): SearchHit[] {
   const mediaClass = presentationMode === "content" ? undefined : libraryPageForMode(presentationMode)?.mediaClass;
+  if (mediaClass === "video") return hits.filter((item) => item.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(item)) === "video");
   return mediaClass === "image" || mediaClass === "audio" ? mediaContentItems(hits, mediaClass) : hits;
 }
 

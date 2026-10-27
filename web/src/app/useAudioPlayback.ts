@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { extractEmbeddedAudioArtwork } from "../lib/audioArtwork";
 import { fetchVerifiedAudio, type AudioQueueEntry, type AudioTrack } from "../lib/audioPlayback";
 import { insertQueueTrackNext, isPlayableQueueTrack, MAX_AUDIO_QUEUE_ENTRIES, moveQueueOccurrenceNext, moveQueueOccurrencesNext, moveQueueTrack, preparePlayableQueue, removeQueueOccurrence, removeQueueOccurrences, resolveQueueAdvance, sameQueueOccurrence, shuffleUpcomingTracks, type QueueTrack, type RepeatMode } from "../lib/playbackQueue";
 
-type Playback = { queue: AudioQueueEntry[]; queueOpen: boolean; queueSkippedCount: number; queueNotice?: string; sleepTimerNotice?: string; repeatMode: RepeatMode; track?: QueueTrack; url?: string; loading: boolean; starting: boolean; error?: string; playing: boolean; currentTime: number; duration: number };
+type Playback = { queue: AudioQueueEntry[]; queueOpen: boolean; queueSkippedCount: number; queueNotice?: string; sleepTimerNotice?: string; repeatMode: RepeatMode; track?: QueueTrack; url?: string; artworkURL?: string; loading: boolean; starting: boolean; error?: string; playing: boolean; currentTime: number; duration: number };
 const initial: Playback = { queue: [], queueOpen: false, repeatMode: "off", queueSkippedCount: 0, loading: false, starting: false, playing: false, currentTime: 0, duration: 0 };
 type QueueActionResult = { queuedCount: number; skippedCount: number; reason?: "no-supported-tracks" | "queue-limit" };
 type NativeStartAttempt = { generation: number; url: string; workspaceID: string; pending: boolean };
@@ -15,6 +16,7 @@ export function useAudioPlayback(workspaceID: string) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const requestRef = useRef<AbortController | undefined>(undefined);
   const urlRef = useRef<string | undefined>(undefined);
+  const artworkUrlRef = useRef<string | undefined>(undefined);
   const nativeStartRef = useRef<NativeStartAttempt | undefined>(undefined);
   const generationRef = useRef(0);
   const queueRef = useRef<AudioQueueEntry[]>([]);
@@ -35,8 +37,11 @@ export function useAudioPlayback(workspaceID: string) {
     requestRef.current?.abort(); requestRef.current = undefined;
     const oldUrl = urlRef.current;
     urlRef.current = undefined;
+    const oldArtworkUrl = artworkUrlRef.current;
+    artworkUrlRef.current = undefined;
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.removeAttribute("src"); audioRef.current.load(); }
     if (oldUrl) URL.revokeObjectURL(oldUrl);
+    if (oldArtworkUrl) URL.revokeObjectURL(oldArtworkUrl);
   }, []);
   const invalidateSleepTimer = useCallback(() => {
     sleepTimerGenerationRef.current += 1;
@@ -83,7 +88,7 @@ export function useAudioPlayback(workspaceID: string) {
     const generation = ++generationRef.current;
     clearMedia();
     setState((current) => generationRef.current === generation
-      ? ({ ...current, url: undefined, loading: false, starting: false, playing: false, error })
+      ? ({ ...current, url: undefined, artworkURL: undefined, loading: false, starting: false, playing: false, error })
       : current);
   }, [clearMedia]);
   const startNativePlayback = useCallback(async (url: string, generation: number) => {
@@ -139,6 +144,20 @@ export function useAudioPlayback(workspaceID: string) {
       setState((current) => generationRef.current === generation && urlRef.current === url
         ? ({ ...current, track, url, loading: false, playing: false, currentTime: 0, duration: 0 })
         : current);
+      // Artwork is derived only from this already verified playback Blob. Its
+      // bounded optional parse runs independently and cannot delay playback.
+      void extractEmbeddedAudioArtwork(blob).then((artwork) => {
+        if (!artwork || workspaceRef.current !== workspaceID || generationRef.current !== generation || urlRef.current !== url) return;
+        const artworkURL = URL.createObjectURL(artwork);
+        if (workspaceRef.current !== workspaceID || generationRef.current !== generation || urlRef.current !== url) {
+          URL.revokeObjectURL(artworkURL);
+          return;
+        }
+        artworkUrlRef.current = artworkURL;
+        setState((current) => generationRef.current === generation && urlRef.current === url && current.url === url
+          ? ({ ...current, artworkURL })
+          : current);
+      }).catch(() => undefined);
       const audio = audioRef.current;
       if (audio) {
         audio.src = url;
@@ -150,7 +169,7 @@ export function useAudioPlayback(workspaceID: string) {
       const failureGeneration = ++generationRef.current;
       clearMedia();
       setState((current) => generationRef.current === failureGeneration
-        ? ({ ...current, track, url: undefined, loading: false, starting: false, playing: false, error: reason })
+        ? ({ ...current, track, url: undefined, artworkURL: undefined, loading: false, starting: false, playing: false, error: reason })
         : current);
     }
   }, [clearMedia, fail, startNativePlayback, workspaceID]);

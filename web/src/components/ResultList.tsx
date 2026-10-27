@@ -117,6 +117,10 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
       const preview = imageMetadata ? searchImageMetadataSummary(imageMetadata, t) : evidence;
       return <span className="result-match" title={segment.matched_text} aria-label={t("Matched segment provenance")} data-image-metadata={imageMetadata ? "recognized" : undefined} key={segmentKey}><b>{searchSegmentSourceLabel(segment, t)}</b>{previewUnicodeText(preview, 72)}</span>;
     })}
+    {matchedSegments.length > 0 && <button type="button" className="result-match-open" onClick={(event) => {
+      event.stopPropagation();
+      onRowClick(index, { metaKey: false, ctrlKey: false, shiftKey: false, preventDefault: () => event.preventDefault() });
+    }}>{t("View matches")}{matchedSegments.length > 1 ? ` · ${matchedSegments.length}` : ""}</button>}
     {visibleTags.length > 0 && <span className="result-tags" title={userTags.join(" · ")}>{visibleTags.map((value) => <span className="result-tag" key={value}><Tag size={10} />{value}</span>)}{userTags.length > visibleTags.length && <span className="result-tag more">+{userTags.length - visibleTags.length}</span>}</span>}
     <details ref={actionsRef} className="result-row-actions" onClick={(event) => event.stopPropagation()} onKeyDown={closeActionsOnEscape} onToggle={() => setActionsOpen(actionsRef.current?.open ?? false)}>
       <summary ref={actionsSummaryRef} aria-label={`${t("More actions")}: ${title}`} title={t("More actions")} onClick={(event) => event.stopPropagation()}><MoreHorizontal size={18} /></summary>

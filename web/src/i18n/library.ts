@@ -10,6 +10,12 @@
 // the split lost and duplicated nothing.
 
 export const library: Record<string, string> = {
+  "More options": "更多选项",
+  "Just saved": "刚刚保存",
+  "These are the exact files confirmed in the latest save. Select or open them to continue.": "这些是最近一次确认保存的确切文件。选择或打开它们以继续。",
+  "Return to ranked results": "返回排序结果",
+  "View matches": "查看匹配内容",
+  "Browse keyword and filter matches for this search. Opening this view replaces the displayed results; return to restore the ranked results.": "浏览此搜索的关键词和筛选匹配项。打开后会替换当前显示结果；返回即可恢复排序结果。",
   "File view": "文件视图",
   "View options": "视图",
   "Filters": "筛选",

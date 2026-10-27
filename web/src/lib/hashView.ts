@@ -60,14 +60,11 @@ export function writeHashView(state: HashView): void {
     if (state.month) params.set("month", state.month);
     if (state.presentation && state.presentation !== "content" && libraryPageForMode(state.presentation)) params.set("presentation", libraryPageForMode(state.presentation)!.route);
   } else if (state.mode === "content") {
-    // A content view with an active month is a distinct deep link, so it
-    // carries v=content like every other encoded view; the default content
-    // view still writes no hash at all.
-    if (state.month || (state.presentation && state.presentation !== "content")) {
-      params.set("v", "content");
-      if (state.month) params.set("month", state.month);
-      if (state.presentation && state.presentation !== "content" && libraryPageForMode(state.presentation)) params.set("presentation", libraryPageForMode(state.presentation)!.route);
-    }
+    // Library is now an explicit destination; an absent hash opens Home.
+    // Keep v=content even without filters so reloading Library stays there.
+    params.set("v", "content");
+    if (state.month) params.set("month", state.month);
+    if (state.presentation && state.presentation !== "content" && libraryPageForMode(state.presentation)) params.set("presentation", libraryPageForMode(state.presentation)!.route);
   } else if (state.mode !== "" && libraryPageForMode(state.mode)) {
     params.set("v", libraryPageForMode(state.mode)!.route);
   } else if (state.mode === "sources" || state.mode === "activity" || state.mode === "duplicates" || state.mode === "tags" || state.mode === "notes") {

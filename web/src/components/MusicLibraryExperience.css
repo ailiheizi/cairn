@@ -101,6 +101,7 @@
 .music-track-current-state { color: var(--accent); font-weight: 650; }
 .music-track-current-state.is-error { color: var(--muted); }
 .music-current-playback { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-width: 0; padding: .55rem .75rem; border: 1px solid var(--accent); border-radius: .7rem; background: var(--accent-soft); }
+.music-current-playback__artwork { flex: 0 0 3rem; width: 3rem; height: 3rem; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: .45rem; object-fit: cover; background: var(--surface); }
 .music-current-playback__copy { display: grid; min-width: 0; gap: .1rem; }
 .music-current-playback__copy > span { color: var(--accent); font-size: .67rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .music-current-playback__copy > strong, .music-current-playback__copy > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -160,8 +161,6 @@
    controls in view while secondary browse controls stay one disclosure away. */
 .music-library { gap: .55rem; }
 .music-library-heading__copy h1 { font-size: clamp(1.55rem, 2.2vw, 2rem); }
-.music-library-heading__saved-lists { min-height: 2.4rem; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: .6rem; color: var(--accent); background: var(--surface); font: inherit; font-size: .8rem; font-weight: 650; cursor: pointer; }
-.music-library-heading__saved-lists:hover { border-color: var(--accent); background: var(--accent-soft); }
 .music-queue-actions .music-save-list { border-color: var(--accent); color: var(--accent); font-weight: 650; }
 .music-queue-actions .music-save-list:hover:not(:disabled) { background: var(--accent-soft); }
 .music-list-scope-note { color: var(--muted); font-size: .75rem; line-height: 1.4; }
@@ -195,6 +194,10 @@
 .music-queue-actions button { min-height: 2.45rem; }
 .music-queue-actions .music-play-displayed { box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent); }
 .music-current-playback { padding: .45rem .65rem; }
+.music-queue-secondary { margin-left: auto; }
+.music-displayed-actions > summary { box-sizing: border-box; justify-content: center; width: 2.45rem; height: 2.45rem; min-height: 2.45rem; padding: .25rem; list-style: none; }
+.music-displayed-actions > summary::-webkit-details-marker { display: none; }
+.music-displayed-actions__menu { max-width: min(28rem, calc(100vw - 2rem)); max-height: min(72vh, 34rem); overflow: auto; }
 
 @media (min-width: 900px) {
   .music-library { gap: .5rem; }

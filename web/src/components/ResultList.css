@@ -16,6 +16,13 @@
   transition: opacity 140ms ease;
   -webkit-tap-highlight-color: transparent;
 }
+/* The 44px selection target can overlap the decorative icon/thumbnail in the
+   tile layout. The icon wrapper was winning pointer hit-testing in that area,
+   so let clicks reach the checkbox; other icon clicks still bubble to the
+   row's existing open handler. */
+.result-list .result-row:not(.music-track) > .file-icon {
+  pointer-events: none;
+}
 .result-list .result-row:not(.music-track) .result-select::before {
   content: ""; position: absolute; top: 11px; left: 11px;
   width: 22px; height: 22px; box-sizing: border-box;

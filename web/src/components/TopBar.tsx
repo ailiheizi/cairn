@@ -21,19 +21,17 @@ import { StatusPanel } from "./StatusPanel";
 // the panel the button opens, so exactly one status disclosure is mounted at a
 // time and every rail surface stays reachable on a phone.
 //
-// A destination header uses one floating glass capsule across the standard
-// Library and registered focused pages: brand, top-level destination links,
-// Search, Add and one utility/status disclosure. The standard desktop Library
-// keeps its rail in the frame, so the menu only mounts that rail on focused
-// pages or compact layouts. The one search form stays mounted; the disclosure
-// only decides whether it is shown, and `focusSearchField` opens it before focus.
+// Content browsing shares a quiet host header: brand, current destination,
+// the one search form, Add and one navigation/status disclosure. Its frame
+// owns no second rail. Other workspace surfaces keep their established header
+// and rail ownership.
 //
 // The predicate row is a projection of the field text: every chip is one token
 // the operator grammar recognised, it names the daemon input that token really
 // writes, and removing or editing a chip rewrites the text instead of keeping
 // a second copy of the query.
 
-export function TopBar({ t, onHome, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, compact, focused, destinationHeader, presentationNavigation, navigation, onOpenRail, railTriggerRef, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
+export function TopBar({ t, onHome, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, compact, focused, destinationHeader, contentSpace = false, currentDestinationLabel, presentationNavigation, navigation, onOpenRail, railTriggerRef, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
   t: Translator;
   /** Client-navigation home; keeps playback and drafts alive instead of reloading. */
   onHome?: () => void;
@@ -50,6 +48,9 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
   compact?: boolean;
   /** Keep top-level destinations and host affordances in one stable header on standard Library views. */
   destinationHeader?: boolean;
+  /** Use the quiet shared header for Home, Photos, Music and Library browse scopes. */
+  contentSpace?: boolean;
+  currentDestinationLabel?: string;
   /**
    * Registered focused composition. Preserves the shared rail inside the
    * utility disclosure while the fullpage destination omits the Library rail.
@@ -72,11 +73,17 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
   const ops = search.ops;
   const { parsed, plan, error, suggestions, suggestionsOpen, activeSuggestion, editing } = ops;
   const showOperators = parsed.predicates.length > 0 || Boolean(error);
-  const usesDestinationHeader = Boolean(focused || destinationHeader);
+  const usesDestinationHeader = Boolean(focused || destinationHeader || contentSpace);
   const searchDisclosureRef = useRef<HTMLDetailsElement | null>(null);
   const searchInteractionRef = useRef(0);
   const searchHelpRef = useRef<HTMLDetailsElement | null>(null);
+  const searchToolsRef = useRef<HTMLDivElement | null>(null);
   const menuDisclosureRef = useRef<HTMLDetailsElement | null>(null);
+  const manageNavigationRef = useRef<HTMLDetailsElement | null>(null);
+  const searchRecentsOpenRef = useRef(search.searchRecentsOpen);
+  const toggleSearchRecentsRef = useRef(search.toggleSearchRecents);
+  searchRecentsOpenRef.current = search.searchRecentsOpen;
+  toggleSearchRecentsRef.current = search.toggleSearchRecents;
   function invalidateSearchInteraction() {
     searchInteractionRef.current += 1;
   }
@@ -88,10 +95,19 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
   // meaning. The listeners exist only while the destination header is mounted.
   useEffect(() => {
     if (!usesDestinationHeader) return;
-    const openDisclosures = () => [searchDisclosureRef.current, menuDisclosureRef.current].filter((element): element is HTMLDetailsElement => Boolean(element?.open));
+    const openDisclosures = () => [
+      searchDisclosureRef.current,
+      menuDisclosureRef.current,
+      ...(searchToolsRef.current ? Array.from(searchToolsRef.current.querySelectorAll<HTMLDetailsElement>("details[open]")) : []),
+    ].filter((element): element is HTMLDetailsElement => Boolean(element?.open));
+    function closeSearchTools() {
+      if (searchHelpRef.current?.open) searchHelpRef.current.open = false;
+      searchToolsRef.current?.querySelectorAll<HTMLDetailsElement>("details[open]").forEach((element) => { element.open = false; });
+    }
     function closeFromOutside(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
+      if (contentSpace && !searchToolsRef.current?.parentElement?.contains(target)) closeSearchTools();
       for (const disclosure of openDisclosures()) {
         if (!disclosure.contains(target)) {
           if (disclosure === searchDisclosureRef.current) invalidateSearchInteraction();
@@ -101,6 +117,12 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
     }
     function closeFromEscape(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      if (searchRecentsOpenRef.current) {
+        toggleSearchRecentsRef.current();
+        search.searchInputRef.current?.focus({ preventScroll: true });
+        event.preventDefault();
+        return;
+      }
       const open = openDisclosures();
       if (!open.length) return;
       if (searchDisclosureRef.current && open.includes(searchDisclosureRef.current)) invalidateSearchInteraction();
@@ -113,7 +135,13 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
       document.removeEventListener("pointerdown", closeFromOutside);
       document.removeEventListener("keydown", closeFromEscape);
     };
-  }, [usesDestinationHeader]);
+  }, [usesDestinationHeader, contentSpace]);
+
+  useEffect(() => {
+    if (!contentSpace) return;
+    if (searchHelpRef.current?.open) searchHelpRef.current.open = false;
+    searchToolsRef.current?.querySelectorAll<HTMLDetailsElement>("details[open]").forEach((element) => { element.open = false; });
+  }, [contentSpace, currentDestinationLabel]);
 
   // Native disclosures do not coordinate with each other, so opening one closes
   // its sibling. Focus lands in the search field on open, which makes a summary
@@ -137,7 +165,10 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
     if (focusWasInside) disclosure.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
   }
   function handleMenuToggle(event: SyntheticEvent<HTMLDetailsElement>) {
-    if (!event.currentTarget.open) return;
+    if (!event.currentTarget.open) {
+      if (manageNavigationRef.current?.open) manageNavigationRef.current.open = false;
+      return;
+    }
     if (searchDisclosureRef.current?.open) {
       invalidateSearchInteraction();
       searchDisclosureRef.current.open = false;
@@ -165,10 +196,11 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
 
   const searchForm = <form className="global-search" onSubmit={handleSearchSubmit} onFocus={(event) => { if (event.target instanceof Element && event.target.matches(".global-search > input")) invalidateSearchInteraction(); search.handleSearchFieldFocus(event.target); }} onBlur={(event) => { search.handleSearchFieldBlur(event.currentTarget.contains(event.relatedTarget as Node | null)); }} onKeyDown={search.handleSearchFieldKeyDown}>
     <Search size={17} aria-hidden="true" />
-    <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="cairn-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { invalidateSearchInteraction(); search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t("Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
+    <input ref={search.searchInputRef} aria-label={t("Search content library")} aria-describedby="cairn-search-hint" aria-invalid={error ? true : undefined} value={query} onChange={(event) => { invalidateSearchInteraction(); search.handleSearchFieldChange(event.target.value, event.target.selectionStart ?? undefined); }} onKeyUp={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} onClick={(event) => { search.handleSearchFieldCaret(event.currentTarget.selectionStart ?? 0); }} placeholder={t(contentSpace ? "Search Photos, Music, and materials" : "Search names, notes, tags, or facts")} disabled={!isConnected || !catalogHealthy} />
     <span className="sr-only" id="cairn-search-hint">{t("Command or Control plus K focuses this field. Recent searches are kept in this browser only; saving a query as a view is the durable form.")}</span>
     {Boolean(query.trim()) && <button type="button" className="search-clear" aria-label={t("Clear search text")} title={t("Clears the field only. Current results stay until you search again or return to All content.")} onClick={search.clearSearchText}><X size={14} aria-hidden="true" /></button>}
-    <button type="submit" className="search-submit" disabled={busy || !query.trim() || !isConnected || !catalogHealthy}>{busy ? <LoaderCircle className="spin" size={16} /> : t("Search")}</button>
+    {(!contentSpace || query.trim() || busy) && <button type="submit" className="search-submit" disabled={busy || !query.trim() || !isConnected || !catalogHealthy}>{busy ? <LoaderCircle className="spin" size={16} /> : t("Search")}</button>}
+    <div className="content-space-search-tools" ref={searchToolsRef}>
     <div className="search-assistance">
       <button type="button" className="search-assistance-toggle" aria-expanded={search.searchRecentsOpen} onClick={search.toggleSearchRecents} disabled={!search.recentSearches.length || Boolean(query.trim())}><History size={13} aria-hidden="true" />{t("Recent searches")}</button>
       <details className="search-help" ref={searchHelpRef}>
@@ -183,7 +215,9 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
         </div>
       </details>
     </div>
-    <SearchFilterBuilder t={t} query={query} tagVocabulary={ops.tagVocabulary} onQueryChange={search.handleSearchFieldChange} disabled={!isConnected || !catalogHealthy} />
+    {contentSpace
+      ? <div className="private-space-filter-slot"><SearchFilterBuilder t={t} query={query} tagVocabulary={ops.tagVocabulary} onQueryChange={search.handleSearchFieldChange} disabled={!isConnected || !catalogHealthy} /></div>
+      : <SearchFilterBuilder t={t} query={query} tagVocabulary={ops.tagVocabulary} onQueryChange={search.handleSearchFieldChange} disabled={!isConnected || !catalogHealthy} />}
     {suggestionsOpen && <div className="search-suggest" role="listbox" aria-label={t("Search operators and values")} aria-describedby="cairn-search-suggest-note">
       <p className="search-suggest-note" id="cairn-search-suggest-note">{t("Operators only. Values are suggested where this browser already knows them: tag names come from the loaded tag vocabulary, and protection modes from the daemon's closed protection vocabulary.")}</p>
       {suggestions.map((suggestion, index) => <button key={suggestion.key} type="button" role="option" aria-selected={index === activeSuggestion} className={`search-suggest-entry ${index === activeSuggestion ? "active" : ""}`} onClick={() => ops.acceptSuggestion(index)}>
@@ -204,6 +238,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
         </li>)}
       </ul>
     </div>}
+    </div>
   </form>;
 
   const operatorPanel = showOperators ? <div className="search-ops" role="group" aria-label={t("Search predicates")}>
@@ -223,6 +258,37 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
   </div> : null;
 
   const connection = <span className={`connection ${isConnected ? "ok" : "bad"}`} aria-label={t(status)} role={!isConnected ? "status" : undefined}>{status === "Checking service" ? <LoaderCircle className="spin" size={15} /> : isConnected ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}<span>{t(status)}</span></span>;
+
+  if (contentSpace) {
+    return <>
+      <header className="topbar topbar--content-space" data-header="content-space">
+        <a className="brand brand--content-space" href="/" aria-label={t("Cairn home")} onClick={(event) => { if (!canLeaveSettings()) { event.preventDefault(); return; } if (onHome) { event.preventDefault(); onHome(); } }}><span className="brand-mark"><ShieldCheck size={19} /></span><span className="brand-name">Cairn</span></a>
+        <span className="content-space-current" aria-current="page">{t(currentDestinationLabel ?? "Library")}</span>
+        <div className="content-space-search">{searchForm}</div>
+        <div className="top-actions top-actions--focused">
+          <button className="primary-button add-button" aria-label={t("Add content")} title={t("Add content")} onClick={(event) => { closeFocusedOverlays(); onOpenAdd(undefined, event.currentTarget); }} disabled={!isConnected || !coreStorageReady}><Plus size={16} /><span className="topbar-entry-label">{t("Add")}</span></button>
+          <details className="topbar-disclosure topbar-menu" ref={menuDisclosureRef} onToggle={handleMenuToggle}>
+            <summary className="topbar-entry topbar-menu-summary" aria-label={t("Navigation and status")} title={t("Navigation and status")}><PanelLeft size={17} aria-hidden="true" /><span className="topbar-entry-label">{t("Navigation and status")}</span></summary>
+            <div className="topbar-overlay topbar-menu-overlay">
+              {presentationNavigation && <div className="topbar-content-destinations" onClick={(event) => { if ((event.target as HTMLElement).closest("button, a")) closeMenu(); }}>{presentationNavigation}</div>}
+              {navigation && <details className="topbar-manage-disclosure" ref={manageNavigationRef}>
+                <summary>{t("MANAGE")}</summary>
+                <div className="topbar-menu-navigation topbar-manage-navigation" onClick={(event) => { if ((event.target as HTMLElement).closest("button, a")) closeMenu(); }}>{navigation}</div>
+              </details>}
+              <div className="topbar-menu-actions">
+                <button className="secondary-button compact" aria-label={t("Restore latest snapshot")} title={t("Restore latest snapshot")} onClick={(event) => { closeMenu(); onOpenRestore(menuCloseTrigger(event.currentTarget)); }} disabled={!snapshotRef || !isConnected || !coreStorageReady}><ArchiveRestore size={16} /><span>{t("Restore")}</span></button>
+                <button className="icon-button" title={t("Refresh service status")} aria-label={t("Refresh service status")} onClick={onRefresh}><RefreshCw size={17} /></button>
+                <button className="icon-button settings-trigger" title={t("Open settings")} aria-label={t("Open settings")} onClick={(event) => { closeMenu(); onOpenSettings(menuCloseTrigger(event.currentTarget)); }}><Settings size={17} /></button>
+              </div>
+              <StatusPanel t={t} status={status} statusData={statusData} capabilities={capabilities} onRefresh={onRefresh} onOpenVerification={(trigger) => { closeMenu(); onOpenVerification(menuCloseTrigger(trigger ?? null)); }} onOpenActivity={onOpenActivity ? () => { closeMenu(); onOpenActivity(); } : undefined} />
+            </div>
+          </details>
+        </div>
+      </header>
+      {!isConnected && <div className="topbar-content-space-status">{connection}</div>}
+      {operatorPanel}
+    </>;
+  }
 
   if (usesDestinationHeader) {
     return <header className="topbar topbar--destinations" data-header="destinations">

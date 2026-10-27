@@ -8,7 +8,7 @@ import { libraryPageForMode } from "../lib/libraryViews";
 import { resolveArchiveSelectionSizes } from "../lib/originalArchive";
 import { projectNamespaceCapturedTimes } from "../lib/namespaceProjection";
 import { filterResultScope, projectResultScope, resultScopeSource } from "../lib/resultScope";
-import type { AnnotationRecord, BrowseCrumb, BrowseRoot, LibraryPageMode, Notice, SearchHit, SortDirection, SortField, SystemFacetState, ViewMode } from "../lib/types";
+import type { AnnotationRecord, BrowseCrumb, BrowseRoot, LibraryPageMode, Notice, SearchHit, SortDirection, SortField, SystemFacetState, UploadFileRow, ViewMode } from "../lib/types";
 
 // The content library projection.
 //
@@ -61,6 +61,8 @@ function libraryEntryKey(item: SearchHit): string {
 export type LibraryFlow = {
   hits: SearchHit[];
   setHits: (value: SearchHit[] | ((current: SearchHit[]) => SearchHit[])) => void;
+  justSavedBatch: boolean;
+  setJustSavedBatch: (value: boolean) => void;
   libraryItems: SearchHit[];
   setLibraryItems: (value: SearchHit[] | ((current: SearchHit[]) => SearchHit[])) => void;
   workspaceTags: AnnotationRecord[];
@@ -110,6 +112,7 @@ export type LibraryFlow = {
   libraryListingError: string;
   /** Fetches the next bounded page of the same chain, if one is available. */
   loadMoreLibrary: () => void;
+  invalidateLibraryLoads: () => void;
   restoreLibraryHashView: (view: "content" | "tag", tags: string[], month: string) => boolean;
   tagFacets: Array<{ value: string; count: number }>;
   systemFacets: { types: Array<{ value: string; count: number }>; formats: Array<{ value: string; count: number }>; dedup: Array<{ value: string; count: number }>; tags: Array<{ value: string; count: number }>; index: Array<{ value: string; count: number }> };
@@ -119,10 +122,12 @@ export type LibraryFlow = {
   loadContentLibrary: (activeWorkspaceID: string, refreshGeneration?: number, guardDrafts?: boolean, resetPresentation?: boolean) => Promise<void>;
   /** Private coordination for a search that can race the initial loaded-list projection. */
   beginSearchIntent: (activeWorkspaceID: string) => number;
+  searchIntentVersion: () => number;
   isCurrentSearchIntent: (intent: number, activeWorkspaceID: string) => boolean;
   hasCurrentSearchIntent: (activeWorkspaceID: string) => boolean;
   cancelSearchIntent: () => void;
   currentLibraryItems: (activeWorkspaceID: string) => SearchHit[];
+  resolveSavedUploadBatch: (activeWorkspaceID: string, rootID: string, rows: UploadFileRow[], stillCurrent: () => boolean) => Promise<SearchHit[]>;
   loadNamespace: (activeWorkspaceID: string, rootID: string, parentEntryID?: string, crumbs?: BrowseCrumb[], stillCurrent?: () => boolean) => Promise<boolean>;
   navigateLibrary: (parentEntryID: string, crumbs: BrowseCrumb[], rootID?: string) => Promise<void>;
   loadTagVocabulary: (activeWorkspaceID: string) => Promise<AnnotationRecord[]>;
@@ -163,6 +168,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   discardDetailDrafts: () => void;
 }): LibraryFlow {
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [justSavedBatch, setJustSavedBatch] = useState(false);
   const [libraryItems, setLibraryItems] = useState<SearchHit[]>([]);
   const libraryItemsRef = useRef<SearchHit[]>([]);
   const libraryItemsWorkspaceRef = useRef("");
@@ -211,6 +217,13 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   const libraryPageRef = useRef({ token: "", loading: false, error: "", complete: true });
   const libraryKeysRef = useRef<Set<string>>(new Set());
   const libraryLoadSequence = useRef(0);
+  useEffect(() => { setJustSavedBatch(false); }, [workspaceID, refreshGenerationRef.current]);
+
+  function invalidateLibraryLoads() {
+    libraryLoadSequence.current += 1;
+    libraryPageRef.current.loading = false;
+    setLibraryListingLoading(false);
+  }
 
   function setLoadedLibraryItems(value: SearchHit[] | ((current: SearchHit[]) => SearchHit[])) {
     const next = typeof value === "function" ? value(libraryItemsRef.current) : value;
@@ -237,6 +250,74 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   function currentLibraryItems(activeWorkspaceID: string) {
     return libraryItemsWorkspaceRef.current === activeWorkspaceID
       && libraryItemsRefreshRef.current === refreshGenerationRef.current ? libraryItemsRef.current : [];
+  }
+
+  // Resolve only the paths named by a complete upload receipt. Each parent is
+  // listed once, so work is bounded by the upload's 200 files and 16 levels;
+  // this never scans content.list or recursively walks unrelated branches.
+  async function resolveSavedUploadBatch(activeWorkspaceID: string, rootID: string, rows: UploadFileRow[], stillCurrent: () => boolean) {
+    if (!activeWorkspaceID || !rootID || rows.length === 0 || rows.length > 200) throw new Error("The saved upload receipt is incomplete.");
+    const paths = rows.map((row) => {
+      const name = row.stored_name ?? "";
+      const components = name.split("/");
+      const sha256 = row.sha256?.toLowerCase() ?? "";
+      const length = Number(row.length);
+      if (!name || name.startsWith("/") || name.includes("\\") || components.length > 16
+        || components.some((part) => !part || part === "." || part === "..")
+        || !/^[0-9a-f]{64}$/.test(sha256) || !Number.isSafeInteger(length) || length < 0) {
+        throw new Error("The saved upload receipt is incomplete.");
+      }
+      return { name, components, contentID: `sha256:${sha256}`, length };
+    });
+    if (new Set(paths.map((item) => item.name)).size !== paths.length) throw new Error("The saved upload receipt contains duplicate paths.");
+
+    const childrenByParent = new Map<string, SearchHit[]>();
+    const listChildren = async (parentID: string): Promise<SearchHit[]> => {
+      const cached = childrenByParent.get(parentID);
+      if (cached) return cached;
+      if (!stillCurrent() || currentWorkspaceID.current !== activeWorkspaceID) throw new Error("The saved source changed before its files could be located.");
+      const response = await command(operations.namespace.list, { workspace_id: activeWorkspaceID, root_id: rootID, parent_id: parentID || undefined });
+      if (!stillCurrent() || currentWorkspaceID.current !== activeWorkspaceID) throw new Error("The saved source changed before its files could be located.");
+      const data = response.data as { root_id?: string; parent_id?: string; entries?: unknown } | undefined;
+      if (response.status !== "SUCCEEDED" || data?.root_id !== rootID || (data.parent_id || "") !== parentID || !Array.isArray(data.entries)) {
+        throw new Error("The saved source listing could not be confirmed.");
+      }
+      const rawEntries = data.entries as Array<Record<string, unknown>>;
+      const entries = rawEntries.map((entry) => ({
+        subject_ref: typeof entry.subject_ref === "string" ? entry.subject_ref : undefined,
+        entry_id: typeof entry.entry_id === "string" ? entry.entry_id : undefined,
+        name: typeof entry.display_name === "string" ? entry.display_name : undefined,
+        entry_type: typeof entry.entry_type === "string" ? entry.entry_type : undefined,
+        content_id: typeof entry.content_id === "string" ? entry.content_id : undefined,
+        logical_size: typeof entry.logical_size === "number" ? entry.logical_size : undefined,
+        index_status: entry.index_status as SearchHit["index_status"],
+      }));
+      childrenByParent.set(parentID, entries);
+      return entries;
+    };
+
+    const resolved: SearchHit[] = [];
+    for (const path of paths) {
+      let parentID = "";
+      let hit: SearchHit | undefined;
+      for (let index = 0; index < path.components.length; index += 1) {
+        const name = path.components[index]!;
+        const matches = (await listChildren(parentID)).filter((entry) => entry.name === name);
+        if (matches.length !== 1) throw new Error("Not every saved file could be matched to its exact uploaded path.");
+        hit = matches[0];
+        if (index < path.components.length - 1) {
+          if (hit.entry_type !== "DIRECTORY" || !(hit.entry_id || hit.subject_ref)) throw new Error("Not every saved file could be matched to its exact uploaded path.");
+          parentID = hit.entry_id || hit.subject_ref!;
+        }
+      }
+      if (!hit || hit.entry_type !== "REGULAR_FILE" || !hit.entry_id || !hit.subject_ref
+        || hit.content_id !== path.contentID || hit.logical_size !== path.length) {
+        throw new Error("Not every saved file could be matched to its exact uploaded identity.");
+      }
+      resolved.push({ ...hit, path: path.name });
+    }
+    if (!stillCurrent() || currentWorkspaceID.current !== activeWorkspaceID) throw new Error("The saved source changed before its files could be located.");
+    return resolved;
   }
 
   const visibleWorkspaceTags = tagVocabularyWorkspaceID === workspaceID ? workspaceTags : [];
@@ -379,6 +460,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     // `namespace.list` omits modification time. Reuse only an already-loaded,
     // current-workspace content.list fact for the exact same file identity.
     setHits(projectNamespaceCapturedTimes(namespaceHits, currentLibraryItems(activeWorkspaceID)));
+    setJustSavedBatch(false);
     setSelected(undefined); setBrowseRootID(rootID); setBrowseCrumbs(crumbs); setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("path");
     return true;
   }
@@ -508,6 +590,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     libraryKeysRef.current = new Set(items.map(libraryEntryKey).filter(Boolean));
     applyLibraryPage(response.data, items.length);
     setLibraryLoaded(true);
+    setJustSavedBatch(false);
     const activeSearch = hasCurrentSearchIntent(activeWorkspaceID);
     const destinationChanged = viewModeRef.current !== viewModeAtStart
       || presentationModeRef.current !== presentationModeAtStart;
@@ -586,6 +669,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   // disclosure bar that duplicated the same sources.
   function showSourcesSurface() {
     if (!canLeaveDetailDrafts()) return;
+    setJustSavedBatch(false);
     cancelSearchIntent();
     discardDetailDrafts();
     setSelected(undefined);
@@ -668,6 +752,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     if (view === "tag" && tagValues.length === 0 && !monthValue) return false;
     if (view === "content" && !monthValue) return false;
     discardDetailDrafts();
+    setJustSavedBatch(false);
     setQuery(""); setLastExecutedQuery(""); setSelected(undefined);
     setActiveTags(view === "tag" ? tagValues : []);
     setActiveTimelineMonth(monthValue);
@@ -689,6 +774,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     libraryKeysRef.current = new Set();
     setLibraryTotal(0); setLibraryListingComplete(true); setLibraryListingMore(false); setLibraryListingLoading(false); setLibraryListingError("");
     setHits([]); libraryItemsWorkspaceRef.current = ""; libraryItemsRefreshRef.current = -1; setLoadedLibraryItems([]);
+    setJustSavedBatch(false);
     setBrowseRootID(""); setBrowseRoots([]); setBrowseCrumbs([]);
     setActiveTags([]); setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); setActiveTimelineMonth(""); setViewMode("content");
     setLibraryLoaded(false);
@@ -697,6 +783,8 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
   return {
     hits,
     setHits,
+    justSavedBatch,
+    setJustSavedBatch,
     libraryItems,
     setLibraryItems: setLoadedLibraryItems,
     workspaceTags: visibleWorkspaceTags,
@@ -734,6 +822,7 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     libraryListingLoading,
     libraryListingError,
     loadMoreLibrary,
+    invalidateLibraryLoads,
     restoreLibraryHashView,
     tagFacets,
     systemFacets,
@@ -742,10 +831,12 @@ export function useLibrary({ t, locale, workspaceID, refreshGenerationRef, viewM
     renderedHits,
     loadContentLibrary,
     beginSearchIntent,
+    searchIntentVersion: () => searchIntentSequence.current,
     isCurrentSearchIntent,
     hasCurrentSearchIntent,
     cancelSearchIntent,
     currentLibraryItems,
+    resolveSavedUploadBatch,
     loadNamespace,
     navigateLibrary,
     loadTagVocabulary,

@@ -12,6 +12,13 @@ Cairn treats analysis as an optional enhancement to exact storage.
 - **One search box** can combine the available dimensions and merge results by
   stable file subject.
 
+Results show a short source-labelled match when the server returns one. Use
+**View matches** to open the existing Details view for the returned passages and
+their sources. Keyword browsing is a separate, pageable view of the same query;
+it excludes meaning-only suggestions. **Return to ranked results** restores
+the original combined ordering without a new model call while that search
+context remains current.
+
 ## Future media indexes
 
 Image CLIP/SigLIP and music-feature models should be separate index dimensions:

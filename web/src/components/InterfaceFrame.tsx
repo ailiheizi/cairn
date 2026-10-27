@@ -13,6 +13,8 @@ export interface InterfaceFrameProps {
    * separate navigation disclosure. Presentation only.
    */
   focused?: boolean;
+  /** Shared single-menu content-space shell; suppresses an inline second rail. */
+  contentSpace?: boolean;
   header: ReactNode;
   navigation: ReactNode;
   content: ReactNode;
@@ -60,10 +62,10 @@ function ShowcaseFrame({ header, navigation, content, details, compact, detailAc
 }
 
 /** Immersive pages still expose the same host navigation, search and inspector. */
-function ImmersiveFrame({ header, navigation, content, details, compact, detailActive, focused, t, onDragOver, onDrop }: InterfaceFrameProps) {
-  return <div className="interface-frame interface-immersive" data-chrome="immersive" data-composition={focused ? "focused" : undefined}>
+function ImmersiveFrame({ header, navigation, content, details, compact, detailActive, focused, contentSpace, t, onDragOver, onDrop }: InterfaceFrameProps) {
+  return <div className={`interface-frame interface-immersive${contentSpace ? " interface-immersive--content-space" : ""}`} data-chrome="immersive" data-composition={focused || contentSpace ? "focused" : undefined}>
     {header}
-    {!focused && !compact && <details className="immersive-navigation">
+    {!focused && !compact && !contentSpace && <details className="immersive-navigation">
       <summary>{t("Browse tools")}</summary>
       <div className="immersive-navigation-content">{navigation}</div>
     </details>}
@@ -91,7 +93,7 @@ export function InterfaceFrame(props: InterfaceFrameProps) {
   // A focused composition always uses the immersive frame: the host header owns
   // the single navigation/status menu, so a second inline rail (workspace or
   // showcase) must never mount beside it.
-  if (props.immersive || props.focused) return <ImmersiveFrame {...props} />;
+  if (props.immersive || props.focused || props.contentSpace) return <ImmersiveFrame {...props} />;
   const Frame = shellRenderers.get(definition.renderSlot)!;
   return <Frame {...props} />;
 }

@@ -26,7 +26,7 @@ export type LibraryPageDefinition = {
    * or selection authority.
    */
   composition?: "focused";
-  mediaClass?: "image" | "audio" | "all";
+  mediaClass?: "image" | "audio" | "video" | "all";
   /** Aggregate layouts stay separate from media-domain destinations. */
   navigationKind?: "domain" | "layout";
 };
@@ -112,8 +112,9 @@ export function validateLibraryRendererIDs(pages: readonly LibraryPageDefinition
 export const libraryPages: readonly LibraryPageDefinition[] = [
   { id: "cairn:photos", mode: "photos", route: "photos", slot: "page.cairn.photos", label: "Photos", presentationLabel: "Photo wall", description: "Photos shows image files saved in your Library.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "image" },
   { id: "cairn:music", mode: "music", route: "music", slot: "page.cairn.music", label: "Music", description: "Audio shows files in your Library; browsing does not play them.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "audio" },
+  { id: "cairn:videos", mode: "page:cairn:videos", route: "videos", slot: "page.cairn.videos", label: "Videos", description: "Videos shows video files in the current loaded Library scope.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "video" },
   { id: "cairn:exhibition", mode: "page:cairn:exhibition", route: "exhibition", slot: "page.cairn.exhibition", label: "Exhibition", presentationOf: "cairn:photos", presentationLabel: "Exhibition", description: "Walk through your saved images in a focused gallery.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "image" },
-  { id: "cairn:overview", mode: "page:cairn:overview", route: "overview", slot: "page.cairn.overview", label: "Content overview", description: "Photos, music and other content together in the current Library scope.", context: "loaded-library", mediaClass: "all", navigationKind: "layout" },
+  { id: "cairn:overview", mode: "page:cairn:overview", route: "overview", slot: "page.cairn.overview", label: "Private space", description: "Photos, music and other content together in the current Library scope.", context: "loaded-library", chrome: "immersive", composition: "focused", mediaClass: "all", navigationKind: "layout" },
 ];
 
 validateLibraryPages(libraryPages);
