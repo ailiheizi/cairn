@@ -382,7 +382,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
       {retrievalOpen && <div id="saved-retrieval-panel">{savedRetrievalPanel}</div>}
     </section>;
   }
-  return <section className={`content-column ${isMediaView ? "library-type-view" : ""}`} data-view={viewMode} data-presentation={presentationMode}>
+  return <section className={`content-column ${isMediaView ? "library-type-view" : ""}`} data-view={viewMode} data-presentation={presentationMode} data-content-space-target={viewMode === "content" && presentationMode === "content" ? "library" : undefined} tabIndex={viewMode === "content" && presentationMode === "content" ? -1 : undefined}>
     {/* The rail is hidden on phones; this compact entry drives the same
         sources mode and is hidden again from 641px up by CSS alone. */}
     <button type="button" className={`sources-entry ${viewMode === "sources" ? "active" : ""}`} onClick={library.showSourcesSurface}><HardDrive size={16} /><span>{t("Sources")}</span><small>{sources.sources.length}</small></button>

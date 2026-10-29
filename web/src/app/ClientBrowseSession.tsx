@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
-export type ClientBrowseDomain = "photos" | "music";
+export type ClientBrowseDomain = "photos" | "music" | "videos";
 
 type SessionContextValue = {
   values: Record<string, unknown>;

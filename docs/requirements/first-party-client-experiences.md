@@ -439,6 +439,166 @@ scope-relative selection correctness, loading-link retention and narrow-screen
 controls. This establishes one fixed compiled template only, not a general
 block SDK, layout editor, public ABI, plugin installer or isolation.
 
+### UX-C2/H1: Editable private-space homepage (2026-10-26)
+
+The owner selected the private-space design and directly requested editable
+homepage frontend implementation. This narrow successor permits editing the
+three existing compiled photo, audio and other-material blocks: visibility,
+order, preview counts of 1, 3 or 6, and an 80-character heading. A live draft
+offers explicit save/cancel; restore-default changes the draft until saved.
+The existing Overview route becomes a focused private-space Home destination,
+separate from Library. Only an unqualified launch defaults to enabled Home;
+explicit routes and disabled-page fallback retain their existing meaning.
+
+Store versioned layout choices in browser-local, workspace-scoped preferences,
+not in the catalog or content. Unknown/duplicate blocks and malformed values
+normalize to bounded known choices. Failed local persistence must be visible
+without blocking use. Hidden blocks mount no previews, and an all-hidden home
+keeps edit and Library navigation available. The current host scope, selection,
+query and domain/player actions remain authoritative; counts and order imply
+neither completeness nor recency. No arbitrary widgets, public block API,
+runtime code, new domain records or new data access are admitted.
+
+**Exit:** The `private-space-home` browser journey edits, cancels, saves,
+reloads and resets the homepage; opens enabled Photos/Music/Library and real
+material details; verifies usable empty/all-hidden states and bounded previews.
+This is client experience evidence only, not a core-phase or release gate.
+
+**2026-10-27 owner refinement:** The private-space homepage follows the chosen
+quiet concept: one photo feature, one music player feature and a Library/material
+footer. Each media feature selects one eligible item from the currently loaded
+scope; the choice remains stable through ordinary rendering, hover and editing.
+Reloading the page may choose again; the random spotlight is not persisted.
+Hover or keyboard focus may reallocate the shared row width, without fetching,
+changing the selected content or starting playback. Music controls reflect the
+exact matching host playback identity and reuse its verified player. No new
+read authority or random server query is introduced. Default Home exposes no
+batch toolbar, file table, count controls or configuration form; existing
+management and editing are available through intentional entries. Active scope,
+unavailable and incomplete-listing information must remain honest. Previous
+browser preview-count values may be retained for compatibility but do not widen
+the single-item spotlights. Photos and Music may swap their positions in the
+shared row; Materials remains in the footer and has a visibility control only.
+The editor must not offer an ordering choice that has no visible effect.
+Future additions require a separate product discussion.
+
+**2026-10-27 direct-manipulation clarification:** The owner rejected the
+heading/settings form as low-value customization. One discreet pencil enters
+in-place layout editing: on-card handles swap Photos/Music, a pointer-draggable
+separator changes the photo share within 35–75 percent, and card controls hide
+or re-add only the existing compiled blocks. Provide keyboard equivalents for
+move/resize. Materials remains in the footer with visibility only. Explicit
+save/cancel applies to the draft; ordinary hover expansion is suspended during
+editing and resumes around the saved proportions afterward. These choices
+reuse browser-local workspace preferences. Legacy heading/count fields may be
+retained but are neither edited nor used to replace the standard welcome.
+No new data read, autoplay, catalog write, widget SDK or server configuration
+follows. Idle Home no longer duplicates the Library-tools panel; management
+stays available in Library and active scope/errors remain visible.
+
+**Exit refinement:** Enter the pencil, resize and swap media cards, hide/re-add
+a block, cancel to restore the saved layout, then save and reload the layout.
+The same random media identities survive editing; one verified host player and
+normal hover remain usable. This replaces the obsolete heading-form acceptance
+as the current Home customization workflow.
+
+**2026-10-27 coherent-content-space refinement:** The owner approved extending
+the accepted Home visual shell to the existing Photos, Music and Library browse
+destinations, including their current search/tag/path scopes. Keep one host
+header/menu and stable content gutters, with a shared palette also inherited by
+existing portaled viewers and drawers. System workspace routes retain their
+existing frame/navigation ownership. Home alone has its welcome and editable
+cards; Photos leads with its wall, Music with current browsing/playback, and
+Library with scope/results/inspection/takeout. Compact local search retains its
+existing semantics. Secondary filter/display/sort and batch tools open on
+demand; active filters, selections, unavailable facts and partial/error states
+remain understandable and actionable. This changes presentation only: no new
+query, read/cache route, player, durable state, widget or backend operation.
+
+**Exit refinement:** One `coherent-content-spaces` journey navigates from Home
+through Photos and its existing viewer, Music and verified playback, Library
+search/selection/Details/takeout access, and back to Home. Confirm one shared
+header/menu, consistent light/dark surfaces and reachable secondary controls
+without resetting the host query or playback. Existing media and identity
+budgets apply; no core phase or release credit follows.
+
+**2026-10-27 owner-requested curated-media/video refinement:** A compiled Videos
+destination may browse current loaded video members and use existing Details
+and original takeout. Explicit MP4/WebM playback may download at most 32 MiB,
+verify complete logical length and SHA-256, then play one transient Blob. No
+background read, streaming service, transcoding, poster extraction or new
+durable media state is admitted. Late/cancelled or identity-mismatched results
+are discarded; object URLs and playback are cleaned up on replacement/exit.
+Starting video pauses host audio, and starting host audio pauses video. The
+Home Videos block is optional and hidden by default below the existing media
+row; only Photos/Music participate in its split/reorder controls.
+
+Home may prefer explicitly favorited supported images from its current scope
+without extra reads. Real embedded MP3/FLAC artwork may be derived transiently
+from audio bytes already verified by explicit playback, with a 2 MiB artwork
+byte ceiling and the existing 12-megapixel image bound. It stays bound to that
+current track identity, is not persisted, and cannot trigger another content
+read or an external artwork lookup. Missing/invalid artwork does not block
+audio. These are bounded first-party presentation successors only.
+
+**2026-10-28 Home video/files refinement:** The owner's request admits a
+Home video card with explicit playback through the same compiled verified
+MP4/WebM reader and transient lifecycle as Videos, retaining the 32 MiB limit,
+full length/digest checks, host-audio coordination and unavailable exits.
+No original read or playback occurs merely by showing Home, entering editing
+or re-adding the card. Editing/hiding, scope or identity changes and route exit
+cancel and dispose its preview. Re-enabling never resumes it automatically.
+No poster extraction, background fetch, streaming or new read authority follows.
+Fresh and missing-block preferences show Videos when loaded video exists;
+explicit saved visibility is retained. Idle empty sections need not render.
+Below Photos/Music, Videos and Files may share a responsive secondary row.
+Files shows at most three regular non-media members from the same loaded scope,
+with filename, honest known type/size, existing Details and Library access.
+It claims neither chronological recency nor a new file classification/query.
+Both sections retain the pencil hide/add/save/cancel flow; Photos/Music remain
+the only resizable/reorderable pair. No extra kernel or durable state follows.
+
+**2026-10-28 simplified Home video-entry clarification:** The owner subsequently
+replaced Home's nested player/side-tools presentation with one content-first
+entry card, following Music's visual treatment. The whole card and its small
+entry cue navigate to the enabled Videos destination without dropping the host
+scope. Home no longer creates a video player or reads video originals; playback
+and original actions remain in Videos. A neutral fallback graphic is honest
+when no actual poster exists. No poster extraction, invented image, additional
+data read or change to saved visibility/Files behavior is admitted.
+
+**2026-10-28 image-first entry/player clarification:** Following the owner's
+Photos-like image/name request, Home may reuse exactly one current-workspace
+transient still captured from a frame already decoded during explicit verified
+video playback. This is the sole exception to the poster-extraction exclusion:
+no additional original read, seek, background processing, endpoint, processor
+or retained derivative follows. Use the existing workspace client-session field,
+not another durable store/cache. One JPEG is bounded to a 960-pixel edge,
+256 KiB binary and 350 KiB encoded URL, keyed to workspace/entry/digest/length;
+late or replaced playback cannot publish. Missing or mismatched stills use an
+honest neutral fallback. Workspace replacement/App exit follows that existing
+session lifecycle. Home shows image/name and one entry cue, with no player.
+
+The Videos destination may wrap its existing verified Blob in a pinned bundled
+mature player component, retaining one native media element, original verification,
+size limits, lifecycle cleanup, unavailable exits and host-audio coordination.
+Standard transport, speed, volume, focused keyboard, PiP/fullscreen controls are
+presentation only. No external URL, plugin loader, CDN, streaming/transcoding,
+automatic resume ledger or additional content authority is admitted.
+
+**2026-10-28 continuous space expansion:** The owner requested that Home
+content expand into its existing dedicated surface, with an app Home return
+shrinking back to the matching content. Same-document transition snapshots may
+connect those rectangles while shared chrome and the live host audio remain
+stable. Existing routes/history, loaded scope, enabled-page guards, drafts and
+browse-position ownership remain authoritative. Animate explicit UI navigation
+only; programmatic/hash restoration stays immediate. Reduced-motion or absent
+API retains working navigation. Rapid interaction must not duplicate or apply
+stale navigation, and completion restores usable heading/card focus. Existing
+workspace session values may retain bounded Home spotlight identities across
+the round trip; no persistent preference/schema, new read or duplicate player
+follows. This is first-party presentation, with no core-phase/release credit.
+
 ## 12. UX-F1: Shared favorites through existing user tags
 
 Admitted 2026-10-09 as a shortcut over existing explicit user TAG operations,

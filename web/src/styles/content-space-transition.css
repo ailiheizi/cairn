@@ -1,0 +1,22 @@
+/* Keep the shared shell steady; only the explicitly named content surface moves. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(cairn-content-space) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+}
+
+::view-transition-old(cairn-content-space),
+::view-transition-new(cairn-content-space) {
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(cairn-content-space) {
+    animation-duration: 1ms;
+  }
+}

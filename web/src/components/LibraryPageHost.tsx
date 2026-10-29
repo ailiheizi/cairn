@@ -271,8 +271,10 @@ export function LibraryPageHost(props: LibraryPageHostProps) {
     <ResultList {...resultProps} />
   </div>;
   const pageProps: LibraryPageHostProps = { ...props, onOpenPhotoPreview: (hit, trigger) => { photoPreviewOpener.current = trigger; setPhotoPreviewHit(hit); } };
+  const contentSpaceTarget = page.id === "cairn:overview" ? undefined : page.mediaClass === "image" ? "photos" : page.mediaClass === "audio" ? "music" : page.mediaClass === "video" ? "videos" : undefined;
+  const renderedPage = <PageRenderBoundary key={page.id} fallback={fallback}>{pageRenderer(pageProps)}</PageRenderBoundary>;
   return <>
-    <PageRenderBoundary key={page.id} fallback={fallback}>{pageRenderer(pageProps)}</PageRenderBoundary>
+    {contentSpaceTarget ? <div data-content-space-target={contentSpaceTarget} tabIndex={-1}>{renderedPage}</div> : renderedPage}
     {photoPreviewHit && createPortal(<div className="photo-viewer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closePhotoPreview(); }}>
       <section ref={photoPreviewDialog} className="photo-viewer photo-exhibition__host-dialog" role="dialog" aria-modal="true" aria-labelledby="exhibition-photo-inspector-title">
         <header className="photo-viewer__header">

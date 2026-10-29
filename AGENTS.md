@@ -357,6 +357,41 @@ same scope, host actions, global thumbnail budget and verified player. It adds
 no durable domain organization, runtime loader or recovery authority. The
 first-party client contract defines bounded blocks and loading/fallback exits.
 
+The owner's 2026-10-26 editable-home request admits UX-C2/H1: the existing
+Overview becomes a private-space Home with browser-local, workspace-scoped
+heading and visibility/order/preview-count preferences for its three existing
+compiled blocks. Explicit save/cancel/reset and distinct Home/Library navigation
+remain presentation-only. All existing scope, identity and media budgets apply;
+this is not an arbitrary widget SDK, runtime loader or new domain state model.
+The owner's 2026-10-27 refinement narrows default Home to one stable random
+photo and one music feature from the loaded scope, with hover/focus width
+reallocation and on-demand editing/management. Existing stored preview counts
+do not widen these spotlights. Host search, playback and identity remain shared.
+The same day's direct-manipulation clarification replaces the heading/form
+editor with one pencil entry, on-card visibility/order controls and a draggable
+bounded Photos/Music split. Save/cancel and browser-local workspace preferences
+remain. Legacy heading/count values are not exposed as editing features. The
+idle Home has no copied Library-tools panel; management remains in Library.
+This permits no arbitrary widgets or additional data access.
+The owner's 2026-10-27 video/real-media request additionally admits the bounded
+Videos destination and hidden-default Home entry, explicit verified MP4/WebM
+original playback up to 32 MiB, and transient MP3/FLAC artwork from already
+verified audio bytes. See the curated-media/video refinement in the client
+contract. This admits no streaming/transcoding service, processor, endpoint,
+durable media state, remote runtime integration or new content-read authority.
+The owner's 2026-10-28 Home follow-up permits the same explicitly verified
+video preview on Home, with no idle reads and disposal on editing/hiding/exit,
+and a compact three-row Files section from existing loaded regular non-media
+members. Fresh/missing-block defaults may show video when present; saved
+visibility remains respected. See the Home video/files client refinement.
+The owner's subsequent image/name and mature-player request admits one
+session-only JPEG of an already decoded explicit verified video frame through
+the existing workspace client-session field (960px edge, 256 KiB binary,
+350 KiB encoded), exact identity matching, and a pinned bundled player UI over
+the same verified Blob. No idle/Home original read, new processor, persisted
+poster, streaming source or runtime plugin follows; see the image-first
+entry/player clarification in the client contract.
+
 Its UX-F1 shortcut permits explicit favorite/unfavorite through the ordinary
 visible `Favorite` user TAG and shared filtering over existing annotations.
 Unknown tag reads remain unavailable and disable mutation. It adds no durable

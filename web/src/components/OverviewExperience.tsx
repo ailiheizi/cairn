@@ -1,8 +1,9 @@
-import { ArrowRight, ArrowUpRight, EyeOff, Film, File, GripVertical, LibraryBig, Pause, Pencil, Play } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Download, EyeOff, Film, File, GripVertical, LibraryBig, Pause, Pencil, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, KeyboardEvent, PointerEvent, ReactNode } from "react";
+import { useWorkspaceBrowseValue } from "../app/ClientBrowseSession";
 import type { AudioTrack } from "../lib/audioPlayback";
-import { formatFacetValue, mediaClassFromSuffix } from "../lib/format";
+import { formatBytes, formatFacetValue, mediaClassFromSuffix } from "../lib/format";
 import { playableMusicTrack, type MusicMetadataState } from "../lib/musicMetadata";
 import { projectOverviewSections } from "../lib/overviewComposition";
 import type { LibraryPageMode, SearchHit } from "../lib/types";
@@ -11,7 +12,9 @@ import type { FavoriteControls } from "../lib/favorites";
 import type { MusicQueueControls } from "../lib/musicQueueControls";
 import { matchesCurrentPlayback } from "./music/musicHelpers";
 import { PHOTO_ORIGINAL_LIMIT, photoCandidateMime } from "../lib/photoRendition";
+import { VIDEO_POSTER_SESSION_KEY, videoPosterIdentity, type VideoPosterSnapshot } from "../lib/videoPoster";
 import { OverviewHomeEditor } from "./OverviewHomeEditor";
+import { downloadOriginal } from "../lib/contentDownload";
 import {
   cloneOverviewPreferences,
   DEFAULT_OVERVIEW_HEADING,
@@ -56,6 +59,9 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const [savedState, setSavedState] = useState(() => readOverviewPreferences(workspaceID));
   const [draft, setDraft] = useState<OverviewPreferences>(() => cloneOverviewPreferences(savedState.preferences));
   const [editing, setEditing] = useState(false);
+  const [videoPoster] = useWorkspaceBrowseValue<VideoPosterSnapshot | undefined>(VIDEO_POSTER_SESSION_KEY, undefined);
+  const [savedPhotoIdentity, setSavedPhotoIdentity] = useWorkspaceBrowseValue<string | undefined>("home.photoSpotlightIdentity", undefined);
+  const [savedMusicIdentity, setSavedMusicIdentity] = useWorkspaceBrowseValue<string | undefined>("home.musicSpotlightIdentity", undefined);
   const resizePointerID = useRef<number | null>(null);
   useEffect(() => {
     const next = readOverviewPreferences(workspaceID);
@@ -79,8 +85,13 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const photoPool = favoritePhotoHits.length > 0 ? favoritePhotoHits : photoHits;
   const audioHits = hits.filter((hit) => hit.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(hit)) === "audio");
   const videoHits = hits.filter((hit) => hit.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(hit)) === "video");
+  const homeVideo = videoHits[0];
+  const matchingVideoPoster = homeVideo && videoPoster?.identity === videoPosterIdentity(workspaceID, homeVideo) ? videoPoster : undefined;
+  const fileHits = hits.filter((hit) => hit.entry_type === "REGULAR_FILE" && !["image", "audio", "video"].includes(mediaClassFromSuffix(formatFacetValue(hit)) ?? "")).slice(0, 3);
   const photoKey = overviewScopeKey(workspaceID, photoPool);
-  const photoIdentity = useMemo(() => pickOverviewSpotlight(photoPool.map((hit) => overviewHitIdentity(workspaceID, hit)), photoKey), [photoKey]);
+  const randomPhotoIdentity = useMemo(() => pickOverviewSpotlight(photoPool.map((hit) => overviewHitIdentity(workspaceID, hit)), photoKey), [photoKey]);
+  const photoIdentity = savedPhotoIdentity && photoPool.some((hit) => overviewHitIdentity(workspaceID, hit) === savedPhotoIdentity) ? savedPhotoIdentity : randomPhotoIdentity;
+  useEffect(() => { if (photoIdentity && photoIdentity !== savedPhotoIdentity) setSavedPhotoIdentity(photoIdentity); }, [photoIdentity, savedPhotoIdentity, setSavedPhotoIdentity]);
   const photo = photoIdentity ? photoPool.find((hit) => overviewHitIdentity(workspaceID, hit) === photoIdentity) : undefined;
   const currentPlayback = queueControls?.currentPlayback;
   const currentScopedTrack = currentPlayback
@@ -94,7 +105,10 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const playableAudioKey = overviewScopeKey(workspaceID, playableAudio.map((item) => item.hit));
   const randomAudioIdentity = useMemo(() => pickOverviewSpotlight(playableAudio.map((item) => item.identity), playableAudioKey), [playableAudioKey]);
   const playingAudioIdentity = currentScopedTrack ? overviewHitIdentity(workspaceID, currentScopedTrack) : undefined;
-  const selectedAudioIdentity = playingAudioIdentity && playableAudio.some((item) => item.identity === playingAudioIdentity) ? playingAudioIdentity : randomAudioIdentity;
+  const selectedAudioIdentity = playingAudioIdentity && playableAudio.some((item) => item.identity === playingAudioIdentity)
+    ? playingAudioIdentity
+    : savedMusicIdentity && playableAudio.some((item) => item.identity === savedMusicIdentity) ? savedMusicIdentity : randomAudioIdentity;
+  useEffect(() => { if (selectedAudioIdentity && selectedAudioIdentity !== savedMusicIdentity) setSavedMusicIdentity(selectedAudioIdentity); }, [selectedAudioIdentity, savedMusicIdentity, setSavedMusicIdentity]);
   const musicSpotlight = selectedAudioIdentity ? playableAudio.find((item) => item.identity === selectedAudioIdentity) : undefined;
 
   const preferences = savedState.preferences;
@@ -102,7 +116,9 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const visibleBlocks = activePreferences.blocks.filter((block) => block.visible && (block.id === "photos" || block.id === "music"));
   const videosVisible = activePreferences.blocks.find((block) => block.id === "videos")?.visible ?? false;
   const materialsVisible = activePreferences.blocks.find((block) => block.id === "materials")?.visible ?? true;
-  const materials = materialsVisible ? sections.other.rows.slice(0, 2) : [];
+  const materials = materialsVisible ? fileHits : [];
+  const hasHomeVideo = videosVisible && (videoHits.length > 0 || editing);
+  const hasHomeFiles = materialsVisible && (fileHits.length > 0 || editing);
   const hiddenBlocks = activePreferences.blocks.filter((block) => !block.visible).map((block) => block.id);
 
   const startEditing = () => { setDraft(cloneOverviewPreferences(preferences)); setEditing(true); };
@@ -189,13 +205,13 @@ export function OverviewExperience(props: OverviewExperienceProps) {
     moveBlock(id, event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1);
   };
 
-  const sectionName = (id: OverviewBlockID) => t(id === "photos" ? "Photos" : id === "music" ? "Music" : id === "videos" ? "Videos" : "Materials");
+  const sectionName = (id: OverviewBlockID) => t(id === "photos" ? "Photos" : id === "music" ? "Music" : id === "videos" ? "Videos" : "Files on Home");
   const editTools = (id: OverviewBlockID) => editing && <div className="private-space-card-edit-tools">
     {(id === "photos" || id === "music") && <button type="button" className="private-space-edit-icon private-space-drag-handle" draggable aria-label={t("Move {{section}}. Use arrow keys to reorder.", { section: sectionName(id) })} title={t("Drag to reorder; arrow keys also work")} onDragStart={(event) => dragStart(event, id)} onKeyDown={(event) => handleKeyMove(event, id)}><GripVertical aria-hidden="true" /></button>}
     <button type="button" className="private-space-edit-icon" aria-label={t("Hide {{section}}", { section: sectionName(id) })} title={t("Hide {{section}}", { section: sectionName(id) })} onClick={() => hideBlock(id)}><EyeOff aria-hidden="true" /></button>
   </div>;
 
-  const renderPhoto = () => <article className="private-space-photo">
+  const renderPhoto = () => <article className="private-space-photo" data-content-space-origin="photos">
     {editTools("photos")}
     <div className="private-space-photo-copy">
       <span className="private-space-kicker">{t("A little space for images")}</span>
@@ -223,7 +239,7 @@ export function OverviewExperience(props: OverviewExperienceProps) {
     const title = facts?.title || item?.hit.name?.trim() || "";
     const byline = [facts?.artist, facts?.album].filter(Boolean).join(" · ");
     const playLabel = isPlaying ? t("Pause {{name}}", { name: title }) : currentPlayback?.status === "paused" && isCurrentTrack ? t("Resume {{name}}", { name: title }) : t("Play {{name}}", { name: title });
-    return <article className="private-space-music">
+    return <article className="private-space-music" data-content-space-origin="music">
       {editTools("music")}
       <div className="private-space-music-top"><span className="private-space-kicker">{t("A little space for sound")}</span>
         {!editing && (musicDestination ? <button type="button" className="private-space-domain-link" aria-label={t("Enter Music")} onClick={() => onNavigate(musicDestination)}><ArrowUpRight aria-hidden="true" /></button> : <span className="private-space-domain-link is-disabled" aria-hidden="true"><ArrowUpRight /></span>)}
@@ -247,26 +263,19 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const renderBlock = (id: OverviewBlockID): ReactNode => id === "photos" ? renderPhoto() : id === "music" ? renderMusic() : null;
 
   const renderVideos = () => {
-    const first = videoHits[0];
-    const name = first?.name?.trim() || first?.path?.split(/[\\/]/).at(-1) || t("No videos in this scope");
-    return <article className="private-space-videos">
+    const name = homeVideo?.name?.trim() || homeVideo?.path?.split(/[\\/]/).at(-1) || t("No videos in this scope");
+    return <div className="private-space-video-entry-wrap" data-content-space-origin="videos">
       {editTools("videos")}
-      <div className="private-space-video-copy">
-        <span className="private-space-video-icon"><Film aria-hidden="true" /></span>
-        <div className="private-space-video-description">
-          <span className="private-space-kicker">{t("A little space for moving images")}</span>
-          <h2>{t("Videos")}</h2>
-          <p title={name}>{name}</p>
-        </div>
-        <span className="private-space-video-count">{t("{{count}} videos in this scope", { count: videoHits.length })}</span>
-      </div>
-      {videoDestination
-        ? <button type="button" className="private-space-video-enter" disabled={editing} onClick={() => onNavigate(videoDestination)}>{t("Enter Videos")}<ArrowUpRight aria-hidden="true" /></button>
-        : <small className="private-space-video-unavailable" role="status">{t("Videos pages are disabled.")}</small>}
-    </article>;
+      <button type="button" className="private-space-video-entry" disabled={editing || !videoDestination} aria-label={videoDestination ? t("Enter video: {{name}}", { name }) : t("Videos pages are disabled.")} title={!videoDestination ? t("Videos pages are disabled.") : name} onClick={() => videoDestination && onNavigate(videoDestination)}>
+        {matchingVideoPoster
+          ? <img className="private-space-video-poster" src={matchingVideoPoster.dataURL} alt="" />
+          : <span className="private-space-video-placeholder" aria-hidden="true"><Film /></span>}
+        <span className="private-space-video-caption"><span title={name}>{name}</span><ArrowUpRight className="private-space-video-entry-arrow" aria-hidden="true" /></span>
+      </button>
+    </div>;
   };
 
-  return <section className="overview-experience private-space-home" aria-label={t("Private space")}>
+  return <section className="overview-experience private-space-home" aria-label={t("Private space")} data-content-space-target="home" tabIndex={-1}>
     <header className="private-space-welcome">
       <p className="private-space-overline">{t("Private space")}</p>
       <h1>{t(DEFAULT_OVERVIEW_HEADING)}</h1>
@@ -282,7 +291,7 @@ export function OverviewExperience(props: OverviewExperienceProps) {
       /> : <button type="button" className="private-space-edit-icon private-space-pencil" aria-label={t("Edit home layout")} title={t("Edit home layout")} onClick={startEditing}><Pencil aria-hidden="true" /></button>}
       {!editing && !savedState.persistenceAvailable && <small className="private-space-persist-warning" role="status">{t("Browser storage is unavailable. This layout may not be available after reload.")}</small>}
     </header>
-    {(visibleBlocks.length > 0 || videosVisible || materials.length === 0) && <div className={`private-space-scene${visibleBlocks.length === 1 ? " has-one-card" : ""}${editing ? " is-editing" : ""}`}>
+    {(visibleBlocks.length > 0 || hasHomeVideo || hasHomeFiles || (editing && !visibleBlocks.length)) && <div className={`private-space-scene${visibleBlocks.length === 1 ? " has-one-card" : ""}${editing ? " is-editing" : ""}`}>
       {visibleBlocks.length > 0 && <div className="private-space-card-row" style={{ "--private-photo-share": activePreferences.photoShare } as CSSProperties}>
         {visibleBlocks.flatMap((block, index) => [
           <div className={`private-space-card-slot private-space-card-slot--${block.id}`} key={block.id} onDragOver={dragOver} onDrop={(event) => dropOnBlock(event, block.id)}>{renderBlock(block.id)}</div>,
@@ -306,24 +315,33 @@ export function OverviewExperience(props: OverviewExperienceProps) {
           ><GripVertical aria-hidden="true" /></div>] : []),
         ])}
       </div>}
-      {videosVisible && renderVideos()}
-      {visibleBlocks.length === 0 && !videosVisible && <div className="private-space-empty" role="status"><h2>{t("Your space is clear for now")}</h2><p>{t("Show a section whenever you want to see it here again.")}</p></div>}
+      {(hasHomeVideo || hasHomeFiles) && <div className="private-space-secondary-row">
+        {hasHomeVideo && renderVideos()}
+        {hasHomeFiles && <section className="private-space-materials" aria-label={t("Files on Home")}>
+          {editTools("materials")}
+          <div className="private-space-materials-heading"><h2>{t("Files on Home")}</h2></div>
+          {materials.map((hit) => {
+            const name = hit.name?.trim() || hit.path?.split(/[\\/]/).at(-1) || t("Untitled subject");
+            const format = formatFacetValue(hit).toUpperCase() || t("Format unavailable");
+            const size = Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) >= 0 ? formatBytes(hit.logical_size!) : t("Size unavailable");
+            const canDownload = Boolean(workspaceID && hit.entry_id && /^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? ""));
+            return <div className="private-space-material" key={`${hit.entry_id ?? ""}:${hit.content_id ?? ""}:${hit.logical_size ?? ""}`}>
+              <button type="button" className="private-space-material-main" disabled={editing} onClick={() => props.onOpenHit(hit)}><span className="private-space-material-icon"><File aria-hidden="true" /></span><span className="private-space-material-copy"><strong title={name}>{name}</strong><small>{format} · {size}</small></span></button>
+              {canDownload && <button type="button" className="private-space-material-download" aria-label={t("Download original {{name}}", { name })} title={t("Download original")} disabled={editing} onClick={() => downloadOriginal(workspaceID, hit.entry_id!, name)}><Download aria-hidden="true" /></button>}
+            </div>;
+          })}
+          {editing && materials.length === 0 && <p className="private-space-material-empty">{t("No files in this loaded scope")}</p>}
+        </section>}
+      </div>}
+      {editing && visibleBlocks.length === 0 && !hasHomeVideo && !hasHomeFiles && <div className="private-space-empty" role="status"><h2>{t("Your space is clear for now")}</h2><p>{t("Show a section whenever you want to see it here again.")}</p></div>}
     </div>}
 
     <footer className="private-space-footer">
-      <button type="button" className="private-space-library" onClick={() => onNavigate("content")}>
+      <button type="button" className="private-space-library" data-content-space-origin="library" onClick={() => onNavigate("content")}>
         <span className="private-space-library-symbol"><LibraryBig aria-hidden="true" /></span>
         <span><strong>{t("Library")}</strong><small>{t("All saved content and original material")}</small></span>
         <ArrowRight aria-hidden="true" />
       </button>
-      {(materials.length > 0 || (editing && materialsVisible)) && <section className="private-space-materials" aria-label={t("Materials")}>
-        <div className="private-space-materials-heading"><h2>{t("Materials")}</h2><div className="private-space-material-actions">{materials.length > 0 && !editing && <button type="button" onClick={() => onNavigate("content")}>{t("See all")}<ArrowRight aria-hidden="true" /></button>}{editing && <button type="button" className="private-space-material-hide" aria-label={t("Hide {{section}}", { section: t("Materials") })} title={t("Hide {{section}}", { section: t("Materials") })} onClick={() => hideBlock("materials")}><EyeOff aria-hidden="true" /></button>}</div></div>
-        {materials.map(({ hit }) => {
-          const name = hit.name?.trim() || hit.path?.split(/[\\/]/).at(-1) || t("Untitled subject");
-          return <button type="button" className="private-space-material" key={`${hit.entry_id ?? ""}:${hit.content_id ?? ""}:${hit.logical_size ?? ""}`} disabled={editing} onClick={() => props.onOpenHit(hit)}><span className="private-space-material-icon"><File aria-hidden="true" /></span><span>{name}</span><ArrowRight aria-hidden="true" /></button>;
-        })}
-        {editing && materials.length === 0 && <p className="private-space-material-empty">{t("No materials in this loaded scope")}</p>}
-      </section>}
     </footer>
   </section>;
 }

@@ -73,7 +73,7 @@ export function buildSavedRetrievalCandidate({
       .map(([key, value]) => `${key}=${value}`)
       .concat(activeTags.filter((tag) => tag.trim()).map((tag) => `tag=${JSON.stringify(tag)}`));
   const unsupportedConditions = [
-    ...(pageDefinition?.mediaClass === "image" || pageDefinition?.mediaClass === "audio"
+    ...(pageDefinition?.mediaClass === "image" || pageDefinition?.mediaClass === "audio" || pageDefinition?.mediaClass === "video"
       ? [t("Switch to All types before saving this retrieval; a display choice is not a saved query condition.")]
       : []),
     ...(viewMode !== "search" && !tagOnlyContent ? [t("Run a keyword search before saving a retrieval.")] : []),

@@ -13,6 +13,7 @@
     "@ant-design/icons": "^6.3.4",
     "@vitejs/plugin-react": "^5.0.2",
     "antd": "^5.29.3",
+    "artplayer": "5.4.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

@@ -18,6 +18,13 @@
 > UX-C2 admits one fixed mixed-content client overview over that same scope
 > and shared action/read budgets. It creates no durable organization or runtime
 > extension capability and does not advance the phase gates.
+> The owner's 2026-10-26 UX-C2/H1 successor allows the existing three compiled
+> overview blocks to become an editable private-space homepage, with local
+> heading, visibility, order and bounded preview preferences. It retains the
+> same scope/actions/budgets and grants no core phase or release credit.
+> The 2026-10-27 clarification replaces the heading form with direct on-card
+> visibility/order and bounded split resizing through one pencil entry. Home
+> shows one photo and one music feature; Library retains its management tools.
 > UX-F1 adds an ordinary visible Favorite TAG shortcut with complete-read
 > status, shared filtering and revision-checked existing annotation actions.
 > It does not admit album/playlist state or new portable-publication semantics.

@@ -6,7 +6,7 @@ const BLOCK_LABELS: Record<OverviewBlockID, string> = {
   photos: "Photos",
   music: "Music",
   videos: "Videos",
-  materials: "Materials",
+  materials: "Files on Home",
 };
 
 type Props = {

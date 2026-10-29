@@ -1,47 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Film, Play, X } from "lucide-react";
+import { useMemo } from "react";
+import { ArrowLeft, ArrowRight, Download, Film, Play, RotateCcw, Search } from "lucide-react";
+import { useClientBrowseValue, useWorkspaceBrowseValue } from "../app/ClientBrowseSession";
 import type { Translator } from "../i18n";
 import type { SearchHit } from "../lib/types";
 import { formatBytes, formatFacetValue, mediaClassFromSuffix } from "../lib/format";
 import type { MusicQueueControls } from "../lib/musicQueueControls";
 import { downloadOriginal } from "../lib/contentDownload";
-import { fetchVerifiedVideo, VIDEO_PLAYBACK_LIMIT, videoMime, type VideoAsset } from "../lib/videoPlayback";
+import { useVideoPlayback, videoFileName, videoPlaybackAsset, videoPlaybackIdentity, videoPlaybackUnavailableReason } from "../app/useVideoPlayback";
+import { videoPosterIdentity, VIDEO_POSTER_SESSION_KEY, type VideoPosterSnapshot } from "../lib/videoPoster";
+import { VerifiedVideoStage } from "./VerifiedVideoStage";
 import "./VideoLibraryExperience.css";
 
-type PlaybackState = {
-  identity: string;
-  hit: SearchHit;
-  status: "loading" | "ready" | "error";
-  url?: string;
-  error?: string;
-  decodeError?: boolean;
-  autoplayBlocked?: boolean;
-};
-
-function assetIdentity(workspaceID: string, hit: SearchHit) {
-  return `${workspaceID}\u0000${hit.subject_ref ?? ""}\u0000${hit.entry_id ?? ""}\u0000${hit.content_id ?? ""}\u0000${videoFileName(hit)}`;
-}
-
-function videoFileName(hit: SearchHit) {
-  return hit.name || hit.path?.split(/[\\/]/).at(-1) || "video";
-}
+type VideoSort = "library" | "name" | "size";
 
 function videoHits(hits: SearchHit[]) {
   return hits.filter((hit) => hit.entry_type === "REGULAR_FILE" && mediaClassFromSuffix(formatFacetValue(hit)) === "video");
 }
 
-function playbackAsset(workspaceID: string, hit: SearchHit): VideoAsset | undefined {
-  if (!workspaceID || hit.entry_type !== "REGULAR_FILE" || !hit.entry_id || !hit.subject_ref || !videoMime(videoFileName(hit)) || !/^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? "")) return undefined;
-  if (!Number.isSafeInteger(hit.logical_size) || (hit.logical_size ?? -1) < 0 || (hit.logical_size ?? VIDEO_PLAYBACK_LIMIT + 1) > VIDEO_PLAYBACK_LIMIT) return undefined;
-  return { workspaceID, entryID: hit.entry_id, name: videoFileName(hit), contentID: hit.content_id!, logicalSize: hit.logical_size! };
-}
-
-function playbackError(error: unknown, t: Translator) {
-  const reason = error instanceof Error ? error.message : "";
-  if (reason === "size-limit") return t("This original is larger than the 32 MiB video playback limit. Download the original to watch it.");
-  if (reason === "unsupported-format") return t("Browser playback is available only for MP4 and WebM files. Download the original to watch it.");
-  if (reason === "length-mismatch" || reason === "hash-mismatch" || reason === "identity-unavailable") return t("The original could not be verified for playback. Download the original instead.");
-  return t("The verified video preview could not be loaded. You can still download the original.");
+function canDownloadOriginal(workspaceID: string, hit: SearchHit): boolean {
+  return Boolean(workspaceID && hit.entry_id && hit.entry_type === "REGULAR_FILE" && /^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? ""));
 }
 
 export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueControls }: {
@@ -51,132 +28,114 @@ export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueC
   onOpenHit: (hit: SearchHit) => void;
   queueControls?: MusicQueueControls;
 }) {
-  const videos = useMemo(() => videoHits(hits), [hits]);
-  const [playback, setPlayback] = useState<PlaybackState>();
-  const requestID = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videos = videoHits(hits);
+  const [query, setQuery] = useClientBrowseValue("videos", "query", "");
+  const [sort, setSort] = useClientBrowseValue<VideoSort>("videos", "sort", "library");
+  const [poster] = useWorkspaceBrowseValue<VideoPosterSnapshot | undefined>(VIDEO_POSTER_SESSION_KEY, undefined);
+  const { playback, videoRef, preparePlayback, stopPlayback, startPlayback, handleVideoPlay, markDecodeError } = useVideoPlayback({ workspaceID, hits: videos, scopeHits: hits, enabled: true, queueControls, t });
 
-  function stopPlayback() {
-    requestID.current += 1;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setPlayback(undefined);
-  }
+  const visibleVideos = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    const matches = videos.flatMap((hit, index) => {
+      if (needle && !videoFileName(hit).toLocaleLowerCase().includes(needle)) return [];
+      return [{ hit, index }];
+    });
+    if (sort === "name") matches.sort((left, right) => videoFileName(left.hit).localeCompare(videoFileName(right.hit), undefined, { numeric: true, sensitivity: "base" }) || left.index - right.index);
+    if (sort === "size") matches.sort((left, right) => {
+      const leftSize = Number.isSafeInteger(left.hit.logical_size) && (left.hit.logical_size ?? -1) >= 0 ? left.hit.logical_size! : undefined;
+      const rightSize = Number.isSafeInteger(right.hit.logical_size) && (right.hit.logical_size ?? -1) >= 0 ? right.hit.logical_size! : undefined;
+      if (leftSize === undefined) return rightSize === undefined ? left.index - right.index : 1;
+      if (rightSize === undefined) return -1;
+      return leftSize - rightSize || left.index - right.index;
+    });
+    return matches.map(({ hit }) => hit);
+  }, [query, sort, videos]);
 
-  async function preparePlayback(hit: SearchHit) {
-    const identity = assetIdentity(workspaceID, hit);
-    if (playback?.identity === identity && playback.status === "ready") {
-      const player = videoRef.current;
-      if (player) void player.play().catch(() => undefined);
-      return;
-    }
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const request = ++requestID.current;
-    const asset = playbackAsset(workspaceID, hit);
-    if (!asset) {
-      setPlayback({ identity, hit, status: "error", error: t("This file is unsupported or exceeds the 32 MiB video playback limit. Download the original to watch it.") });
-      return;
-    }
-    setPlayback({ identity, hit, status: "loading" });
-    try {
-      const blob = await fetchVerifiedVideo(asset, controller.signal);
-      if (request !== requestID.current || controller.signal.aborted) return;
-      const url = URL.createObjectURL(blob);
-      setPlayback({ identity, hit, status: "ready", url });
-    } catch (error) {
-      if (request !== requestID.current || controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
-      setPlayback({ identity, hit, status: "error", error: playbackError(error, t) });
-    } finally {
-      if (abortRef.current === controller) abortRef.current = null;
-    }
-  }
-
-  useEffect(() => {
-    const url = playback?.url;
-    if (!url) return undefined;
-    return () => URL.revokeObjectURL(url);
-  }, [playback?.url]);
-
-  useEffect(() => () => {
-    requestID.current += 1;
-    abortRef.current?.abort();
-    abortRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    if (playback && !videos.some((hit) => assetIdentity(workspaceID, hit) === playback.identity)) stopPlayback();
-  }, [videos, playback?.identity, workspaceID]);
-
-  useEffect(() => {
-    const status = queueControls?.currentPlayback?.status;
-    if (status === "starting" || status === "playing") videoRef.current?.pause();
-  }, [queueControls?.currentPlayback?.status]);
-
-  useEffect(() => {
-    if (playback?.status !== "ready" || !playback.url) return;
-    const player = videoRef.current;
-    if (!player) return;
-    void player.play().catch(() => setPlayback((current) => current?.identity === playback.identity ? { ...current, autoplayBlocked: true } : current));
-  }, [playback?.status, playback?.url]);
+  const visiblePlayableVideos = useMemo(() => visibleVideos.filter((hit) => Boolean(videoPlaybackAsset(workspaceID, hit))), [visibleVideos, workspaceID]);
+  const idleFeaturedVideo = visibleVideos[0];
+  const idleFeaturedAsset = idleFeaturedVideo ? videoPlaybackAsset(workspaceID, idleFeaturedVideo) : undefined;
+  const matchingIdlePoster = idleFeaturedVideo && poster?.identity === videoPosterIdentity(workspaceID, idleFeaturedVideo) ? poster : undefined;
+  const activeIsVisible = Boolean(playback && visibleVideos.some((hit) => videoPlaybackIdentity(workspaceID, hit) === playback.identity));
+  const currentPlayableIndex = playback ? visiblePlayableVideos.findIndex((hit) => videoPlaybackIdentity(workspaceID, hit) === playback.identity) : -1;
+  const previousVideo = currentPlayableIndex > 0 ? visiblePlayableVideos[currentPlayableIndex - 1] : undefined;
+  const nextVideo = currentPlayableIndex >= 0 && currentPlayableIndex < visiblePlayableVideos.length - 1 ? visiblePlayableVideos[currentPlayableIndex + 1] : undefined;
+  const clearView = () => { setQuery(""); setSort("library"); };
 
   return <section className="video-library" aria-label={t("Videos")}>
     <header className="video-library__heading">
       <div><p className="eyebrow">{t("YOUR LIBRARY")}</p><h1>{t("Videos")}</h1></div>
-      <p>{t("{{count}} videos in the current loaded results", { count: videos.length })}</p>
+      <p>{t("{{visible}} shown · {{total}} loaded", { visible: visibleVideos.length, total: videos.length })}</p>
     </header>
 
-    {playback && <section className="video-library__stage" aria-label={t("Video playback")}>
-      <div className="video-library__stage-heading">
-        <div><Film size={16} aria-hidden="true" /><strong>{videoFileName(playback.hit)}</strong></div>
-        <button type="button" className="video-library__close" onClick={stopPlayback} aria-label={t("Close video playback")}><X size={16} />{t("Close")}</button>
-      </div>
-      {playback.status === "loading" && <p className="video-library__status" role="status">{t("Downloading and verifying the complete original before playback…")}</p>}
-      {playback.status === "error" && <p className="video-library__status is-error" role="status">{playback.error}</p>}
-      {playback.status === "ready" && playback.url && <>
-        <video
-          ref={videoRef}
-          key={playback.identity}
-          className="video-library__player"
-          src={playback.url}
-          controls
-          playsInline
-          preload="metadata"
-          aria-label={t("Video player: {{name}}", { name: videoFileName(playback.hit) })}
-          onPlay={() => { if (["starting", "playing"].includes(queueControls?.currentPlayback?.status ?? "")) queueControls?.toggleCurrentPlayback?.(); }}
-          onError={() => setPlayback((current) => current?.identity === playback.identity ? { ...current, decodeError: true } : current)}
-        />
-        {playback.autoplayBlocked && <p className="video-library__status" role="status">{t("The verified preview is ready. Press Play in the video controls to begin.")}</p>}
-        {playback.decodeError && <p className="video-library__status is-error" role="status">{t("This browser could not decode this file. The verified original is still available to download.")}</p>}
-        <p className="video-library__verified">{t("Complete length and SHA-256 verified before this temporary preview was created.")}</p>
-      </>}
-    </section>}
+    <div className="video-library__toolbar" role="search">
+      <label className="video-library__search"><Search size={16} aria-hidden="true" /><span className="sr-only">{t("Search video filenames")}</span><input type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={t("Find a video by filename")} /></label>
+      <label className="video-library__sort"><span>{t("Sort videos")}</span><select value={sort} onChange={(event) => setSort(event.currentTarget.value as VideoSort)}>
+        <option value="library">{t("Videos: library order")}</option>
+        <option value="name">{t("Videos: name, A to Z")}</option>
+        <option value="size">{t("Videos: size, smallest first")}</option>
+      </select></label>
+      {(query || sort !== "library") && <button type="button" className="video-library__reset" onClick={clearView}><RotateCcw size={14} />{t("Reset")}</button>}
+    </div>
 
-    {videos.length === 0 ? <div className="video-library__empty" role="status"><Film size={24} aria-hidden="true" /><h2>{t("No videos in the current loaded results")}</h2><p>{t("Videos shows video files already present in the current Library scope.")}</p></div> : <ul className="video-library__choices" aria-label={t("Videos in the current loaded results")}>
-      {videos.map((hit) => {
-        const identity = assetIdentity(workspaceID, hit);
-        const asset = playbackAsset(workspaceID, hit);
-        const canDownload = Boolean(workspaceID && hit.entry_id && hit.entry_type === "REGULAR_FILE" && /^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? ""));
-        const isActive = playback?.identity === identity;
-        const size = Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) >= 0 ? formatBytes(hit.logical_size!) : t("Size unavailable");
-        const playUnavailableReason = !videoMime(videoFileName(hit))
-          ? t("Browser playback is available only for MP4 and WebM files. Open Details or download the original.")
-          : !asset && Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) > VIDEO_PLAYBACK_LIMIT
-            ? t("This original is larger than the 32 MiB video playback limit. Download the original to watch it.")
-            : !asset && (!Number.isSafeInteger(hit.logical_size) || (hit.logical_size ?? -1) < 0)
-              ? t("Playback requires a known original of at most 32 MiB")
-              : !asset ? t("Playback requires a verified original identity.") : "";
-        return <li className={`video-library__choice${isActive ? " is-active" : ""}`} key={identity}>
-          <div className="video-library__choice-info"><Film size={17} aria-hidden="true" /><div><h2>{videoFileName(hit)}</h2><p>{size} · {formatFacetValue(hit).toUpperCase() || t("Format unavailable")}</p>{playUnavailableReason && <small>{playUnavailableReason}</small>}</div></div>
-          <div className="video-library__choice-actions">
-            <button type="button" className="primary-button" aria-label={t("Verify and play {{name}}", { name: videoFileName(hit) })} disabled={!asset || isActive && playback?.status === "loading"} onClick={() => void preparePlayback(hit)} title={asset ? t("Downloads and verifies the complete original before playback") : playUnavailableReason}>{isActive && playback?.status === "loading" ? <><Play size={14} />{t("Verifying…")}</> : isActive && playback?.status === "ready" ? <><Play size={14} />{t("Play again")}</> : <><Play size={14} />{t("Verify and play")}</>}</button>
-            <button type="button" className="secondary-button compact" aria-label={t("Open details for {{name}}", { name: videoFileName(hit) })} onClick={() => onOpenHit(hit)}>{t("Details")}</button>
-            <button type="button" className="secondary-button compact" aria-label={t("Download original {{name}}", { name: videoFileName(hit) })} disabled={!canDownload} onClick={() => downloadOriginal(workspaceID, hit.entry_id!, videoFileName(hit))}><Download size={14} />{t("Download original")}</button>
-          </div>
-        </li>;
-      })}
-    </ul>}
+    <div className="video-library__room">
+      <section className="video-library__main" aria-label={t("Video viewing room")}>
+        {playback
+          ? <VerifiedVideoStage t={t} workspaceID={workspaceID} playback={playback} videoRef={videoRef} onClose={stopPlayback} onPlay={handleVideoPlay} onPlayerReady={startPlayback} onDecodeError={markDecodeError} />
+          : <section className="video-library__idle" aria-label={t("Video playback")}>
+            {idleFeaturedVideo ? <>
+              <div className="video-library__idle-art">{matchingIdlePoster ? <img src={matchingIdlePoster.dataURL} alt="" /> : <Film size={30} aria-hidden="true" />}</div>
+              <div className="video-library__idle-copy"><p className="eyebrow">{t("READY WHEN YOU ARE")}</p><h2>{videoFileName(idleFeaturedVideo)}</h2><p>{Number.isSafeInteger(idleFeaturedVideo.logical_size) && (idleFeaturedVideo.logical_size ?? -1) >= 0 ? formatBytes(idleFeaturedVideo.logical_size!) : t("Size unavailable")} · {formatFacetValue(idleFeaturedVideo).toUpperCase() || t("Format unavailable")}</p></div>
+              {idleFeaturedAsset
+                ? <button type="button" className="video-library__featured-watch" onClick={() => void preparePlayback(idleFeaturedVideo)}><Play size={15} />{t("Watch")}</button>
+                : <p className="video-library__idle-note">{t("Browser playback is unavailable for this file. Details and original download are available in its list row.")}</p>}
+              <p className="video-library__idle-note">{t("Originals are read only after you choose to watch or download one.")}</p>
+            </> : <>
+              <div className="video-library__idle-art"><Film size={30} aria-hidden="true" /></div>
+              <h2>{t("Your viewing room")}</h2>
+              <p>{videos.length ? t("No video filenames match this search.") : t("Videos shows video files already present in the current Library scope.")}</p>
+              {videos.length > 0 && <button type="button" className="secondary-button compact" onClick={clearView}>{t("Clear search and reset sort")}</button>}
+              <p className="video-library__idle-note">{t("Originals are read only after you choose to watch or download one.")}</p>
+            </>}
+          </section>}
+        {playback && <div className="video-library__transport" aria-label={t("Video navigation")}>
+          <button type="button" className="secondary-button compact" disabled={!previousVideo} onClick={() => previousVideo && void preparePlayback(previousVideo)}><ArrowLeft size={15} />{t("Previous video")}</button>
+          <span>{currentPlayableIndex >= 0 ? t("{{current}} of {{total}} supported visible videos", { current: currentPlayableIndex + 1, total: visiblePlayableVideos.length }) : t("Current video is outside this visible list")}</span>
+          <button type="button" className="secondary-button compact" disabled={!nextVideo} onClick={() => nextVideo && void preparePlayback(nextVideo)}>{t("Next video")}<ArrowRight size={15} /></button>
+        </div>}
+        {playback && !activeIsVisible && <div className="video-library__hidden-current" role="status">
+          <p>{t("The current video is hidden by this filename search. Reveal it to return to its row and navigation.")}</p>
+          <button type="button" className="secondary-button compact" onClick={() => setQuery("")}>{t("Reveal current video")}</button>
+        </div>}
+      </section>
+
+      <aside className="video-library__list" aria-label={t("Videos in the current loaded results")}>
+        <div className="video-library__list-heading"><div><h2>{t("Your videos")}</h2><p>{t("{{count}} visible", { count: visibleVideos.length })}</p></div></div>
+        {videos.length === 0
+          ? <div className="video-library__list-empty" role="status"><Film size={20} aria-hidden="true" /><p>{t("No videos in the current loaded results")}</p></div>
+          : visibleVideos.length === 0
+            ? <div className="video-library__list-empty" role="status"><p>{t("No video filenames match this search.")}</p><button type="button" className="secondary-button compact" onClick={clearView}>{t("Clear search and reset sort")}</button></div>
+            : <ul className="video-library__choices">
+              {visibleVideos.map((hit) => {
+                const identity = videoPlaybackIdentity(workspaceID, hit);
+                const asset = videoPlaybackAsset(workspaceID, hit);
+                const canDownload = canDownloadOriginal(workspaceID, hit);
+                const isActive = playback?.identity === identity;
+                const size = Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) >= 0 ? formatBytes(hit.logical_size!) : t("Size unavailable");
+                const playUnavailableReason = videoPlaybackUnavailableReason(workspaceID, hit, t);
+                return <li className={`video-library__choice${isActive ? " is-active" : ""}`} key={identity}>
+                  <div className="video-library__choice-info"><Film size={16} aria-hidden="true" /><div><h3>{videoFileName(hit)}</h3><p>{size} · {formatFacetValue(hit).toUpperCase() || t("Format unavailable")}</p>{playUnavailableReason && <small>{playUnavailableReason}</small>}</div></div>
+                  <button type="button" className="video-library__watch" aria-label={t("Verify and play {{name}}", { name: videoFileName(hit) })} disabled={!asset || isActive && playback?.status === "loading"} onClick={() => void preparePlayback(hit)} title={asset ? t("Downloads and verifies the complete original before playback") : playUnavailableReason}>{isActive && playback?.status === "loading" ? <><Play size={14} />{t("Verifying…")}</> : <><Play size={14} />{t("Watch")}</>}</button>
+                  <details className="video-library__actions">
+                    <summary>{t("More video actions")}</summary>
+                    <div className="video-library__action-menu">
+                      <button type="button" className="secondary-button compact" onClick={() => onOpenHit(hit)}>{t("Details")}</button>
+                      <button type="button" className="secondary-button compact" disabled={!canDownload} onClick={() => canDownload && hit.entry_id && downloadOriginal(workspaceID, hit.entry_id, videoFileName(hit))}><Download size={14} />{t("Download original")}</button>
+                    </div>
+                  </details>
+                </li>;
+              })}
+            </ul>}
+      </aside>
+    </div>
   </section>;
 }

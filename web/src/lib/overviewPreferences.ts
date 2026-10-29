@@ -27,7 +27,7 @@ export const DEFAULT_OVERVIEW_PREFERENCES: OverviewPreferences = {
   blocks: [
     { id: "photos", visible: true, count: 3 },
     { id: "music", visible: true, count: 3 },
-    { id: "videos", visible: false, count: 3 },
+    { id: "videos", visible: true, count: 3 },
     { id: "materials", visible: true, count: 3 },
   ],
   photoShare: DEFAULT_OVERVIEW_PHOTO_SHARE,

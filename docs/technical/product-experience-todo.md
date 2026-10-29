@@ -25,6 +25,7 @@ The Core MVP Execution Plan still owns core phase order.
 | Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
 | Locally delivered | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | ML-3 real-model candidate → reviewed capture → reopen / exact takeout; no phase or release credit |
 | Locally delivered | F13 / [AIL-35](https://linear.app/ailiheizi/issue/AIL-35) | Offline program reads saved order/context/Skill and verifies explicitly supplied original bytes |
+| Locally delivered, bounded video | F17 / [AIL-61](https://linear.app/ailiheizi/issue/AIL-61) | Videos room, loaded filename search/sort, explicit verified small-original playback and exact takeout; [scope and evidence](../superpowers/plans/2026-10-29-video-viewing-room.md) |
 | Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
 
 The owner clarified the 2026-10-22 direction: build the Web application once,

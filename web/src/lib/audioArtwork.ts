@@ -152,9 +152,11 @@ function parseFlacArtwork(bytes: Uint8Array, blobSize: number): ArtworkRange | u
       if (!mime) return undefined;
       const descriptionLength = unsigned32(bytes, cursor); if (descriptionLength === undefined) return undefined; cursor += 4 + descriptionLength;
       if (cursor + 20 > blockEnd) return undefined;
-      const width = unsigned32(bytes, cursor); const height = unsigned32(bytes, cursor + 4); cursor += 16;
+      // FLAC permits zero dimensions when the PICTURE header leaves them
+      // unknown. Validate the actual JPEG/PNG dimensions from its image bytes
+      // in imageDimensions() instead of rejecting valid artwork here.
+      cursor += 16;
       const dataLength = unsigned32(bytes, cursor); if (dataLength === undefined) return undefined; cursor += 4;
-      if (!dimensionsWithinLimit(width && height ? { width, height } : undefined)) return undefined;
       if (dataLength > ARTWORK_BYTE_LIMIT || cursor + dataLength > blockEnd) return undefined;
       return { offset: cursor, length: dataLength, mime };
     }

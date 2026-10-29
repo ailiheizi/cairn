@@ -16,6 +16,7 @@ import { useAppearance } from "./app/useAppearance";
 import { useLibraryViews } from "./app/useLibraryViews";
 import { bootstrapAppearance } from "./lib/appearance";
 import { isLibraryViewEnabled, libraryPageForMode, libraryPageRoot } from "./lib/libraryViews";
+import { transitionContentSpace, type ContentSpaceKey } from "./lib/contentSpaceTransition";
 import { useCompactLayout } from "./app/useCompactLayout";
 import { useLibraryDrafts } from "./app/useLibraryDrafts";
 import { useLibrary } from "./app/useLibrary";
@@ -55,6 +56,7 @@ import { MaterialListComposer } from "./components/material/MaterialListComposer
 import type { MaterialListDocument } from "./lib/materialList";
 import "./styles/index.css";
 import "./components/PrivateSpaceShell.css";
+import "./styles/content-space-transition.css";
 import "antd/dist/reset.css";
 import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary, UploadFileRow, ViewMode } from "./lib/types";
 
@@ -884,6 +886,36 @@ function App() {
     }
     if (library.showLibrarySurface(availableMode)) { view.setPresentationMode(availableMode); selection.clearSelection(); completeUserNavigation(); }
   }
+  function contentSpaceKeyForMode(mode: "content" | LibraryPageMode): ContentSpaceKey | undefined {
+    if (mode === "content") return "library";
+    const page = libraryPageForMode(mode);
+    if (page?.id === "cairn:overview") return "home";
+    if (page?.mediaClass === "image") return "photos";
+    if (page?.mediaClass === "audio") return "music";
+    if (page?.mediaClass === "video") return "videos";
+    return undefined;
+  }
+  function currentContentSpaceKey(): ContentSpaceKey | undefined {
+    if (libraryPageForMode(view.viewMode)) return contentSpaceKeyForMode(view.viewMode as LibraryPageMode);
+    if (view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path") return contentSpaceKeyForMode(view.presentationMode);
+    return undefined;
+  }
+  function openLibrarySurfaceAnimated(mode: "content" | LibraryPageMode) {
+    const effectiveMode = isLibraryViewEnabled(mode, libraryViews.enabledViewIds) ? mode : "content";
+    const destination = contentSpaceKeyForMode(effectiveMode);
+    const current = currentContentSpaceKey();
+    if (!destination || !current || destination === current) { openLibrarySurface(mode); return; }
+    const focusedOrigin = document.activeElement instanceof HTMLElement
+      ? document.activeElement.closest<HTMLElement>("[data-content-space-origin]") ?? undefined
+      : undefined;
+    const destinationOrigin = current === "home" && destination !== "home"
+      ? document.querySelector<HTMLElement>(`[data-content-space-origin="${destination}"]`) ?? undefined
+      : undefined;
+    const source = destinationOrigin ?? focusedOrigin ?? document.querySelector<HTMLElement>(`[data-content-space-target="${current}"]`) ?? undefined;
+    const originValue = destinationOrigin?.dataset.contentSpaceOrigin ?? focusedOrigin?.dataset.contentSpaceOrigin;
+    const origin = destination === "home" ? undefined : originValue && ["library", "photos", "music", "videos"].includes(originValue) ? originValue as Exclude<ContentSpaceKey, "home"> : destination;
+    transitionContentSpace(() => openLibrarySurface(mode), source, destination, origin);
+  }
   // The rail has one Library destination; its internal views stay local to the
   // already-loaded set, while a true return from other workspaces reloads it.
   function openLibrary(event: { currentTarget: EventTarget | null }) {
@@ -1151,7 +1183,7 @@ function App() {
       onOpenSettings={(trigger) => openSettings(trigger)}
       header={<TopBar
         t={t}
-        onHome={() => openLibrarySurface(isLibraryViewEnabled("page:cairn:overview", libraryViews.enabledViewIds) ? "page:cairn:overview" : "content")}
+        onHome={() => openLibrarySurfaceAnimated(isLibraryViewEnabled("page:cairn:overview", libraryViews.enabledViewIds) ? "page:cairn:overview" : "content")}
         query={query}
         busy={busy}
         status={status}
@@ -1167,7 +1199,7 @@ function App() {
         destinationHeader
         contentSpace={contentSpace}
         currentDestinationLabel={contentSpaceDestination}
-        presentationNavigation={<LibraryPresentationNavigation t={t} mode={headerDestination} enabledPageIds={libraryViews.enabledViewIds} onNavigate={openLibrarySurface} variant="domains" />}
+        presentationNavigation={<LibraryPresentationNavigation t={t} mode={headerDestination} enabledPageIds={libraryViews.enabledViewIds} onNavigate={openLibrarySurfaceAnimated} variant="domains" />}
         navigation={rail}
         onOpenRail={openRail}
         railTriggerRef={railTriggerRef}
@@ -1212,7 +1244,7 @@ function App() {
           workspaceID={workspaceID}
           viewMode={view.viewMode}
           enabledViews={libraryViews.enabledViewIds}
-          onLibraryView={openLibrarySurface}
+          onLibraryView={openLibrarySurfaceAnimated}
           library={library}
           selection={selection}
           sources={sources}
@@ -1276,6 +1308,7 @@ function App() {
                 contentID: audioPlayback.track.contentID,
                 logicalSize: audioPlayback.track.logicalSize,
                 name: audioPlayback.track.name,
+                artworkURL: audioPlayback.artworkURL,
                 status: audioPlayback.error ? "error"
                   : audioPlayback.loading ? "loading"
                     : audioPlayback.starting ? "starting"

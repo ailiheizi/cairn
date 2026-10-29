@@ -416,21 +416,21 @@ executable UI remains a future design decision, not a shipped F16 subfeature.
 ### F17 · [AIL-61](https://linear.app/ailiheizi/issue/AIL-61) — Watch locally saved video within a clear first boundary
 <a id="f17"></a><a id="r35"></a><a id="r36"></a><a id="r37"></a><a id="r58"></a><a id="r66"></a>
 
-**Baseline:** General save/download exists; a video library/player, seek contract and supported-format promise do not. **Outcome:** Play one supported locally saved video and take out its original.
+**Current local delivery (2026-10-29):** The dedicated Videos destination wraps explicitly verified MP4/WebM originals up to 32 MiB in the bundled ArtPlayer, with loaded-filename search/sort and on-demand Details/download. **Outcome:** Play one supported locally saved video and take out its original.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
-| Save/find/download video original | General content capability usable | Do not call it a video experience. |
-| Dedicated video page/playback | Missing | First choose bounded direct-play formats. |
-| Pause/seek/exit/original takeout journey | Missing | Deliver together if admitted. |
+| Save/find/download video original | Existing content capability; local video takeout demonstrated | Original download matched the independently retained MP4 bytes. |
+| Dedicated video page/playback | Implemented in the bounded client profile | Explicit complete-byte verification; MP4/WebM up to 32 MiB; no streaming/transcoding. |
+| Pause/seek/exit/original takeout journey | Locally demonstrated with one real retained MP4 | Search/sort, pause/seek, filter without losing the player, reveal, same-Blob playback, Details, exact download and Home return. |
 | Episodes/Bangumi/subtitles/chat | Future candidate | Reassess after basic watching. |
 | TV/MV/sync/transcode/auto-download | Out of scope | Prefer external mature tools. |
 
-**Reuse and steps:** Before implementation, resolve authorized immutable reads versus range/seek, budgets, cancellation and resource cleanup. Choose browser-native scope, then reuse host scope/Details/takeout; use clear handoff for unsupported files.
+**Reuse and steps:** Reuse the bounded verified-original hook, bundled player and host scope/Details/takeout; use clear original-only exits for unsupported files. Filename filtering and sorting project the loaded list without replacing the reader scope or player.
 
 **Finished looks like:** Open a supported saved video, play/pause/seek, cancel and return, then verify original; the same journey explains unsupported, unauthorized or damaged content.
 
-**Dependencies:** Separate bounded-video admission. **Scope:** No streaming server, transcoder, downloader or persistent playback progress. **Sources:** [media research](../../research/media-and-anime-experience-20261013.md), [media successor proposal](../../technical/media-experience-successor-proposal.md).
+**Dependencies:** Owner-admitted bounded-video client refinement in the [first-party contract](../../requirements/first-party-client-experiences.md). **Scope:** No streaming server, transcoder, downloader or persistent playback progress. Multi-video next/previous is implemented but not exercised by the one-video demo. **Evidence:** [current delivery plan](2026-10-29-video-viewing-room.md). Historical sources: [media research](../../research/media-and-anime-experience-20261013.md), [media successor proposal](../../technical/media-experience-successor-proposal.md).
 
 ### F18 · [AIL-64](https://linear.app/ailiheizi/issue/AIL-64) — Save research links and materials to resume later
 <a id="f18"></a><a id="r38"></a><a id="r39"></a>

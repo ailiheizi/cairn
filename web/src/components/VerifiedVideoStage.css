@@ -1,0 +1,14 @@
+.verified-video-stage { position: relative; min-width: 0; display: grid; gap: 10px; padding: clamp(12px, 2.5vw, 22px); border: 1px solid var(--sp-line, var(--line)); border-radius: 20px; color: var(--sp-ink, var(--ink)); background: var(--sp-paper, var(--surface)); }
+.verified-video-stage__heading { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.verified-video-stage__heading > div { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.verified-video-stage__heading strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.verified-video-stage__heading svg { flex: 0 0 auto; color: var(--sp-green, var(--accent)); }
+.verified-video-stage__heading > button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; border: 1px solid var(--sp-line, var(--line)); border-radius: 10px; padding: 6px 10px; color: var(--sp-ink, var(--ink)); background: var(--sp-raised, var(--surface-raised)); cursor: pointer; }
+.verified-video-stage__player { display: block; width: 100%; max-height: min(64vh, 720px); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: #101512; }
+.verified-video-stage__player .art-video-player { width: 100%; height: 100%; border-radius: 12px; --art-theme: #8fa786; --art-control-height: 44px; --art-control-icon-size: 34px; --art-control-icon-scale: 1; --art-bottom-height: 78px; }
+.verified-video-stage__player .art-video-player .art-video { object-fit: contain; }
+.verified-video-stage__message, .verified-video-stage__verified { margin: 0; color: var(--sp-muted, var(--muted)); font-size: 12px; line-height: 1.5; }
+.verified-video-stage__message.is-error { color: var(--coral, #b34e41); }
+.verified-video-stage__verified { font-size: 11px; }
+@media (max-width: 600px) { .verified-video-stage__player { min-height: 190px; } .verified-video-stage__player .art-video-player { --art-control-height: 38px; --art-control-icon-size: 30px; } }
+@media (prefers-reduced-motion: reduce) { .verified-video-stage *, .verified-video-stage *::before, .verified-video-stage *::after { scroll-behavior: auto; } }
