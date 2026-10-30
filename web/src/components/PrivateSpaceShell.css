@@ -1,14 +1,19 @@
 body:has(.cairn-content-space) {
-  --sp-ink: light-dark(#24312c, #e9eee7);
-  --sp-muted: light-dark(#637169, #aebbb1);
-  --sp-canvas: light-dark(#f2f3ec, #15231d);
-  --sp-paper: light-dark(#fbfbf6, #222d28);
-  --sp-raised: light-dark(#ffffff, #2a3731);
-  --sp-line: light-dark(#d8ded5, #3a4941);
-  --sp-green: light-dark(#345c4a, #8fb69c);
-  --sp-green-ink: light-dark(#f7f8f1, #17231c);
-  --sp-sand: light-dark(#e8e0ce, #514b3e);
-  --sp-focus: light-dark(#a75e37, #e7a474);
+  --sp-ink: light-dark(#25232c, #f0edf5);
+  --sp-muted: light-dark(#686471, #b3aebd);
+  --sp-canvas: light-dark(#eeedf2, #141419);
+  --sp-paper: light-dark(#faf9fc, #202027);
+  --sp-raised: light-dark(#ffffff, #292932);
+  --sp-line: light-dark(#d6d1df, #3b3745);
+  --sp-primary: light-dark(#7651ae, #c1a5f2);
+  --sp-on-primary: light-dark(#ffffff, #241c2d);
+  --sp-metal: light-dark(#aaa3b6, #716a7e);
+  --sp-shine: light-dark(#ffffff, #c1b9ce);
+  /* Compatibility aliases used by the compiled content surfaces. */
+  --sp-green: var(--sp-primary);
+  --sp-green-ink: var(--sp-on-primary);
+  --sp-sand: light-dark(#ebe3f6, #332b40);
+  --sp-focus: var(--sp-primary);
 
   --ink: var(--sp-ink);
   --ink-muted: var(--sp-muted);
@@ -55,14 +60,14 @@ body:has(.cairn-content-space) {
   z-index: 7;
   width: min(1320px, calc(100% - 2 * clamp(20px, 4vw, 48px)));
   min-height: 0;
-  margin: 22px auto 0;
+  margin: 26px auto 0;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(16px, 3vw, 40px);
   padding: 0 0 22px;
   border: 0;
-  border-bottom: 1px solid var(--sp-line);
+  border-bottom: 1px solid color-mix(in srgb, var(--sp-line) 60%, transparent);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -74,8 +79,8 @@ body:has(.cairn-content-space) {
   min-width: 0;
   gap: 11px;
   color: var(--sp-ink);
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 23px;
+  font-weight: 500;
   letter-spacing: -.03em;
 }
 .topbar--content-space .brand--content-space > .brand-name { display: inline; }
@@ -90,11 +95,11 @@ body:has(.cairn-content-space) {
 .cairn-content-space .brand--content-space .brand-mark {
   width: 30px;
   height: 30px;
-  border: 0;
-  border-radius: 10px 10px 10px 3px;
-  color: var(--sp-green-ink);
-  background: var(--sp-green);
-  box-shadow: none;
+  border: 1px solid var(--sp-shine);
+  border-radius: 42% 56% 45% 47%;
+  color: var(--sp-ink);
+  background: linear-gradient(130deg,var(--sp-shine),var(--sp-metal) 27%,var(--sp-canvas) 60%,var(--sp-primary));
+  box-shadow: inset 0 0 8px color-mix(in srgb,var(--sp-shine) 22%,transparent);
 }
 
 .content-space-search { min-width: 0; }
@@ -181,11 +186,11 @@ body:has(.cairn-content-space) {
 .topbar--content-space .topbar-disclosure > summary::-webkit-details-marker { display: none; }
 .topbar--content-space .topbar-menu-summary { width: 42px; min-width: 42px; padding: 9px; }
 .topbar--content-space .top-actions--focused > .add-button {
-  border-color: var(--sp-green);
-  color: var(--sp-green-ink);
-  background: var(--sp-green);
+  border-color: var(--sp-metal);
+  color: light-dark(#fff,#241c2d);
+  background: linear-gradient(140deg,light-dark(#45374f,#e4dcec),light-dark(#24202d,#bbaecd));
 }
-.topbar--content-space .top-actions--focused > .add-button:hover { background: color-mix(in srgb, var(--sp-green) 88%, var(--sp-ink)); }
+.topbar--content-space .top-actions--focused > .add-button:hover { filter: brightness(1.07); }
 .topbar--content-space .topbar-entry:hover,
 .topbar--content-space .topbar-entry:focus-visible { border-color: var(--sp-green); background: var(--sp-raised); }
 .topbar--content-space .topbar-menu-overlay {

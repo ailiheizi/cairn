@@ -515,6 +515,21 @@ demand; active filters, selections, unavailable facts and partial/error states
 remain understandable and actionable. This changes presentation only: no new
 query, read/cache route, player, durable state, widget or backend operation.
 
+**2026-10-30 floating-result refinement:** The owner approved implementation of
+the private-space floating entry and usable-result prototype. A compiled overlay
+may reuse the existing host search pipeline in a result-only mode without changing
+the background browse scope. An explicit expansion retains the same transient
+draft and results. Existing saved material may be selected into an ordinary ML-1
+list; its spacious result presentation reuses ML-2 playback/takeout and the
+existing ML-3 editor for explicitly reviewed organization. Save uses reviewed
+ordinary capture; reopening a saved list verifies its bytes through existing list
+I/O. Text/files enter existing reviewed intake only on explicit user action.
+This admits no general AI chat execution, automatic original reads, persistent
+conversation store, calendar operation, endpoint or new durable model. Errors,
+partial search coverage and unresolved list members remain visible. One journey
+finds material, expands/adjusts/uses a list, saves it and reopens it from Library,
+while checking draft continuity and the unchanged background browse layout.
+
 **Exit refinement:** One `coherent-content-spaces` journey navigates from Home
 through Photos and its existing viewer, Music and verified playback, Library
 search/selection/Details/takeout access, and back to Home. Confirm one shared

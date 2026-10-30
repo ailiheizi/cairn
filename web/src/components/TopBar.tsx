@@ -31,10 +31,12 @@ import { StatusPanel } from "./StatusPanel";
 // writes, and removing or editing a chip rewrites the text instead of keeping
 // a second copy of the query.
 
-export function TopBar({ t, onHome, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, compact, focused, destinationHeader, contentSpace = false, currentDestinationLabel, presentationNavigation, navigation, onOpenRail, railTriggerRef, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
+export function TopBar({ t, onOpenAssistant, onOpenLibrary, onHome, query, busy, status, statusData, capabilities, isConnected, coreStorageReady, catalogHealthy, snapshotRef, search, compact, focused, destinationHeader, contentSpace = false, currentDestinationLabel, presentationNavigation, navigation, onOpenRail, railTriggerRef, onRefresh, onOpenRestore, onOpenAdd, onOpenSettings, onOpenVerification, onOpenActivity, canLeaveSettings }: {
   t: Translator;
   /** Client-navigation home; keeps playback and drafts alive instead of reloading. */
   onHome?: () => void;
+  onOpenAssistant?: () => void;
+  onOpenLibrary?: () => void;
   query: string;
   busy: boolean;
   status: string;
@@ -264,7 +266,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
       <header className="topbar topbar--content-space" data-header="content-space">
         <a className="brand brand--content-space" href="/" aria-label={t("Cairn home")} onClick={(event) => { if (!canLeaveSettings()) { event.preventDefault(); return; } if (onHome) { event.preventDefault(); onHome(); } }}><span className="brand-mark"><ShieldCheck size={19} /></span><span className="brand-name">Cairn</span></a>
         <span className="content-space-current" aria-current="page">{t(currentDestinationLabel ?? "Library")}</span>
-        <div className="content-space-search">{searchForm}</div>
+        <div className="content-space-search">{onOpenAssistant ? <nav className="space-assistant-topnav" aria-label={t("Space navigation")}><button type="button" onClick={onHome} aria-current={currentDestinationLabel === "Home" ? "page" : undefined}>{t("My space")}</button><button type="button" onClick={onOpenLibrary} aria-current={currentDestinationLabel === "Library" ? "page" : undefined}>{t("Library")}</button></nav> : searchForm}</div>
         <div className="top-actions top-actions--focused">
           <button className="primary-button add-button" aria-label={t("Add content")} title={t("Add content")} onClick={(event) => { closeFocusedOverlays(); onOpenAdd(undefined, event.currentTarget); }} disabled={!isConnected || !coreStorageReady}><Plus size={16} /><span className="topbar-entry-label">{t("Add")}</span></button>
           <details className="topbar-disclosure topbar-menu" ref={menuDisclosureRef} onToggle={handleMenuToggle}>
@@ -275,6 +277,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
                 <summary>{t("MANAGE")}</summary>
                 <div className="topbar-menu-navigation topbar-manage-navigation" onClick={(event) => { if ((event.target as HTMLElement).closest("button, a")) closeMenu(); }}>{navigation}</div>
               </details>}
+              {onOpenAssistant && <details className="space-assistant-advanced-search" onToggle={(event) => { if (event.currentTarget.open) search.focusSearchField(); }}><summary>{t("Advanced Library search")}</summary>{searchForm}{operatorPanel}</details>}
               <div className="topbar-menu-actions">
                 <button className="secondary-button compact" aria-label={t("Restore latest snapshot")} title={t("Restore latest snapshot")} onClick={(event) => { closeMenu(); onOpenRestore(menuCloseTrigger(event.currentTarget)); }} disabled={!snapshotRef || !isConnected || !coreStorageReady}><ArchiveRestore size={16} /><span>{t("Restore")}</span></button>
                 <button className="icon-button" title={t("Refresh service status")} aria-label={t("Refresh service status")} onClick={onRefresh}><RefreshCw size={17} /></button>
@@ -286,7 +289,7 @@ export function TopBar({ t, onHome, query, busy, status, statusData, capabilitie
         </div>
       </header>
       {!isConnected && <div className="topbar-content-space-status">{connection}</div>}
-      {operatorPanel}
+      {!onOpenAssistant && operatorPanel}
     </>;
   }
 

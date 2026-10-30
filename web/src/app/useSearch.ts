@@ -123,7 +123,7 @@ export type SearchFlow = {
   handleSearchFieldCaret: (caret: number) => void;
   handleSearchFieldKeyDown: (event: ReactKeyboardEvent<HTMLFormElement>) => void;
   handleRecentsListKeyDown: (event: ReactKeyboardEvent<HTMLUListElement>) => void;
-  runSearch: (event?: FormEvent, explicitQuery?: string) => Promise<boolean>;
+  runSearch: (event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void) => Promise<boolean>;
   keywordBrowse: KeywordBrowseState | undefined;
   runKeywordBrowseAction: () => Promise<void>;
   canReturnToRanked: boolean;
@@ -686,7 +686,8 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: message });
     }
   }
-  async function runSearch(event?: FormEvent, explicitQuery?: string) {
+  async function runSearch(event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void) {
+    const report = onResults ? (_notice: Notice | undefined) => {} : notify;
     event?.preventDefault();
     if (!canLeaveSettings()) return false;
     const submittedQuery = (explicitQuery ?? query).trim();
@@ -698,22 +699,22 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     if (submitted.errors.length > 0 || submittedPlan.requestError) {
       setSuggestionsDismissed(submittedQuery);
       setActiveSuggestion(-1);
-      notify(undefined);
+      report(undefined);
       focusSearchField();
       return false;
     }
-    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return false; }
-    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return false; }
+    if (!isConnected || !catalogHealthy) { report({ kind: "error", text: catalogStorageMessage }); return false; }
+    if (!workspaceID) { report({ kind: "warning", text: t("Add a source first so there is content to search.") }); return false; }
     if (!drafts.canLeaveDetailDrafts()) return false;
     const projectionAtStart = localProjectionRef.current;
     const unavailableAtStart = unavailableLocalProjections(submittedPlan, workspaceID, projectionAtStart);
     if (unavailableAtStart.length > 0) {
-      notify({ kind: "error", text: localProjectionError(unavailableAtStart) });
+      report({ kind: "error", text: localProjectionError(unavailableAtStart) });
       return false;
     }
-    invalidateKeywordBrowse();
+    if (!onResults) invalidateKeywordBrowse();
     const searchIntent = library.beginSearchIntent(workspaceID);
-    setBusy(true); notify(undefined);
+    setBusy(true); report(undefined);
     try {
       // Leave dimension selection to the typed dispatcher so ordinary search
       // always uses its lexical + structured + semantic default broker. The
@@ -723,7 +724,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
       const changedProjections = changedLocalProjectionNames(submittedPlan, workspaceID, projectionAtStart);
       if (changedProjections.length > 0) {
-        notify({ kind: "error", text: localProjectionError(changedProjections) });
+        report({ kind: "error", text: localProjectionError(changedProjections) });
         return false;
       }
       const loadedItems = library.currentLibraryItems(workspaceID);
@@ -738,6 +739,13 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         identityProjectionAvailable: projectionAtStart.identityCounts.size > 0,
       });
       if (narrowed.unavailable.length > 0) throw new Error(localProjectionError(narrowed.unavailable));
+      // The floating client projects the same broker response without changing
+      // the background query, selection, browse position or presentation.
+      if (onResults) {
+        onResults(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })), response.status === "DEGRADED" ? t("Search results are available, but some search coverage is degraded: {{reason}}", { reason: response.reasons?.map((item) => item.message).filter(Boolean).join("; ") || t("Search degradation reason was not reported.") }) : undefined);
+        markConnected();
+        return true;
+      }
       drafts.discardDetailDrafts();
       library.setJustSavedBatch(false);
       library.setHits(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
@@ -772,13 +780,13 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       if (response.status === "DEGRADED") {
         const reason = response.reasons?.map((item) => item.message?.trim()).filter((message): message is string => Boolean(message)).map((message) => t(message)).join("; ") || t("Search degradation reason was not reported.");
-        notify({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
+        report({ kind: "warning", text: t("Search results are available, but some search coverage is degraded: {{reason}}", { reason }) });
       }
       markConnected();
       return true;
     } catch (error) {
       if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
-      notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") });
+      report({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") });
       return false;
     }
     finally { setBusy(false); }

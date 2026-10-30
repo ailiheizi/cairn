@@ -18,7 +18,7 @@ import { buildMaterialListGuide, createMaterialList, materialListFiles, readMate
 import { sha256ContentID } from "../../lib/originalArchive";
 import "./materialList.css";
 
-export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, initialDocument, busy, organizer, onClose, onSaveFiles }: {
+export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, initialDocument, busy, organizer, onClose, onSaveFiles, onPreviewResult }: {
   t: Translator;
   workspaceID: string;
   subjects: SearchHit[];
@@ -28,6 +28,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   organizer: MaterialOrganizerController;
   onClose: () => void;
   onSaveFiles: (files: File[]) => void;
+  onPreviewResult?: (document: MaterialListDocument) => void;
 }) {
   const selectionKey = JSON.stringify(subjects.map((item) => [item.subject_ref, item.entry_id, item.content_id, item.logical_size]));
   const initialKey = initialDocument ? JSON.stringify(initialDocument) : "";
@@ -425,6 +426,13 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
     });
   }
 
+  function previewResult() {
+    runWithController(async (controller, key) => {
+      const document = await currentDocument();
+      if (operationIsCurrent(controller, key)) onPreviewResult?.(document);
+    });
+  }
+
   function saveFiles() {
     setFeedback("");
     runWithController(async (controller, key) => {
@@ -554,7 +562,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
       {error && <p className="material-list-error" role="alert">{error}</p>}
       {feedback && <p className="material-list-feedback" role="status">{feedback}</p>}
       <p className="material-list-save-note">{t("Saving prepares a list file and Skill file for the existing upload and plan-review flow. It is saved only after that flow confirms the capture.")}</p>
-      <footer className="material-list-actions"><button type="button" className="secondary-button compact" onClick={copyPrompt} disabled={busy || loading || guideLoading || !draft}><Clipboard size={14} />{t("Copy prompt for chosen AI")}</button><button type="button" className="secondary-button compact" onClick={downloadJSON} disabled={busy || loading || guideLoading || !draft}><Download size={14} />{t("Download JSON")}</button><button type="button" className="primary-button compact" onClick={saveFiles} disabled={busy || loading || guideLoading || !draft}><Save size={14} />{t("Review and save files")}</button></footer>
+      <footer className="material-list-actions">{onPreviewResult && <button type="button" className="primary-button compact" onClick={previewResult} disabled={busy || loading || guideLoading || organizerBusy || actionPending || !draft}>{t("Expand and use result")}</button>}<button type="button" className="secondary-button compact" onClick={copyPrompt} disabled={busy || loading || guideLoading || !draft}><Clipboard size={14} />{t("Copy prompt for chosen AI")}</button><button type="button" className="secondary-button compact" onClick={downloadJSON} disabled={busy || loading || guideLoading || !draft}><Download size={14} />{t("Download JSON")}</button><button type="button" className="primary-button compact" onClick={saveFiles} disabled={busy || loading || guideLoading || !draft}><Save size={14} />{t("Review and save files")}</button></footer>
     </>}
     </fieldset>
   </section>;

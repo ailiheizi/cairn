@@ -63,6 +63,42 @@ MCP/CLI/AI-harness integration is a real future direction but is deferred
 until after this convergence phase; do not start that work without a direct
 request.
 
+### Frontend and product priority (owner clarification, 2026-10-30)
+
+The current priority is the local single-owner frontend and everyday product
+experience: preserve the content-led private-space Home and existing
+Photos/Music/Videos/Library destinations, with clear save/find/use flows and
+progressive disclosure. The owner's latest same-day correction rejects replacing
+Home with the chat-like workbench concept: explore a bottom-centered floating AI
+entry that overlays rather than reflows the page, with an explicit expansion into
+a dedicated conversation surface. Preserve draft, material and browse context
+across those sizes. This is frontend concept exploration, not delivered AI chat.
+The owner's subsequent implementation approval admits the bounded floating
+retrieval and ordinary-list result layer described in the first-party client
+contract's 2026-10-30 floating-result refinement. Reuse host search, reviewed
+capture and ML-1/2/3; general AI conversation and calendar operations remain
+outside that bounded implementation. See the dated floating-results plan.
+The owner explicitly moved DeepSeek Harness adoption, runtime-plugin expansion,
+hosted signup/multi-user delivery and commercialization back to future ideas.
+Earlier discussion of those directions is not an instruction to start them.
+The owner's subsequent clarification makes a useful, enjoyable open-source
+project the current product goal. Commercialization is an optional future idea,
+not the assumed destination or a reason to add hosting, accounts or billing now.
+The earlier signup-and-use preference records one possible future direction only.
+The confirmed product framing is an AI personal-content space: help people find
+and use their saved material, let AI work from its content and context, and deliver
+usable results that can themselves be saved and reused. Compose existing material,
+Notes/tags, Skill text and ordinary lists instead of adding a new domain model for
+each scenario. Contextual understanding is a product objective, not a claim of
+infallible inference or a newly delivered general AI capability. Judge priorities
+by useful everyday outcomes and repeated use, not feature count or hypothetical
+commercial requirements. This does not change current implementation admissions.
+See `docs/superpowers/specs/2026-10-30-input-first-private-space.md` for the
+frontend proposal and its distinction between owner decisions and design choices.
+Reuse existing host actions; no new backend, AI executor or storage model is
+admitted by this presentation direction. Existing feature-level delivery and
+testing rules remain unchanged.
+
 ### ML-1 ordinary material-list client admission (2026-10-21)
 
 The owner explicitly requested implementation of the material/Notes/Skill/list

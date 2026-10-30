@@ -52,6 +52,7 @@ import { RestoreDrawer } from "./components/RestoreDrawer";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { VerificationDrawer } from "./components/VerificationDrawer";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { SpaceAssistant, type SpaceAssistantHandle } from "./components/SpaceAssistant";
 import { MaterialListComposer } from "./components/material/MaterialListComposer";
 import type { MaterialListDocument } from "./lib/materialList";
 import "./styles/index.css";
@@ -81,6 +82,7 @@ type MaterialListComposerHostProps = {
   busy: boolean;
   onClose: () => void;
   onSaveFiles: (files: File[]) => void;
+  onPreviewResult?: (document: MaterialListDocument) => void;
 };
 
 function MaterialListComposerHost(props: MaterialListComposerHostProps) {
@@ -116,6 +118,7 @@ function App() {
   const addOpenRef = useRef(addOpen);
   addOpenRef.current = addOpen;
   const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
+  const assistantRef = useRef<SpaceAssistantHandle>(null);
   const [materialListEditor, setMaterialListEditor] = useState<{ workspaceID: string; subjects: SearchHit[]; initialDocument?: MaterialListDocument }>();
   useEffect(() => { setMaterialListEditor(undefined); }, [workspaceID]);
   const pendingPasteFilesRef = useRef(false);
@@ -579,12 +582,12 @@ function App() {
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && !event.altKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        search.focusSearchField();
+        if (assistantRef.current && document.querySelector(".cairn-content-space")) assistantRef.current.focus(); else search.focusSearchField();
         return;
       }
       if (event.key === "/" && !modifier && !event.altKey && !isTextEntryTarget(event.target)) {
         event.preventDefault();
-        search.focusSearchField();
+        if (assistantRef.current && document.querySelector(".cairn-content-space")) assistantRef.current.focus(); else search.focusSearchField();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -634,6 +637,7 @@ function App() {
   }, [drawerOpen, drawerKind, addOpen, materialListEditorOpen, sources.planAction, sources.planCheckBusy]);
 
   async function openLibraryEntry(hit: SearchHit) {
+    if (hit.entry_type === "REGULAR_FILE" && hit.name?.toLowerCase().endsWith(".cairn-list.json")) { assistantRef.current?.openList(hit); return; }
     if (hit.entry_type === "DIRECTORY" && (hit.entry_id || hit.subject_ref) && library.browseRootID) {
       const entryID = hit.entry_id || hit.subject_ref || "";
       const nextCrumbs = [...library.browseCrumbs, { subject_ref: hit.subject_ref || entryID, entry_id: entryID, name: hit.name || "Folder" }];
@@ -650,7 +654,7 @@ function App() {
     if (event.shiftKey) { event.preventDefault(); selection.extendSelectionTo(index); return; }
     const hit = library.renderedHits[index];
     if (!hit) return;
-    void (view.viewMode === "path" ? openLibraryEntry(hit) : details.loadDetails(hit, hit.subject_ref ?? ""));
+    void openLibraryEntry(hit);
   }
   function openSettings(trigger?: EventTarget | null) {
     if (!settings.canLeaveSettings()) return;
@@ -1199,6 +1203,8 @@ function App() {
         destinationHeader
         contentSpace={contentSpace}
         currentDestinationLabel={contentSpaceDestination}
+        onOpenAssistant={() => assistantRef.current?.focus()}
+        onOpenLibrary={() => openLibrarySurfaceAnimated("content")}
         presentationNavigation={<LibraryPresentationNavigation t={t} mode={headerDestination} enabledPageIds={libraryViews.enabledViewIds} onNavigate={openLibrarySurfaceAnimated} variant="domains" />}
         navigation={rail}
         onOpenRail={openRail}
@@ -1283,8 +1289,8 @@ function App() {
           onClearNotice={() => setNotice(undefined)}
           onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
           onVisualTextSearch={(description) => void search.runVisualTextSearch(description)}
-          onOpenHit={(hit) => void details.loadDetails(hit)}
-          onFocusSearch={() => search.focusSearchField()}
+          onOpenHit={(hit) => void openLibraryEntry(hit)}
+          onFocusSearch={() => contentSpace ? assistantRef.current?.focus() : search.focusSearchField()}
           libraryListRef={libraryListRef}
           onPlayTrack={(track) => void audioPlayback.play(track)}
           onQueueTrack={audioPlayback.addToQueue}
@@ -1385,6 +1391,13 @@ function App() {
       onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
       onDrop={handleLibraryFileDrop}
     />
+    <SpaceAssistant key={workspaceID} ref={assistantRef} t={t} workspaceID={workspaceID} active={contentSpace && !settingsOpen}
+      blocked={drawerOpen || settingsOpen} busy={busy} playbackActive={Boolean(audioPlayback.track)}
+      catalogItems={library.libraryItems} selectedItems={selection.selectionSubjects} notice={notice?.text}
+      onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
+      onOpen={(hit) => void details.loadDetails(hit)} onUse={useMaterialList}
+      onOrganize={(document) => openMaterialListEditor([], document)}
+      onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />
     <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => {
       const matchesTrack = (hit: SearchHit | undefined): hit is SearchHit => Boolean(
         track.workspaceID === workspaceID && hit && hit.entry_type === "REGULAR_FILE" && hit.subject_ref?.trim() &&
@@ -1434,6 +1447,7 @@ function App() {
         initialDocument={materialListEditor.initialDocument}
         busy={busy}
         onClose={() => setMaterialListEditor(undefined)}
+        onPreviewResult={(document) => { setMaterialListEditor(undefined); assistantRef.current?.showResult(document); }}
         onSaveFiles={(files) => saveMaterialListFiles(files, materialListEditor.workspaceID)}
       />
     </div>}

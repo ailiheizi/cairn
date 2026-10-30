@@ -10,6 +10,7 @@
 // between partials is a presentation change, not a translation change.
 // `scripts/web-i18n-check.mjs` proves the split kept every key exactly once.
 
+import { spaceAssistant } from "./i18n/spaceAssistant";
 import { appearance } from "./i18n/appearance";
 import { libraryViews } from "./i18n/libraryViews";
 import { activity } from "./i18n/activity";
@@ -75,6 +76,7 @@ export type Locale = "en" | "zh-CN";
 export type Translator = (message: string, values?: Record<string, string | number>) => string;
 
 const chinese: Record<string, string> = {
+  ...spaceAssistant,
   ...playerVerticalPolish,
   ...verticalMedia,
   ...musicVerticalPolish,

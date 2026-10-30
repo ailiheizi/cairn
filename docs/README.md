@@ -6,6 +6,28 @@ Project documentation is written in English.
 
 ## Current direction
 
+**2026-10-30 owner priority:** improve the local frontend and product experience
+first. The latest [private-space and floating-assistant direction](superpowers/specs/2026-10-30-input-first-private-space.md)
+keeps Home focused on content and adds an overlay input with a dedicated expanded
+conversation concept. It supersedes the chat-like workbench Home proposal;
+these concepts do not claim delivered general AI execution. The owner subsequently
+approved the bounded [floating retrieval and usable-list implementation](superpowers/plans/2026-10-30-floating-results.md): real host search without replacing
+the background scope, expandable ordinary-list results, adjustment, existing
+playback/takeout and reviewed save/reopen. Its local journey is recorded in that
+plan; general AI conversation and calendar delivery remain proposals. DeepSeek Harness
+adoption, hosted multi-user signup and commercialization are future ideas,
+not current implementation work. The owner's latest clarification prioritizes
+a useful, enjoyable open-source project; commercialization is optional, not the
+assumed destination. The earlier hosted-product preference is only a possible
+future direction and does not change the current single-owner deployment.
+
+The confirmed user-facing framing is an **AI personal-content space**: make
+saved content easier to find and use, let AI work from its content and context,
+and deliver useful results that can be saved and reused as ordinary material.
+Reuse Notes/tags, Skills and lists rather than adding a separate concept for
+each scenario. This is a product direction, not a claim that general AI
+understanding, automatic updates or arbitrary actions are already delivered.
+
 Cairn is a single-person self-hosted personal-content platform: one operator, one configured repository, and one SQLite catalog. Its trusted kernel protects exact bytes and supports descriptions, discovery, export, verification, and recovery. Organization and first-party Photos, Music, and Overview experiences share that authority. See [Content-First Product Decision](technical/content-first-product-decision.md) for the current user-facing framing.
 
 The latest product direction is to reuse ordinary stored material—including originals, descriptions, Skills, and lists. Lists should be readable by programs; repeated corrections should accumulate in an ordinary document for later organization. The owner has admitted the bounded [ML-1 ordinary-list client](requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots): explicit result snapshots, retained Skill text, manual or external-AI copy/paste organization, and existing reviewed capture/takeout. The [ML-2 successor](requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions) connects saved lists to existing playback and unique-file takeout. Their [client contract](technical/material-list-client-contract.md) defines the bounded workflow. The owner-approved ML-3 successor admits one explicit model candidate over the current draft and Skill; the bounded flow is implemented and locally validated. Persistent current-list heads and automatic refresh remain outside it. The [2026-10-20 research record](research/skill-driven-content-substrate-and-qa-20261020.md) and [broader material/list draft](technical/material-list-and-guidance-draft.md) retain those further goals and gaps.

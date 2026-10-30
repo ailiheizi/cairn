@@ -214,8 +214,8 @@ export function OverviewExperience(props: OverviewExperienceProps) {
   const renderPhoto = () => <article className="private-space-photo" data-content-space-origin="photos">
     {editTools("photos")}
     <div className="private-space-photo-copy">
-      <span className="private-space-kicker">{t("A little space for images")}</span>
-      <h2>{t("Photos")}</h2>
+      <span className="private-space-kicker">{t("Photos")}</span>
+      <h2>{photo?.name?.replace(/\.[^.]+$/, "").split(" — ")[0] || t("Photos")}</h2>
       <p>{t("Follow the light back to a place you remember.")}</p>
       <button type="button" className="private-space-enter" disabled={editing || !photoDestination} onClick={() => photoDestination && onNavigate(photoDestination)}>
         {t("Enter Photos")}<ArrowUpRight aria-hidden="true" />
@@ -241,7 +241,7 @@ export function OverviewExperience(props: OverviewExperienceProps) {
     const playLabel = isPlaying ? t("Pause {{name}}", { name: title }) : currentPlayback?.status === "paused" && isCurrentTrack ? t("Resume {{name}}", { name: title }) : t("Play {{name}}", { name: title });
     return <article className="private-space-music" data-content-space-origin="music">
       {editTools("music")}
-      <div className="private-space-music-top"><span className="private-space-kicker">{t("A little space for sound")}</span>
+      <div className="private-space-music-top"><span className="private-space-kicker">{t("Music")}</span>
         {!editing && (musicDestination ? <button type="button" className="private-space-domain-link" aria-label={t("Enter Music")} onClick={() => onNavigate(musicDestination)}><ArrowUpRight aria-hidden="true" /></button> : <span className="private-space-domain-link is-disabled" aria-hidden="true"><ArrowUpRight /></span>)}
       </div>
       <button type="button" className="private-space-record-wrap" aria-label={musicDestination ? t("Enter Music") : t("Music pages are disabled.")} disabled={editing || !musicDestination} onClick={() => musicDestination && onNavigate(musicDestination)}>
