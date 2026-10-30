@@ -44,6 +44,7 @@ export type LibraryPageHostProps = {
   resultProps: LibraryResultProps;
   onOpenHit: (hit: SearchHit) => void;
   focusedSubjectRef?: string;
+  focusRequest?: number;
   onFocusSubject?: (subjectRef: string) => void;
   photoLoading?: boolean;
   onPlayTrack?: (track: AudioTrack) => void;
@@ -65,14 +66,15 @@ export type LibraryPageHostProps = {
   onFallback?: (mode: ViewMode) => void;
   onOpenPhotoPreview?: (hit: SearchHit, trigger: HTMLElement) => void;
   onShowSelectionActions?: () => void;
-  onNavigate?: (mode: "content" | LibraryPageMode) => void;
+  onNavigate?: (mode: "content" | LibraryPageMode, focusHit?: SearchHit) => void;
 };
 
-function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
+function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
   return <PhotoLibraryExperience
     {...resultProps}
     onOpenHit={onOpenHit}
     focusedSubjectRef={focusedSubjectRef}
+    focusRequest={focusRequest}
     onFocusSubject={onFocusSubject}
     onShowSelectionActions={onShowSelectionActions}
     loading={photoLoading}
@@ -88,9 +90,12 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, onFocusSubjec
   />;
 }
 
-function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
+function renderMusic({ resultProps, focusedSubjectRef, focusRequest, onFocusSubject, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
   return <MusicLibraryExperience
     {...resultProps}
+    focusedSubjectRef={focusedSubjectRef}
+    focusRequest={focusRequest}
+    onFocusSubject={onFocusSubject}
     onPlayTrack={onPlayTrack ?? (() => undefined)}
     onQueueTrack={onQueueTrack ?? (() => undefined)}
     {...(onPlayTracks ? { onPlayTracks } : {})}
@@ -106,11 +111,14 @@ function renderMusic({ resultProps, onPlayTrack, onQueueTrack, onPlayTracks, mus
   />;
 }
 
-function renderVideos({ resultProps, onOpenHit, musicQueueControls }: LibraryPageHostProps) {
+function renderVideos({ resultProps, onOpenHit, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject }: LibraryPageHostProps) {
   return <VideoLibraryExperience
     t={resultProps.t}
     workspaceID={resultProps.workspaceID}
     hits={resultProps.hits}
+    focusedSubjectRef={focusedSubjectRef}
+    focusRequest={focusRequest}
+    onFocusSubject={onFocusSubject}
     onOpenHit={onOpenHit}
     queueControls={musicQueueControls}
   />;

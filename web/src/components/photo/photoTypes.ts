@@ -9,6 +9,7 @@ export type PhotoLibraryExperienceProps = ComponentProps<typeof ResultList> & {
   onOpenHit: (hit: SearchHit) => void;
   /** App-owned focus carried across same-context page presentations. */
   focusedSubjectRef?: string;
+  focusRequest?: number;
   onFocusSubject?: (subjectRef: string) => void;
   onShowSelectionActions?: () => void;
   onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove" | "invert") => void;

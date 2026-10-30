@@ -49,6 +49,9 @@ function restoreSharedName(element: HTMLElement | undefined, previous: string): 
 
 function focusTarget(target: HTMLElement | undefined): void {
   if (!target?.isConnected) return;
+  // A destination may already have revealed and focused an explicit media
+  // target. Finishing its expansion must not move focus back to the heading.
+  if (document.activeElement && target.contains(document.activeElement)) return;
   const focusable = target.matches("button:not([disabled]), [href], [tabindex]")
     ? target
     : target.querySelector<HTMLElement>("button:not([disabled]), [href], [tabindex]") ?? target;

@@ -60,3 +60,43 @@ with no browser exceptions. The final screenshots are local developer artifacts
 `Shuffle selected ({{count}})` duplicate in `musicDaily.ts` and
 `musicExperience.ts`, verified in HEAD. This batch's new keys are unique. No
 unrelated backend or broad regression suite was run; no release gate is closed.
+
+
+## Owner follow-up: quiet input and direct media entry
+
+This same admitted client batch now refines the host-owned focus/navigation flow:
+keep only maximize on the floating header, collapse on outside pointer action
+while retaining draft/results, and move the textarea focus indicator to the
+rounded assistant edge. Home media and ordinary Library/assistant media entry
+open their existing enabled destination with the exact loaded subject as a
+transient focus hint. The target is revealed despite stale local page filters;
+explicit Details and playback actions keep their existing meanings. A search
+result outside the host scope keeps the existing Details fallback rather than
+opening a page that cannot locate it or changing the host query. No new read,
+endpoint, durable state or playback-on-entry is admitted.
+
+Acceptance is one `home-media-entry` journey: focus/type/collapse/reopen/expand the
+same draft, then enter the displayed photo, music and video destinations and
+observe the clicked subject in view without a Details modal or autoplay. Existing
+whole-feature save/takeout evidence above remains applicable.
+
+
+**Implemented evidence (2026-10-30):** `npm run build --prefix web` and the
+selected `home-media-entry` browser journey passed on the existing isolated
+curated-media instance at port 4670. The draft survives outside dismissal and
+maximize/return; the textarea has no inner focus rectangle. Home Photos, Music
+and Videos reveal and focus the exact loaded item without a Details modal or
+autoplay. Selecting a search result while already in Photos/Music also locates
+it, including repeated selection of the same photo; stale Music-local filters
+are reset, and an explicitly focused photo Favorite
+control retains focus. The transition preserves the destination's item focus.
+The browser reported no page exceptions. This refinement writes no catalog or
+media state; earlier list-save and exact-original ZIP evidence is reused.
+
+The out-of-host-scope fallback was also exercised: keep a `credits` Library
+search active, find `Joel` in the floating layer, open its existing Details,
+and retain the `credits` host query. An incorrect driver wait for Library rows
+inside a filtered Videos presentation was removed; only this fallback segment
+was resumed. The preceding Home/media steps had already passed unchanged.
+A read-only Luna diff review found no blocking issue; the coordinator additionally
+bounded media navigation to host-scope members to avoid an absent locate target.

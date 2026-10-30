@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Download, Film, Play, RotateCcw, Search } from "lucide-react";
 import { useClientBrowseValue, useWorkspaceBrowseValue } from "../app/ClientBrowseSession";
 import type { Translator } from "../i18n";
@@ -21,14 +21,20 @@ function canDownloadOriginal(workspaceID: string, hit: SearchHit): boolean {
   return Boolean(workspaceID && hit.entry_id && hit.entry_type === "REGULAR_FILE" && /^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? ""));
 }
 
-export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueControls }: {
+export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueControls, focusedSubjectRef, focusRequest, onFocusSubject }: {
   t: Translator;
   workspaceID: string;
   hits: SearchHit[];
   onOpenHit: (hit: SearchHit) => void;
   queueControls?: MusicQueueControls;
+  focusedSubjectRef?: string;
+  focusRequest?: number;
+  onFocusSubject?: (subjectRef: string) => void;
 }) {
-  const videos = videoHits(hits);
+  const videos = useMemo(() => videoHits(hits), [hits]);
+  const entryRef = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef("");
+  const [locatedSubject, setLocatedSubject] = useState("");
   const [query, setQuery] = useClientBrowseValue("videos", "query", "");
   const [sort, setSort] = useClientBrowseValue<VideoSort>("videos", "sort", "library");
   const [poster] = useWorkspaceBrowseValue<VideoPosterSnapshot | undefined>(VIDEO_POSTER_SESSION_KEY, undefined);
@@ -52,7 +58,21 @@ export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueC
   }, [query, sort, videos]);
 
   const visiblePlayableVideos = useMemo(() => visibleVideos.filter((hit) => Boolean(videoPlaybackAsset(workspaceID, hit))), [visibleVideos, workspaceID]);
-  const idleFeaturedVideo = visibleVideos[0];
+  useEffect(() => {
+    const target = focusedSubjectRef?.trim();
+    if (!target || !videos.some(hit => hit.subject_ref === target)) return;
+    pendingFocus.current = target; setLocatedSubject(target); setQuery("");
+  }, [focusedSubjectRef, focusRequest, videos]);
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    const row = Array.from(entryRef.current?.querySelectorAll<HTMLElement>("[data-subject-ref]") ?? []).find(element => element.dataset.subjectRef === target);
+    if (!row) return;
+    pendingFocus.current = ""; row.scrollIntoView({ block: "nearest", inline: "nearest" });
+    row.querySelector<HTMLElement>("button:not([disabled]),summary")?.focus({ preventScroll: true });
+    onFocusSubject?.("");
+  }, [focusedSubjectRef, focusRequest, visibleVideos, locatedSubject]);
+  const idleFeaturedVideo = visibleVideos.find(hit => hit.subject_ref === locatedSubject) ?? visibleVideos[0];
   const idleFeaturedAsset = idleFeaturedVideo ? videoPlaybackAsset(workspaceID, idleFeaturedVideo) : undefined;
   const matchingIdlePoster = idleFeaturedVideo && poster?.identity === videoPosterIdentity(workspaceID, idleFeaturedVideo) ? poster : undefined;
   const activeIsVisible = Boolean(playback && visibleVideos.some((hit) => videoPlaybackIdentity(workspaceID, hit) === playback.identity));
@@ -77,7 +97,7 @@ export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueC
       {(query || sort !== "library") && <button type="button" className="video-library__reset" onClick={clearView}><RotateCcw size={14} />{t("Reset")}</button>}
     </div>
 
-    <div className="video-library__room">
+    <div ref={entryRef} className="video-library__room">
       <section className="video-library__main" aria-label={t("Video viewing room")}>
         {playback
           ? <VerifiedVideoStage t={t} workspaceID={workspaceID} playback={playback} videoRef={videoRef} onClose={stopPlayback} onPlay={handleVideoPlay} onPlayerReady={startPlayback} onDecodeError={markDecodeError} />
@@ -122,7 +142,7 @@ export function VideoLibraryExperience({ t, workspaceID, hits, onOpenHit, queueC
                 const isActive = playback?.identity === identity;
                 const size = Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) >= 0 ? formatBytes(hit.logical_size!) : t("Size unavailable");
                 const playUnavailableReason = videoPlaybackUnavailableReason(workspaceID, hit, t);
-                return <li className={`video-library__choice${isActive ? " is-active" : ""}`} key={identity}>
+                return <li className={`video-library__choice${isActive ? " is-active" : ""}`} data-subject-ref={hit.subject_ref} data-located={hit.subject_ref === locatedSubject ? "true" : undefined} key={identity}>
                   <div className="video-library__choice-info"><Film size={16} aria-hidden="true" /><div><h3>{videoFileName(hit)}</h3><p>{size} · {formatFacetValue(hit).toUpperCase() || t("Format unavailable")}</p>{playUnavailableReason && <small>{playUnavailableReason}</small>}</div></div>
                   <button type="button" className="video-library__watch" aria-label={t("Verify and play {{name}}", { name: videoFileName(hit) })} disabled={!asset || isActive && playback?.status === "loading"} onClick={() => void preparePlayback(hit)} title={asset ? t("Downloads and verifies the complete original before playback") : playUnavailableReason}>{isActive && playback?.status === "loading" ? <><Play size={14} />{t("Verifying…")}</> : <><Play size={14} />{t("Watch")}</>}</button>
                   <details className="video-library__actions">

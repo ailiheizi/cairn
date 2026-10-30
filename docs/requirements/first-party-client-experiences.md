@@ -529,6 +529,15 @@ conversation store, calendar operation, endpoint or new durable model. Errors,
 partial search coverage and unresolved list members remain visible. One journey
 finds material, expands/adjusts/uses a list, saves it and reopens it from Library,
 while checking draft continuity and the unchanged background browse layout.
+The owner's same-day follow-up keeps one maximize action in the floating header;
+outside pointer dismissal collapses it without clearing material, results or draft.
+Focus feedback belongs to the rounded composer rather than an inner textarea box.
+Ordinary media entry opens the existing enabled domain destination and reveals
+the clicked loaded subject; page-local filters may be cleared to reveal it, while
+the host result scope and batch selection remain unchanged. Explicit Details and
+play controls remain separate actions; entry alone does not start playback.
+A media result outside the current host scope retains the existing Details
+fallback rather than silently changing that scope or implying a successful locate.
 
 **Exit refinement:** One `coherent-content-spaces` journey navigates from Home
 through Photos and its existing viewer, Music and verified playback, Library

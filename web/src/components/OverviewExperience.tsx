@@ -47,7 +47,7 @@ export type OverviewExperienceProps = {
   onToggleSelection: (index: number) => void;
   onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove") => void;
   onOpenHit: (hit: SearchHit) => void;
-  onNavigate: (mode: "content" | LibraryPageMode) => void;
+  onNavigate: (mode: "content" | LibraryPageMode, focusHit?: SearchHit) => void;
   onPlayTrack?: (track: AudioTrack) => void;
   onQueueTrack?: (track: AudioTrack) => void;
   onPlayTracks?: (tracks: AudioTrack[]) => void;
@@ -217,13 +217,13 @@ export function OverviewExperience(props: OverviewExperienceProps) {
       <span className="private-space-kicker">{t("Photos")}</span>
       <h2>{photo?.name?.replace(/\.[^.]+$/, "").split(" — ")[0] || t("Photos")}</h2>
       <p>{t("Follow the light back to a place you remember.")}</p>
-      <button type="button" className="private-space-enter" disabled={editing || !photoDestination} onClick={() => photoDestination && onNavigate(photoDestination)}>
+      <button type="button" className="private-space-enter" disabled={editing || !photoDestination} onClick={() => photoDestination && onNavigate(photoDestination, photo)}>
         {t("Enter Photos")}<ArrowUpRight aria-hidden="true" />
       </button>
       {!photoDestination && <small className="private-space-unavailable">{t("Photos pages are disabled.")}</small>}
     </div>
       {photo && photoDestination
-      ? <button type="button" className="private-space-photo-art" disabled={editing} aria-label={t("Open details for {{name}}", { name: photo.name || t("Untitled subject") })} onClick={() => props.onOpenHit(photo)}>{props.renderThumbnail(photo)}<span className="private-space-photo-caption">{photo.name?.trim() || t("Untitled subject")}</span></button>
+      ? <button type="button" className="private-space-photo-art" data-subject-ref={photo.subject_ref} disabled={editing} aria-label={t("Enter Photos at {{name}}", { name: photo.name || t("Untitled subject") })} onClick={() => photoDestination && onNavigate(photoDestination, photo)}>{props.renderThumbnail(photo)}<span className="private-space-photo-caption">{photo.name?.trim() || t("Untitled subject")}</span></button>
       : photo ? <div className="private-space-photo-empty" role="status">{t("Photos pages are disabled.")}</div>
       : <div className="private-space-photo-empty" role="status">{t("No supported photos in this scope")}</div>}
   </article>;
@@ -242,15 +242,15 @@ export function OverviewExperience(props: OverviewExperienceProps) {
     return <article className="private-space-music" data-content-space-origin="music">
       {editTools("music")}
       <div className="private-space-music-top"><span className="private-space-kicker">{t("Music")}</span>
-        {!editing && (musicDestination ? <button type="button" className="private-space-domain-link" aria-label={t("Enter Music")} onClick={() => onNavigate(musicDestination)}><ArrowUpRight aria-hidden="true" /></button> : <span className="private-space-domain-link is-disabled" aria-hidden="true"><ArrowUpRight /></span>)}
+        {!editing && (musicDestination ? <button type="button" className="private-space-domain-link" aria-label={t("Enter Music")} onClick={() => onNavigate(musicDestination, item?.hit)}><ArrowUpRight aria-hidden="true" /></button> : <span className="private-space-domain-link is-disabled" aria-hidden="true"><ArrowUpRight /></span>)}
       </div>
-      <button type="button" className="private-space-record-wrap" aria-label={musicDestination ? t("Enter Music") : t("Music pages are disabled.")} disabled={editing || !musicDestination} onClick={() => musicDestination && onNavigate(musicDestination)}>
+      <button type="button" className="private-space-record-wrap" aria-label={musicDestination ? t("Enter Music") : t("Music pages are disabled.")} disabled={editing || !musicDestination} onClick={() => musicDestination && onNavigate(musicDestination, item?.hit)}>
         <span className={`private-space-record${isCurrentTrack && currentPlayback?.artworkURL ? " has-art" : ""}`} aria-hidden="true">
           {isCurrentTrack && currentPlayback?.artworkURL && <img className="private-space-record-art" src={currentPlayback.artworkURL} alt="" />}
         </span>
       </button>
       {item ? <div className="private-space-track">
-        <button type="button" className="private-space-track-title" disabled={editing} onClick={() => props.onOpenHit(item.hit)}><strong title={title}>{title}</strong>{byline && <span title={byline}>{byline}</span>}</button>
+        <button type="button" className="private-space-track-title" data-subject-ref={item.hit.subject_ref} disabled={editing || !musicDestination} onClick={() => musicDestination && onNavigate(musicDestination, item.hit)}><strong title={title}>{title}</strong>{byline && <span title={byline}>{byline}</span>}</button>
         <button type="button" className="private-space-play" disabled={editing || !musicDestination || !track || (!onPlayTrack && !canToggle) || isPending || (isCurrentTrack && !canToggle && (currentPlayback?.status === "playing" || currentPlayback?.status === "paused"))} aria-label={playLabel} title={playLabel} onClick={() => {
           if (canToggle) queueControls?.toggleCurrentPlayback?.();
           else if (track) onPlayTrack?.(track);
@@ -266,7 +266,7 @@ export function OverviewExperience(props: OverviewExperienceProps) {
     const name = homeVideo?.name?.trim() || homeVideo?.path?.split(/[\\/]/).at(-1) || t("No videos in this scope");
     return <div className="private-space-video-entry-wrap" data-content-space-origin="videos">
       {editTools("videos")}
-      <button type="button" className="private-space-video-entry" disabled={editing || !videoDestination} aria-label={videoDestination ? t("Enter video: {{name}}", { name }) : t("Videos pages are disabled.")} title={!videoDestination ? t("Videos pages are disabled.") : name} onClick={() => videoDestination && onNavigate(videoDestination)}>
+      <button type="button" className="private-space-video-entry" data-subject-ref={homeVideo?.subject_ref} disabled={editing || !videoDestination} aria-label={videoDestination ? t("Enter video: {{name}}", { name }) : t("Videos pages are disabled.")} title={!videoDestination ? t("Videos pages are disabled.") : name} onClick={() => videoDestination && onNavigate(videoDestination, homeVideo)}>
         {matchingVideoPoster
           ? <img className="private-space-video-poster" src={matchingVideoPoster.dataURL} alt="" />
           : <span className="private-space-video-placeholder" aria-hidden="true"><Film /></span>}

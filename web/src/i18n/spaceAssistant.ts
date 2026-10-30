@@ -1,4 +1,5 @@
 export const spaceAssistant: Record<string, string> = {
+  "Enter Photos at {{name}}": "进入照片并定位到 {{name}}",
   "Space navigation": "空间导航",
   "My space": "我的空间",
   "Play this list": "播放全部",

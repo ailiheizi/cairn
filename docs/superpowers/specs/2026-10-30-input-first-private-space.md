@@ -29,6 +29,11 @@ turn the broader conversation or calendar examples into delivered capabilities.
   tenancy and billing design are not part of the current work.
 - Preserve simplicity and reveal controls when needed. Existing specialist
   surfaces should remain comfortable to enter and return from.
+- The same-day interaction correction keeps only maximize in the floating
+  header and collapses it on an outside click while preserving the draft.
+  The input uses a quiet outer focus edge. Clicking a media entry enters its
+  specialist page and locates the displayed item; metadata/Details and explicit
+  playback remain separate actions.
 - The owner initially preferred the third metallic concept, **Expanded Workbench**,
   but rejected the subsequent interaction mock because the whole product felt too
   much like a generic chat application. Its use as the Home baseline is withdrawn.

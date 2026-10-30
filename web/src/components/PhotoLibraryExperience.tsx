@@ -44,7 +44,7 @@ const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_AXIS_RATIO = 1.6;
 
 export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
-  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, imageSearchBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
+  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, focusRequest = 0, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, imageSearchBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
   const photoTagStatus = favoriteControls?.status ?? "unavailable";
   const [format, setFormat] = useClientBrowseValue("photos", "format", "all");
   const [photoSortValue, setPhotoSort] = useClientBrowseValue<"library" | "filename" | "size" | "modified">("photos", "sort", "library");
@@ -70,7 +70,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   const viewerFullscreenOwnerRef = useRef<HTMLElement | null>(null);
   const [viewerFullscreen, setViewerFullscreen] = useState(false);
   const [viewerFullscreenMessage, setViewerFullscreenMessage] = useState("");
-  const lastHostFocus = useRef("");
+  const lastHostFocus = useRef({ subjectRef: "", request: -1 });
   const swipeRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null);
   const swipeListenersRef = useRef<(() => void) | null>(null);
   const swipeHandledClick = useRef(false);
@@ -373,10 +373,14 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
 
   useEffect(() => {
     const subjectRef = focusedSubjectRef?.trim();
-    if (!subjectRef || subjectRef === lastHostFocus.current) return;
-    lastHostFocus.current = subjectRef;
+    if (!subjectRef || (subjectRef === lastHostFocus.current.subjectRef && focusRequest === lastHostFocus.current.request)) return;
+    if (!items.some(item => item.hit.subject_ref === subjectRef)) return;
+    lastHostFocus.current = { subjectRef, request: focusRequest };
+    const activeCard = document.activeElement instanceof Element ? document.activeElement.closest("[data-subject-ref]") : null;
+    if (activeCard?.getAttribute("data-subject-ref") === subjectRef) { pendingFocusRef.current = ""; return; }
+    if (!visibleItems.some(item => item.hit.subject_ref === subjectRef)) clearPhotoFilters();
     pendingFocusRef.current = subjectRef;
-  }, [focusedSubjectRef]);
+  }, [focusedSubjectRef, focusRequest, items]);
 
   // Focus follows the App-owned subject once its card is mounted. A subject
   // outside the window is revealed first, so a focus carried across
@@ -391,6 +395,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     if (!subjectRef && originalIndex == null) return;
     const position = visibleItems.findIndex((item) => subjectRef ? item.hit.subject_ref === subjectRef : item.index === originalIndex);
     if (position < 0) {
+      if (subjectRef === focusedSubjectRef && hasLocalPhotoFilters && items.some(item => item.hit.subject_ref === subjectRef)) return;
       pendingFocusRef.current = "";
       pendingReturnIndexRef.current = null;
       searchInputRef.current?.focus();
@@ -412,7 +417,8 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     pendingFocusRef.current = "";
     pendingReturnIndexRef.current = null;
     target.focus({ preventScroll: true });
-  }, [libraryListRef, mountedItems, viewerIndex, visibleItems, wall.endIndex, wall.measured, wall.revealIndex, wall.startIndex]);
+    card?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [focusedSubjectRef, focusRequest, libraryListRef, mountedItems, viewerIndex, visibleItems, wall.endIndex, wall.measured, wall.revealIndex, wall.startIndex]);
 
   // Local keyboard moves target positions in the filtered/sorted photo wall,
   // while each card keeps its original host index for shared actions. A target

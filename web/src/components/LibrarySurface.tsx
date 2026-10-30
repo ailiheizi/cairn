@@ -32,12 +32,12 @@ import "./LibraryWorkflow.css";
 // Every control here changes a browser projection or opens a drawer; none of
 // them writes durable state directly.
 
-export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, onFocusSubject, retrievalFlow }: {
+export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject, retrievalFlow }: {
   t: Translator;
   locale: Locale;
   workspaceID: string;
   viewMode: ViewMode;
-  onLibraryView: (mode: "content" | LibraryPageMode) => void;
+  onLibraryView: (mode: "content" | LibraryPageMode, focusHit?: SearchHit) => void;
   /** Browser-local visibility choices for bundled photo/audio library views. */
   enabledViews?: ReadonlySet<LibraryViewId>;
   library: LibraryFlow;
@@ -91,6 +91,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   favoriteControls?: FavoriteControls;
   musicQueueControls?: MusicQueueControls;
   focusedSubjectRef: string;
+  focusRequest?: number;
   onFocusSubject: (subjectRef: string) => void;
   retrievalFlow: ExportFlow;
 }) {
@@ -507,7 +508,7 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
       </details>}
       {isMediaView ? <LibraryPageHost
         mode={presentationMode} enabledPageIds={enabledViews} resultProps={resultProps}
-        onOpenHit={onOpenHit} focusedSubjectRef={focusedSubjectRef} onFocusSubject={onFocusSubject}
+        onOpenHit={onOpenHit} focusedSubjectRef={focusedSubjectRef} focusRequest={focusRequest} onFocusSubject={onFocusSubject}
         onPlayTrack={onPlayTrack} onQueueTrack={onQueueTrack} onPlayTracks={onPlayTracks}
         musicMetadata={musicMetadata} favoriteControls={favoriteControls} musicQueueControls={musicQueueControls} photoLoading={!library.libraryLoaded}
         onShowSelectionActions={showSelectionActions}

@@ -15,7 +15,7 @@ import { captureActiveBrowsePosition, markActiveBrowsePositionPending, ClientBro
 import { useAppearance } from "./app/useAppearance";
 import { useLibraryViews } from "./app/useLibraryViews";
 import { bootstrapAppearance } from "./lib/appearance";
-import { isLibraryViewEnabled, libraryPageForMode, libraryPageRoot } from "./lib/libraryViews";
+import { enabledLibraryPageGroups, isLibraryViewEnabled, libraryPageForMode, libraryPageRoot } from "./lib/libraryViews";
 import { transitionContentSpace, type ContentSpaceKey } from "./lib/contentSpaceTransition";
 import { useCompactLayout } from "./app/useCompactLayout";
 import { useLibraryDrafts } from "./app/useLibraryDrafts";
@@ -31,6 +31,7 @@ import { useMusicMetadata } from "./app/useMusicMetadata";
 import { useFavorites } from "./app/useFavorites";
 import { useOriginalTakeout } from "./app/useOriginalTakeout";
 import { useMaterialOrganizer } from "./app/useMaterialOrganizer";
+import { formatFacetValue, mediaClassFromSuffix } from "./lib/format";
 import { resolveArchiveSelectionSizes } from "./lib/originalArchive";
 import { projectMaterialListActions, type MaterialListAction } from "./lib/materialListActions";
 import { downloadOriginal } from "./lib/contentDownload";
@@ -113,6 +114,8 @@ function App() {
   const [selected, setSelected] = useState<SearchHit>();
   // A page's browsing focus is separate from Details and batch selection.
   const [focusedSubjectRef, setFocusedSubjectRef] = useState("");
+  // Reopening the same subject is still a new navigation/focus request.
+  const [mediaFocusRequest, setMediaFocusRequest] = useState(0);
   useEffect(() => { setFocusedSubjectRef(""); }, [workspaceID]);
   const [addOpen, setAddOpen] = useState(false);
   const addOpenRef = useRef(addOpen);
@@ -638,6 +641,17 @@ function App() {
 
   async function openLibraryEntry(hit: SearchHit) {
     if (hit.entry_type === "REGULAR_FILE" && hit.name?.toLowerCase().endsWith(".cairn-list.json")) { assistantRef.current?.openList(hit); return; }
+    if (hit.entry_type === "REGULAR_FILE") {
+      const mediaClass = mediaClassFromSuffix(formatFacetValue(hit));
+      const group = enabledLibraryPageGroups(libraryViews.enabledViewIds).find(candidate => candidate.root.navigationKind !== "layout" && candidate.root.mediaClass === mediaClass);
+      const destination = group?.presentations.find(page => page.id === group.root.id)?.mode ?? group?.presentations[0]?.mode;
+      // A floating result can be outside the background host scope. Keep its
+      // existing Details fallback rather than navigating to an absent row or
+      // silently replacing the owner's query and filters.
+      if (mediaClass && destination && hit.subject_ref && library.scopeHits.some(item => item.subject_ref === hit.subject_ref)) {
+        openLibrarySurfaceAnimated(destination, hit); return;
+      }
+    }
     if (hit.entry_type === "DIRECTORY" && (hit.entry_id || hit.subject_ref) && library.browseRootID) {
       const entryID = hit.entry_id || hit.subject_ref || "";
       const nextCrumbs = [...library.browseCrumbs, { subject_ref: hit.subject_ref || entryID, entry_id: entryID, name: hit.name || "Folder" }];
@@ -904,11 +918,16 @@ function App() {
     if (view.viewMode === "content" || view.viewMode === "search" || view.viewMode === "tag" || view.viewMode === "path") return contentSpaceKeyForMode(view.presentationMode);
     return undefined;
   }
-  function openLibrarySurfaceAnimated(mode: "content" | LibraryPageMode) {
+  function openLibrarySurfaceAnimated(mode: "content" | LibraryPageMode, focusHit?: SearchHit) {
+    if (focusHit && (!settings.canLeaveSettings() || !drafts.canLeaveDetailDrafts())) return;
+    const navigate = () => {
+      if (focusHit) { drafts.discardDetailDrafts(); setSelected(undefined); setFocusedSubjectRef(focusHit.subject_ref?.trim() || ""); setMediaFocusRequest(request => request + 1); }
+      openLibrarySurface(mode);
+    };
     const effectiveMode = isLibraryViewEnabled(mode, libraryViews.enabledViewIds) ? mode : "content";
     const destination = contentSpaceKeyForMode(effectiveMode);
     const current = currentContentSpaceKey();
-    if (!destination || !current || destination === current) { openLibrarySurface(mode); return; }
+    if (!destination || !current || destination === current) { navigate(); return; }
     const focusedOrigin = document.activeElement instanceof HTMLElement
       ? document.activeElement.closest<HTMLElement>("[data-content-space-origin]") ?? undefined
       : undefined;
@@ -918,7 +937,7 @@ function App() {
     const source = destinationOrigin ?? focusedOrigin ?? document.querySelector<HTMLElement>(`[data-content-space-target="${current}"]`) ?? undefined;
     const originValue = destinationOrigin?.dataset.contentSpaceOrigin ?? focusedOrigin?.dataset.contentSpaceOrigin;
     const origin = destination === "home" ? undefined : originValue && ["library", "photos", "music", "videos"].includes(originValue) ? originValue as Exclude<ContentSpaceKey, "home"> : destination;
-    transitionContentSpace(() => openLibrarySurface(mode), source, destination, origin);
+    transitionContentSpace(navigate, source, destination, origin);
   }
   // The rail has one Library destination; its internal views stay local to the
   // already-loaded set, while a true return from other workspaces reloads it.
@@ -1289,7 +1308,7 @@ function App() {
           onClearNotice={() => setNotice(undefined)}
           onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
           onVisualTextSearch={(description) => void search.runVisualTextSearch(description)}
-          onOpenHit={(hit) => void openLibraryEntry(hit)}
+          onOpenHit={(hit) => void details.loadDetails(hit)}
           onFocusSearch={() => contentSpace ? assistantRef.current?.focus() : search.focusSearchField()}
           libraryListRef={libraryListRef}
           onPlayTrack={(track) => void audioPlayback.play(track)}
@@ -1328,6 +1347,7 @@ function App() {
             },
           }}
           focusedSubjectRef={focusedSubjectRef}
+          focusRequest={mediaFocusRequest}
           onFocusSubject={setFocusedSubjectRef}
           retrievalFlow={exportFlow}
         />}
@@ -1395,7 +1415,7 @@ function App() {
       blocked={drawerOpen || settingsOpen} busy={busy} playbackActive={Boolean(audioPlayback.track)}
       catalogItems={library.libraryItems} selectedItems={selection.selectionSubjects} notice={notice?.text}
       onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
-      onOpen={(hit) => void details.loadDetails(hit)} onUse={useMaterialList}
+      onOpen={(hit) => void openLibraryEntry(hit)} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />
     <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => {

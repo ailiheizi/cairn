@@ -71,3 +71,4 @@
   .video-library__transport > span { flex: 1 0 100%; order: -1; }
   .video-library__hidden-current { align-items: flex-start; flex-direction: column; }
 }
+.video-library__choice[data-located="true"]{border-color:var(--primary);background:var(--primary-soft)}

@@ -310,3 +310,4 @@
   .music-scope-actions__menu { left: 0; right: auto; width: min(22rem, calc(100vw - 2rem)); min-width: 0; }
   .music-scope-actions__menu button { min-height: 2.75rem; }
 }
+.music-track[data-located="true"]{background:var(--primary-soft);box-shadow:inset 2px 0 var(--primary);border-radius:10px}

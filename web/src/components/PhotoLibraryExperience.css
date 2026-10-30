@@ -279,3 +279,4 @@
   .photo-library__search-hint { grid-column: 2; }
   .photo-library__search-panel:not(:has(.photo-library__search-scopes)) .photo-library__search-row { grid-column: 1 / -1; }
 }
+.photo-card:focus-within{box-shadow:0 0 0 1px color-mix(in srgb,var(--primary) 55%,transparent)}

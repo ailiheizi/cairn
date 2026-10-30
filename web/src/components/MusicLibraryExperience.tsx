@@ -122,6 +122,30 @@ export function MusicLibraryExperience(props: Props) {
   };
   const trackRows = useMemo(() => sortedRows.filter(matchesAvailability), [eligibilityFilter, sortedRows, workspaceID]);
   const artistTrackRows = useMemo(() => selectedArtistRows.filter(matchesAvailability), [eligibilityFilter, selectedArtistRows, workspaceID]);
+  const pendingEntryFocus = useRef("");
+  const [locatedSubject, setLocatedSubject] = useState("");
+  useEffect(() => {
+    const target = props.focusedSubjectRef?.trim();
+    if (!target || !hits.some(hit => hit.subject_ref === target)) return;
+    pendingEntryFocus.current = target;
+    setLocatedSubject(target);
+    setMode("tracks"); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined);
+    setArtistTracksView(false); setQuery(""); setEligibilityFilter("all");
+    setFormatFilter("all"); setSelectedTagFilters([]); setYearFilter("all"); setOnlySelectedTracks(false);
+  }, [props.focusedSubjectRef, props.focusRequest, hits]);
+  useEffect(() => {
+    const target = pendingEntryFocus.current;
+    if (!target || mode !== "tracks" || selectedGroup || selectedArtistAlbum || artistTracksView || query || eligibilityFilter !== "all" || formatFilter !== "all" || selectedTagFilters.length || yearFilter !== "all" || onlySelectedTracks) return;
+    const row = Array.from(props.libraryListRef.current?.querySelectorAll<HTMLElement>(".music-track[data-subject-ref]") ?? []).find(element => element.dataset.subjectRef === target);
+    if (!row) return;
+    const control = row.querySelector<HTMLButtonElement>(".music-track-main");
+    if (!control) return;
+    pendingEntryFocus.current = "";
+    setFocusedIndex(Number(row.dataset.resultIndex));
+    row.scrollIntoView({ block: "nearest", inline: "nearest" });
+    control.focus({ preventScroll: true });
+    props.onFocusSubject?.("");
+  }, [props.focusedSubjectRef, props.focusRequest, trackRows, mode, selectedGroup, selectedArtistAlbum, artistTracksView, props.libraryListRef]);
   const rangeSelectionScope = useMemo(() => JSON.stringify([workspaceID ?? "", mode, selectedGroup ?? "", selectedArtistAlbum ?? "", artistTracksView, query, sortField, sortDirection, eligibilityFilter, selectedTagFilters, onlySelectedTracks, formatFilter, yearFilter, trackRows.map(musicRowSelectionKey)]), [artistTracksView, eligibilityFilter, formatFilter, mode, onlySelectedTracks, query, selectedArtistAlbum, selectedGroup, selectedTagFilters, sortDirection, sortField, trackRows, workspaceID, yearFilter]);
   const rangeAnchor = useRef<{ scope: string; rowKey: string } | undefined>(undefined);
   const selectionEmpty = props.selectionRefs.length === 0;
@@ -516,7 +540,7 @@ export function MusicLibraryExperience(props: Props) {
       <GroupList groups={artistAlbumGroups} listRef={groupListRef} registerOpenButton={groupOpenButtons.current} countLabel={t("tracks")} t={t} workspaceID={workspaceID} queueControls={props.queueControls} onSelectSubjects={props.onSelectSubjects} onDownloadOriginals={props.onDownloadOriginals} originalTakeoutBusy={props.originalTakeoutBusy} selectionRefs={selectedRefs} onSelect={(key, label) => enterArtistAlbum(key, label)} onPlay={props.onPlayTracks ? (tracks) => props.onPlayTracks?.(tracks) : undefined} />
       {!groupFactsPending && <button ref={artistTracksButtonRef} className="music-artist-all-tracks" type="button" onClick={showArtistTracks}>{t("All tracks by {{artist}} ({{count}})", { artist: selectedArtistLabel, count: artistTrackRows.length })}</button>}
     </div> : showingTrackRows && trackRows.length ? <div ref={props.libraryListRef} className="music-track-list result-list list-mode" role="group" aria-label={t("Library results")} aria-description={t("Use the arrow keys to move through visible tracks; Space selects and Enter opens the focused track. Shift+Space selects the visible range.")} data-selection-count={props.selectionCount} onKeyDown={handleListKeyDown} onFocusCapture={(event) => { const index = Number((event.target as HTMLElement).closest(".music-track")?.getAttribute("data-result-index")); if (Number.isSafeInteger(index)) setFocusedIndex(index); }}>
-      {trackRows.map((row) => <TrackRow key={row.hit.subject_ref || row.hit.entry_id || row.hit.name} row={row} props={props} facts={row.facts} open={open} tabIndex={row.index === rovingIndex ? 0 : -1} onEnterGroup={enterGroup} onToggleSelection={(index) => { props.onToggleSelection(index); establishRangeAnchor(row); }} onRangeSelect={() => selectVisibleRange(row)} />)}
+      {trackRows.map((row) => <TrackRow key={row.hit.subject_ref || row.hit.entry_id || row.hit.name} row={row} props={{ ...props, focusedSubjectRef: locatedSubject }} facts={row.facts} open={open} tabIndex={row.index === rovingIndex ? 0 : -1} onEnterGroup={enterGroup} onToggleSelection={(index) => { props.onToggleSelection(index); establishRangeAnchor(row); }} onRangeSelect={() => selectVisibleRange(row)} />)}
     </div> : groupFactsPending ? null : selectedGroup ? <div className="music-empty"><Music2 /><h2>{t("No tracks match this group in the current view")}</h2><p>{eligibilityFilter !== "all" ? t("Clear the playback availability filter to see all tracks in this group.") : yearFilter !== "all" ? t("Clear the recorded-year filter to see other tracks in this group.") : t("This group has no matching tracks in the current loaded view.")}</p></div> : <div className="music-empty"><Music2 /><h2>{t(onlySelectedTracks ? "No selected tracks match these filters" : selectedTagFilters.length ? "No tracks match the selected tags" : formatFilter !== "all" ? "No tracks match this filename suffix filter" : yearFilter !== "all" ? "No tracks match the recorded-year filter" : query.trim() ? "No tracks match this search" : eligibilityFilter !== "all" ? "No tracks in this availability filter" : "No audio tracks in the loaded listing")}</h2><p>{t("Track names come from original filenames. Metadata and artwork are shown only when real facts are available.")}</p></div>}
     <details className="music-playback-limits"><summary>{t("Playback and format details")}</summary><p>{t("Playback downloads and verifies the complete original first. It supports common browser audio formats up to 32 MiB; seeking starts after verification. Larger or unavailable files can still be downloaded from Details.")}</p></details>
   </section>;
