@@ -3,8 +3,8 @@
 [中文](README.md) · [English](README.en.md)
 
 <p align="center">
-  <strong>Keep your content safe, find it, use it, and take the originals with you.</strong><br>
-  A private content space for NAS and self-hosting enthusiasts.
+  <strong>Find what you saved. Put it to use. Keep the useful results.</strong><br>
+  A self-hosted AI personal-content space.
 </p>
 
 <p align="center">
@@ -23,12 +23,24 @@
 
 | | Cairn helps you |
 |---|---|
-| **Save** | Review files and explicitly save originals; exact duplicates are identified by full-content SHA-256 and logical length. |
-| **Find** | Search keywords, structured fields, tags, and Notes. Prepare the local BGE model explicitly to enable semantic search. |
-| **Use** | Revisit photos, listen to music, and watch videos in dedicated experiences, with originals kept in the same library. |
+| **Save** | Files, folders and text share one review/save flow. Reopen a review or explicitly retry a stopped upload. Exact duplicates use full-content SHA-256 and logical length. |
+| **Find** | Use the floating input to search keywords, fields, tags and Notes. Explicitly prepared local models add meaning and photo-scene retrieval; match evidence opens on demand. |
+| **Use** | Open a media result in its dedicated Photos, Music or Videos page and locate the item. Playback, takeout and saved results share the same material. |
 | **Originals** | Download originals or use the existing export flow to materialize and verify files; original bytes can be verified on restore. |
 | **Make it yours** | Choose the built-in Workspace or Content showcase interface. Home lets you change existing block visibility and the order and split of Photos/Music. See the [compiled client contribution guide](docs/technical/client-experience-extension-guide.md). |
 | **Lists** | Save ordinary JSON material lists with Notes and Skill context; request and review an organization candidate, then save through the existing flow. |
+
+### From finding to using
+
+1. **Save something:** drop files, choose a folder or write text. Review and explicitly confirm, then open the exact saved batch.
+2. **Give a clue:** the floating input returns related material while keeping your space in place. Expand match evidence when needed; explicitly open an outside-scope media result in this search's dedicated page.
+3. **Use and keep the result:** open, play or take out originals, or arrange selected material as an ordinary list. Review/save it and reopen it later.
+
+<p align="center">
+  <img src="docs/assets/screenshots/current/search-zh.jpg" alt="Floating scene-description search over the private-space Home" width="49%">
+  <img src="docs/assets/screenshots/current/result-zh.jpg" alt="An ordinary list result ready to adjust, play, save and reuse" width="49%">
+</p>
+<p align="center"><sub>Queries and evidence disclosure retain the background page; explicit result activation performs the scope handoff. Lists remain ordinary saved material.</sub></p>
 
 ### Dedicated experiences
 
@@ -47,7 +59,7 @@ Photos supports continuous viewing and timed slideshows. Music has track browsin
 
 ### Notes, search, and lists
 
-Names, source paths, available file facts, user tags, and Notes help you find content. PDF/DOCX body search uses extraction compiled into the application. Semantic search requires an explicitly prepared local BGE bundle; image OCR and photo scene search also require their own explicitly prepared local processing bundle or model. They are not downloaded on the first query. Lists can be read by programs; the existing Reader can play supported audio or take out the list's unique original files.
+Names, source paths, available file facts, user tags, and Notes help you find content. PDF/DOCX body search uses extraction compiled into the application. Semantic search requires an explicitly prepared local BGE bundle; image OCR and photo scene search also require their own explicitly prepared local processing bundle or model. They are not downloaded on the first query. Programs can read lists directly. Reopen them in the result page to play supported audio or take out unique originals. In-product AI organization sends an explicitly chosen list and Skill, returns a candidate, and waits for acceptance and reviewed saving.
 
 See the [material-list guide](docs/wiki/material-lists.md) and [detailed capability reference](docs/wiki/capability-reference.md).
 

@@ -2,7 +2,7 @@
 
 > Current entry point for the informative client progress ledger. This page is navigation, not a new plan or a normative status source. The Core MVP Execution Plan remains the only implementation order.
 
-## Current direction — synchronized with Linear, 2026-10-30
+## Current direction — synchronized with Linear, 2026-10-31
 
 Cairn is an **AI personal-content space**: find and use saved content more
 easily, retain its source/context, and keep useful results as ordinary material
@@ -26,14 +26,16 @@ and the result the user receives. Core phase order remains unchanged.
 | --- | --- | --- |
 | Latest locally delivered baseline | F02 / [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) | Home content, floating input, expanded result and specialist-page entry feel continuous; draft/results survive returns; metadata stays on demand |
 | Latest locally delivered save-to-use | F01 / [AIL-38](https://linear.app/ailiheizi/issue/AIL-38) | Save files/text, understand progress and cancellation, continue review, then find and use the saved material |
-| Next whole feature | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
+| Latest locally delivered retrieval handoff | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
 At most one whole feature enters implementation. F02's bounded baseline is now
 Done after the named journey. F01's session-resume and save-to-use continuation
-is now locally delivered; F03 is the next selected whole feature. Earlier F01/F03
-In Progress labels were planning drift, not evidence that several batches were
-running; they are now the ordered Todo successors. A completed baseline card
+is now locally delivered; F03's selected result-use/real-local-query continuation is now locally delivered.
+Further field/recall and domain gaps remain in their existing cards and core plan.
+F01 is Done for the selected browser workflow; F03 remains In Progress for its
+remaining field/recall gaps, and F28 is Done for this documentation version.
+A completed baseline card
 does not promise every mature-product feature or release qualification.
 
 ### Existing capabilities to reuse
@@ -79,6 +81,23 @@ presentation data. Runtime third-party code and a plugin store stay outside
 scope. The shared Web implementation remains computer-first, with no current
 native-wrapper, mobile or Linux/NAS detour.
 
+## F03 and F28 current delivery — 2026-10-31
+
+Floating match evidence is on demand. An explicit outside-scope media activation
+reruns the same normal host query, accepts only the same exact target, and enters
+its specialist page; changed or superseded answers do not overwrite the former
+scope. Photos original takeout and Music no-autoplay entry passed. The local
+curated demo now uses already installed BGE/CLIP bundles with an explicit rebuild;
+its landscape paraphrase used both real providers and returned the two lake
+photographs first. The [batch record](../superpowers/plans/2026-10-30-save-find-use.md#f03-selected-local-delivery--2026-10-31)
+keeps profile, source and remaining core coverage/qualification limits explicit.
+
+F28's current bilingual story, English guide updates and six real screenshots
+are synchronized with this build. Future observations remain future; screenshot
+and local query success are not whole-product or release completion. Existing
+Backlog cards retain their concrete remaining capability/depth, and completed
+foundations can still be polished when a real use gap appears.
+
 ## F01 save-to-use continuation — 2026-10-31
 
 Ordinary folder/file receipts survive panel close/reopen; stop keeps explicit
@@ -99,8 +118,9 @@ explicit composer return and located media entry without focus theft or autoplay
 The FileList snapshot fix closes a real attachment intake failure. No new
 capture/export/model mutation or broad test suite was run. Root and independent
 Luna review found no blocking issue. Linear readback preserved all 28 functional
-IDs and ten milestone IDs; F02 is the delivered baseline, F01/F03 are ordered
-Todo, and F28 still owns the remaining current walkthrough/README work. This
+IDs and ten milestone IDs. At that date F02 was the delivered baseline and
+F01/F03 were ordered successors; their 10-31 delivery and F28's current
+walkthrough/README are recorded above. This
 synchronization grants no new scope or release credit.
 
 ## F13 offline program consumption — 2026-10-23

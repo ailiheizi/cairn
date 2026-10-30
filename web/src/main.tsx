@@ -544,7 +544,9 @@ function App() {
     const mode = libraryPageForMode(view.viewMode) ? "content" : view.viewMode;
     writeHashView({ mode, presentation: view.presentationMode, q: lastExecutedQuery, tags: library.activeTags, month: library.activeTimelineMonth });
   }, [hashRestoreComplete, lastExecutedQuery, library.activeTags, library.activeTimelineMonth, view.viewMode, view.presentationMode]);
+  const navigationEpochRef = useRef(0);
   function completeUserNavigation() {
+    navigationEpochRef.current += 1;
     hashRestoreSupersededRef.current = true;
     hashRestoreFailedRef.current = false;
     setHashRestoreFailed(false);
@@ -639,17 +641,46 @@ function App() {
     };
   }, [drawerOpen, drawerKind, addOpen, materialListEditorOpen, sources.planAction, sources.planCheckBusy]);
 
-  async function openLibraryEntry(hit: SearchHit) {
+  function mediaDestinationForHit(hit: SearchHit) {
+    if (hit.entry_type !== "REGULAR_FILE") return undefined;
+    const mediaClass = mediaClassFromSuffix(formatFacetValue(hit));
+    if (!mediaClass) return undefined;
+    const group = enabledLibraryPageGroups(libraryViews.enabledViewIds).find(candidate => candidate.root.navigationKind !== "layout" && candidate.root.mediaClass === mediaClass);
+    return group?.presentations.find(page => page.id === group.root.id)?.mode ?? group?.presentations[0]?.mode;
+  }
+  function searchEntryHint(hit: SearchHit) {
+    return mediaDestinationForHit(hit) && !library.scopeHits.some(item => item.subject_ref === hit.subject_ref)
+      ? t("Opens this search in its dedicated page") : undefined;
+  }
+  async function openLibraryEntry(hit: SearchHit, resultQuery?: string) {
     if (hit.entry_type === "REGULAR_FILE" && hit.name?.toLowerCase().endsWith(".cairn-list.json")) { assistantRef.current?.openList(hit); return; }
     if (hit.entry_type === "REGULAR_FILE") {
-      const mediaClass = mediaClassFromSuffix(formatFacetValue(hit));
-      const group = enabledLibraryPageGroups(libraryViews.enabledViewIds).find(candidate => candidate.root.navigationKind !== "layout" && candidate.root.mediaClass === mediaClass);
-      const destination = group?.presentations.find(page => page.id === group.root.id)?.mode ?? group?.presentations[0]?.mode;
-      // A floating result can be outside the background host scope. Keep its
-      // existing Details fallback rather than navigating to an absent row or
-      // silently replacing the owner's query and filters.
-      if (mediaClass && destination && hit.subject_ref && library.scopeHits.some(item => item.subject_ref === hit.subject_ref)) {
-        openLibrarySurfaceAnimated(destination, hit); return;
+      const destination = mediaDestinationForHit(hit);
+      if (destination && hit.subject_ref) {
+        if (library.scopeHits.some(item => item.subject_ref === hit.subject_ref)) {
+          openLibrarySurfaceAnimated(destination, hit); return;
+        }
+        if (resultQuery?.trim()) {
+          let fresh: SearchHit | undefined;
+          let accepted = false;
+          let cancelled = false;
+          const navigationEpoch = navigationEpochRef.current;
+          const requestedWorkspace = workspaceID;
+          const ok = await search.runSearch(undefined, resultQuery, undefined, hits => {
+            if (navigationEpochRef.current !== navigationEpoch || workspaceIDRef.current !== requestedWorkspace) { cancelled = true; return false; }
+            accepted = true;
+            fresh = hits.find(candidate => candidate.subject_ref === hit.subject_ref
+              && candidate.content_id === hit.content_id && candidate.logical_size === hit.logical_size);
+            return Boolean(fresh);
+          });
+          if (cancelled) return;
+          if (!ok || !fresh) {
+            if (accepted) setNotice({ kind: "warning", text: t("This result changed or is no longer returned. Search again; your previous view is unchanged.") });
+            return false;
+          }
+          setQuery(resultQuery.trim());
+          openLibrarySurfaceAnimated(destination, fresh); return;
+        }
       }
     }
     if (hit.entry_type === "DIRECTORY" && (hit.entry_id || hit.subject_ref) && library.browseRootID) {
@@ -1418,7 +1449,7 @@ function App() {
       blocked={drawerOpen || settingsOpen} busy={busy} playbackActive={Boolean(audioPlayback.track)}
       catalogItems={library.libraryItems} selectedItems={selection.selectionSubjects} notice={notice?.text}
       onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
-      onOpen={(hit) => void openLibraryEntry(hit)} onUse={useMaterialList}
+      onOpen={(hit, resultQuery) => openLibraryEntry(hit, resultQuery)} entryHint={searchEntryHint} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />
     <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => {

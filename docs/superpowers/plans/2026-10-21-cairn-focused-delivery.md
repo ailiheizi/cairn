@@ -152,11 +152,12 @@ Linear card after the selected assistant-continuity journey: retained draft and
 attachment, menu-first Escape, explicit return focus, and expanded result/media
 entry without composer focus theft or autoplay. Source FileLists are copied
 before asynchronous updates/input reset. See the [actual batch record](2026-10-30-floating-results.md#product-convergence-follow-up--2026-10-30).
-F01 then F03 are ordered Todo successors, not parallel implementation work.
+F01 then F03 were ordered successors. Their selected 10-31 delivery is recorded
+under those cards; remaining F03 field/recall gaps stay open.
 
 **Reuse and steps:** Reuse the existing page registry, host result scope, selection and player. State each destination's purpose; move secondary controls into disclosure; retain query, selection, draft, scroll and player state.
 
-**Finished looks like:** Find material from the floating layer, expand/use a result, open its loaded media destination and return with draft, results and shared playback intact. Explicit metadata/playback actions stay separate; out-of-host-scope results retain their existing Details fallback. The remaining save-to-use handoff belongs to F01 and retrieval gaps to F03.
+**Finished looks like:** Find material from the floating layer, expand/use a result, open its media destination and return with draft, results and shared playback intact. Explicit metadata/playback actions stay separate. F03 now supplies explicit fresh-query handoff for outside-scope media; other objects retain Details. F01 supplies the selected save-to-use handoff.
 
 **Dependencies:** R12/F01 intake experience. **Scope:** `LibraryPageHost`, existing result scope and page registry; no second query authority. **Sources:** [first-party client contract](../../requirements/first-party-client-experiences.md), [domain presentation review](../../technical/domain-presentations-and-composition-20261009.md).
 
@@ -170,12 +171,20 @@ F01 then F03 are ordered Todo successors, not parallel implementation work.
 | Name, type and tag conditions | Usable; coverage incomplete | Fill only already-promised feeds. |
 | Notes and extracted text | Partial | Close observed misses and show the matched source. |
 | Local BGE semantic search | Real-model local evidence | Make profile readiness, rebuild and query behavior direct. |
-| Search controls and explanation | Partial | Keep a simple default query with filters/source detail on demand. |
+| Search controls and explanation | Selected floating/local flow delivered | Three previews, explicit all-file count, bounded source evidence on demand. |
 | Missing-model fallback | Usable fallback | Keep lexical search and original takeout available. |
 
 **Reuse and steps:** Reuse lexical/structured/BGE broker and matched-source projection. Use known misses to locate missing feeds, not add dimensions; distinguish UI availability from indexed-field coverage; keep model readiness and stale generations visible.
 
 **Finished looks like:** Find representative material by name, Notes, body excerpt and paraphrase, understand its match and retrieve its original; no claim that every field is covered.
+
+**2026-10-31 selected delivery:** The [F03 batch](2026-10-30-save-find-use.md#f03-selected-local-delivery--2026-10-31)
+connects explicit cross-scope media search to fresh exact-target navigation,
+refuses changed responses before scope replacement, and discloses source evidence
+on demand. The existing installed BGE/CLIP bundles and an explicit rebuild made
+the curated instance's paraphrase retrieval real; an original takeout matched its
+independent input. This does not close the earlier larger-corpus recall misses,
+all field coverage, model distribution or core/release gates.
 
 **Dependencies:** Search uses existing saved content (R46 maps to F23). **Scope:** `server/internal/search`, current lexical feeds and search control plane; exact identity unchanged. **Sources:** [Phase 4](../../technical/core-mvp-execution-plan.md#8-phase-4-descriptions-and-complete-discovery), [real-project corpus acceptance](../../technical/real-project-corpus-acceptance-20261016.md).
 
@@ -660,14 +669,19 @@ executable UI remains a future design decision, not a shipped F16 subfeature.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
-| Project name, README and Wiki | Existing; ongoing maintenance | Keep links and product framing consistent. |
-| Photos/Music/content screenshots | Existing assets | Use the matching real build only. |
-| Whole-loop walkthrough | Missing as one current story | Show capture → find → use/takeout. |
+| Project name, README and Wiki | Current bilingual story delivered | Keep links and product framing consistent. |
+| Home/media/search/result screenshots | Six current real-build assets | Use the matching real build only. |
+| Whole-loop walkthrough | Current three-step story delivered | Show capture → find → use/takeout; keep usable results. |
 | Real user feedback | Not yet evidenced | Record actual feedback; invent no customers or demand. |
 
 **Reuse and steps:** Maintain existing README/Wiki, links and user-provided assets; capture a walkthrough from an actual matching build; label current/optional/future and model dependencies accurately.
 
 **Finished looks like:** A newcomer can follow current instructions through save, find and takeout and can distinguish delivered scope from future items.
+
+**2026-10-31 delivery:** The bilingual README, quick-start/list guide and six
+real screenshots now match this build. The original Linear project, 28-card
+document and M2/M3/M10 descriptions were synchronized and read back; F28 is Done
+for this version. Real user feedback remains unevidenced, not fabricated.
 
 **Dependencies:** Delivered F09/F10 and current user-facing flows. **Scope:** Documentation/screenshots only; no unsolicited publication or outreach. **Sources:** [README](../../../README.md), [Wiki map](../../wiki/README.md), [product framing](../../technical/content-first-product-decision.md).
 

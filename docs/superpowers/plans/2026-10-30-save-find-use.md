@@ -65,14 +65,14 @@ scope, do not commit and do not run independent test campaigns.
 
 ## F03 — actual retrieval and result-use gaps (next, not simultaneous)
 
-- [ ] After F01, inspect one known retrieval/use failure and agree the minimal
+- [x] After F01, inspect one known retrieval/use failure and agree the minimal
   reuse seam from the current broker, result scope and matched-source output.
-- [ ] Prefer directly usable results, on-demand source/context and honest
+- [x] Prefer directly usable results, on-demand source/context and honest
   model/coverage/empty/error states. Keep real semantic evidence requirements.
-- [ ] Any cross-background-scope media handoff must be explicit and preserve
+- [x] Any cross-background-scope media handoff must be explicit and preserve
   return/query meaning; do not invent another query authority or replace scope
   while merely typing in the floating input.
-- [ ] Deliver one complete find -> inspect needed context -> use/takeout journey,
+- [x] Deliver one complete find -> inspect needed context -> use/takeout journey,
   then record only its actual scope and remaining core coverage.
 
 
@@ -108,3 +108,92 @@ Root reviewed source and outcomes; Luna found no confirmed spec/code blocker.
 The epoch concern was adjudicated as intentional old-callback invalidation:
 clear/reset schedules a fresh draft render before any next upload, while late
 old callbacks are rejected. No new durable semantics or phase/release credit.
+
+
+## F03 selected implementation — 2026-10-31
+
+**Concrete gap:** a floating query preserves the background scope, so a matching
+photo outside that scope currently opens Details instead of its specialist page.
+The selected result also offers only one unlabelled snippet.
+
+**Decision:** keep input/query projection side-effect free. A result outside the
+background scope visibly says it opens this search's results. On that explicit
+activation, run the same query through the existing normal search path, validate
+that the exact selected subject/content is still returned before committing its
+result scope, and then locate that fresh hit in the existing enabled specialist
+page. This is one host-owned scope transition, not another query authority. A
+failed/stale response retains the former scope and visible error; merely typing
+or seeing results never changes the background. The active query is shown by
+ordinary Library/Photos/Music/Videos search context and can be cleared through
+its existing control. Saved-list entries have no implied search query.
+
+Reuse existing source-label formatting in a small compiled result-list component:
+necessary snippet/type and destination cue first, bounded matched-source details
+on demand. No original/body read or model invocation follows from expansion.
+
+**Files:** useSearch.ts (optional pre-commit response acceptance gate), main.tsx
+(existing normal-search -> navigation handoff), SpaceAssistant.tsx/CSS and its
+compiled result-list helper/i18n. Existing namespaces, annotations and media
+budgets stay unchanged. Inspect the already installed local BGE bundle and
+existing model readiness/rebuild path; repair only the selected local profile
+configuration when needed, not provider internals or unrelated corpus recall.
+
+**Exit:** normal host query with a limited scope -> independent floating query
+and its match context -> explicit cross-scope photo/music entry -> current query
+label + exact located subject -> existing original takeout. Include stale result
+refusal and honest semantic coverage within this same flow; if a real BGE path
+is exercised, use the already pinned local bundle and explicit existing rebuild.
+No general chat, external AI, new fields or index dimensions are admitted.
+
+
+## F03 selected local delivery — 2026-10-31
+
+Implemented explicit fresh-query handoff to the existing enabled media page,
+subject + content-ID + length acceptance before background mutation, and
+workspace/navigation supersession. Returned match context reuses existing source
+labels and bounded snippets in a compiled helper with no original reads. The
+floating default shows three previews; expansion retains all returned results
+and the unselected-list action names the exact regular-file count.
+
+The selected browser journey started with a document-only `suffix:md` host scope,
+then found Joel in the independent floating query. It exposed the scope hint and
+source evidence without changing the background. A changed second response was
+injected only for the refusal case: the former scope remained unchanged. A real
+fresh response then entered Photos and focused the exact subject. Its original
+JPEG download matched the independent retained 478,185-byte source (SHA-256
+`140ec258d58f6742b98bbff457b8b89101c56970b5c11485401ff131698d594d`).
+The Music continuation entered and focused lixound from another document-only
+scope without autoplay. A disclosure-toggle driver correction resumed only that
+read-only tail. No saved content or provider egress was mutated by this journey.
+
+The isolated curated demo had overridden its model path to an empty directory.
+Its launch/config now explicitly reuse the already installed pinned local model
+root, `/Users/macos/.local/share/cairn/models-zvec-dynamic-candidate-20261015`;
+old local configuration was retained under the ignored evidence directory. The
+owned demo daemon was restarted at the same port, and one explicit existing
+`search.rebuild` produced BGE generation
+`idx_55283414096145bb76ee2b7927bc2eb5` (AVAILABLE) and existing CLIP generation
+`idx_ae651bcdac61ee30ebb73017f7c5a66a` (READY). No model was downloaded,
+new dimension added or historical processor rerun. The real paraphrase
+“有湖水和高山的风景” returned SUCCEEDED: lexical 0, BGE 16, CLIP 3; the two
+lake landscapes ranked first. This is small-profile development evidence, not
+all-corpus recall/field completeness or a default release qualification.
+
+Evidence: `dist/f03-20261031/` actual query/rebuild responses, journey/read-only
+continuation, JPEG and screenshots. A driver initially used an unsupported
+operator; the UI refused it without executing a query. The supported suffix
+operator was then used. Web build and diff check passed. Root and independent
+Luna review found no blocking issue; no broader suites were run.
+
+F28 accompanies this feature: bilingual README and English quick-start/list
+instructions now describe the actual save -> find -> use -> keep loop. Six
+current-build JPEG screenshots were captured through actual UI navigation,
+including explicit verified audio/video playback and an unsaved list-title edit;
+no second capture or model request was made for that result draft. Root inspected
+the Home, search and result images. Existing media credits and model/playback
+limits remain. This documentation update grants no additional capability.
+
+The original Linear project and its 28-card document now reflect these outcomes:
+F01 Done for browser intake/use, F03 In Progress with this selected handoff
+delivered and broader field/recall gaps retained, and F28 Done for the current
+documentation version. M2/M3/M10 retain their IDs and explicit remaining limits.

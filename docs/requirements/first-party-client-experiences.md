@@ -538,6 +538,17 @@ the host result scope and batch selection remain unchanged. Explicit Details and
 play controls remain separate actions; entry alone does not start playback.
 A media result outside the current host scope retains the existing Details
 fallback rather than silently changing that scope or implying a successful locate.
+The owner's continued feature-delivery request admits an explicit floating-result
+handoff: a media row outside the background scope may visibly offer opening this
+search in its dedicated page. Only that activation reruns the retained query
+through the normal host broker and installs its result scope, after confirming
+that the selected subject and exact content identity are still returned. The
+ordinary current-query display and clear action explain the new scope. Typing,
+projection and match-context expansion never change the background. Failed or
+stale responses preserve it; a superseding navigation/workspace cancels the
+handoff. Saved-list member opening implies no unrelated remembered query.
+Matched sources reuse returned broker segments and existing source labels,
+shown on demand with bounded previews and no new original-body reads.
 
 **Exit refinement:** One `coherent-content-spaces` journey navigates from Home
 through Photos and its existing viewer, Music and verified playback, Library

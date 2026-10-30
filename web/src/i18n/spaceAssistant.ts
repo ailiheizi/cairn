@@ -1,4 +1,11 @@
 export const spaceAssistant: Record<string, string> = {
+  "Organize all {{count}} files": "整理全部 {{count}} 个文件",
+  "Opens this search in its dedicated page": "在此搜索的专属页面中打开",
+  "This result changed or is no longer returned. Search again; your previous view is unchanged.": "这项结果已变化或不再匹配。请重新查找，原页面范围保持不变。",
+  "The item could not be opened. Your search and draft are preserved.": "暂时无法打开，已保留搜索结果和草稿。",
+  "Why this matched": "为什么找到它",
+  "No matched excerpt was reported.": "未提供命中片段。",
+  "More match details are available in item details.": "更多命中信息可在资料详情中查看。",
   "Enter Photos at {{name}}": "进入照片并定位到 {{name}}",
   "Space navigation": "空间导航",
   "My space": "我的空间",

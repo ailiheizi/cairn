@@ -4,6 +4,16 @@ A list keeps an ordered result over saved originals, together with the context
 needed to use it. It is an ordinary JSON file in Cairn. Reading the saved result
 does not invoke AI or change the originals, their Notes or their Tags.
 
+## Quick path from the floating input
+
+Find saved material in the bottom input. Select returned files, then choose
+**Organize selected**; the unselected action explicitly names the count of all
+returned regular files. The spacious result can be adjusted, played or taken
+out through existing host actions. **Keep in Library** opens the ordinary save
+review; only confirmation retains it. Reopen the saved `.cairn-list.json` from
+Library to use the same result again. The guide/editor paths below remain
+available through **Organize with a Skill** and explicit item Details.
+
 ## Create and save
 
 1. Select saved files in the content library or a search result. Open the

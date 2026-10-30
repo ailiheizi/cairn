@@ -1,11 +1,22 @@
 # Current product screenshots
 
-Captured from the real local development preview on 2026-10-29. These are application screenshots, not mockups; the demo uses a small curated library. The interface is shown in Chinese and is also available in English. The screenshots do not qualify a release or imply every optional search model is enabled.
+Captured from the real local development preview on 2026-10-31. These are application screenshots, not mockups; the demo uses a small curated library. The interface is shown in Chinese and is also available in English. The screenshots do not qualify a release or imply every optional search model is enabled.
 
 - `home-zh.jpg`: private-space Home.
 - `photos-zh.jpg`: Photos over the same loaded content.
 - `music-zh.jpg`: Music with the shared verified-original player.
 - `videos-zh.jpg`: Videos with the bundled player and on-demand file actions.
+- `search-zh.jpg`: floating scene-description retrieval over Home, showing three
+  related previews with remaining results available on expansion.
+- `result-zh.jpg`: an ordinary two-track list, adjusted through the real UI to
+  the title “夜晚，慢慢听”; it is visibly an unsaved draft, not a new capture.
+
+The local curated profile used already installed pinned BGE and CLIP bundles
+and an explicit rebuild through the existing host operation. The displayed
+paraphrase query used real local semantic/image providers. This does not claim
+bundles are installed automatically, that all fields/corpora are covered, or
+that any release profile is qualified. The screenshots contain no model files,
+original media, credentials or catalogs.
 
 ## Media credits
 

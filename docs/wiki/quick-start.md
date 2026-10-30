@@ -26,6 +26,13 @@ temporary until you review and confirm the save; staging is not protection.
    provenance. Choose **View saved files** to see and select the confirmed
    upload batch, ready for existing Notes, tags and takeout actions.
 
+A ready upload review can be closed and reopened in the same browser session
+without another upload or plan. During transfer, use **Stop upload** or wait for
+the receipt before closing. A stopped transfer retains the selected browser files
+for an explicit retry; it is not a confirmed save. Retry may leave an earlier
+unconfirmed temporary upload on the host. Refreshing the browser does not retain
+these transient File objects or replace server-side recovery records.
+
 The saved batch is temporary, not a new collection. If Cairn cannot match every
 accepted upload to its saved path, digest and length, it opens the source with
 a notice instead of selecting a partial or uncertain batch. Server-path intake
@@ -40,6 +47,12 @@ Search combines names, paths, metadata, Notes, tags, extracted text, and any
 available semantic generation. A result always points back to the same stable
 file subject; a similarity score never changes file identity or authorizes
 deletion.
+
+From Home, use the floating input without replacing the background query. Its
+**Why this matched** disclosure shows returned evidence without reading another
+original. A media result outside the background scope indicates that activation
+opens this search in its dedicated page; only the click performs that fresh
+search/scope handoff. A changed result is refused before replacing the scope.
 
 Open **View matches** beside a result to inspect its returned evidence in
 Details. You can browse keyword-only matches and then return to the original

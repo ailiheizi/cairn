@@ -36,7 +36,9 @@ The existing [Linear project](https://linear.app/ailiheizi/project/cairn-15f834d
 and [Product Experience Todo](technical/product-experience-todo.md) are
 synchronized to this direction: F02 continuity and the [F01 save-to-use
 continuation](superpowers/plans/2026-10-30-save-find-use.md) are locally delivered;
-F03 concrete retrieval/use gaps are the current continuation. M1–M10 are retained delivery
+F03's selected cross-scope retrieval/use handoff is also locally delivered,
+with real local BGE/CLIP in the curated profile; broader recall/coverage remains
+in the existing core plan. M1–M10 are retained delivery
 themes; completed baseline cards do not imply all future features are delivered.
 
 ## Capability and status

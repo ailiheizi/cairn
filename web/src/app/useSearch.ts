@@ -123,7 +123,7 @@ export type SearchFlow = {
   handleSearchFieldCaret: (caret: number) => void;
   handleSearchFieldKeyDown: (event: ReactKeyboardEvent<HTMLFormElement>) => void;
   handleRecentsListKeyDown: (event: ReactKeyboardEvent<HTMLUListElement>) => void;
-  runSearch: (event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void) => Promise<boolean>;
+  runSearch: (event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void, acceptResults?: (hits: SearchHit[]) => boolean) => Promise<boolean>;
   keywordBrowse: KeywordBrowseState | undefined;
   runKeywordBrowseAction: () => Promise<void>;
   canReturnToRanked: boolean;
@@ -686,7 +686,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       setKeywordBrowse({ query: chain.capture.query, phase: chain.phase, loaded: chain.loaded, error: message });
     }
   }
-  async function runSearch(event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void) {
+  async function runSearch(event?: FormEvent, explicitQuery?: string, onResults?: (hits: SearchHit[], coverage?: string) => void, acceptResults?: (hits: SearchHit[]) => boolean) {
     const report = onResults ? (_notice: Notice | undefined) => {} : notify;
     event?.preventDefault();
     if (!canLeaveSettings()) return false;
@@ -746,6 +746,9 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         markConnected();
         return true;
       }
+      // Explicit result navigation can reject a stale fresh answer before it
+      // replaces the background scope. This is the normal host search path.
+      if (acceptResults && !acceptResults(narrowed.hits)) return false;
       drafts.discardDetailDrafts();
       library.setJustSavedBatch(false);
       library.setHits(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
