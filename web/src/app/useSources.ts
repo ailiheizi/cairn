@@ -31,6 +31,9 @@ export type SourcesFlow = {
   source: string;
   setSource: (value: string) => void;
   pastedTextDraft: PastedTextDraft;
+  uploadDraft: UploadDraft;
+  updateUploadDraft: (update: (draft: UploadDraft) => UploadDraft) => void;
+  clearUploadDraft: () => void;
   openTextComposerRequested: boolean;
   editPastedTextDraft: (filename: string, text: string) => void;
   beginPastedTextUpload: () => number;
@@ -65,6 +68,18 @@ export type SourcesFlow = {
   cleanStaged: () => Promise<void>;
   resetSourceProjection: () => void;
 };
+
+/** Session-only receipt and retry material, never a save/protection record. */
+export type UploadDraft = {
+  files: File[];
+  relativePaths: boolean;
+  rows: UploadFileRow[];
+  stagingDir: string;
+  error: string;
+  partial: boolean;
+  receiving: boolean;
+};
+const emptyUploadDraft = (): UploadDraft => ({ files: [], relativePaths: false, rows: [], stagingDir: "", error: "", partial: false, receiving: false });
 
 export type PastedTextDraft = {
   filename: string;
@@ -111,6 +126,14 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
   const [pastedTextDraft, setPastedTextDraft] = useState<PastedTextDraft>({
     filename: "reading-notes.txt", text: "", locked: false, stagingDir: "", rows: [], error: "", partial: false, planID: "", attemptID: 0, receiving: false,
   });
+  const [uploadDraft, setUploadDraft] = useState<UploadDraft>(emptyUploadDraft);
+  const uploadDraftEpoch = useRef(0);
+  const capturedUploadEpoch = uploadDraftEpoch.current;
+  function updateUploadDraft(update: (draft: UploadDraft) => UploadDraft) {
+    if (capturedUploadEpoch !== uploadDraftEpoch.current) return;
+    setUploadDraft(current => capturedUploadEpoch === uploadDraftEpoch.current ? update(current) : current);
+  }
+  function clearUploadDraft() { uploadDraftEpoch.current += 1; setUploadDraft(emptyUploadDraft()); }
   const [openTextComposerRequested, setOpenTextComposerRequested] = useState(false);
   const pastedTextAttemptRef = useRef(0);
   const editPastedTextDraft = (filename: string, text: string) => {
@@ -379,6 +402,14 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
       if (!pastedTextDraft.planID || plan?.plan_id !== pastedTextDraft.planID) setPlan(undefined);
       setPlanAction("IDLE");
       setRecheckSourceRef("");
+    } else if (!sourceItem && !options?.openTextComposer && (uploadDraft.files.length || uploadDraft.rows.length || uploadDraft.error)) {
+      // Reopen the same browser receipt without re-upload or a fresh apply.
+      const directory = uploadDraft.stagingDir.trim();
+      if (!directory || source.trim() !== directory) {
+        planRequestRef.current += 1;
+        setPlan(undefined); setPlanAction("IDLE"); setPlanCheckBusy(false);
+      }
+      setSource(directory); setRecheckSourceRef("");
     } else {
       planRequestRef.current += 1;
       setPlanCheckBusy(false);
@@ -411,9 +442,11 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     setPlanAction("IDLE");
     setRecheckSourceRef("");
     clearPastedTextDraft();
+    clearUploadDraft();
     return true;
   }
   function closeAdd() {
+    if (uploadDraft.receiving) { notify({ kind: "warning", text: t("Stop the upload or wait for its receipt before closing.") }); return; }
     if (planAction === "INSPECTING" || planAction === "PROTECTING") { notify({ kind: "warning", text: t("This operation is still running. Keep this panel open until it finishes.") }); return; }
     setAddOpen(false); setRecheckSourceRef(""); setOpenTextComposerRequested(false);
   }
@@ -453,6 +486,7 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     try { await refresh(); } catch { /* the refresh reports its own projection failures */ }
   }
   function resetSourceProjection() {
+    clearUploadDraft();
     setPlan(undefined);
     setSources([]);
     setStaging(undefined);
@@ -509,6 +543,9 @@ export function useSources({ t, workspaceID, isConnected, coreStorageReady, core
     setSource,
     changeSourceInput,
     pastedTextDraft,
+    uploadDraft,
+    updateUploadDraft,
+    clearUploadDraft,
     editPastedTextDraft,
     beginPastedTextUpload,
     recordPastedTextUpload,

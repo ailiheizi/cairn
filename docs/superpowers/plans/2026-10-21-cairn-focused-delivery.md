@@ -117,13 +117,19 @@ SHA-256 plus logical length; local development evidence is not release proof.
 | --- | --- | --- |
 | File, drop and directory intake | Usable; local journey evidence | Reuse upload and safe relative paths. |
 | Quick text capture | Usable | Keep ordinary text capture; no Inbox. |
-| Progress, cancel, failure continuation | Partial | Give one file-level status and a clear resume path. |
-| Post-save locate and retrieve | Partial | Join confirmed save to the saved source and takeout action. |
+| Progress, stop, retry and review continuation | Locally delivered for the selected browser flow | Retain receipt/files in session; explicit retry, no upload/apply replay on reopen. |
+| Post-save locate and retrieve | Locally delivered for exact uploaded batch and literal text | Open exact saved files and take out the matching original. |
 | Background phone camera-roll sync | Out of scope | Keep manual phone file selection; decide a dedicated capture profile separately. |
 
 **Reuse and steps:** Keep `SourceDrawer` and existing intake hooks/API. Unify file, folder and text review with explicit protection state; preserve recoverable cancel/failure outcomes; expose advanced paths only when needed and lead confirmed saves to the saved item.
 
 **Finished looks like:** Save a mixed folder and a text note, find the saved target and verify its original; an unconfirmed staged item is never shown as protected.
+
+**2026-10-31 local delivery:** The [save-to-use batch](2026-10-30-save-find-use.md#f01-bounded-local-delivery--2026-10-31)
+passed folder stop/retry/review resumption, one confirmed apply, exact saved-batch
+handoff and matching original download; pasted-text resumption also passed.
+Receipts/browser files are session state only, and unknown outcomes remain
+unconfirmed. This closes the selected F01 client scope, not all ingest profiles.
 
 **Dependencies:** Existing intake only. **Scope:** `web/src/components/SourceDrawer.tsx` and intake hooks; no Inbox or second lifecycle. **Sources:** [API/WebUI §2.2](../../requirements/api-and-webui.md#22-familiar-browser-intake-refinement), [private-drive intake acceptance](../../technical/private-drive-intake-acceptance-20261012.md).
 

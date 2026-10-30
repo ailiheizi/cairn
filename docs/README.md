@@ -34,8 +34,9 @@ The latest product direction is to reuse ordinary stored material—including or
 
 The existing [Linear project](https://linear.app/ailiheizi/project/cairn-15f834de8536)
 and [Product Experience Todo](technical/product-experience-todo.md) are
-synchronized to this direction on 2026-10-30: F02 continuity first, F01 save-to-use
-handoff next, then F03 concrete retrieval gaps. M1–M10 are retained delivery
+synchronized to this direction: F02 continuity and the [F01 save-to-use
+continuation](superpowers/plans/2026-10-30-save-find-use.md) are locally delivered;
+F03 concrete retrieval/use gaps are the current continuation. M1–M10 are retained delivery
 themes; completed baseline cards do not imply all future features are delivered.
 
 ## Capability and status

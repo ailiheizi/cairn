@@ -80,12 +80,13 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
   onDone: (uploadBatch?: { stagingDir: string; rows: UploadFileRow[]; receiptComplete: boolean }) => void;
 }) {
   const { source, recheckSourceRef, plan, planAction, planCheckBusy, pathSuggestions, sourceBarState, sourceBarReason, sourceSaveLabel, sourcePreviewDisabled, sourceSaveDisabled, sourceSuggestionDisabled, sourceLooksRemote } = sources;
-  const [mode, setMode] = useState<UploadMode>(sources.pastedTextDraft.locked ? "upload" : recheckSourceRef || source.trim() ? "path" : "upload");
+  const [mode, setMode] = useState<UploadMode>(sources.pastedTextDraft.locked || (!recheckSourceRef && (sources.uploadDraft.files.length > 0 || sources.uploadDraft.rows.length > 0 || Boolean(sources.uploadDraft.error))) ? "upload" : recheckSourceRef || source.trim() ? "path" : "upload");
   const [uploading, setUploading] = useState(false);
-  const [uploadRows, setUploadRows] = useState<UploadFileRow[]>(sources.pastedTextDraft.rows);
-  const [uploadStagingDir, setUploadStagingDir] = useState(sources.pastedTextDraft.stagingDir);
-  const [uploadError, setUploadError] = useState(sources.pastedTextDraft.error);
-  const [uploadPartial, setUploadPartial] = useState(sources.pastedTextDraft.partial);
+  const { rows: uploadRows, stagingDir: uploadStagingDir, error: uploadError, partial: uploadPartial } = sources.uploadDraft;
+  const setUploadRows = (rows: UploadFileRow[]) => sources.updateUploadDraft(draft => ({ ...draft, rows }));
+  const setUploadStagingDir = (stagingDir: string) => sources.updateUploadDraft(draft => ({ ...draft, stagingDir }));
+  const setUploadError = (error: string) => sources.updateUploadDraft(draft => ({ ...draft, error }));
+  const setUploadPartial = (partial: boolean) => sources.updateUploadDraft(draft => ({ ...draft, partial }));
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | undefined>();
   const [transportReceiving, setTransportReceiving] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -123,12 +124,7 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
     setSearchPreparation({ state: "IDLE" });
   }, [workspaceID, plan?.plan_id]);
 
-  useEffect(() => {
-    if (!pendingFiles?.length) return;
-    setMode("upload");
-    void handleUpload(pendingFiles);
-    onPendingFilesConsumed?.();
-  }, [pendingFiles]);
+
 
   useEffect(() => { if (recheckSourceRef) setMode("path"); }, [recheckSourceRef]);
 
@@ -181,6 +177,13 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
   );
   const clearTextDraftDisabled = surfaceBusy || pastedTextPlanPending;
   const uploadSelectionDisabled = surfaceBusy || stagedPlanActive || acceptedBatchNeedsReview || sources.pastedTextDraft.locked || !coreStorageReady || isUnavailable;
+  useEffect(() => {
+    if (!pendingFiles?.length || uploadSelectionDisabled) return;
+    setMode("upload");
+    void handleUpload(pendingFiles);
+    onPendingFilesConsumed?.();
+  }, [pendingFiles, uploadSelectionDisabled]);
+
   // The explicit review/retry runs the ordinary plan.ingest again over the
   // existing staging directory. It is offered before any plan exists and after
   // a blocked or up-to-date plan, but never for a saved or awaiting result.
@@ -271,9 +274,11 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
     if (!fileList || fileList.length === 0) return;
     if (uploadingRef.current || uploadSelectionDisabled) return;
     const selectedFiles = Array.from(fileList);
+    sources.updateUploadDraft(draft => ({ ...draft, files: selectedFiles, relativePaths: preserveRelativePaths, receiving: true }));
     if (preserveRelativePaths) {
       const folderUpload = inspectFolderUpload(selectedFiles);
       if (!folderUpload.paths) {
+        sources.updateUploadDraft(draft => ({ ...draft, receiving: false }));
         setUploadError(t(folderUpload.problem ?? "The browser did not provide a valid relative path for every selected file."));
         return;
       }
@@ -300,7 +305,7 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
     try {
       let outcome: Awaited<ReturnType<typeof uploadFiles>>;
       try {
-        outcome = await uploadFiles(Array.from(fileList), {
+        outcome = await uploadFiles(selectedFiles, {
           signal: controller.signal,
           preserveRelativePaths,
           onProgress: (progress) => {
@@ -315,10 +320,8 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
           ? t("Upload stopped. Server receipt was not confirmed. Temporary files may remain; no saving review was prepared.")
           : t("The connection ended before the server receipt was confirmed. Temporary files may remain; no saving review was prepared.");
         if (pastedText && pastedTextAttemptID !== undefined) sources.recordPastedTextUpload({ attemptID: pastedTextAttemptID, stagingDir: "", rows: [], error: unresolvedMessage, partial: true });
-        if (mountedRef.current) {
-          setUploadError(unresolvedMessage);
-          setUploadPartial(true);
-        }
+        setUploadError(unresolvedMessage);
+        setUploadPartial(true);
         onStaged?.();
         return;
       }
@@ -343,7 +346,7 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
       const directory = typeof outcomeRecord?.staging_dir === "string" ? outcomeRecord.staging_dir.trim() : "";
       returnedStagingDir = directory;
       const accepted = rows.filter((row) => !row.skipped_reason);
-      if (attemptID === uploadAttemptRef.current && mountedRef.current) {
+      if (attemptID === uploadAttemptRef.current) {
         setUploadRows(rows);
         setUploadStagingDir(directory);
       }
@@ -371,12 +374,10 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
       if (stoppedAttemptRef.current === attemptID) {
         const stoppedMessage = t("Stop arrived after the server responded. No saving review was prepared.");
         if (pastedText && pastedTextAttemptID !== undefined) sources.recordPastedTextUpload({ attemptID: pastedTextAttemptID, stagingDir: directory, rows, error: stoppedMessage, partial: true });
-        if (mountedRef.current) {
-          setUploadRows(rows);
-          setUploadStagingDir(directory);
-          setUploadError(stoppedMessage);
-          setUploadPartial(true);
-        }
+        setUploadRows(rows);
+        setUploadStagingDir(directory);
+        setUploadError(stoppedMessage);
+        setUploadPartial(true);
         onStaged?.();
         return;
       }
@@ -386,14 +387,14 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
       // mounted batch must finish its ordinary read-only plan first: a cold
       // refresh with no restore point or recent plan can otherwise clear that
       // newly returned plan from the shared source projection.
-      if (!mountedRef.current) {
-        if (accepted.length > 0) onStaged?.();
-        return;
-      }
       setUploadRows(rows);
       setUploadStagingDir(directory);
       setUploadError(errorMessage);
       setUploadPartial(partialAccepted);
+      if (!mountedRef.current) {
+        if (accepted.length > 0) onStaged?.();
+        return;
+      }
       // Only a fully reported batch with a staging directory is prepared
       // automatically. A partial subset always needs the explicit action.
       if (!partial && accepted.length > 0 && directory) {
@@ -412,16 +413,15 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
         if (pastedText && pastedTextAttemptID !== undefined && returnedRows) {
           sources.recordPastedTextUpload({ attemptID: pastedTextAttemptID, stagingDir: returnedStagingDir, rows: returnedRows, error: followupError, partial: true });
         }
-        if (mountedRef.current) {
-          if (returnedRows) setUploadRows(returnedRows);
-          setUploadStagingDir(returnedStagingDir);
-          setUploadError(followupError);
-          setUploadPartial(true);
-        }
+        if (returnedRows) setUploadRows(returnedRows);
+        setUploadStagingDir(returnedStagingDir);
+        setUploadError(followupError);
+        setUploadPartial(true);
       }
     } finally {
       if (attemptID === uploadAttemptRef.current) {
         uploadingRef.current = false;
+        sources.updateUploadDraft(draft => ({ ...draft, receiving: false }));
         uploadControllerRef.current = undefined;
         transportReceivingRef.current = false;
         stoppedAttemptRef.current = 0;
@@ -623,6 +623,11 @@ export function SourceDrawer({ t, sources, isUnavailable, coreStorageReady, core
           </div>}
           {canReviewStaged && <div className="upload-handoff">
             <button type="button" className="secondary-button" onClick={() => prepareStaged(uploadStagingDir)}><RefreshCw size={15} />{!stagedPlanActive && uploadPartial ? t("Review accepted files") : t("Preview storage plan")}</button>
+          </div>}
+          {!surfaceBusy && !uploadSaved && !uploadAwaiting && !acceptedRows.length && !stagedPlanActive && sources.uploadDraft.files.length > 0 && uploadError && <div className="upload-handoff">
+            <button type="button" className="secondary-button" disabled={isUnavailable || !coreStorageReady} onClick={() => void handleUpload(sources.uploadDraft.files, false, undefined, sources.uploadDraft.relativePaths)}><RefreshCw size={15} />{t("Upload these files again")}</button>
+            <small>{t("Retry sends a new upload. Unconfirmed temporary files may remain; nothing is saved without confirmation.")}</small>
+            <details><summary>{t("{{count}} selected files retained for retry", { count: sources.uploadDraft.files.length })}</summary><ul>{sources.uploadDraft.files.map((file, index) => <li key={index}>{file.webkitRelativePath || file.name} · {formatBytes(file.size)}</li>)}</ul></details>
           </div>}
           {!uploadSaved && !uploadAwaiting && <p className="planning-note">{t("Received files stay temporary until you confirm saving originals.")}</p>}
           {!stagedPlanActive && <button type="button" className="upload-server-entry" disabled={surfaceBusy || sources.pastedTextDraft.locked} onClick={() => setMode("path")}><Server size={15} />{t("Server folder")}</button>}

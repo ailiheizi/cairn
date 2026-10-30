@@ -25,12 +25,13 @@ and the result the user receives. Core phase order remains unchanged.
 | Position | Capability and existing card | User-visible delivery |
 | --- | --- | --- |
 | Latest locally delivered baseline | F02 / [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) | Home content, floating input, expanded result and specialist-page entry feel continuous; draft/results survive returns; metadata stays on demand |
-| Next whole feature | F01 / [AIL-38](https://linear.app/ailiheizi/issue/AIL-38) | Save files/text, understand progress and cancellation, continue review, then find and use the saved material |
-| After that | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
+| Latest locally delivered save-to-use | F01 / [AIL-38](https://linear.app/ailiheizi/issue/AIL-38) | Save files/text, understand progress and cancellation, continue review, then find and use the saved material |
+| Next whole feature | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
 At most one whole feature enters implementation. F02's bounded baseline is now
-Done after the named journey; F01 is the next Todo, followed by F03. Earlier F01/F03
+Done after the named journey. F01's session-resume and save-to-use continuation
+is now locally delivered; F03 is the next selected whole feature. Earlier F01/F03
 In Progress labels were planning drift, not evidence that several batches were
 running; they are now the ordered Todo successors. A completed baseline card
 does not promise every mature-product feature or release qualification.
@@ -77,6 +78,17 @@ interaction; current contribution remains trusted compiled code or restricted
 presentation data. Runtime third-party code and a plugin store stay outside
 scope. The shared Web implementation remains computer-first, with no current
 native-wrapper, mobile or Linux/NAS detour.
+
+## F01 save-to-use continuation — 2026-10-31
+
+Ordinary folder/file receipts survive panel close/reopen; stop keeps explicit
+retry material and never implies saved bytes. Ready review resumes without a
+second upload/plan, and confirmed completion opens its exact saved batch for
+normal use/takeout. The pasted-text review also resumes its literal draft.
+The [save/find/use plan](../superpowers/plans/2026-10-30-save-find-use.md)
+records actual folder and text journeys, independent original-byte comparison,
+and the narrow driver continuations with no repeated successful mutation.
+The transient browser draft is not persistent across reload or a recovery record.
 
 ## 2026-10-30 bounded delivery and plan synchronization
 

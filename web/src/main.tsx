@@ -795,6 +795,7 @@ function App() {
     return busy || (sources.planAction !== "IDLE" && !completedPlan)
       || sources.planCheckBusy || Boolean(sources.plan && !completedPlan)
       || sources.pastedTextDraft.locked || sources.pastedTextDraft.receiving
+      || sources.uploadDraft.receiving || sources.uploadDraft.files.length > 0 || sources.uploadDraft.rows.length > 0
       || pendingPasteFilesRef.current || pendingUploadFiles.length > 0;
   }
   function handleLibraryFileDrop(event: DragEvent<HTMLElement>) {
@@ -1120,6 +1121,7 @@ function App() {
         view.setPresentationMode("content");
         view.setViewMode("path");
         sources.closeAdd();
+        sources.clearUploadDraft();
         completeUserNavigation();
         return;
       } catch {
@@ -1137,6 +1139,7 @@ function App() {
       selection.clearSelection();
       view.setPresentationMode("content");
       sources.closeAdd();
+      sources.clearUploadDraft();
       completeUserNavigation();
     } catch (error) {
       setNotice({ kind: "error", text: error instanceof Error ? error.message : t("Could not open source content") });

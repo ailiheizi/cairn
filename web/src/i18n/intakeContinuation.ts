@@ -1,5 +1,9 @@
 // Copy for continuing and finding content after a confirmed save.
 export const intakeContinuation: Record<string, string> = {
+  "Stop the upload or wait for its receipt before closing.": "请先停止上传，或等收到上传结果后再关闭。",
+  "{{count}} selected files retained for retry": "已保留 {{count}} 个待重试文件",
+  "Upload these files again": "重新上传这些文件",
+  "Retry sends a new upload. Unconfirmed temporary files may remain; nothing is saved without confirmation.": "重试会发起新的上传。未确认的临时文件可能仍在；只有你确认后才会保存。",
   "Continue adding": "继续添加",
   "View saved source": "查看已保存来源",
   "View saved files": "查看已保存文件",
