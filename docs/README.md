@@ -32,6 +32,12 @@ Cairn is a single-person self-hosted personal-content platform: one operator, on
 
 The latest product direction is to reuse ordinary stored material—including originals, descriptions, Skills, and lists. Lists should be readable by programs; repeated corrections should accumulate in an ordinary document for later organization. The owner has admitted the bounded [ML-1 ordinary-list client](requirements/first-party-client-experiences.md#ml-1-ordinary-material-list-snapshots): explicit result snapshots, retained Skill text, manual or external-AI copy/paste organization, and existing reviewed capture/takeout. The [ML-2 successor](requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions) connects saved lists to existing playback and unique-file takeout. Their [client contract](technical/material-list-client-contract.md) defines the bounded workflow. The owner-approved ML-3 successor admits one explicit model candidate over the current draft and Skill; the bounded flow is implemented and locally validated. Persistent current-list heads and automatic refresh remain outside it. The [2026-10-20 research record](research/skill-driven-content-substrate-and-qa-20261020.md) and [broader material/list draft](technical/material-list-and-guidance-draft.md) retain those further goals and gaps.
 
+The existing [Linear project](https://linear.app/ailiheizi/project/cairn-15f834de8536)
+and [Product Experience Todo](technical/product-experience-todo.md) are
+synchronized to this direction on 2026-10-30: F02 continuity first, F01 save-to-use
+handoff next, then F03 concrete retrieval gaps. M1–M10 are retained delivery
+themes; completed baseline cards do not imply all future features are delivered.
+
 ## Capability and status
 
 Development evidence, local delivery, and release qualification are separate claims. An acceptance report proves only its named workflow and build. It does not close a phase or qualify a release unless the corresponding normative gate says so. Check the canonical status in [Content Store, Views, and Export Requirements](requirements/content-store-views-and-exports.md), the [Core MVP Execution Plan](technical/core-mvp-execution-plan.md), and the relevant acceptance report before describing a capability as complete.

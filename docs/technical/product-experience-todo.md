@@ -2,74 +2,94 @@
 
 > Current entry point for the informative client progress ledger. This page is navigation, not a new plan or a normative status source. The Core MVP Execution Plan remains the only implementation order.
 
-## Current direction
+## Current direction — synchronized with Linear, 2026-10-30
 
-### Function-level delivery and board (updated 2026-10-23)
+Cairn is an **AI personal-content space**: find and use saved content more
+easily, retain its source/context, and keep useful results as ordinary material
+for later use. The immediate goal is an enjoyable single-owner self-hosted
+open-source product. General AI execution, hosted signup and commercialization
+remain future ideas. The [confirmed product decisions](../superpowers/specs/2026-10-30-input-first-private-space.md)
+keep content on Home and a bottom-centered floating input above it; a generic
+chat page does not replace the private space.
 
-Use the [Cairn Linear board](https://linear.app/ailiheizi/project/cairn-15f834de8536),
-[function delivery plan](../superpowers/plans/2026-10-21-cairn-focused-delivery.md),
-the [Chinese function overview](https://linear.app/ailiheizi/document/cairn-功能交付能用什么补什么交付成什么样-1fa39dca65df),
-and [mature-product capability comparison](../references/functional-capability-comparison-20261021.md).
-The 67-row draft has been consolidated into **28 functional deliverables and
-127 subfeature states**. Design and necessary validation belong inside each
-feature. Pure research and release records are not active product tasks.
-The Core MVP Execution Plan still owns core phase order.
+Use the existing [Linear project](https://linear.app/ailiheizi/project/cairn-15f834de8536),
+[Chinese feature overview](https://linear.app/ailiheizi/document/cairn-功能交付能用什么补什么交付成什么样-1fa39dca65df)
+and [28-card functional index](../superpowers/plans/2026-10-21-cairn-focused-delivery.md).
+The original F identifiers remain stable. The historical 127 subfeature states
+are an inventory, not 127 newly selected promises or a current completion score.
+Each card distinguishes existing usable behavior, an actual gap, minimal reuse,
+and the result the user receives. Core phase order remains unchanged.
 
-| Delivery position | Function | Current scope |
+### Current delivery sequence
+
+| Position | Capability and existing card | User-visible delivery |
 | --- | --- | --- |
-| Existing delivery | F09 / [AIL-5](https://linear.app/ailiheizi/issue/AIL-5), ML-1 | Ordinary saved list snapshots, locally delivered |
-| Existing delivery | F10 / [AIL-6](https://linear.app/ailiheizi/issue/AIL-6), ML-2 | Saved-list playback and unique takeout, locally delivered |
-| Locally delivered | F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54), complete Music use | S1 browse/listen/queue/scoped save/reopen delivered locally |
-| Locally delivered | F14 / [AIL-49](https://linear.app/ailiheizi/issue/AIL-49), complete Photos use | S2 view/annotate/scoped save/takeout/return delivered locally |
-| Locally delivered | F16 / [AIL-58](https://linear.app/ailiheizi/issue/AIL-58), complete interface choice | S3 existing layouts validated; compiled contribution example documented |
-| Locally delivered | F11 / [AIL-8](https://linear.app/ailiheizi/issue/AIL-8) | Correct an ordinary Skill, save a new snapshot and explicitly reuse it |
-| Locally delivered | F12 / [AIL-10](https://linear.app/ailiheizi/issue/AIL-10) | ML-3 real-model candidate → reviewed capture → reopen / exact takeout; no phase or release credit |
-| Locally delivered | F13 / [AIL-35](https://linear.app/ailiheizi/issue/AIL-35) | Offline program reads saved order/context/Skill and verifies explicitly supplied original bytes |
-| Locally delivered, bounded video | F17 / [AIL-61](https://linear.app/ailiheizi/issue/AIL-61) | Videos room, loaded filename search/sort, explicit verified small-original playback and exact takeout; [scope and evidence](../superpowers/plans/2026-10-29-video-viewing-room.md) |
-| Relevant capability gaps | F03 global retrieval | Resolve actual misses affecting the chosen workflow |
+| Latest locally delivered baseline | F02 / [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) | Home content, floating input, expanded result and specialist-page entry feel continuous; draft/results survive returns; metadata stays on demand |
+| Next whole feature | F01 / [AIL-38](https://linear.app/ailiheizi/issue/AIL-38) | Save files/text, understand progress and cancellation, continue review, then find and use the saved material |
+| After that | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
+| Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
-The owner clarified the 2026-10-22 direction: build the Web application once,
-prioritize the computer/desktop layout, and reuse the same applications and
-settings UI in a future desktop wrapper. Four default workflows cover save,
-find/takeout, listening and photo viewing; plugins enhance those workflows.
-No separate desktop product or mobile adaptation campaign is planned now.
-The [detailed product-form design](../superpowers/specs/2026-10-22-server-client-product-form.md)
-records the implemented client direction. This changes client priority, not the core phase order. No new
-architecture/testing issue is added and no runtime plugin or media service is
-admitted. Source inspection confirmed Music already has metadata browsing,
-queue controls and sleep timer. Both Music and Photos already expose list
-creation through the global SelectionBar; the chosen seams are a direct
-domain-scoped list entry, clear reopening and interaction hierarchy.
+At most one whole feature enters implementation. F02's bounded baseline is now
+Done after the named journey; F01 is the next Todo, followed by F03. Earlier F01/F03
+In Progress labels were planning drift, not evidence that several batches were
+running; they are now the ordered Todo successors. A completed baseline card
+does not promise every mature-product feature or release qualification.
 
-Use the [detailed staged todo](../superpowers/plans/2026-10-22-desktop-web-delivery.md)
-for S1–S3 files, ordered implementation steps, actual user outcomes and a
-single whole-feature journey per stage. Desktop packaging and later AI/media
-candidates are conditional. The plan records bounded S1–S3 delivery evidence; no successor implementation batch is active.
+### Existing capabilities to reuse
 
-AIL-7 and AIL-9 are retained as merged records, not standalone design tasks.
-The selected S1–S3 client batch is delivered locally. Conditional successors remain outside this completed batch.
-The [superseded complete idea draft](../history/whole-product-planning-draft-20261021.md)
-preserves historical goals; its rows are not another queue. Canceled planning
-cards mean merged or documentation-only, not successful feature completion.
+- F09–F13: ordinary material/Notes/TAG/Skill/list snapshots, reviewed save,
+  reopening, verified playback/unique-original takeout, explicit ML-3 model
+  candidate and an offline program consumer. No separate list service or head.
+- F14/F15: focused Photos/Music, selection-scoped saved results and shared host
+  actions; the S1–S3 [desktop-Web plan](../superpowers/plans/2026-10-22-desktop-web-delivery.md)
+  is retained as completed historical evidence, not the current priority order.
+- F17: bounded actual video watching was delivered locally on 2026-10-29;
+  [the Videos plan](../superpowers/plans/2026-10-29-video-viewing-room.md)
+  limits it to explicit verified MP4/WebM originals up to 32 MiB. It is not
+  Bangumi, a TV client, streaming/transcoding or an automatic downloader.
+- The 2026-10-30 [floating-results plan](../superpowers/plans/2026-10-30-floating-results.md)
+  records real retrieval -> adjustable ordinary list -> playback/ZIP -> review
+  save -> reopen, plus quiet input/outside dismissal and exact loaded-media
+  entry. Reuse its existing original-byte evidence, not a new save/export run.
 
-F11 reused standalone text saving, Skill selection and frozen guide capture.
-Its concrete correction keeps the visible file selection consistent after
-editing, so the same original can be selected again. Two ordinary examples and
-the shortest correction/reuse path are in the [user guide](../wiki/material-lists.md#correct-and-reuse-a-saved-skill).
-See the [bounded design and actual-gap decision](../superpowers/specs/2026-10-21-skill-reuse-design.md).
-No second instruction type, executor or current head was added.
+### Milestone meanings
 
-At most one complete feature enters implementation. Each continuation names
-the functional result, existing subfeatures, actual gap and normal-use finish.
-Unrelated tests, platforms, refactors and
-new surfaces do not enter the batch. Completion requires evidence, review and
-commit/push; update this ledger and the same Linear issue together.
+M1–M10 retain their IDs and are delivery themes, not an instruction to start
+all ten or an alternative core execution order.
 
-After the repository review, the owner selected the bounded material/Notes/Skill/list client loop. ML-1 snapshots and ML-2 playback/takeout actions are implemented with local evidence below. Their [normative admission](../requirements/first-party-client-experiences.md#ml-2-use-saved-lists-through-existing-host-actions) and [client contract](material-list-client-contract.md#use-saved-lists-ml-2) reuse ordinary files and host-owned actions without changing the core phase gates.
+| Milestone | Current meaning |
+| --- | --- |
+| M1 | Material, Skill and reusable-result foundation; ML-1/2/3, not general AI |
+| M2 | Current private-space and everyday-use convergence; F02 then F01 |
+| M3 | Retrieval and context; F03 then only actual admitted F04–F06 gaps |
+| M4 | Photos baseline: view, slideshow, selected result, takeout |
+| M5 | Music baseline: sustained listening, transient queue and saved result |
+| M6 | Coherent interfaces and compiled presentation contribution; not a runtime plugin platform |
+| M7 | Bounded local video watching baseline; the former anime/TV title was too broad |
+| M8 | Future composition examples, voice and external clients; not activated |
+| M9 | Existing trusted storage/takeout/recovery plus remaining core work under its original gates |
+| M10 | Local onboarding and truthful open-source presentation |
 
-The broader product direction remains reuse of ordinary stored material—originals, descriptions, Skills, and program-readable lists—with repeated corrections retained in an ordinary document. ML-1 implements a bounded JSON result snapshot; persistent current-list heads, automatic refresh and an integrated AI executor remain proposals in the [2026-10-20 research](../research/skill-driven-content-substrate-and-qa-20261020.md) and [material/list draft](material-list-and-guidance-draft.md).
+Future household, reading/research, calendar, voice and music-context examples
+reuse ordinary material, Notes, Skills and lists where possible. They are not
+new domain services in the active queue. Full themes can change layout and
+interaction; current contribution remains trusted compiled code or restricted
+presentation data. Runtime third-party code and a plugin store stay outside
+scope. The shared Web implementation remains computer-first, with no current
+native-wrapper, mobile or Linux/NAS detour.
 
-The earlier Photos/Music interaction-polish record is historical; current S1/S2 delivery is recorded below. Earlier acceptance and remaining unrelated scope are preserved under [the focused Photos/Music batch](../history/product-experience-ledger-through-20261020.md#active-batch--focused-photos-and-music-interaction-2026-10-20). OCR and visual-search work has local delivery evidence, with limits and unresolved qualification gates recorded in the [searchable-content batch](../history/product-experience-ledger-through-20261020.md#active-batch--saved-content-to-searchable-content-2026-10-19) and [media/visual-discovery batch](../history/product-experience-ledger-through-20261020.md#active-batch--personal-media-presentation-and-visual-discovery-2026-10-20). Those records do not qualify a phase or release.
+## 2026-10-30 bounded delivery and plan synchronization
+
+The current assistant return/entry refinement and its one named whole-feature
+journey are recorded in the [same floating-results plan](../superpowers/plans/2026-10-30-floating-results.md#product-convergence-follow-up--2026-10-30).
+The selected flow passed with draft/attachment retention, menu-first Escape,
+explicit composer return and located media entry without focus theft or autoplay.
+The FileList snapshot fix closes a real attachment intake failure. No new
+capture/export/model mutation or broad test suite was run. Root and independent
+Luna review found no blocking issue. Linear readback preserved all 28 functional
+IDs and ten milestone IDs; F02 is the delivered baseline, F01/F03 are ordered
+Todo, and F28 still owns the remaining current walkthrough/README work. This
+synchronization grants no new scope or release credit.
 
 ## F13 offline program consumption — 2026-10-23
 

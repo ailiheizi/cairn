@@ -76,6 +76,30 @@ the guardrails. MCP/CLI/AI-harness integration is deferred absent a direct
 request. Cold custody, P2P, specialized app/game/database/VM capture and other
 future profiles below are not active implementation tasks.
 
+## Current product convergence — 2026-10-30
+
+The latest [owner-confirmed form](../specs/2026-10-30-input-first-private-space.md)
+is an AI personal-content space: content-first Home, a bottom-centered floating
+input, useful directly usable results, and specialist media destinations.
+Reuse ordinary originals, Notes/TAG, Skills and lists; save useful results for
+later use. An input surface does not imply general AI conversation or execution.
+The local open-source experience comes first; hosted signup/commercialization,
+voice/calendar, external Harness and richer domain apps remain future ideas.
+
+The existing Linear project, M1–M10 and F identifiers are retained. Current
+client sequence is **F02 continuity -> F01 save-to-use handoff -> F03 actual
+retrieval gaps**. F28 keeps explanations, demonstrations and the same board in
+sync with each delivery. Completed S1–S3 remain historical local evidence, not
+an instruction to repeat them or start a separate desktop product. Only one
+whole feature is in implementation; next cards are Todo rather than concurrent
+In Progress promises. Existing core-phase dependencies remain authoritative.
+
+M7 now means bounded local video watching, matching F17's real scope, rather
+than implying anime/TV delivery. Other completed client milestones explicitly
+name their foundations. M8 holds future combination examples; M9 preserves
+remaining trust/storage gates; M10 covers honest onboarding and open-source
+presentation. Linear percentages count card states, not universal capability.
+
 ## Function cards
 
 Every card has a stable F anchor plus aliases for its absorbed inventory keys.
@@ -103,21 +127,30 @@ SHA-256 plus logical length; local development evidence is not release proof.
 
 **Dependencies:** Existing intake only. **Scope:** `web/src/components/SourceDrawer.tsx` and intake hooks; no Inbox or second lifecycle. **Sources:** [API/WebUI §2.2](../../requirements/api-and-webui.md#22-familiar-browser-intake-refinement), [private-drive intake acceptance](../../technical/private-drive-intake-acceptance-20261012.md).
 
-### F02 · [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) — Make Library, Overview, Photos and Music coherent
+### F02 · [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) — Make private space, floating results and specialist entry coherent
 <a id="f02"></a><a id="r13"></a>
 
-**Baseline:** Library, fixed Overview, full-page Photos/Music and shared scope exist; navigation and switching still feel cluttered. **Outcome:** Clear destinations with current work retained on return.
+**Baseline:** Content-first private Home, shared specialist pages, floating retrieval and reusable ordinary-list results have bounded local evidence (2026-10-30). **Outcome:** Move between content, input, results and their specialist destination without losing current work.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
-| Library, Overview and domain pages | Usable | Clarify each page's job and keep entry points stable. |
+| Private Home, Library and domain pages | Locally usable | Keep content-first Home and stable dedicated destinations. |
+| Floating retrieval and reusable result | Locally delivered | Real host search, adjustable ordinary lists, reviewed save/reopen and existing use actions. |
+| Quiet input and loaded-media entry | Locally delivered | One maximize, outside dismissal with draft retained; enter and locate without a Details modal. |
 | Scope and selection across navigation | Partial, locally joined | Fix only observed lost scope or selection. |
 | Management tools shown on demand | Partial | Reduce always-visible controls. |
 | Details return and current playback | Partial, locally joined | Keep the same player and return position. |
 
+**2026-10-30 bounded delivery:** F02's baseline is now Done on the existing
+Linear card after the selected assistant-continuity journey: retained draft and
+attachment, menu-first Escape, explicit return focus, and expanded result/media
+entry without composer focus theft or autoplay. Source FileLists are copied
+before asynchronous updates/input reset. See the [actual batch record](2026-10-30-floating-results.md#product-convergence-follow-up--2026-10-30).
+F01 then F03 are ordered Todo successors, not parallel implementation work.
+
 **Reuse and steps:** Reuse the existing page registry, host result scope, selection and player. State each destination's purpose; move secondary controls into disclosure; retain query, selection, draft, scroll and player state.
 
-**Finished looks like:** Search mixed content, open Photos, listen in Music, visit Overview and return to Library with the same scope, selection and playback.
+**Finished looks like:** Find material from the floating layer, expand/use a result, open its loaded media destination and return with draft, results and shared playback intact. Explicit metadata/playback actions stay separate; out-of-host-scope results retain their existing Details fallback. The remaining save-to-use handoff belongs to F01 and retrieval gaps to F03.
 
 **Dependencies:** R12/F01 intake experience. **Scope:** `LibraryPageHost`, existing result scope and page registry; no second query authority. **Sources:** [first-party client contract](../../requirements/first-party-client-experiences.md), [domain presentation review](../../technical/domain-presentations-and-composition-20261009.md).
 

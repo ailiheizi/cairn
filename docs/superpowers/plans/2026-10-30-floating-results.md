@@ -100,3 +100,61 @@ inside a filtered Videos presentation was removed; only this fallback segment
 was resumed. The preceding Home/media steps had already passed unchanged.
 A read-only Luna diff review found no blocking issue; the coordinator additionally
 bounded media navigation to host-scope members to avoid an absent locate target.
+
+
+## Product convergence follow-up — 2026-10-30
+
+The owner requested continued product polish and synchronization of the existing
+Linear project/milestones with the confirmed AI personal-content-space direction.
+Keep all 28 functional card identities. Current frontend delivery remains F02:
+Home content stays in place, floating retrieval is secondary, useful results use
+ordinary lists, and specialist content opens in its existing destination.
+
+- [x] Polish the existing assistant's complete return/open flow: Escape dismisses
+  a local menu first, then a floating panel, while retaining draft/material;
+  explicit full-workspace return resumes the composer. Opening material from an
+  expanded result must not restore focus over the destination's located item.
+  Hide the full-header result action when no reusable result exists.
+- [x] Integrate and run one existing-environment browser journey: Home -> draft
+  -> floating/expanded retrieval -> specialist media entry -> return -> Escape
+  and reopen; retain draft and search, observe destination focus, no new reads
+  or automatic playback from navigation. Root owns acceptance and review.
+- [x] Synchronize project definition, existing M1–M10 milestone descriptions,
+  the existing functional document and affected F cards. Keep remaining work
+  explicit, only one feature in implementation, and future ideas out of active
+  scope. Review documentation and read back changed Linear records; no app
+  test is justified by the planning edits themselves.
+
+**Allowed implementation:** `web/src/components/SpaceAssistant.tsx` and its CSS
+only, reusing existing host actions and strings. No new endpoint, schema, model
+runner, provider, processor, runtime loader or package. The client refinement
+runs alongside Phase 4/5, grants no core/release completion and preserves the
+existing first-party client/ML contracts and media budgets.
+
+
+**Bounded follow-up delivered locally:** the affected Web build and selected
+`product-convergence` browser journey passed on the existing port-4670 profile.
+An in-memory attachment and draft survive menu-first Escape, floating collapse,
+full return and reopening. Explicit Return restores composer focus, while opening
+Joel from expanded retrieval keeps Photos' located-card focus. Opening a member
+of the existing saved result keeps the exact Music-row focus without autoplay;
+closing that result resumes the composer. No browser exception occurred. No
+capture, export or provider request was replayed; the old original-byte evidence
+remains applicable. A stale translated test selector was corrected, and an actual
+FileList lifetime defect was repaired by copying files before resetting the input
+or deferring the React update. Dropped files use the same synchronous snapshot.
+
+Root reviewed the diff and screenshots; independent Luna review found no blocking
+spec or quality issue. `git diff --check` passed. No backend, model or broad
+regression campaign was run. This remains a client development delivery, not a
+core-phase or release qualification.
+
+The same ailiheizi Linear project was synchronized in place: project definition,
+all ten existing milestone descriptions, the complete 28-card document and 16
+affected issue descriptions/states. No new issue or milestone was created. F02's
+bounded baseline is Done; F01 then F03 are ordered Todo, and F28 retains its
+remaining current README/Wiki/walkthrough work. Existing theme percentages do not
+mean every future capability has shipped. The service's optional shared-context
+helper was unavailable, so verified repository sources and existing project/cards
+were used instead. Readback confirmed the correct organization, new direction,
+28 F headings, and removal of the old unimplemented-video claim.
