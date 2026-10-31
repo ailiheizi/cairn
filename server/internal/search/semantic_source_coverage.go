@@ -145,10 +145,15 @@ func semanticSourceProofValid(row semanticSourceInventoryRow) bool {
 	if !validSHA256Text(row.BodyDigest) && !(row.Disposition == SemanticSourceUnavailable && row.Reason == SemanticSourceReasonSourceDigestMissing) {
 		return false
 	}
-	segmented := row.SegmentationProfileDigest != ""
-	if segmented && ((row.SourceKind != "NOTE" && row.SourceKind != "EXTRACT") ||
-		row.BodyLength <= semanticTextSourceSegmentTargetBytes ||
-		row.SegmentationProfileDigest != semanticTextSourceSegmentationProfileDigest) {
+	ocrProjected := row.SegmentationProfileDigest == semanticOCRTextProjectionProfileDigest
+	segmented := row.SegmentationProfileDigest == semanticTextSourceSegmentationProfileDigest
+	if row.SegmentationProfileDigest != "" && !segmented && !ocrProjected {
+		return false
+	}
+	if segmented && ((row.SourceKind != "NOTE" && row.SourceKind != "EXTRACT") || row.BodyLength <= semanticTextSourceSegmentTargetBytes) {
+		return false
+	}
+	if ocrProjected && row.SourceKind != "EXTRACT" {
 		return false
 	}
 	switch row.SourceKind {
@@ -232,13 +237,19 @@ func semanticSourceProofValid(row semanticSourceInventoryRow) bool {
 		if input.InputEvidence != nil && (input.InputEvidence.TextDigest != input.InputDigest || input.InputEvidence.SourceRef != input.SourceRef || input.InputEvidence.Ordinal != input.Ordinal) {
 			return false
 		}
-		if row.SourceKind != "DESCRIPTION" && !segmented && input.Disposition == SemanticSourceIndexed && row.BodyDigest != input.InputDigest {
+		if row.SourceKind != "DESCRIPTION" && !segmented && !ocrProjected && input.Disposition == SemanticSourceIndexed && row.BodyDigest != input.InputDigest {
 			return false
 		}
 		if segmented && input.Disposition == SemanticSourceIndexed {
 			if !input.HasSourceSpan || input.Ordinal < 0 ||
 				input.SegmentID != semanticTextSegmentID(row.SourceKind, row.SubjectID, row.SourceRef, row.Revision,
 					row.BodyDigest, row.SegmentationProfileDigest, input.Ordinal, input.SourceSpanStart, input.SourceSpanEnd, input.InputDigest) {
+				return false
+			}
+		}
+		if ocrProjected && input.Disposition == SemanticSourceIndexed {
+			if input.SegmentDigest != input.InputDigest || input.HasSourceSpan || input.SourceSpanStart != 0 || input.SourceSpanEnd != 0 || input.Ordinal < 0 ||
+				input.SegmentID != semanticOCRTextSegmentID(row.SubjectID, row.SourceRef, row.Revision, row.BodyDigest, input.Ordinal, input.InputDigest) {
 				return false
 			}
 		}
@@ -265,7 +276,15 @@ func semanticSourceProofValid(row semanticSourceInventoryRow) bool {
 		if len(row.Inputs) == 0 {
 			return false
 		}
-		if segmented {
+		if ocrProjected {
+			ordered := append([]semanticSourceInputProof(nil), row.Inputs...)
+			sort.Slice(ordered, func(i, j int) bool { return ordered[i].Ordinal < ordered[j].Ordinal })
+			for ordinal, input := range ordered {
+				if input.Ordinal != int64(ordinal) || input.HasSourceSpan || input.Disposition != SemanticSourceIndexed {
+					return false
+				}
+			}
+		} else if segmented {
 			spans := append([]semanticSourceInputProof(nil), row.Inputs...)
 			sort.Slice(spans, func(i, j int) bool { return spans[i].Ordinal < spans[j].Ordinal })
 			offset := 0
@@ -449,7 +468,7 @@ func summarizeSemanticSourceCoverage(generation sqlite.IndexGeneration, inventor
 			missing := false
 			profileMismatch := false
 			consumptionReason := ""
-			if row.SourceKind == "DESCRIPTION" || row.SegmentationProfileDigest != "" {
+			if row.SourceKind == "DESCRIPTION" || row.SegmentationProfileDigest == semanticTextSourceSegmentationProfileDigest {
 				spans := make([]semanticSourceInputProof, 0, len(row.Inputs))
 				for _, input := range row.Inputs {
 					spans = append(spans, input)

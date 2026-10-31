@@ -186,6 +186,16 @@ the curated instance's paraphrase retrieval real; an original takeout matched it
 independent input. This does not close the earlier larger-corpus recall misses,
 all field coverage, model distribution or core/release gates.
 
+**2026-10-31 source repair:** The [OCR semantic cleanup](2026-10-30-save-find-use.md#m3-f03-ocr-semantic-candidate-cleanup--2026-10-31)
+replaces engine/region metadata chunks with a separately bound minimal text
+projection. The actual screenshot went from 12 inputs to one FULL input, with
+unchanged original artifact identity. Real BGE/clipboard/restart/original
+takeout and ordinary DOCX passage passed. All 25 selected sources were accounted
+for after fixing the observed coverage and empty-PARTIAL cases. The configured
+preview was activated without changing its 20 originals/artifact identities;
+semantic coverage is complete, CLIP READY, absent lexical fields still DEGRADED.
+F03 remains In Progress for broader actual field/recall gaps.
+
 **Dependencies:** Search uses existing saved content (R46 maps to F23). **Scope:** `server/internal/search`, current lexical feeds and search control plane; exact identity unchanged. **Sources:** [Phase 4](../../technical/core-mvp-execution-plan.md#8-phase-4-descriptions-and-complete-discovery), [real-project corpus acceptance](../../technical/real-project-corpus-acceptance-20261016.md).
 
 ### F04 · [AIL-46](https://linear.app/ailiheizi/issue/AIL-46) — Find PDF/DOCX by body and meaning

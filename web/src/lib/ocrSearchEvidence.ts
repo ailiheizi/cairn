@@ -223,5 +223,7 @@ function parsePayload(raw: string | undefined, returnedFragment: boolean): OcrSe
 
 export function searchOcrEvidence(segment: SearchSegment): OcrSearchEvidence | null {
   if (segment.source_type !== "ARTIFACT" || segment.kind !== "EXTRACT") return null;
-  return parsePayload(segment.matched_text, false) ?? parsePayload(segment.matched_excerpt, true);
+  const provenance = (segment as SearchSegment & { text_source_provenance?: unknown }).text_source_provenance;
+  const returnedFragment = Boolean(segment.source_id && segment.semantic_segment_id && segment.source_id !== segment.semantic_segment_id && provenance == null);
+  return parsePayload(segment.matched_text, returnedFragment) ?? parsePayload(segment.matched_excerpt, true);
 }

@@ -669,6 +669,51 @@ This is evidence on an existing result, not a new command or recovery record.
 Older readers may refuse newly segmented rows; no existing receipt is rewritten
 and an explicit rebuild is required to create new input coverage.
 
+##### F03 OCR semantic-input projection refinement (2026-10-31)
+
+The existing v2 inventory MAY additionally declare the closed
+`cairn.semantic-ocr-text-projection.v1` profile for an admitted EXTRACT artifact
+whose exact body is `cairn.artifact.ocr-text.v1`. This is a search-input
+projection of existing OCR output, not another processor, semantic space,
+provider ABI, durable source or receipt format. Other EXTRACT and NOTE rows
+retain their existing rules. Lexical fields and their source proof do not change.
+
+The profile MUST bind a deterministic, bounded decoding/segmentation rule and
+canonical per-input JSON containing only the existing OCR schema, recognition
+state and recognized text. Engine, runtime, model, dictionary, geometry and
+repeated region metadata MUST NOT become inputs under this profile. The small
+existing OCR envelope preserves the current readable client evidence format;
+it does not mean that all original artifact metadata was embedded. The selected
+text is the artifact's top-level `text`, not a reconstructed region transcript.
+Invalid known OCR payloads are unavailable; missing text or invalid Unicode MUST
+NOT be repaired or silently embedded as technical metadata. Empty recognized
+text has the existing EMPTY_TEXT disposition. Existing OCR text/body limits
+remain in force. Missing recognition quality stays unknown.
+
+The row MUST retain the complete original artifact digest/length and bind the
+projection profile. Each ordered input binds the canonical subject, immutable
+artifact reference/revision, original body digest, profile digest, ordinal and
+exact canonical input digest in its segment identity. Input/segment digests
+refer to the same submitted canonical input. JSON-decoded text is not a
+contiguous span of the original artifact: `has_source_span` MUST be false and
+`text_source_provenance` MUST be absent. No original byte offset may be inferred
+from decoded-text coordinates. Unknown projection profiles remain refused.
+
+Build, coverage inspection, freshness and query MUST agree on this profile.
+Query MUST verify the pinned admitted artifact's original digest, state,
+subject/root authority and body length, reproduce the complete ordered input
+set, and verify exact selected input identity/text before projecting a hit.
+Provider/tokenizer evidence still binds that actual canonical input and retains
+FULL/TRUNCATED/UNKNOWN semantics. Clients conservatively label derived OCR
+inputs as returned fragments; they do not invent recognition quality or claim
+the complete artifact was returned.
+
+Existing whole-body/v1 span receipts keep their meaning and validation rules;
+they MUST NOT be decoded using the new profile. A current feed/profile mismatch
+is stale/unavailable until explicit rebuilding creates a new generation. This
+refinement changes no original, OCR artifact, signed recovery format or restore
+dependency and does not qualify general corpus recall or distribution.
+
 V2 retains the existing generation/workspace/snapshot/root/config/profile,
 semantic-space, library and subject/segment identity bindings. It additionally
 commits a deterministic selected-source inventory and digest. The inventory

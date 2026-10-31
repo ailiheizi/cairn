@@ -7,6 +7,105 @@
 **Goal:** Complete the admitted everyday save-to-use and retrieval handoffs in
 existing F01 then F03, without starting future domain or AI infrastructure.
 
+## M3 F03 OCR semantic candidate cleanup — 2026-10-31
+
+**Phase/requirement:** admitted Phase 4 search-source lineage under content-store
+§9 and the F03 OCR projection refinement in the driver/interface contract.
+**Decision owner:** root. **Implementation/acceptance execution:** Luna; one
+root-owned whole-feature journey, then only a focused changed-lineage check if
+the user journey cannot prove rejection. F03 remains open for broader recall.
+
+**Observed gap:** the retained F05 response contains OCR engine/model/region
+JSON chunks in BGE's candidates. Current indexer sends the entire admitted
+EXTRACT artifact through generic byte segmentation. Display-only suppression
+does not prevent this metadata from occupying search candidates. The old
+104-file description/rank misses have no established cause and do not justify
+ranking or model changes in this batch.
+
+**Smallest reuse:** preserve the original OCR artifact and lexical feed. Add
+one closed, digest-bound OCR semantic-input projection within the existing v2
+inventory shape. Decode the top-level text and split using the existing bounded
+text cutter; each actual model input is the minimal canonical existing OCR
+envelope `{schema,state,text}`. This retains the existing client decoder without
+a new wire evidence type, at the cost of a few fixed envelope tokens. All
+engine/geometry/duplicate-region metadata stays out of these inputs. Inventory
+body identity remains the original artifact; input identity binds that body,
+the projection rule, ordinal and actual canonical input digest. No source byte
+span is claimed for JSON-decoded text. Query rederives and verifies the entire
+set. Legacy v1 spans retain their strict rules and are never reinterpreted.
+Model/worker ABI and lexical provenance stay unchanged. Explicit rebuilding is
+required after the source-profile change. The client conservatively identifies
+derived OCR inputs as returned fragments, retaining unknown quality.
+
+**Implementation boundary:** new `server/internal/search/ocr_semantic_projection.go`;
+existing `indexer.go`, `semantic_source_coverage.go`,
+`semantic_feed_freshness.go`; existing `web/src/lib/ocrSearchEvidence.ts`.
+Only if necessary, one focused projection-lineage test file in the same Go
+package, after integration. No new endpoint, schema field, durable record,
+processor, provider, index dimension, runtime loader, service or test framework.
+
+**Single exit:** reuse F04/F05/F06's stopped isolated profile, installed models
+and existing independent screenshot/document inputs. Build the affected daemon
+and Web. The old generation must be honestly stale/unavailable; explicitly
+rebuild once without recapture or OCR reprocessing. Query the screenshot by a
+predeclared Chinese paraphrase through real BGE, inspect its actual semantic
+inputs/returned sources, show/copy recognized text in the ordinary floating
+result/Details, reopen after restart and download the unchanged original.
+Verify no engine/model/region-only semantic inputs for the known OCR artifact,
+no fabricated source byte spans, unknown quality/returned-fragment labels and
+unchanged ordinary DOCX body lookup. Source/model/coverage evidence is retained
+in ignored `dist/f03-ocr-20261031/`; no broad backend suite or corpus matrix.
+
+**Delivered, 2026-10-31:** Luna implemented and ran the selected user journey;
+root reviewed production/test diffs, raw response evidence and the screenshot.
+The retained screenshot's OCR input count fell from 12 to one FULL canonical
+input, with original artifact body digest
+`sha256:bf9c5bd05206852de2cd1e65671b0940f2905c4a349a967f9ffb88d57e73b1ff`
+unchanged. Final isolated generation `idx_91d1f9e8c271b0773725b2dce1c56c71`
+accounts for all 25 selected sources (22 indexed, three empty-text exclusions,
+zero missing/unavailable). Empty PARTIAL OCR remains a valid empty-text source,
+not an inference failure. No OCR processor was rerun and no file was recaptured.
+
+The predeclared paraphrase returned `image-b.png` first through real
+`query.semantic.onnx-bge-zvec.v1`, with only `schema/state/text` in its projected
+OCR input and no source-byte-span claim. The ordinary floating result and
+Details exposed readable/copyable recognized text; the semantic fragment had
+unknown quality, while keyword evidence retained actual original OCR quality.
+The unchanged `CedarBlue317` DOCX passage remained readable/copyable. A daemon
+restart reused the same target projection, and the downloaded screenshot was
+byte-equal to the independent F05 input: 74,634 bytes, SHA-256
+`8a2fd4cc149d98b6cca5c6b2a6f2092ac664e57f58935a4849ce4b4b2d06bcfa`.
+The final query additionally confirmed the final generation after the last
+empty-text coverage fix; unchanged successful UI/download work was not replayed.
+
+The three isolated rebuild attempts are retained honestly: the initial attempt
+exposed a coverage reporter incorrectly demanding original byte spans; its
+retry exposed valid empty PARTIAL OCR being rejected. Each affected step was
+repaired, with no capture, model installation or original-download replay.
+Overall rebuilding remains DEGRADED for absent lexical fields, not missing
+selected semantic sources. The review also corrected a top-level schema detector
+that could otherwise mistake ordinary prose examples for OCR. One subsequently
+run `TestOCRSemanticProjectionLineage` checks these observed regressions and
+changed digest/profile/no-span rejection invariants; it is fixture validation,
+not additional real-provider evidence. No broad Go/E2E suite ran.
+
+Evidence is retained in ignored `dist/f03-ocr-20261031/`: old-generation baseline,
+three rebuild responses, actual queries, `final-result.json`, the continued
+browser journey, `semantic-fragment.png`, independent original and the single
+named lineage-check log. Final Web/daemon compilation and diff check passed.
+
+The configured demo was not listening on 4670. Its generated old content-list
+document referenced a stale workspace ID; the configured catalog's sole actual
+`default` workspace was used without creating/importing/replacing anything.
+The tested daemon now serves that existing profile on 4670. One explicit
+activation rebuild reports complete semantic-source coverage and CLIP READY
+(11 images); original identity sets for all 20 entries/file versions and
+processor artifacts are identical before/after. The startup/Home response and
+real BGE query passed; the service remains running. Activation details are in
+`demo-activation.json`. Its overall state remains DEGRADED for six absent lexical
+fields. This scope does not close the larger F03 card, retune ranking,
+redistribute models, or qualify a core phase/release.
+
 ## M3 F06 scene and reference-image continuity — 2026-10-31
 
 **Active phase:** admitted Phase 4 VIS-1/2/3 and first-party Photos maintenance.

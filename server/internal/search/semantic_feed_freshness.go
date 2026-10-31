@@ -277,7 +277,9 @@ func (idx *Indexer) currentSemanticFeedIdentities(ctx context.Context, workspace
 			continue
 		}
 		profile := ""
-		if int64(len(artifact.Body)) > semanticTextSourceSegmentTargetBytes {
+		if semanticOCRKnownArtifact(artifact.Body) {
+			profile = semanticOCRTextProjectionProfileDigest
+		} else if int64(len(artifact.Body)) > semanticTextSourceSegmentTargetBytes {
 			profile = semanticTextSourceSegmentationProfileDigest
 		}
 		if err := add(semanticFeedIdentity{SubjectID: subject, SourceKind: "EXTRACT", SourceRef: artifact.ID,

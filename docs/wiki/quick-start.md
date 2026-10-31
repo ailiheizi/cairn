@@ -92,6 +92,14 @@ Download still takes out the original image. Recognition uses the installed OCR
 bundle on new captures or ordinary explicit recaptures; missing OCR does not
 prevent exact saving.
 
+After updating from an OCR whole-artifact semantic index, explicitly rebuild
+the search index to use its recognized-text projection. Older semantic input
+rules are reported stale/unavailable until rebuilding; exact saving, keyword
+search and original takeout remain available. The rebuild uses saved OCR
+artifacts and does not rerun recognition or change the original image. Returned
+semantic OCR fragments retain their fragment label and unknown quality when
+quality information was not returned.
+
 In **Photos → Scene**, describe what a saved photo shows, then choose **Find**.
 This uses the installed local Chinese-CLIP image generation, independently of
 filenames, OCR and the text embedding space. The compact result strip shows the

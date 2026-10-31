@@ -614,14 +614,36 @@ func (idx *Indexer) rebuild(ctx context.Context, workspaceID, snapshotRef, names
 			extractedBySubject[subjectRef] = append(extractedBySubject[subjectRef], artifact.Body)
 			appendSourceCoverageCandidate(sourceCoverageBySubject, subjectRef, "EXTRACT", "", "extracted", artifact.ID, artifact.ID, artifact.Body, artifact.Digest, coverageStart(subjectRef, "extracted", artifact.Body))
 			disposition, reason := semanticExtractSourceDisposition(artifact.Body)
-			if disposition == SemanticSourceIndexed && artifact.State == sqlite.ArtifactAdmitted {
-				segment := SegmentRef{
-					SourceType: "ARTIFACT", SourceID: artifact.ID,
-					SegmentID: artifact.ID, MatchedText: artifact.Body,
-					Kind: artifact.Stage, Producer: artifact.ProducerDigest,
-					Accepted: true, Language: "und",
+			if disposition == SemanticSourceIndexed {
+				lexicalSegment := SegmentRef{SourceType: "ARTIFACT", SourceID: artifact.ID, SegmentID: artifact.ID,
+					MatchedText: artifact.Body, Kind: artifact.Stage, Producer: artifact.ProducerDigest, Accepted: true, Language: "und"}
+				segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], lexicalSegment)
+			}
+			ocrSegments, ocrState, ocrKnown, ocrValid := projectSemanticOCRArtifact(subjectRef, artifact.ID, artifact.ID, artifact.Digest, artifact.ProducerDigest, artifact.Body)
+			if ocrKnown {
+				row := semanticSourceInventoryRow{SubjectID: subjectRef, SourceKind: "EXTRACT", SourceRef: artifact.ID, Revision: artifact.ID, BodyDigest: artifact.Digest, BodyLength: int64(len(artifact.Body)), SegmentationProfileDigest: semanticOCRTextProjectionProfileDigest}
+				switch {
+				case !validSHA256Text(artifact.Digest):
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceDigestMissing
+				case sha256Text(artifact.Body) != artifact.Digest:
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSourceChanged
+				case !ocrValid:
+					row.Disposition, row.Reason = SemanticSourceUnavailable, SemanticSourceReasonSegmentSetInvalid
+				case ocrState == "EMPTY" || len(ocrSegments) == 0:
+					row.Disposition, row.Reason = SemanticSourceExcluded, SemanticSourceReasonEmptyText
+				default:
+					row.Disposition = SemanticSourceIndexed
+					for _, semanticSegment := range ocrSegments {
+						semanticSegmentsBySubject[subjectRef] = append(semanticSegmentsBySubject[subjectRef], semanticSegment)
+						row.Inputs = append(row.Inputs, semanticSourceInputFromSegment(semanticSegment, artifact.ID, artifact.ID))
+					}
 				}
-				segmentsBySubject[subjectRef] = append(segmentsBySubject[subjectRef], segment)
+				semanticSourceInventory.Rows = append(semanticSourceInventory.Rows, row)
+				continue
+			}
+			if disposition == SemanticSourceIndexed && artifact.State == sqlite.ArtifactAdmitted {
+				segment := SegmentRef{SourceType: "ARTIFACT", SourceID: artifact.ID, SegmentID: artifact.ID,
+					MatchedText: artifact.Body, Kind: artifact.Stage, Producer: artifact.ProducerDigest, Accepted: true, Language: "und"}
 				row := semanticSourceInventoryRow{SubjectID: subjectRef, SourceKind: "EXTRACT", SourceRef: artifact.ID,
 					Revision: artifact.ID, BodyDigest: artifact.Digest, BodyLength: int64(len(artifact.Body)), Disposition: SemanticSourceIndexed}
 				semanticSegments := []SegmentRef{segment}
@@ -1919,7 +1941,21 @@ func (idx *Indexer) semanticSourceProjection(ctx context.Context, generation sql
 		if err != nil || !ok || artifactSubject != hit.SubjectID || semanticEntrySubject(entry) != hit.SubjectID {
 			return projected, errors.New("generation-pinned extracted source root binding is unavailable")
 		}
-		if row.SegmentationProfileDigest == "" {
+		if row.SegmentationProfileDigest == semanticOCRTextProjectionProfileDigest {
+			if int64(len(artifact.Body)) != row.BodyLength {
+				return projected, errors.New("generation-pinned OCR artifact body length changed")
+			}
+			segments, _, known, valid := projectSemanticOCRArtifact(hit.SubjectID, row.SourceRef, row.Revision, row.BodyDigest, artifact.ProducerDigest, artifact.Body)
+			if !known || !valid || !semanticOCRInputSetMatches(*row, segments) {
+				return projected, errors.New("generation-pinned OCR semantic input set is unavailable or mismatched")
+			}
+			for _, segment := range segments {
+				if segment.SegmentID == proof.SegmentID {
+					projected = segment
+					break
+				}
+			}
+		} else if row.SegmentationProfileDigest == "" {
 			if sha256Text(artifact.Body) != proof.InputDigest || hit.SegmentID != row.SourceRef {
 				return projected, errors.New("legacy generation-pinned extract input is mismatched")
 			}
