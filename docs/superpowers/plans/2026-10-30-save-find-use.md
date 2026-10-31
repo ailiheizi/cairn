@@ -7,6 +7,87 @@
 **Goal:** Complete the admitted everyday save-to-use and retrieval handoffs in
 existing F01 then F03, without starting future domain or AI infrastructure.
 
+## M3 F03 field-scoped lookup — 2026-10-31
+
+**Phase/requirement:** admitted Phase 4 discovery and bounded first-party search;
+content-store §9, the existing named lexical axes and truthful query semantics.
+**Owner:** root decisions/review; Luna implementation and one selected journey.
+
+**Concrete gap:** the client compiles a field-only `name:`, `path:` or `tag:`
+query into `construct_axes`, but always invokes the default fused broker.
+Those axes constrain the lexical lane only; semantic/image candidates can
+therefore reintroduce body/Notes matches outside the field the user specified.
+The retained large-corpus ranks do not establish a model/ranking defect and
+are not grounds for tuning weights or candidate depth in this batch.
+
+**Decision:** field-only plans (`axesRestricted`) explicitly use the existing
+`lexical-metadata-fts` lane. Ordinary free text and typed-filter searches retain
+the existing fused experience. This is deliberate field lookup, not an implicit
+fallback caused by an unavailable model. Existing prefix/phrase matching and
+mixed-free-text widening rules remain unchanged. Surface those existing scope
+limitations in the floating result's existing on-demand explanation, rather
+than keeping them only in a hidden full search header. The explanation heading
+must describe scope as well as availability, without calling a scope choice a
+model failure. If several lexical axes are combined, explain that terms search
+the selected fields together, not as independent per-term field predicates.
+
+**Boundary:** `web/src/app/useSearch.ts`, `lib/searchops.ts`,
+`components/SpaceAssistant.tsx`, `i18n/searchops.ts`, `i18n/spaceAssistant.ts`.
+No backend, endpoint, query grammar/operator, provider, model, index rebuild,
+durable format or new UI surface. Reuse result selection, continued keyword
+pages, matching-source Details and exact original download. Saved-search/list
+unsupported-condition rules stay unchanged.
+
+**One exit:** reuse the existing isolated F04 profile and installed BGE with
+its current generation, without recapturing/rebuilding. The pre-existing
+`CedarBlue317` body belongs to `item-f.docx`; add that exact ordinary TAG once
+to `item-b.docx`. Plain text finds the body target with a real semantic
+component; `name:CedarBlue317` returns no filename hit; `tag:CedarBlue317`
+returns only the tagged target; a filename/path scoped lookup returns the
+independently expected file. Continue from the floating query into Library and
+its existing keyword browse without broadening the field scope; inspect and
+take out the target against its independently retained bytes. Mixed free text
+and mixed field axes expose their actual limits in the existing disclosure.
+No new harness, local test matrix or broad suite; inspect locally only after
+an observed failure or a concrete changed invariant.
+
+**Delivered, 2026-10-31:** Luna implemented and executed the shared journey;
+root reviewed the diff, actual requests/responses and result screenshot.
+The old client-shaped request reproduced the error: `construct_axes=[name]`
+with no dimension returned the body-only `item-f.docx`, despite zero lexical
+name hits. The revised ordinary browser request pins the existing lexical
+dimension and returns zero for `name:CedarBlue317`. Exactly one ordinary TAG
+write put `CedarBlue317` on `item-b.docx`; `tag:CedarBlue317` then returned only
+that file, while positive filename/path queries returned `item-f.docx`.
+
+Ordinary free text and `type:document` retained the fused broker and actual
+local BGE. The Tag write updated only the lexical generation; BGE remained
+available on `idx_91d1f9e8c271b0773725b2dce1c56c71` without another index build.
+Mixed free-text and multiple-axis limitations appeared in the existing
+**About this search** disclosure. Floating-to-Library continuation and the
+explicit keyword page retained the `tags` axis and lexical lane. Details read
+the exact live TAG. The downloaded `item-b.docx` matched its independent input:
+36,990 bytes, SHA-256
+`3fb2bbb6a8249ddf835e5e27202219abeae9628d68be931e2abd04ae0b7ee862`.
+
+Evidence is in ignored `dist/f03-fields-20261031/`: the reproduced legacy
+request, single Tag response, `journey.mjs`/`journey-result.json`, actual query
+records and `floating-tag-result.png`/`library-tag-details.png`. Early driver
+assumptions about single-lane response shape, TAG evidence and axis ordering
+were corrected without replaying the successful write. No backend rebuild,
+recapture, model preparation, local test suite or broad regression ran.
+The final affected Web build, diff check and review passed; zero browser page
+errors were observed. The isolated daemon was stopped and user port 4670 kept
+running; refreshing it loads the shared updated Web build.
+
+One additional product observation remains in F03: the ordinary unscoped opaque
+marker query had two lexical matches, but its body target appeared fourth in
+the fused answer behind image candidates with no literal marker match. This
+is retained evidence for evaluating direct-word versus related-result ordering,
+not proof that the earlier frozen corpus misses have the same cause and not an
+instruction to tune against those labels. No ranking policy changed here.
+Broader actual recall/coverage and core/release qualification remain open.
+
 ## M3 F03 OCR semantic candidate cleanup — 2026-10-31
 
 **Phase/requirement:** admitted Phase 4 search-source lineage under content-store

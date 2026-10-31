@@ -721,11 +721,13 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     const searchIntent = library.beginSearchIntent(workspaceID);
     setBusy(true); report(undefined);
     try {
-      // Leave dimension selection to the typed dispatcher so ordinary search
-      // always uses its lexical + structured + semantic default broker. The
-      // operators only add the typed filters and the lexical field scope the
-      // daemon already accepts.
-      const response = await command(operations.search.query, { workspace_id: workspaceID, ...submittedPlan.request });
+      // Field-only plans deliberately stay in the existing lexical field lane;
+      // ordinary free text and typed-filter plans keep the fused default.
+      const response = await command(operations.search.query, {
+        workspace_id: workspaceID,
+        ...submittedPlan.request,
+        ...(submittedPlan.axesRestricted ? { dimension: KEYWORD_BROWSE_DIMENSION } : {}),
+      });
       if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
       const changedProjections = changedLocalProjectionNames(submittedPlan, workspaceID, projectionAtStart);
       if (changedProjections.length > 0) {
@@ -747,7 +749,11 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       // The floating client projects the same broker response without changing
       // the background query, selection, browse position or presentation.
       if (onResults) {
-        onResults(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })), response.status === "DEGRADED" ? t("Search results are available, but some search coverage is degraded: {{reason}}", { reason: response.reasons?.map((item) => item.message).filter(Boolean).join("; ") || t("Search degradation reason was not reported.") }) : undefined);
+        const coverage = [
+          ...submittedPlan.limits.map((limit) => t(limit)),
+          ...(response.status === "DEGRADED" ? [t("Search results are available, but some search coverage is degraded: {{reason}}", { reason: response.reasons?.map((item) => item.message).filter(Boolean).join("; ") || t("Search degradation reason was not reported.") })] : []),
+        ];
+        onResults(narrowed.hits.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })), coverage.length ? coverage.join("; ") : undefined);
         markConnected();
         return true;
       }

@@ -196,6 +196,14 @@ preview was activated without changing its 20 originals/artifact identities;
 semantic coverage is complete, CLIP READY, absent lexical fields still DEGRADED.
 F03 remains In Progress for broader actual field/recall gaps.
 
+**2026-10-31 field-scope repair:** [Field-only lookup](2026-10-30-save-find-use.md#m3-f03-field-scoped-lookup--2026-10-31)
+now pins the existing lexical lane so semantic recommendations cannot widen
+`name:`, `path:` or `tag:`-only results. Ordinary free text retains fused search;
+mixed-scope limits use the existing disclosure. One live TAG, positive/negative
+field queries, retained Library keyword scope and exact original takeout passed.
+The unscoped direct-word/related-image ordering observation remains in F03;
+this client-only fix does not change model, index or rank policy.
+
 **Dependencies:** Search uses existing saved content (R46 maps to F23). **Scope:** `server/internal/search`, current lexical feeds and search control plane; exact identity unchanged. **Sources:** [Phase 4](../../technical/core-mvp-execution-plan.md#8-phase-4-descriptions-and-complete-discovery), [real-project corpus acceptance](../../technical/real-project-corpus-acceptance-20261016.md).
 
 ### F04 · [AIL-46](https://linear.app/ailiheizi/issue/AIL-46) — Find PDF/DOCX by body and meaning

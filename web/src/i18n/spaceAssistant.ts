@@ -20,7 +20,7 @@ export const spaceAssistant: Record<string, string> = {
   "Keep in Library": "保存到资料库",
   "Advanced Library search": "高级资料检索",
   "List title": "清单标题",
-  "Some search coverage is unavailable": "部分检索覆盖不可用，当前展示可用结果",
+  "About this search": "关于这次检索",
   "Find and organize": "找资料，理清单",
   "Find and organize your space": "使用你的私人空间",
   "Find or organize material": "查找或整理资料",

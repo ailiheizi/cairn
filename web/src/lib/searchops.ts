@@ -575,6 +575,7 @@ export function searchPlan(parsed: ParsedSearchQuery): SearchPlan {
     : "";
   if (overLoadedResults.length > 0) limits.push("Evaluated over the loaded results only: the daemon has no expression for this predicate, so it is applied to the hits this query returned.");
   if (axesWidened && scopedAxes.length > 0) limits.push("Free text widens every field-scoped predicate: the daemon matches each token against all of its indexed fields in one query.");
+  if (axesRestricted && scopedAxes.length > 1) limits.push("All terms are matched across the selected fields together, not bound independently to each field.");
   return {
     request: {
       query: lexicalText,

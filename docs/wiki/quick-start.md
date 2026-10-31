@@ -48,6 +48,17 @@ available semantic generation. A result always points back to the same stable
 file subject; a similarity score never changes file identity or authorizes
 deletion.
 
+For a field-only lookup, use `name:"report.pdf"`, `path:"research"` or
+`tag:reviewed`. These use the existing keyword field lane, so meaning-based
+suggestions from other fields do not enter the answer. Matching still uses
+the existing token/prefix/phrase rules; this is not arbitrary substring or
+exact tag-string matching. Ordinary text continues to combine keyword and
+available meaning/visual search. Adding ordinary text to a field expression
+broadens its scope; multiple named fields are searched together, rather than
+each term being bound to its own field. **About this search** explains those
+limits on demand. Continuing in Library and browsing keyword matches retains
+the submitted field scope.
+
 From Home, use the floating input without replacing the background query. Its
 **Why this matched** disclosure shows returned evidence without reading another
 original. A media result outside the background scope indicates that activation

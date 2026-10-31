@@ -96,6 +96,7 @@ export const searchops: Record<string, string> = {
   "Nothing here reaches the daemon: this text has no lexical token and no typed filter, so there are no results for the remaining predicates to narrow. Add a word, tag:, type:, size:, or a complete hash: value.": "这段文本没有任何词元或类型化过滤器会发送给守护进程，因此剩余谓词没有可供筛选的结果。请加入一个词、tag:、type:、size:，或完整的 hash: 取值。",
   "Evaluated over the loaded results only: the daemon has no expression for this predicate, so it is applied to the hits this query returned.": "仅对已加载结果求值：守护进程无法表达该谓词，因此它只作用于本次查询返回的命中结果。",
   "Free text widens every field-scoped predicate: the daemon matches each token against all of its indexed fields in one query.": "自由文本会放宽所有限定字段的谓词：一次查询中守护进程会把每个词元与全部已索引字段匹配。",
+  "All terms are matched across the selected fields together, not bound independently to each field.": "多个字段会一起查找，不会把每个关键词分别限定在它前面的字段。",
   "Evaluated over the loaded results": "仅对已加载结果求值",
   "Exact duplicates": "精确重复项",
   "Could not apply these filters: {{conditions}}. Their data is unavailable or changed. Previous results are unchanged; refresh and try again.": "无法应用这些条件：{{conditions}}。相关信息暂不可用或已变化，已保留原来的结果，请刷新后重试。",

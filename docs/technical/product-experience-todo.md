@@ -34,6 +34,7 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest M3 screenshot delivery | F05 / [AIL-47](https://linear.app/ailiheizi/issue/AIL-47) | Find screenshots by printed words or paraphrase, read/copy recognized text with honest quality, and take out the original image |
 | Latest M3 visual delivery | F06 / [AIL-48](https://linear.app/ailiheizi/issue/AIL-48) | Describe a scene or find similar from a saved photo, keep query/draft context through browsing, and take out unchanged originals |
 | Latest M3 semantic-source repair | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Keep OCR engine/model/region metadata out of semantic candidates while preserving readable recognized text and original-source identity |
+| Latest M3 field lookup | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Name/path/tag-only lookups stay in their named fields; mixed-scope limits are explained on demand |
 | Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
@@ -218,6 +219,22 @@ No processor/model inputs or backend contracts changed. Selected lexical sources
 are 17/17 in this profile, but overall absent-field diagnostics remain DEGRADED.
 F03's broader recall/field work remains. F06's visual continuation was subsequently
 locally delivered as recorded below. Neither local card closes a core or release gate.
+
+## M3 F03 field-scoped lookup — 2026-10-31
+
+The [field-scope repair](../superpowers/plans/2026-10-30-save-find-use.md#m3-f03-field-scoped-lookup--2026-10-31)
+is locally delivered. Explicit field-only lookups use the existing lexical lane;
+ordinary descriptions and typed filters keep fused discovery. The browser
+journey reproduced a body-only hit leaking into a name lookup, then verified
+zero name hits, one independently tagged target, and positive name/path lookup.
+Continuation through Library/keyword pages retained its axis; the live TAG and
+independently retained 36,990-byte original matched. Mixed-scope explanations
+reuse the existing floating disclosure. No backend/index/model change occurred.
+
+F03 still owns broader actual coverage/recall and the newly observed ordinary
+query ordering case: direct literal body matches can appear behind related
+image candidates. That observation is not a diagnosis of old frozen corpus
+misses; no ranking policy or expected labels changed in this batch.
 
 ## M3 F03 OCR semantic-source repair — 2026-10-31
 
