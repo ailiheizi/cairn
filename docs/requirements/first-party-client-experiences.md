@@ -56,6 +56,20 @@ for unique file targets, with repeated targets visibly described as exported
 once. It MUST NOT claim ordered or occurrence-preserving export. No new kernel
 format, endpoint, provider, processor, list head or persistence is admitted.
 
+The owner's 2026-10-31 direction to advance complete product milestones also
+permits an explicit queue-to-ML-1 snapshot handoff and saved-list entry within
+the existing Music presentation. Queue occurrences MUST be resolved against
+the current host-loaded catalog with their exact digest and length, preserving
+order and repetitions. Any unresolved occurrence or more than 200 occurrences
+MUST refuse the whole handoff without truncating or changing listening state.
+Existing composer review and ordinary capture remain the only save workflow;
+the live queue itself remains transient. A Music saved-list subview MAY list
+loaded regular-file `.cairn-list.json` candidates from metadata only. It MUST
+distinguish candidates from validated lists and disclose loaded-scope limits;
+opening uses the existing explicit bounded identity-checked Reader and ML-2
+actions. It MUST NOT silently read candidate originals, infer music membership,
+change shared query scope or introduce a playlist registry/current head.
+
 ### ML-3: Explicit model candidate for a current material list
 
 The owner's 2026-10-22 approval admits only the F12 scope in the

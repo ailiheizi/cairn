@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useBrowsePositionScopeIdentity, useClientBrowseValue } from "../app/ClientBrowseSession";
 import { useBrowsePosition } from "../app/useBrowsePosition";
-import { MoreHorizontal, Music2, Search } from "lucide-react";
+import { FileText, MoreHorizontal, Music2, Search } from "lucide-react";
 import type { AudioTrack } from "../lib/audioPlayback";
 import { mediaClassFromSuffix } from "../lib/format";
 import { materialListSelectionEligible } from "../lib/materialListIO";
+import type { SearchHit } from "../lib/types";
 import { musicGroupKey, musicPlaybackEligibility, orderRecordedAlbumTracks, playableMusicTrack, sortMusicRows, type MusicSortDirection, type MusicSortField, type MusicTrackFacts } from "../lib/musicMetadata";
 import { GroupList, TrackRow } from "./music/MusicRows";
+import { MaterialListReader } from "./material/MaterialListReader";
 import { buildGroups, filenameFormatToken, groupDurationSummary, matchesCurrentPlayback, musicRowSelectionKey, NO_FILENAME_EXTENSION, playbackStatusText, shuffleTracks, uniqueMusicHits, type MusicLibraryProps as Props, type MusicRow } from "./music/musicHelpers";
 import "./MusicLibraryExperience.css";
 
@@ -14,9 +16,18 @@ type Mode = "tracks" | "artists" | "albums";
 type MusicYearFilter = "all" | "unknown" | `year:${string}`;
 type CurrentTrackRecovery = { workspaceID: string; playbackIdentity: string; expectedViewIdentity: string };
 
+function hasExactSavedListIdentity(hit: SearchHit): boolean {
+  return hit.entry_type === "REGULAR_FILE" && Boolean(hit.entry_id?.trim()) && Boolean(hit.subject_ref?.trim())
+    && /^sha256:[a-f0-9]{64}$/.test(hit.content_id ?? "")
+    && Number.isSafeInteger(hit.logical_size) && (hit.logical_size ?? -1) >= 0;
+}
+
 export function MusicLibraryExperience(props: Props) {
   const { hits, t, workspaceID, tagsBySubject, onPlayTrack, onQueueTrack } = props;
   const [mode, setMode] = useClientBrowseValue<Mode>("music", "mode", "tracks");
+  const [savedListsOpen, setSavedListsOpen] = useClientBrowseValue("music", "saved-lists-open", false);
+  const [selectedSavedList, setSelectedSavedList] = useState<{ workspaceID: string; hit: SearchHit }>();
+  const [savedListOpenRequest, setSavedListOpenRequest] = useState(0);
   const [query, setQuery] = useClientBrowseValue("music", "query", "");
   const [selectedGroup, setSelectedGroup] = useClientBrowseValue<string | undefined>("music", "selected-group", undefined);
   const [selectedGroupFacts, setSelectedGroupFacts] = useState<{ key: string; label: string; artist?: string } | undefined>();
@@ -36,6 +47,14 @@ export function MusicLibraryExperience(props: Props) {
   const detailHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const groupListRef = useRef<HTMLDivElement | null>(null);
   const artistTracksButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousWorkspaceIDRef = useRef(workspaceID);
+  useEffect(() => {
+    if (previousWorkspaceIDRef.current === workspaceID) return;
+    previousWorkspaceIDRef.current = workspaceID;
+    setSelectedSavedList(undefined);
+    setSavedListsOpen(false);
+    setSavedListOpenRequest(0);
+  }, [setSavedListsOpen, workspaceID]);
   const groupOpenButtons = useRef(new Map<string, HTMLButtonElement>());
   const records = props.metadata?.records ?? new Map<string, MusicTrackFacts>();
   const tagStatus = props.favoriteControls?.status ?? "unavailable";
@@ -129,7 +148,7 @@ export function MusicLibraryExperience(props: Props) {
     if (!target || !hits.some(hit => hit.subject_ref === target)) return;
     pendingEntryFocus.current = target;
     setLocatedSubject(target);
-    setMode("tracks"); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined);
+    setSavedListsOpen(false); setSelectedSavedList(undefined); setMode("tracks"); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined);
     setArtistTracksView(false); setQuery(""); setEligibilityFilter("all");
     setFormatFilter("all"); setSelectedTagFilters([]); setYearFilter("all"); setOnlySelectedTracks(false);
   }, [props.focusedSubjectRef, props.focusRequest, hits]);
@@ -186,6 +205,14 @@ export function MusicLibraryExperience(props: Props) {
   const selectedDisplayedHits = useMemo(() => uniqueMusicHits(selectedDisplayedRows.map((row) => row.hit)), [selectedDisplayedRows]);
   const materialListSubjects = selectedDisplayedHits.length ? selectedDisplayedHits : displayedTrackHits;
   const materialListSelectionValid = materialListSelectionEligible(materialListSubjects);
+  const savedListCandidates = useMemo(() => (props.catalogItems ?? []).filter((hit) => hit.entry_type === "REGULAR_FILE" && hit.name?.toLocaleLowerCase("en-US").endsWith(".cairn-list.json")), [props.catalogItems]);
+  const selectedSavedListForWorkspace = selectedSavedList?.workspaceID === workspaceID ? selectedSavedList : undefined;
+  const currentSelectedSavedList = selectedSavedListForWorkspace
+    ? savedListCandidates.find((candidate) => candidate.entry_id === selectedSavedListForWorkspace.hit.entry_id
+      && candidate.subject_ref === selectedSavedListForWorkspace.hit.subject_ref
+      && candidate.content_id === selectedSavedListForWorkspace.hit.content_id
+      && candidate.logical_size === selectedSavedListForWorkspace.hit.logical_size)
+    : undefined;
   const showingTrackRows = mode === "tracks" || Boolean(mode === "albums" && selectedGroup) || Boolean(mode === "artists" && selectedGroup && (selectedArtistAlbum || artistTracksView));
   const currentPlayback = props.queueControls?.currentPlayback;
   const browseScopeIdentity = useBrowsePositionScopeIdentity();
@@ -406,17 +433,19 @@ export function MusicLibraryExperience(props: Props) {
   const artistAlbumLanding = mode === "artists" && Boolean(selectedGroup) && !selectedArtistAlbum && !artistTracksView;
   const detailTrackCount = artistAlbumLanding ? artistTrackRows.length : trackRows.length;
 
-  return <section className="music-library" aria-label={t("Music library")} aria-busy={groupFactsPending}>
+  return <section className="music-library" aria-label={t("Music library")} aria-busy={!savedListsOpen && groupFactsPending}>
     <header className="music-library-heading">
       <div className="music-library-heading__copy">
         <h1>{t("Music")}</h1>
-        {!groupFactsPending && <p className="music-library-heading__count">{t("{{count}} tracks in this view", { count: artistAlbumLanding ? artistTrackRows.length : trackRows.length })}</p>}
+        {!savedListsOpen && !groupFactsPending && <p className="music-library-heading__count">{t("{{count}} tracks in this view", { count: artistAlbumLanding ? artistTrackRows.length : trackRows.length })}</p>}
       </div>
     </header>
     <div className="music-library__toolbar">
       <nav className="music-browse-modes" aria-label={t("Browse music")}>
-        {(["tracks", "artists", "albums"] as const).map((nextMode) => <button key={nextMode} type="button" aria-pressed={mode === nextMode} onClick={() => { groupBrowsePosition.capture(); artistAlbumBrowsePosition.capture(); trackBrowsePosition.capture(); setMode(nextMode); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined); setArtistTracksView(false); setSelectedGroupFacts(undefined); }}>{t(nextMode === "tracks" ? "Tracks" : nextMode === "artists" ? "Artists" : "Albums")}</button>)}
+        {(["tracks", "artists", "albums"] as const).map((nextMode) => <button key={nextMode} type="button" aria-pressed={!savedListsOpen && mode === nextMode} onClick={() => { groupBrowsePosition.capture(); artistAlbumBrowsePosition.capture(); trackBrowsePosition.capture(); setSavedListsOpen(false); setMode(nextMode); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined); setArtistTracksView(false); setSelectedGroupFacts(undefined); }}>{t(nextMode === "tracks" ? "Tracks" : nextMode === "artists" ? "Artists" : "Albums")}</button>)}
+        <button type="button" aria-pressed={savedListsOpen} onClick={() => setSavedListsOpen(true)}>{t("Saved lists")}</button>
       </nav>
+      {!savedListsOpen && <>
       <label className="music-browse-search"><Search aria-hidden="true" /><span className="sr-only">{t("Search music")}</span><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedGroup(undefined); setSelectedArtistAlbum(undefined); setArtistTracksView(false); setSelectedGroupFacts(undefined); }} placeholder={t("Filter music in this view")} /></label>
       <details className="music-tag-filters">
         <summary>{t("Filters and sort")}{(selectedTagFilters.length || onlySelectedTracks || formatFilter !== "all" || query.trim() || eligibilityFilter !== "all" || yearFilter !== "all" || sortField !== "original") ? ` · ${selectedTagFilters.length + Number(onlySelectedTracks) + Number(formatFilter !== "all") + Number(Boolean(query.trim())) + Number(eligibilityFilter !== "all") + Number(yearFilter !== "all") + Number(sortField !== "original")}` : ""}</summary>
@@ -448,7 +477,22 @@ export function MusicLibraryExperience(props: Props) {
           {props.metadata?.reload && <button type="button" className="music-refresh-facts" disabled={props.metadata.status === "loading"} onClick={props.metadata.reload}>{t("Refresh music facts")}</button>}
         </div>
       </details>
+      </>}
     </div>
+    {savedListsOpen ? <section className="music-saved-lists" aria-label={t("Saved lists")}>
+      {selectedSavedListForWorkspace ? <>
+        <button type="button" className="text-button" onClick={() => setSelectedSavedList(undefined)}>{t("Return to saved lists")}</button>
+        {currentSelectedSavedList && hasExactSavedListIdentity(currentSelectedSavedList)
+          ? <MaterialListReader t={t} workspaceID={workspaceID} hit={currentSelectedSavedList} catalogItems={props.catalogItems ?? []} onEdit={props.onEditMaterialList} onUseMaterialList={props.onUseMaterialList} actionsDisabled={Boolean(props.materialListActionsDisabled)} actionsDisabledReason={props.materialListActionsDisabledReason} explicitOpenRequest={savedListOpenRequest} />
+          : <p className="music-saved-lists__empty" role="status">{t("This saved-list candidate changed or left the loaded catalog. Return to the list and choose it again.")}</p>}
+      </> : <>
+        <details className="music-saved-lists__about"><summary>{t("About saved lists")}</summary><p>{t("These are candidate list files in the currently loaded catalog. The Reader validates each file when opened; a list can contain non-music items.")}</p></details>
+        {savedListCandidates.length ? <ul>{savedListCandidates.map((hit) => {
+          const identityReady = hasExactSavedListIdentity(hit);
+          return <li key={`${hit.entry_id ?? ""}:${hit.subject_ref ?? ""}:${hit.content_id ?? ""}:${hit.logical_size ?? ""}`}><button type="button" className="music-saved-list-item" disabled={!identityReady} onClick={() => { setSelectedSavedList({ workspaceID, hit }); setSavedListOpenRequest((request) => request + 1); }}><FileText aria-hidden="true" /><span><strong>{hit.name || t("Untitled material")}</strong><small>{t(identityReady ? "Open saved list in the Music reader" : "This candidate has no complete exact catalog identity and cannot be opened.")}</small></span></button></li>;
+        })}</ul> : <p className="music-saved-lists__empty">{t("No saved-list candidates in the loaded catalog.")}</p>}
+      </>}
+    </section> : <>
     {(query.trim() || eligibilityFilter !== "all" || formatFilter !== "all" || onlySelectedTracks || selectedTagFilters.length > 0 || yearFilter !== "all") && <div className="music-active-filters" aria-label={t("Active local filters")}>
       <span>{t("Active filters")}</span>
       {query.trim() && <button type="button" aria-label={t("Remove search filter") } onClick={() => setQuery("")}>{t("Search: {{value}}", { value: query.trim() })}<span aria-hidden="true"> ×</span></button>}
@@ -543,5 +587,6 @@ export function MusicLibraryExperience(props: Props) {
       {trackRows.map((row) => <TrackRow key={row.hit.subject_ref || row.hit.entry_id || row.hit.name} row={row} props={{ ...props, focusedSubjectRef: locatedSubject }} facts={row.facts} open={open} tabIndex={row.index === rovingIndex ? 0 : -1} onEnterGroup={enterGroup} onToggleSelection={(index) => { props.onToggleSelection(index); establishRangeAnchor(row); }} onRangeSelect={() => selectVisibleRange(row)} />)}
     </div> : groupFactsPending ? null : selectedGroup ? <div className="music-empty"><Music2 /><h2>{t("No tracks match this group in the current view")}</h2><p>{eligibilityFilter !== "all" ? t("Clear the playback availability filter to see all tracks in this group.") : yearFilter !== "all" ? t("Clear the recorded-year filter to see other tracks in this group.") : t("This group has no matching tracks in the current loaded view.")}</p></div> : <div className="music-empty"><Music2 /><h2>{t(onlySelectedTracks ? "No selected tracks match these filters" : selectedTagFilters.length ? "No tracks match the selected tags" : formatFilter !== "all" ? "No tracks match this filename suffix filter" : yearFilter !== "all" ? "No tracks match the recorded-year filter" : query.trim() ? "No tracks match this search" : eligibilityFilter !== "all" ? "No tracks in this availability filter" : "No audio tracks in the loaded listing")}</h2><p>{t("Track names come from original filenames. Metadata and artwork are shown only when real facts are available.")}</p></div>}
     <details className="music-playback-limits"><summary>{t("Playback and format details")}</summary><p>{t("Playback downloads and verifies the complete original first. It supports common browser audio formats up to 32 MiB; seeking starts after verification. Larger or unavailable files can still be downloaded from Details.")}</p></details>
+    </>}
   </section>;
 }

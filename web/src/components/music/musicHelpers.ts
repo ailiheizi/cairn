@@ -6,9 +6,16 @@ import type { MusicCurrentPlayback, MusicQueueControls } from "../../lib/musicQu
 import type { FavoriteControls } from "../../lib/favorites";
 import type { LibraryPageMode, SearchHit } from "../../lib/types";
 import { uniqueSubjectHits } from "../../lib/subjectHits";
+import type { MaterialListDocument } from "../../lib/materialList";
+import type { MaterialListAction } from "../../lib/materialListActions";
 
 type ResultListProps = ComponentProps<typeof ResultList>;
 export type MusicLibraryProps = Pick<ResultListProps, "hits" | "libraryListRef" | "selectionCount" | "rovingRow" | "selectedRef" | "selectionRefs" | "identityCounts" | "tagsBySubject" | "viewMode" | "locale" | "t" | "command" | "workspaceID" | "onRowClick" | "onToggleSelection" | "onKeyDown"> & {
+  catalogItems?: SearchHit[];
+  onUseMaterialList?: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
+  onEditMaterialList?: (document: MaterialListDocument) => void;
+  materialListActionsDisabled?: boolean;
+  materialListActionsDisabledReason?: string;
   onOpenHit?: (hit: SearchHit) => void;
   focusedSubjectRef?: string;
   focusRequest?: number;

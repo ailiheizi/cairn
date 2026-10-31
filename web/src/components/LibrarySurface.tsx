@@ -12,6 +12,8 @@ import { SavedRetrievalPanel } from "./SavedRetrievalPanel";
 import type { ExportFlow, RecalledViewState } from "../app/useExport";
 import type { KeywordBrowseState } from "../app/useSearch";
 import type { AudioTrack } from "../lib/audioPlayback";
+import type { MaterialListDocument } from "../lib/materialList";
+import type { MaterialListAction } from "../lib/materialListActions";
 import { SelectionBar } from "./SelectionBar";
 import { SourcesSurface } from "./SourcesSurface";
 import { TimelineStrip } from "./TimelineStrip";
@@ -33,7 +35,7 @@ import "./LibraryWorkflow.css";
 // Every control here changes a browser projection or opens a drawer; none of
 // them writes durable state directly.
 
-export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, visualSearchContext, onReturnToAllPhotos, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject, retrievalFlow }: {
+export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, onUseMaterialList, onEditMaterialList, materialListActionsDisabled = false, materialListActionsDisabledReason = "", materialListCreationDisabled = false, catalogItems, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, visualSearchContext, onReturnToAllPhotos, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject, retrievalFlow }: {
   t: Translator;
   locale: Locale;
   workspaceID: string;
@@ -68,7 +70,12 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   originalTakeoutBusy?: boolean;
   onDownloadOriginals?: (subjects: SearchHit[]) => void;
   onCreateMaterialList?: (subjects: SearchHit[]) => void;
+  onUseMaterialList?: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
+  onEditMaterialList?: (document: MaterialListDocument) => void;
+  materialListActionsDisabled?: boolean;
+  materialListActionsDisabledReason?: string;
   materialListCreationDisabled?: boolean;
+  catalogItems: SearchHit[];
   refresh: () => void;
   onOpenAdd: (trigger?: EventTarget | null) => void;
   onViewSource: (sourceItem: SourceSummary) => void;
@@ -510,7 +517,9 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
         <div ref={selectionActionsRef} className="selection-actions-focus-target" role="group" tabIndex={-1} aria-label={t("Selection actions")}><SelectionBar count={selection.selectionSubjects.length} subjects={selection.selectionSubjects} unresolvedCount={selection.selectionRefs.length - selection.selectionSubjects.length} workspaceID={workspaceID} locale={locale} viewMode={viewMode} query={lastExecutedQuery} tagDraft={selection.selectionTagDraft} tagActionsReady={selection.tagActionsReady} tagActionsUnavailableMessage={selection.tagActionsUnavailableMessage} tagMatchCount={selection.selectionTagMatchCount} favoriteMatchCount={selection.selectionTagMatchCount(FAVORITE_TAG)} busy={busy} originalTakeoutBusy={originalTakeoutBusy} t={t} onSelectAll={domainOwnsSelection ? undefined : selection.selectAllVisible} onInvertSelection={domainOwnsSelection ? undefined : selection.invertVisibleSelection} onExport={(trigger) => onOpenExport(trigger, selection.selectionSubjects)} onDownloadOriginals={onDownloadOriginals} onCreateMaterialList={onCreateMaterialList} materialListCreationDisabled={materialListCreationDisabled} onTagDraft={selection.setSelectionTagDraft} onApplyTag={() => void selection.applySelectionTag()} tagQueue={selection.selectionTagQueue} tagQueueDraft={selection.selectionTagQueueDraft} onTagQueueDraft={selection.setSelectionTagQueueDraft} onAddQueuedTag={selection.addSelectionTagToQueue} onRemoveQueuedTag={selection.removeQueuedSelectionTag} onClearQueuedTags={selection.clearQueuedSelectionTags} onApplyQueuedTags={() => void selection.applySelectionTagQueue()} onRemoveTag={() => void selection.removeSelectionTag()} onAddFavorite={() => void selection.addSelectionFavorite()} onRemoveFavorite={() => void selection.removeSelectionFavorite()} onClear={selection.clearSelection} onImageSearch={onImageSearch} tagMutationProgress={selection.tagMutationProgress} onStopTagMutation={selection.stopSelectionTagMutation} onRefreshTagState={() => void selection.refreshSelectionTagState()} /></div>
       </details>}
       {isMediaView ? <LibraryPageHost
-        mode={presentationMode} enabledPageIds={enabledViews} resultProps={resultProps}
+        mode={presentationMode} enabledPageIds={enabledViews} resultProps={resultProps} catalogItems={catalogItems}
+        onUseMaterialList={onUseMaterialList} onEditMaterialList={onEditMaterialList}
+        materialListActionsDisabled={materialListActionsDisabled} materialListActionsDisabledReason={materialListActionsDisabledReason}
         onOpenHit={onOpenHit} focusedSubjectRef={focusedSubjectRef} focusRequest={focusRequest} onFocusSubject={onFocusSubject}
         onPlayTrack={onPlayTrack} onQueueTrack={onQueueTrack} onPlayTracks={onPlayTracks}
         musicMetadata={musicMetadata} favoriteControls={favoriteControls} musicQueueControls={musicQueueControls} photoLoading={!library.libraryLoaded}

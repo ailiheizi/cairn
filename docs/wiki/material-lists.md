@@ -100,11 +100,31 @@ through ordinary text intake, then selected from the loaded catalog:
 They are instructions for the explicitly chosen organizer or external AI
 handoff, not executable Skills or automatic tag/list updates.
 
+## Keep a listening queue and use it again
+
+In Music, open **Queue** and choose **Save queue as list**. The editor receives
+the complete current sequence, including repeated songs: A/B/A stays A/B/A.
+Name it and use **Review and save files**, then explicitly confirm the save.
+Opening, cancelling or saving this snapshot does not stop or rearrange listening.
+
+Next time, open **Music → Saved lists**. This lists candidate `.cairn-list.json`
+files from your currently loaded content, including mixed-content lists. Click
+one to verify and open it directly inside Music, then play in list order,
+append its audio or take out unique originals. Return to **Saved lists** or
+**Tracks** to browse again. Candidate filenames alone do not validate a list;
+no candidate original is read until you open it.
+
+The live queue clears on browser reload. Only a confirmed ordinary snapshot is
+saved. A queue above 200 occurrences or containing an unresolved member cannot
+be saved as a whole list; nothing is silently omitted. Listening retains its
+existing 1,000-entry queue and 32 MiB-per-original playback limits.
+
 ## Reopen and use
 
 Find the saved `.cairn-list.json` file, open Details and choose **Open saved
 list**. The reader checks the original file's SHA-256 and length, validates the
 body, and checks the retained Skill text. It displays every occurrence in order.
+Music's **Saved lists** entry opens the same reader directly in that page.
 Resolved members offer the ordinary verified original download.
 The list appears before **Original JSON**, whose raw preview stays closed until
 you explicitly open it.

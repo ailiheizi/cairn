@@ -27,6 +27,7 @@ import { useRestore } from "./app/useRestore";
 import { useExport } from "./app/useExport";
 import { useSavedViews } from "./app/useSavedViews";
 import { useAudioPlayback } from "./app/useAudioPlayback";
+import type { AudioQueueEntry } from "./lib/audioPlayback";
 import { useMusicMetadata } from "./app/useMusicMetadata";
 import { useFavorites } from "./app/useFavorites";
 import { useOriginalTakeout } from "./app/useOriginalTakeout";
@@ -55,7 +56,7 @@ import { VerificationDrawer } from "./components/VerificationDrawer";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SpaceAssistant, type SpaceAssistantHandle } from "./components/SpaceAssistant";
 import { MaterialListComposer } from "./components/material/MaterialListComposer";
-import type { MaterialListDocument } from "./lib/materialList";
+import { MATERIAL_LIST_LIMITS, type MaterialListDocument } from "./lib/materialList";
 import "./styles/index.css";
 import "./components/PrivateSpaceShell.css";
 import "./styles/content-space-transition.css";
@@ -827,6 +828,30 @@ function App() {
     rememberDrawerTrigger();
     setMaterialListEditor({ workspaceID, subjects: [...subjects], ...(initialDocument ? { initialDocument } : {}) });
   }
+  function saveQueueAsMaterialList(queue: AudioQueueEntry[]) {
+    if (!queue.length) return;
+    if (queue.length > MATERIAL_LIST_LIMITS.items) {
+      setNotice({ kind: "warning", text: t("A material list can contain at most 200 selected items; no list was created.") });
+      return;
+    }
+    const subjects: SearchHit[] = [];
+    for (const occurrence of queue) {
+      const hint = occurrence.sourceHit;
+      if (occurrence.workspaceID !== workspaceID || !hint?.subject_ref?.trim()) {
+        setNotice({ kind: "warning", text: t("The queue contains an occurrence that cannot be matched to the current loaded catalog; no list was created.") });
+        return;
+      }
+      const exact = library.libraryItems.find((hit) => hit.entry_type === "REGULAR_FILE"
+        && hit.entry_id === occurrence.entryID && hit.content_id === occurrence.contentID
+        && hit.logical_size === occurrence.logicalSize && hit.subject_ref === hint.subject_ref);
+      if (!exact) {
+        setNotice({ kind: "warning", text: t("The queue contains an occurrence that cannot be matched to the current loaded catalog; no list was created.") });
+        return;
+      }
+      subjects.push(exact);
+    }
+    openMaterialListEditor(subjects);
+  }
   function saveMaterialListFiles(files: File[], capturedWorkspaceID: string) {
     if (workspaceIDRef.current !== capturedWorkspaceID || !files.length || !isConnected || isUnavailable || !coreStorageReady
       || settingsOpen || addOpen || restoreOpen || exportOpen || verificationOpen || sourceIntakeIsPending()) {
@@ -1347,6 +1372,7 @@ function App() {
           enabledViews={libraryViews.enabledViewIds}
           onLibraryView={openLibrarySurfaceAnimated}
           library={library}
+          catalogItems={library.libraryItems}
           selection={selection}
           sources={sources}
           view={view}
@@ -1373,6 +1399,10 @@ function App() {
           originalTakeoutBusy={originalTakeoutBusy}
           onDownloadOriginals={(subjects) => { void originalTakeout.start(resolveArchiveSelectionSizes(subjects, library.libraryItems)); }}
           onCreateMaterialList={(subjects) => openMaterialListEditor(resolveArchiveSelectionSizes(subjects, library.libraryItems))}
+          onUseMaterialList={useMaterialList}
+          onEditMaterialList={(document) => openMaterialListEditor([], document)}
+          materialListActionsDisabled={Boolean(materialListActionsDisabledReason())}
+          materialListActionsDisabledReason={materialListActionsDisabledReason()}
           materialListCreationDisabled={!workspaceID || !isConnected || isUnavailable || !coreStorageReady || !library.libraryLoaded || drawerOpen || settingsOpen || sourceIntakeIsPending()}
           refresh={() => void refresh()}
           onOpenAdd={addSource}
@@ -1499,7 +1529,7 @@ function App() {
       onOpen={(hit, resultQuery) => openLibraryEntry(hit, resultQuery)} entryHint={searchEntryHint} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />
-    <AudioPlayer playback={audioPlayback} t={t} onOpenDetails={(track) => {
+    <AudioPlayer playback={audioPlayback} t={t} onSaveQueueAsMaterialList={saveQueueAsMaterialList} onOpenDetails={(track) => {
       const matchesTrack = (hit: SearchHit | undefined): hit is SearchHit => Boolean(
         track.workspaceID === workspaceID && hit && hit.entry_type === "REGULAR_FILE" && hit.subject_ref?.trim() &&
         hit.entry_id === track.entryID && hit.content_id === track.contentID && hit.logical_size === track.logicalSize,

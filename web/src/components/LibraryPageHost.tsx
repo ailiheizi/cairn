@@ -18,6 +18,8 @@ import type { MusicMetadataState } from "../lib/musicMetadata";
 import type { FavoriteControls } from "../lib/favorites";
 import type { MusicQueueControls } from "../lib/musicQueueControls";
 import { downloadOriginal } from "../lib/contentDownload";
+import type { MaterialListDocument } from "../lib/materialList";
+import type { MaterialListAction } from "../lib/materialListActions";
 
 export type LibraryResultProps = ComponentProps<typeof ResultList>;
 type ExhibitionProps = {
@@ -43,6 +45,11 @@ export type LibraryPageHostProps = {
   mode: ViewMode;
   enabledPageIds?: ReadonlySet<LibraryPageId>;
   resultProps: LibraryResultProps;
+  catalogItems?: SearchHit[];
+  onUseMaterialList?: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
+  onEditMaterialList?: (document: MaterialListDocument) => void;
+  materialListActionsDisabled?: boolean;
+  materialListActionsDisabledReason?: string;
   onOpenHit: (hit: SearchHit) => void;
   focusedSubjectRef?: string;
   focusRequest?: number;
@@ -95,9 +102,14 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest,
   />;
 }
 
-function renderMusic({ resultProps, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
+function renderMusic({ resultProps, catalogItems, onUseMaterialList, onEditMaterialList, materialListActionsDisabled, materialListActionsDisabledReason, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
   return <MusicLibraryExperience
     {...resultProps}
+    catalogItems={catalogItems}
+    onUseMaterialList={onUseMaterialList}
+    onEditMaterialList={onEditMaterialList}
+    materialListActionsDisabled={materialListActionsDisabled}
+    materialListActionsDisabledReason={materialListActionsDisabledReason}
     focusedSubjectRef={focusedSubjectRef}
     focusRequest={focusRequest}
     onFocusSubject={onFocusSubject}

@@ -107,6 +107,8 @@ export const materialList: Record<string, string> = {
   "Only references already in this draft are accepted. Imported text is treated as data; it is never executed.": "只接受此草稿中已有的引用。导入文本按数据处理，不会执行。",
   "Open list": "打开列表",
   "Open saved list": "打开已保存列表",
+  "A material list can contain at most 200 selected items; no list was created.": "资料清单最多可包含 200 项；未创建清单。",
+  "The queue contains an occurrence that cannot be matched to the current loaded catalog; no list was created.": "队列中有一项无法与当前已加载目录匹配；未创建清单。",
   "Opening list…": "正在打开列表…",
   "Ordered items": "有序项目",
   "Organizing Skill (optional)": "整理 Skill（可选）",

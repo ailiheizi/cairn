@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { Download, Edit3, FileText, ListPlus, Music2, RefreshCw } from "lucide-react";
 import type { Translator } from "../../i18n";
@@ -9,7 +9,7 @@ import { projectMaterialListActions, type MaterialListAction } from "../../lib/m
 import type { SearchHit } from "../../lib/types";
 import "./materialList.css";
 
-export function MaterialListReader({ t, workspaceID, hit, catalogItems, onEdit, onUseMaterialList, actionsDisabled = false, actionsDisabledReason = "" }: {
+export function MaterialListReader({ t, workspaceID, hit, catalogItems, onEdit, onUseMaterialList, actionsDisabled = false, actionsDisabledReason = "", explicitOpenRequest }: {
   t: Translator;
   workspaceID: string;
   hit: SearchHit;
@@ -18,11 +18,14 @@ export function MaterialListReader({ t, workspaceID, hit, catalogItems, onEdit, 
   onUseMaterialList?: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;
+  /** A non-default value requests opening only after an explicit parent action. */
+  explicitOpenRequest?: number;
 }) {
   const hitKey = JSON.stringify([workspaceID, hit.entry_id, hit.subject_ref, hit.content_id, hit.logical_size]);
   const hitKeyRef = useRef(hitKey);
   hitKeyRef.current = hitKey;
   const requestRef = useRef<AbortController | null>(null);
+  const lastExplicitOpenRequestRef = useRef<number | undefined>(undefined);
   const [document, setDocument] = useState<MaterialListDocument>();
   const [documentKey, setDocumentKey] = useState("");
   const [opened, setOpened] = useState(false);
@@ -47,7 +50,7 @@ export function MaterialListReader({ t, workspaceID, hit, catalogItems, onEdit, 
     };
   }, [hitKey]);
 
-  function openList() {
+  const openList = useCallback(() => {
     if (currentDocument) { setOpened(true); return; }
     setLoading(true);
     setError("");
@@ -67,7 +70,13 @@ export function MaterialListReader({ t, workspaceID, hit, catalogItems, onEdit, 
       if (!controller.signal.aborted && hitKeyRef.current === key) setLoading(false);
       if (requestRef.current === controller) requestRef.current = null;
     });
-  }
+  }, [currentDocument, hit, t, workspaceID]);
+
+  useEffect(() => {
+    if (explicitOpenRequest === undefined || lastExplicitOpenRequestRef.current === explicitOpenRequest) return;
+    lastExplicitOpenRequestRef.current = explicitOpenRequest;
+    openList();
+  }, [explicitOpenRequest, openList]);
 
   function closeList() {
     setOpened(false);

@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Maximize2, Music2, Pause, Play, Repeat, Repeat1, Se
 import type { useAudioPlayback } from "../app/useAudioPlayback";
 import type { Translator } from "../i18n";
 import { sameQueueOccurrence } from "../lib/playbackQueue";
+import type { AudioQueueEntry } from "../lib/audioPlayback";
 import "./AudioPlayer.css";
 
 type Playback = ReturnType<typeof useAudioPlayback>;
@@ -52,7 +53,7 @@ function clock(seconds: number) {
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 }
 
-export function AudioPlayer({ playback, t, onOpenDetails }: { playback: Playback; t: Translator; onOpenDetails?: (track: NonNullable<Playback["track"]>) => boolean | void }) {
+export function AudioPlayer({ playback, t, onOpenDetails, onSaveQueueAsMaterialList }: { playback: Playback; t: Translator; onOpenDetails?: (track: NonNullable<Playback["track"]>) => boolean | void; onSaveQueueAsMaterialList?: (queue: AudioQueueEntry[]) => void }) {
   const queuePanelRef = useRef<HTMLDivElement>(null);
   const queueSummaryRef = useRef<HTMLElement>(null);
   const queueHeadingRef = useRef<HTMLElement>(null);
@@ -323,6 +324,7 @@ export function AudioPlayer({ playback, t, onOpenDetails }: { playback: Playback
         {currentQueueTrackHidden && <p className="audio-player-queue-current-hidden" role="status">{t("The current track is hidden by this filter.")} <button type="button" onClick={() => { setQueueFilter(""); requestAnimationFrame(() => queueFilterRef.current?.focus()); }}>{t("Show current track")}</button></p>}
         <div className="audio-player-queue-tools">
           {playback.queue.length > 0 && !playback.track && <button type="button" className="audio-queue-start" onClick={() => void playback.play(playback.queue[0])}><Play />{t("Play queue")}</button>}
+          {playback.queue.length > 0 && onSaveQueueAsMaterialList && <button type="button" onClick={() => onSaveQueueAsMaterialList(playback.queue.map((entry) => ({ ...entry })))}>{t("Save queue as list ({{count}})", { count: playback.queue.length })}</button>}
           <button type="button" disabled={playback.queue.length < 2} onClick={playback.shuffleUpcoming}><Shuffle />{t("Shuffle upcoming")}</button>
           <button type="button" aria-label={t("Repeat mode: {{mode}}", { mode: t(playback.repeatMode) })} onClick={playback.cycleRepeatMode}>{playback.repeatMode === "one" ? <Repeat1 /> : <Repeat />}{t("Repeat: {{mode}}", { mode: t(playback.repeatMode) })}</button>
         </div>

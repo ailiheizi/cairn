@@ -28,6 +28,18 @@
 .music-refresh-facts { flex: 0 0 auto; min-height: 2rem; padding: .3rem .7rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: transparent; font: inherit; font-size: .76rem; cursor: pointer; }
 .music-refresh-facts:hover { color: var(--ink); background: var(--surface-soft); }
 .music-refresh-facts:disabled { opacity: .5; cursor: default; }
+.music-saved-lists { min-width: 0; display: grid; gap: .8rem; }
+.music-saved-lists__about { color: var(--muted); font-size: .82rem; }
+.music-saved-lists__about summary { width: fit-content; cursor: pointer; }
+.music-saved-lists__about p { max-width: 48rem; margin: .45rem 0 0; line-height: 1.5; }
+.music-saved-lists ul { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.music-saved-list-item { width: 100%; min-height: 3.2rem; display: flex; align-items: center; gap: .7rem; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: .75rem; color: var(--ink); background: var(--surface); text-align: left; font: inherit; cursor: pointer; }
+.music-saved-list-item:hover { background: var(--surface-soft); }
+.music-saved-list-item svg { flex: 0 0 auto; color: var(--muted); }
+.music-saved-list-item span { min-width: 0; display: grid; gap: .15rem; }
+.music-saved-list-item strong { overflow-wrap: anywhere; }
+.music-saved-list-item small, .music-saved-lists__empty { color: var(--muted); font-size: .78rem; }
+.music-saved-list-item:disabled { opacity: .55; cursor: default; }
 
 /* Local search: a filter over the displayed/loaded scope, not a library query. */
 .music-browse-search { display: flex; align-items: center; gap: .5rem; flex: 1 1 18rem; min-width: min(100%, 12rem); max-width: 34rem; min-height: 2.6rem; padding: 0 .8rem; border: 1px solid var(--line); border-radius: .7rem; background: var(--surface); }

@@ -13,6 +13,7 @@ export const queueExperience: Record<string, string> = {
   "This listening queue is cleared on refresh.": "刷新页面后会清空此聆听队列。",
   "{{count}} displayed items were unavailable or unsupported and were not added.": "有 {{count}} 个当前显示项目不可用或格式不受支持，因此未加入队列。",
   "Play queue": "播放队列",
+  "Save queue as list ({{count}})": "将队列保存为清单（{{count}}）",
   "Queue item {{position}}: {{name}}": "队列第 {{position}} 项：{{name}}",
   "Move queue item {{position}} up: {{name}}": "将队列第 {{position}} 项上移：{{name}}",
   "Move queue item {{position}} down: {{name}}": "将队列第 {{position}} 项下移：{{name}}",

@@ -35,15 +35,17 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest M3 visual delivery | F06 / [AIL-48](https://linear.app/ailiheizi/issue/AIL-48) | Describe a scene or find similar from a saved photo, keep query/draft context through browsing, and take out unchanged originals |
 | Latest M3 semantic-source repair | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Keep OCR engine/model/region metadata out of semantic candidates while preserving readable recognized text and original-source identity |
 | Latest M3 field lookup | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Name/path/tag-only lookups stay in their named fields; mixed-scope limits are explained on demand |
-| Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
+| Latest whole milestone stage | M5 / F15 / [AIL-54](https://linear.app/ailiheizi/issue/AIL-54) | [Music daily use delivered](../superpowers/plans/2026-10-31-music-daily-use.md): queue snapshot → reviewed save → find again within Music → ordered listening and unique-original takeout |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
 At most one whole feature enters implementation. F02's bounded baseline is now
 Done after the named journey. F01's session-resume and save-to-use continuation
 is now locally delivered; F03's selected result-use/real-local-query continuation is now locally delivered.
 Further field/recall and domain gaps remain in their existing cards and core plan.
-F01 is Done for the selected browser workflow; F03 remains In Progress for its
-remaining field/recall gaps, and F28 is Done for this documentation version.
+F01 is Done for the selected browser workflow; F03 returns to Todo for its
+remaining field/recall gaps, with no new F03 patch active in this batch. F15 is
+Done for the selected M5 daily-use stage; its S1 baseline remains valid. F28 is Done
+for the preceding documentation delivery.
 A completed baseline card
 does not promise every mature-product feature or release qualification.
 
