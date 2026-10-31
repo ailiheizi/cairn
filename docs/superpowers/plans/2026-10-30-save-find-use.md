@@ -256,3 +256,20 @@ applicable; this change did not alter model execution, grants or candidate rules
 This closes the selected M1 client loop. Continue existing M2 daily-use and M3
 retrieval gaps; no future refresh, general AI, domain service or core/release
 qualification is implied.
+
+## Composer scroll refinement — 2026-10-31
+
+The owner reported the native scrollbar in the floating input. Its fixed 46px
+height left three text lines at 93px scroll height, and a short single-line
+height could expose a native track with platform/zoom rounding. The composer
+now measures its text, grows from 46px to the existing 110px ceiling and only
+enables vertical scrolling beyond that ceiling. Width-only ResizeObserver
+updates avoid height feedback; ordinary draft, focus and search semantics stay
+unchanged. Shared scrollbars have thin themed thumbs and transparent tracks,
+with forced-color fallback and no replacement scroll engine.
+
+The selected compose/search journey passed for empty, three-line, long text,
+expand/return with exact draft preservation, zoom, shrink and actual search.
+No browser exceptions occurred. The built real dark UI screenshot is retained
+at `dist/scrollbar-refinement-20261031.png`; build and diff check passed. This
+is frontend presentation maintenance, not a core phase or media-budget change.

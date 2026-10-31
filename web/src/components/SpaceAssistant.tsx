@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { Ref } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowUp, ArrowUpRight, Bookmark, FileText, FolderOpen, ListMusic, LoaderCircle, Maximize2, Paperclip, Plus, Search, Sparkles, X } from "lucide-react";
@@ -33,6 +33,26 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
   const [coverage, setCoverage] = useState("");
   const disabled = blocked || busy || working || !workspaceID;
   const full = expanded || showResult;
+  useLayoutEffect(() => {
+    const field = input.current;
+    if (!field) return;
+    const resize = () => {
+      field.style.height = "0px";
+      const limit = Number.parseFloat(getComputedStyle(field).maxHeight) || 110;
+      const height = Math.min(field.scrollHeight, limit);
+      field.style.height = `${height}px`;
+      field.style.overflowY = field.scrollHeight > limit ? "auto" : "hidden";
+    };
+    resize();
+    let width = field.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (field.clientWidth === width) return;
+      width = field.clientWidth;
+      resize();
+    });
+    observer.observe(field);
+    return () => observer.disconnect();
+  }, [draft, active, full]);
   useEffect(() => () => { request.current++; controller.current?.abort(); }, []);
   useEffect(() => {
     if (!active || !open || full || blocked) return;

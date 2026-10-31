@@ -5,6 +5,13 @@ contrast fallbacks, and the screen-reader-only utility. Nothing here owns a
 surface; everything here is shared by all of them. */
 
 * { box-sizing: border-box; }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 42%, transparent) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 42%, transparent); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 68%, transparent); }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (forced-colors: active) { * { scrollbar-color: auto; } }
 html { color-scheme: dark; }
 body { min-width: 0; min-height: 100vh; margin: 0; background: var(--surface); }
 body.drawer-open { overflow: hidden; }
