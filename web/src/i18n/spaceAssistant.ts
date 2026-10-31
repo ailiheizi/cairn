@@ -1,4 +1,8 @@
 export const spaceAssistant: Record<string, string> = {
+  "Saved searches": "常用查找",
+  "Save this search": "保存这次查找",
+  "Close saved searches": "关闭常用查找",
+  "Saved search: {{name}}": "已保存查找：{{name}}",
   "Organize all {{count}} files": "整理全部 {{count}} 个文件",
   "Opens this search in its dedicated page": "在此搜索的专属页面中打开",
   "This result changed or is no longer returned. Search again; your previous view is unchanged.": "这项结果已变化或不再匹配。请重新查找，原页面范围保持不变。",

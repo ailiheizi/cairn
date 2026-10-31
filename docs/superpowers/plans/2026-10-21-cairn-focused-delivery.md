@@ -279,6 +279,16 @@ all field coverage, model distribution or core/release gates.
 
 **Finished looks like:** Save a tag/type search, restart, recall more than one page, edit/copy it, then freeze and take out results; later catalog changes do not change the existing manifest.
 
+**2026-10-31 F08 client closure:** Floating results now offer on-demand named
+search review and same-library reopening. The real selected flow preserved the
+submitted suffix condition and unsent draft, reloaded, copied and explicitly
+revised the query, rejected superseded recall before result installation, and
+took out the matching exact original through Music. Existing SavedView paging
+and frozen-export behavior/evidence remain unchanged. See the
+[current batch](2026-10-30-save-find-use.md#m2-f08-saved-search-continuation--2026-10-31).
+The current admitted client scope is Done; unsupported conditions and semantic
+ranking remain visibly outside this dynamic keyword/structured view.
+
 **Dependencies:** None beyond existing discovery. **Scope:** `useSavedViews`, SavedRetrieval components and existing operations; no wider query semantics. **Sources:** [SavedView contract](../../requirements/content-store-views-and-exports.md#72-savedview), [current client ledger](../../technical/product-experience-todo.md#structure-cleanup-2026-10-20).
 
 ### F09 · [AIL-5](https://linear.app/ailiheizi/issue/AIL-5) — Save materials and instructions as a reusable list

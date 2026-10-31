@@ -25,7 +25,7 @@ export type SavedViewsFlow = {
   saveSavedRetrievalView: (name: string, query: string, fields: string[], unsupportedConditions: string[], replacing?: SavedViewData, copyingFrom?: SavedViewData) => Promise<SavedViewData | undefined>;
   loadSavedViews: () => Promise<void>;
   loadSavedRetrievalForEdit: (view: SavedViewData) => Promise<SavedViewData | undefined>;
-  recallSavedView: (view: SavedViewData) => Promise<RecallOutcome>;
+  recallSavedView: (view: SavedViewData, acceptRecall?: () => boolean) => Promise<RecallOutcome>;
   continueRecalledViewPage: () => Promise<void>;
   refreshRecalledView: () => Promise<RecallOutcome>;
   invalidateForSearch: () => void;
@@ -331,7 +331,7 @@ export function useSavedViews({ t, workspaceID, viewMode, lastExecutedQuery, lib
       setSavedViewsError(error instanceof Error ? error.message : t("Saved views are unavailable."));
     } finally { if (isCurrentRead()) setSavedViewsLoading(false); }
   }
-  async function recallSavedView(view: SavedViewData): Promise<RecallOutcome> {
+  async function recallSavedView(view: SavedViewData, acceptRecall?: () => boolean): Promise<RecallOutcome> {
     const viewID = view?.view_id?.trim() ?? "";
     if (!viewID) return { kind: "stale" };
     if (!canLeaveSettings() || !canLeaveDetailDrafts()) return { kind: "stale" };
@@ -359,7 +359,7 @@ export function useSavedViews({ t, workspaceID, viewMode, lastExecutedQuery, lib
       // predate a successor revision, and the library caption must describe
       // the view that was actually evaluated.
       const current = await command(operations.view.get, { view_id: viewID });
-      if (currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID)) return { kind: "stale" };
+      if (currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID) || (acceptRecall && !acceptRecall())) return { kind: "stale" };
       const resolved = current.data as SavedViewData | undefined;
       const fieldsAreValid = resolved?.fields === undefined
         || (Array.isArray(resolved.fields) && resolved.fields.every((field) => typeof field === "string"));
@@ -381,7 +381,7 @@ export function useSavedViews({ t, workspaceID, viewMode, lastExecutedQuery, lib
       // different saved scope instead of the library they are looking at.
       const storedScope = resolved.scope?.trim() ?? "";
       const evaluation = await command(operations.view.evaluate, { view_id: viewID, page: { limit: libraryPageSize } });
-      if (recallRequestRef.current !== request || currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID)) return { kind: "stale" };
+      if (recallRequestRef.current !== request || currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID) || (acceptRecall && !acceptRecall())) return { kind: "stale" };
       const evaluationData = evaluation.data as Record<string, unknown> | undefined;
       if ((evaluation.status !== "SUCCEEDED" && evaluation.status !== "DEGRADED")
         || !evaluationData) {
@@ -411,7 +411,7 @@ export function useSavedViews({ t, workspaceID, viewMode, lastExecutedQuery, lib
         const pageReason = error instanceof Error ? t(error.message) : t("The saved view page did not match the current bounded result scope. Reopen it to refresh the results.");
         throw new Error(t("Saved view evaluation is degraded, but its result page could not be confirmed: {{reason}}", { reason: `${degradedReason} ${pageReason}`.trim() }));
       }
-      if (recallRequestRef.current !== request || currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID)) return { kind: "stale" };
+      if (recallRequestRef.current !== request || currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID) || (acceptRecall && !acceptRecall())) return { kind: "stale" };
       const evaluatedHits = firstPage.hits;
       const sameWorkspace = firstPage.workspaceID === requestWorkspaceID;
       const loadedItems = sameWorkspace ? library.currentLibraryItems(requestWorkspaceID) : [];
@@ -460,7 +460,7 @@ export function useSavedViews({ t, workspaceID, viewMode, lastExecutedQuery, lib
       // The caller closes the export drawer after the library result is committed.
       return { kind: "success" };
     } catch (error) {
-      if (currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID)) return { kind: "stale" };
+      if (currentWorkspaceRef.current !== requestWorkspaceID || !library.isCurrentSearchIntent(searchIntent, requestWorkspaceID) || (acceptRecall && !acceptRecall())) return { kind: "stale" };
       const message = error instanceof Error ? t(error.message) : t("Could not evaluate this saved view.");
       // A refused view has no membership to show. Drop the recalled projection,
       // and when the library was actually displaying a previous view's hits,

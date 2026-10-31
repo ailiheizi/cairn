@@ -273,3 +273,61 @@ expand/return with exact draft preservation, zoom, shrink and actual search.
 No browser exceptions occurred. The built real dark UI screenshot is retained
 at `dist/scrollbar-refinement-20261031.png`; build and diff check passed. This
 is frontend presentation maintenance, not a core phase or media-budget change.
+
+## M2 F08 saved-search continuation — 2026-10-31
+
+Active batch: admitted Phase 4/5 parallel first-party SavedView ergonomics under
+content-store §7.2 and F08. Goal: save the explicitly submitted floating query,
+reload, open the named current evaluation in Library and use/take out results.
+Existing dynamic keyword/structured semantics stay distinct from ordinary fixed
+lists, semantic ranking and frozen exports. No backend or persistent format
+change, new query authority, model call or runtime package is needed.
+
+Decision: add on-demand Save this search and Saved searches access in the
+existing floating layer. Reuse `buildSavedRetrievalCandidate` with the submitted
+floating query and no hidden background filters; reuse `SavedRetrievalEditor`
+and `useSavedViews` for naming, exact conditions, same-name review, edit/copy,
+readiness and revision checks. Only explicit recall replaces the host scope
+through its normal paged flow and shows Library. Creating/opening the saved
+search panel must not change background scope. Same-library saved rows use their
+stored workspace; failed/unknown states are visible. Explain that saved searches
+rerun supported keyword/filters, rather than freezing semantic results.
+
+- [x] Wire one compiled `FloatingSavedSearches` projection and existing host
+  props/callbacks in `SpaceAssistant.tsx`/`main.tsx`; add existing i18n/CSS only
+  as needed. One new component may reuse existing editor; no second save or
+  evaluation implementation. Keep management and forms hidden by default.
+- [x] Build then run one `floating-saved-search` journey: submit supported
+  type/keyword query, save/reload, open current Library evaluation, edit/copy
+  through existing revision checks, use a result and verify downloaded original
+  against independent input. Existing continuation/export evidence remains for
+  untouched code; only diagnose real failures or changed invariants locally.
+- [x] Root/Luna review, diff check, update existing F08/M2 records with actual
+  delivery and remaining limits, then commit/push. Preserve all unrelated files.
+
+Actual local delivery: the floating menu now exposes same-library named searches,
+and a submitted result can open the existing name/condition review without
+changing its background. Save, edit/copy and same-name revision confirmation
+reuse the existing editor and operations. A client acceptance predicate on the
+existing recall path rejects superseded navigation before installing results;
+other callers retain their prior behavior. Only explicit recall enters Library.
+
+The port-4670 journey saved `suffix:mp3` while unrelated unsent text remained in
+the composer: the durable record had empty keyword text and exactly
+`suffix=mp3`, and the Home route/draft stayed unchanged. Reload found it; editing
+and copying to a `lixound` query kept the suffix and original record. Cancelling
+same-name confirmation wrote nothing; explicit update created revision 2 of the
+copy with query `Summer`. A held real evaluation was superseded by Home
+navigation without restoring the old search. Opening the updated name then
+showed exactly one Library result and located its Music row. The first driver
+incorrectly expected a Details modal after that intentional media entry; only
+the read-only download tail was corrected and resumed, with no replay of the
+three confirmed view writes. The 7,084,053-byte original matched the independently
+retained MP3 (SHA-256
+`694c479a448fc41bb4367e4fa4c3edc155c3732e1947adc104c831957d30c509`).
+Evidence is retained in `dist/f08-20261031/` (save responses, journey/read-only
+tail, source comparison and screenshots). No capture/apply or model operation
+ran. Root/Luna review, affected Web build and diff check passed. Untouched paged
+recall and view-backed frozen export retain the prior stated evidence; this is
+the F08 client-entry closure, not arbitrary condition support or core/release
+qualification. M2 still owns F07/F22 and M3 still owns concrete retrieval gaps.

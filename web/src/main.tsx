@@ -60,7 +60,7 @@ import "./styles/index.css";
 import "./components/PrivateSpaceShell.css";
 import "./styles/content-space-transition.css";
 import "antd/dist/reset.css";
-import type { ActionFeedback, LibraryPageMode, Notice, SearchHit, SnapshotSummary, SourceSummary, UploadFileRow, ViewMode } from "./lib/types";
+import type { ActionFeedback, LibraryPageMode, Notice, SavedViewData, SearchHit, SnapshotSummary, SourceSummary, UploadFileRow, ViewMode } from "./lib/types";
 
 // The application shell.
 //
@@ -732,6 +732,17 @@ function App() {
     if (drawerOpen || settingsOpen) return t("Close the current panel before using a saved list.");
     if (sourceIntakeIsPending() || originalTakeoutBusy) return t("Wait until the current operation finishes before using a saved list.");
     return "";
+  }
+  async function recallFloatingSavedSearch(saved: SavedViewData): Promise<boolean | undefined> {
+    if (busy || drawerOpen || settingsOpen || sourceIntakeIsPending() || !isConnected
+      || !coreStorageReady || saved.scope !== workspaceID) return false;
+    completeUserNavigation();
+    const epoch = navigationEpochRef.current, requestedWorkspace = workspaceID;
+    const outcome = await savedViewFlow.recallSavedView(saved, () => navigationEpochRef.current === epoch && workspaceIDRef.current === requestedWorkspace);
+    if (outcome.kind === "stale" || navigationEpochRef.current !== epoch || workspaceIDRef.current !== requestedWorkspace) return undefined;
+    if (outcome.kind === "failure") throw new Error(outcome.message);
+    view.setPresentationMode("content");
+    return true;
   }
   function useMaterialList(document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) {
     const capturedWorkspaceID = workspaceID;
@@ -1449,6 +1460,7 @@ function App() {
       blocked={drawerOpen || settingsOpen} busy={busy} playbackActive={Boolean(audioPlayback.track)}
       catalogItems={library.libraryItems} selectedItems={selection.selectionSubjects} notice={notice?.text}
       onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
+      savedViews={savedViewFlow} onRecallSavedSearch={recallFloatingSavedSearch}
       onOpen={(hit, resultQuery) => openLibraryEntry(hit, resultQuery)} entryHint={searchEntryHint} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />

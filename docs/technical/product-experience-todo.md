@@ -110,6 +110,24 @@ and context survived, verified playback advanced, and ZIP's two unique originals
 matched independent inputs. No new model request or general AI path was added.
 M1's admitted loop is closed; current work returns to existing M2/M3 gaps.
 
+## M2 F08 common-search closure — 2026-10-31
+
+The floating result offers an on-demand **Save this search** review, and its
+menu exposes **Saved searches** for this library. The existing editor owns
+naming, exact supported conditions, copy and same-name revision confirmation.
+Only explicit recall installs the normal Library evaluation; opening/saving the
+panel leaves Home and unsent text intact. Saved search semantics remain current
+keyword/structured evaluation, not a frozen semantic result or ordinary list.
+
+The [selected F08 journey](../superpowers/plans/2026-10-30-save-find-use.md#m2-f08-saved-search-continuation--2026-10-31)
+saved/reloaded a filter-only view, copied and explicitly revised it, superseded a
+late recall through navigation, and took out its one matching original with
+independent byte comparison. Existing paging/export evidence is retained.
+F08's selected client scope is Done; M2 still has F07/F22 gaps, and F03 continues
+to own broader retrieval coverage. The same batch fixes the reported native
+scrollbar: composer text grows to its existing bound and shared thumbs use the
+active theme while retaining ordinary scroll behavior.
+
 ## F01 save-to-use continuation — 2026-10-31
 
 Ordinary folder/file receipts survive panel close/reopen; stop keeps explicit

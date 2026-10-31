@@ -54,6 +54,14 @@ original. A media result outside the background scope indicates that activation
 opens this search in its dedicated page; only the click performs that fresh
 search/scope handoff. A changed result is refused before replacing the scope.
 
+Choose **Save this search** below a floating result to review and name its
+submitted keyword/structured conditions. Unsent text and background filters are
+not silently included. Reopen it through **+ → Saved searches**, then explicitly
+choose **Open in library**. The same panel offers edit/copy and reviewed same-name
+updates. A saved search evaluates current matching content; it does not freeze
+semantic suggestions. Use an ordinary list or frozen export to retain a fixed
+result instead.
+
 Open **View matches** beside a result to inspect its returned evidence in
 Details. You can browse keyword-only matches and then return to the original
 ranked results without running the meaning search again. Keyword pages do not
