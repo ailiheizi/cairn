@@ -74,6 +74,15 @@ ranked results without running the meaning search again. Keyword pages do not
 include semantic-only suggestions. A new search, refreshed catalog or changed
 workspace invalidates the old return snapshot.
 
+Inside a floating result's **Why this matched**, choose **View match details**
+to inspect that returned evidence directly. This keeps media title clicks free
+to open Photos/Music/Videos. For PDF/DOCX hits, **Matched document text** shows
+one returned passage at a time. Use **Read returned passage** to expand beyond
+the short excerpt and **Copy passage** to copy its exact returned text. Browse
+other passages with the existing previous/next controls; **Source details**
+reveals provenance on demand. These are search-returned passages, not a complete
+document viewer. The original document remains available through Download.
+
 ## Adding context
 
 Use the single **Notes** surface for human notes and attributed imported,

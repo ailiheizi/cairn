@@ -196,14 +196,25 @@ all field coverage, model distribution or core/release gates.
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | PDF/DOCX body extraction | Usable; local evidence | Reuse the admitted formats, limits and bound producer. |
-| Body and paraphrase search | Partial, real BGE evidence | Close observed feed and entry gaps in existing search. |
-| Matched passage and source | Usable | Show the actual extracted source. |
-| Original download | Locally joined | Keep extracted text distinct from the original. |
+| Body and paraphrase search | Locally delivered 2026-10-31 | Neutral-name PDF/DOCX body and real BGE paraphrase work after restart; broad recall remains F03. |
+| Matched passage and source | Locally delivered 2026-10-31 | Read/copy exact returned passage, one at a time; provenance on demand. |
+| Original download | Locally verified 2026-10-31 | Three actual documents matched independent original bytes. |
 | Scanned PDF/other Office types | Out of scope | Do not infer additional formats. |
 
 **Reuse and steps:** Reuse approved processors, EXTRACT, BGE and original download. Preserve producer/version evidence; show the extraction source in Details; keep malformed, encrypted or over-limit input exactly saved with visible extraction fallback.
 
 **Finished looks like:** Capture a neutral-name PDF/DOCX, search by body wording and paraphrase, inspect the matching passage after restart, and verify the original. Real BGE is required for the meaning path.
+
+**2026-10-31 local outcome:** F04's bounded client loop is Done. The
+[readable-passage batch](2026-10-30-save-find-use.md#m3-f04-readable-returned-passages--2026-10-31)
+exposes broker-returned text beyond the old 280-character preview without new
+reads, allows exact copy with honest clipboard failure, and provides explicit
+floating evidence inspection while retaining normal specialist-page entry.
+The real restart journey covered body/paraphrase retrieval, readable/copyable
+non-prefix content, retained unsaved Notes and three exact originals. Document
+source paging and on-demand provenance keep the default compact. This is not
+scanned-PDF support, complete document rendering, full-field/broad recall or
+release qualification; current field absence remains DEGRADED under F03.
 
 **Dependencies:** Approved CS admission only. **Scope:** Existing PDF/DOCX processor and search artifacts; no reader service. **Sources:** [CS admission](../../requirements/file-identification-and-extraction.md#cs-document-body-search-admission-2026-10-19), [content-search proposal](../../technical/product-power-content-search-proposal.md).
 

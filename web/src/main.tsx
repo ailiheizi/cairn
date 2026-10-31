@@ -652,6 +652,21 @@ function App() {
     return mediaDestinationForHit(hit) && !library.scopeHits.some(item => item.subject_ref === hit.subject_ref)
       ? t("Opens this search in its dedicated page") : undefined;
   }
+  async function inspectFloatingMatch(hit: SearchHit): Promise<boolean> {
+    const subject = hit.subject_ref?.trim();
+    if (!subject || busy || drawerOpen || settingsOpen || sourceIntakeIsPending() || !isConnected || !coreStorageReady) return false;
+    const requestedWorkspace = workspaceID;
+    if (selected?.subject_ref?.trim() === subject) {
+      if (selected.entry_id !== hit.entry_id || selected.content_id !== hit.content_id
+        || (selected.logical_size != null && hit.logical_size != null && selected.logical_size !== hit.logical_size)) return false;
+      // Refresh only the explicitly requested search evidence. Keep live Notes
+      // and unsaved edits in the existing subject-bound inspector lifecycle.
+      setSelected({ ...selected, segments: hit.segments });
+      return true;
+    }
+    await details.loadDetails(hit);
+    return workspaceIDRef.current === requestedWorkspace && details.detailSubjectRef.current === subject;
+  }
   async function openLibraryEntry(hit: SearchHit, resultQuery?: string) {
     if (hit.entry_type === "REGULAR_FILE" && hit.name?.toLowerCase().endsWith(".cairn-list.json")) { assistantRef.current?.openList(hit); return; }
     if (hit.entry_type === "REGULAR_FILE") {
@@ -1477,6 +1492,7 @@ function App() {
       onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
       savedViews={savedViewFlow} onRecallSavedSearch={recallFloatingSavedSearch}
       onBrowseSearch={browseFloatingSearch}
+      onInspect={inspectFloatingMatch}
       onOpen={(hit, resultQuery) => openLibraryEntry(hit, resultQuery)} entryHint={searchEntryHint} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />

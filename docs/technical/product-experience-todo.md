@@ -30,6 +30,7 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest locally delivered common search | F08 / [AIL-42](https://linear.app/ailiheizi/issue/AIL-42) | Name a submitted search, reload, edit/copy and explicitly reopen its current Library results |
 | Latest locally delivered manual context | F07 / [AIL-41](https://linear.app/ailiheizi/issue/AIL-41) | Open media Notes/tags, preserve context through batch changes and find/use it again |
 | Latest locally delivered continuation | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue a floating query in Library, load later keyword matches, inspect and return with browse anchor/selection retained |
+| Latest M3 document delivery | F04 / [AIL-46](https://linear.app/ailiheizi/issue/AIL-46) | Find neutral-name PDF/DOCX by body or meaning, read/copy returned passages and download exact originals after restart |
 | Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
@@ -167,6 +168,28 @@ to its original runs; this is not a new performance or release qualification.
 F22's bounded client continuation is Done, closing M2's five current function
 cards. M3/F03 remains active for broader field coverage and concrete recall gaps;
 F04–F06 retain their current delivery/qualification boundaries.
+
+## M3 F04 readable-passage closure — 2026-10-31
+
+F04's admitted local client loop is Done. The floating evidence disclosure can
+explicitly open the same returned hit in Details. PDF/DOCX evidence keeps a short
+preview, with the returned text readable and exactly copyable on demand. One
+document passage is shown at a time, using existing source paging; technical
+provenance remains available behind **Source details**. Normal media title entry
+still opens its dedicated page. No new original read is needed to expand/copy.
+
+The [selected F04 journey](../superpowers/plans/2026-10-30-save-find-use.md#m3-f04-readable-returned-passages--2026-10-31)
+used real saved PDF/DOCX and the installed local BGE generation after daemon
+restart. Body-only and paraphrase queries found their neutral-name targets.
+A 568-character returned passage, including a clue after character 280, was
+read and copied without alteration. Clipboard refusal stayed visible; same-item
+inspection preserved unsaved Notes. Three downloaded originals matched their
+independent inputs. The final reading-only tail confirmed source disclosure and
+next/previous passage behavior. The curated port-4670 profile was untouched.
+
+This closes the bounded document client card, not full-field or broad-corpus
+recall. Rebuild still reports DEGRADED for absent lexical fields; F03 remains
+active and F05/F06 keep their remaining screenshot/visual delivery work.
 
 ## F01 save-to-use continuation — 2026-10-31
 

@@ -481,3 +481,89 @@ F22's admitted client continuation closes M2's current five cards. Retained
 listing/SavedView/large-scale evidence is not requalified by this 230-file flow.
 Unlimited semantic continuation, general performance claims and core/release
 completion remain outside it. M3/F03 continues the concrete field/recall work.
+
+## M3 F04 readable returned passages — 2026-10-31
+
+Active batch: Phase 4 discovery and admitted first-party client maintenance,
+under content-store §8/9 and CS-1/2/3. Outcome: find a neutral-name PDF/DOCX by
+content or meaning, read and copy the returned passage, and take out its exact
+original. Existing processors, source lineage, query bounds and BGE are reused.
+
+Concrete gap: Details renders `matched_excerpt || matched_text` and truncates it
+again at 280 characters, even when the broker supplied a longer exact passage.
+The floating layer also has no explicit inspector action for its returned
+evidence: default media entry correctly locates a specialist page, but an
+already-loaded library item need not carry that floating hit's segments.
+
+Decision: keep concise excerpts, then disclose a read-only returned passage
+inside the existing source section. Copy uses the unchanged returned text with
+visible success/failure feedback. Label it as returned text, not a complete
+document/page. Add an explicit **View match details** action inside the existing
+floating evidence disclosure, using the returned hit and current host Details;
+do not attach hidden evidence state to a specialist page or change default
+media activation. No new original read is performed to expand or copy text.
+
+- [x] Add one small shared `MatchedSourceText.tsx` component for preview,
+  on-demand returned passage and copy feedback; use it in the existing generic
+  and document matched-source rendering in `DetailsPanel.tsx`. Existing source
+  paging is reused with one document passage at a time; technical provenance
+  stays available on demand. Generic/OCR page sizes and OCR-specific
+  interpretation stay unchanged. Style within the
+  existing Details styles and i18n; plain React text, no HTML rendering.
+- [x] Wire `onInspect` from `SpaceAssistant.tsx` through the optional
+  `FloatingSearchResults.tsx` callback to the guarded host inspector in `main.tsx`.
+  Reuse the existing open/error/collapse lifecycle, preserving draft/results
+  on failure. Explicit inspection bypasses list-reader/media routing only;
+  normal title activation continues its current navigation.
+- [x] Build and run one `document-passage-find-use` journey using real captured
+  neutral-name PDF/DOCX, the existing real local BGE profile and a long returned
+  passage. Verify body wording/paraphrase, actual source, expanded non-prefix
+  text and exact copied text, restart/reopen and original byte equality. Verify
+  the new explicit floating inspector preserves returned evidence and input;
+  reuse existing OCR/visual evidence where unchanged. Root owns this journey;
+  investigate only observed failures or changed invariants, with no broad suite.
+- [x] Review root/Luna diff, run diff check, update F04/M3 in existing records,
+  commit and push. No new schema, endpoint, processor, provider, index dimension,
+  durable state, reader service, runtime package or test framework. Preserve
+  unrelated changes; this batch grants no full-recall or release qualification.
+
+
+Actual local delivery: a small read-only source component keeps the excerpt and
+reveals the returned text without clipping it again. Copy preserves that text
+exactly and reports clipboard denial. The floating disclosure explicitly opens
+its returned hit in the current host inspector; media/list title behavior is
+unchanged. Inspecting the same captured subject refreshes only its requested
+segments after entry/content checks, keeping unsaved Notes in the current
+lifecycle. Different subjects use the normal draft-leave and subject-read gates.
+Document passages use existing paging with one visible segment; source metadata
+is disclosed on demand, rather than repeating long producer IDs by default.
+
+The isolated port-4671 profile saved seven independent originals once, then
+explicitly built its real installed BGE/CLIP generation. The daemon was stopped
+and restarted before the browser workflow. Neutral-name `item-a.pdf` and
+`item-b.docx` were found from body wording and their predeclared paraphrases;
+the semantic components succeeded through `query.semantic.onnx-bge-zvec.v1`.
+A longer DOCX returned 568 characters with `CedarBlue317` at position 538. The
+browser exposed and copied that exact returned text, including the non-prefix
+clue. A refused clipboard write showed failure; a later real write/read matched.
+Explicit same-subject inspection preserved an unsaved note without writing it.
+Media evidence opened Details with its returned source; normal image activation
+still entered Photos. Expanding/copying did not increase `content.open` reads.
+
+All three downloads matched independent inputs: 25,870-byte PDF, 36,990-byte
+DOCX, and 37,018-byte long DOCX. Their SHA-256 values and actual commands/results
+are retained with the source corpus, browser journey/log and final read-only
+passage continuation under `dist/f04-20261031/`. The final continuation checked
+source disclosure and next/previous text after the one-passage refinement; the
+successful capture, index build and provider journey were not replayed. The
+first browser driver waited for the empty composer's submit button to become
+enabled; correcting it to await the enabled composer fixed that driver timeout.
+No browser capture/apply or annotation mutation occurred. Root/Luna review,
+final affected Web build, visual inspection and diff check passed.
+
+F04's bounded local client scope is Done. Selected lexical sources are 14/14,
+while overall rebuild remains DEGRADED for absent fields; this does not claim
+full field presence, all-corpus recall, a new PDF reader, scanned-PDF OCR, model
+redistribution qualification or core/release closure. F03 stays active, and
+F05/F06 retain their screenshot/visual work. The port-4670 demo was not populated
+or restarted by the acceptance run; it serves the updated shared Web build.

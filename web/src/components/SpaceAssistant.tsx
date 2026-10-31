@@ -21,12 +21,12 @@ type Props = {
   ref?: Ref<SpaceAssistantHandle>; t: Translator; workspaceID: string; active: boolean; blocked: boolean; busy: boolean;
   playbackActive: boolean; catalogItems: SearchHit[]; selectedItems: SearchHit[]; notice?: string;
   onSearch: (query: string, onResults: (hits: SearchHit[], coverage?: string) => void) => Promise<boolean>;
-  onOpen: (hit: SearchHit, query?: string) => void | Promise<void | boolean>; entryHint?: (hit: SearchHit) => string | undefined; onUse: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
+  onOpen: (hit: SearchHit, query?: string) => void | Promise<void | boolean>; onInspect: (hit: SearchHit) => void | Promise<void | boolean>; entryHint?: (hit: SearchHit) => string | undefined; onUse: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
   onOrganize: (document: MaterialListDocument) => void; onSaveFiles: (files: File[]) => boolean;
   onBrowseSearch: (query: string) => Promise<boolean | undefined>;
   savedViews: SavedViewsFlow; onRecallSavedSearch: (view: SavedViewData) => Promise<boolean | undefined>;
 };
-export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, playbackActive, catalogItems, selectedItems, notice, onSearch, onOpen, entryHint, onUse, onOrganize, onSaveFiles, savedViews, onRecallSavedSearch, onBrowseSearch }: Props) {
+export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, playbackActive, catalogItems, selectedItems, notice, onSearch, onOpen, onInspect, entryHint, onUse, onOrganize, onSaveFiles, savedViews, onRecallSavedSearch, onBrowseSearch }: Props) {
   const input = useRef<HTMLTextAreaElement>(null), panel = useRef<HTMLElement>(null);
   const fileInput = useRef<HTMLInputElement>(null), request = useRef(0), controller = useRef<AbortController | null>(null);
   const [open, setOpen] = useState(false), [expanded, setExpanded] = useState(false), [showResult, setShowResult] = useState(false);
@@ -196,13 +196,13 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
     if (draft.trim()) captures.push(new File([draft], `note-${Date.now()}.txt`, { type: "text/plain;charset=utf-8" }));
     setMenu(false); setOpen(false); setExpanded(false); onSaveFiles(captures);
   }
-  async function openHit(hit: SearchHit, query?: string) {
+  async function openHit(hit: SearchHit, query?: string, intent: "open" | "inspect" = "open") {
     if (disabled) return;
-    if (hit.name?.toLowerCase().endsWith(".cairn-list.json")) { void loadList(hit); return; }
+    if (intent === "open" && hit.name?.toLowerCase().endsWith(".cairn-list.json")) { void loadList(hit); return; }
     const token = ++request.current;
     setWorking(true); setError("");
     try {
-      const opened = await onOpen(hit, query);
+      const opened = intent === "inspect" ? await onInspect(hit) : await onOpen(hit, query);
       if (token !== request.current) return;
       if (opened === false) { setOpen(true); setError(t("The item could not be opened. Your search and draft are preserved.")); return; }
       setExpanded(false); setShowResult(false); setOpen(false);
@@ -218,7 +218,7 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
   const conversation = <div className="space-assistant-conversation" aria-live="polite">
     {savedSearchPanel ? <FloatingSavedSearches t={t} flow={savedViews} candidate={savedCandidate} workspaceID={workspaceID} showSave={savedSearchPanel === "save"} disabled={disabled} onRecall={openSavedSearch} onClose={() => setSavedSearchPanel(undefined)} /> : <>
     {resultCard}
-    {searched ? <><div className="space-assistant-search-heading"><span><Search size={14} />{searched}</span><small>{t("{{count}} results returned", { count: results.length })}</small></div><button type="button" className="text-button" disabled={disabled} onClick={continueInLibrary}>{t("Continue in Library")}</button>{!results.length && <p className="space-assistant-empty">{t("No matching material. Try another phrase or browse your library.")}</p>}<FloatingSearchResults t={t} hits={shown} picked={picked} disabled={disabled} entryHint={entryHint} onPick={(index, checked) => setPicked(value => checked ? [...value, index] : value.filter(i => i !== index))} onOpen={hit => void openHit(hit, searched)} />{results.length > 3 && !expanded && <button type="button" className="text-button" onClick={() => setExpanded(true)}>{t("Expand all results")}</button>}{regularResults.length > 0 && <div className="space-assistant-result-actions"><button type="button" className="secondary-button compact" disabled={disabled || (!picked.length && regularResults.length > 200)} onClick={() => void makeList(picked.length ? picked.map(i => results[i]!).filter(Boolean) : regularResults.map(row => row.hit))}><ListMusic size={15} />{picked.length ? t("Organize {{count}} selected", { count: picked.length }) : t("Organize all {{count}} files", { count: regularResults.length })}</button><small>{t("Only returned material is included.")}</small></div>}</> : !result && <div className="space-assistant-welcome"><p>{t("Search your saved content, then open, organize or take it out.")}</p>{selectedItems.length > 0 && <button type="button" className="text-button" disabled={disabled} onClick={() => void makeList(selectedItems)}>{t("Organize {{count}} selected", { count: selectedItems.length })}<ArrowUpRight size={15} /></button>}</div>}
+    {searched ? <><div className="space-assistant-search-heading"><span><Search size={14} />{searched}</span><small>{t("{{count}} results returned", { count: results.length })}</small></div><button type="button" className="text-button" disabled={disabled} onClick={continueInLibrary}>{t("Continue in Library")}</button>{!results.length && <p className="space-assistant-empty">{t("No matching material. Try another phrase or browse your library.")}</p>}<FloatingSearchResults t={t} hits={shown} picked={picked} disabled={disabled} entryHint={entryHint} onPick={(index, checked) => setPicked(value => checked ? [...value, index] : value.filter(i => i !== index))} onOpen={hit => void openHit(hit, searched)} onInspect={hit => void openHit(hit, undefined, "inspect")} />{results.length > 3 && !expanded && <button type="button" className="text-button" onClick={() => setExpanded(true)}>{t("Expand all results")}</button>}{regularResults.length > 0 && <div className="space-assistant-result-actions"><button type="button" className="secondary-button compact" disabled={disabled || (!picked.length && regularResults.length > 200)} onClick={() => void makeList(picked.length ? picked.map(i => results[i]!).filter(Boolean) : regularResults.map(row => row.hit))}><ListMusic size={15} />{picked.length ? t("Organize {{count}} selected", { count: picked.length }) : t("Organize all {{count}} files", { count: regularResults.length })}</button><small>{t("Only returned material is included.")}</small></div>}</> : !result && <div className="space-assistant-welcome"><p>{t("Search your saved content, then open, organize or take it out.")}</p>{selectedItems.length > 0 && <button type="button" className="text-button" disabled={disabled} onClick={() => void makeList(selectedItems)}>{t("Organize {{count}} selected", { count: selectedItems.length })}<ArrowUpRight size={15} /></button>}</div>}
     {coverage && <details className="space-assistant-coverage"><summary>{t("Some search coverage is unavailable")}</summary><p>{coverage}</p></details>}
     {searched && <button type="button" className="text-button space-assistant-save-search" disabled={disabled} onClick={() => showSavedSearches("save")}><Bookmark size={14} />{t("Save this search")}</button>}
     </>}

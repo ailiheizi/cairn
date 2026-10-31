@@ -4,6 +4,7 @@ import type { Locale, Translator } from "../i18n";
 import { abbreviateIdentity, identityBars } from "../identity";
 import { ContentPreview } from "./ContentPreview";
 import { NoteText } from "./NoteText";
+import { MatchedSourceText } from "./MatchedSourceText";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
 import { sameDescribeProfileIdentity, validateDescribeProfile, type DescribeProfile } from "../lib/describeAuthorization";
@@ -60,6 +61,7 @@ function subjectMayDiscloseImageBytes(hit: SearchHit): boolean {
 }
 
 const MATCHED_SOURCE_PAGE_SIZE = 6;
+const DOCUMENT_MATCH_PAGE_SIZE = 1;
 
 function safeSearchSegment(value: unknown): SearchSegment | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -479,11 +481,11 @@ export function Details({ workspaceId, hit, annotations, representations, descri
   const matchedSourceFirst = otherMatchedSourceSegments.length === 0 ? 0 : matchedSourcePageIndex * MATCHED_SOURCE_PAGE_SIZE + 1;
   const matchedSourceLast = Math.min(otherMatchedSourceSegments.length, (matchedSourcePageIndex + 1) * MATCHED_SOURCE_PAGE_SIZE);
   const visibleMatchedSourceSegments = otherMatchedSourceSegments.slice(matchedSourcePageIndex * MATCHED_SOURCE_PAGE_SIZE, (matchedSourcePageIndex + 1) * MATCHED_SOURCE_PAGE_SIZE);
-  const matchedDocumentPageCount = Math.ceil(documentBodySegments.length / MATCHED_SOURCE_PAGE_SIZE);
+  const matchedDocumentPageCount = Math.ceil(documentBodySegments.length / DOCUMENT_MATCH_PAGE_SIZE);
   const matchedDocumentPageIndex = Math.min(matchedDocumentSourcePage, Math.max(0, matchedDocumentPageCount - 1));
-  const matchedDocumentFirst = matchedDocumentPageIndex * MATCHED_SOURCE_PAGE_SIZE + 1;
-  const matchedDocumentLast = Math.min(documentBodySegments.length, (matchedDocumentPageIndex + 1) * MATCHED_SOURCE_PAGE_SIZE);
-  const visibleMatchedDocumentSegments = documentBodySegments.slice(matchedDocumentPageIndex * MATCHED_SOURCE_PAGE_SIZE, (matchedDocumentPageIndex + 1) * MATCHED_SOURCE_PAGE_SIZE);
+  const matchedDocumentFirst = matchedDocumentPageIndex * DOCUMENT_MATCH_PAGE_SIZE + 1;
+  const matchedDocumentLast = Math.min(documentBodySegments.length, (matchedDocumentPageIndex + 1) * DOCUMENT_MATCH_PAGE_SIZE);
+  const visibleMatchedDocumentSegments = documentBodySegments.slice(matchedDocumentPageIndex * DOCUMENT_MATCH_PAGE_SIZE, (matchedDocumentPageIndex + 1) * DOCUMENT_MATCH_PAGE_SIZE);
   const matchedOcrPageCount = Math.ceil(matchedOcrEvidence.length / MATCHED_SOURCE_PAGE_SIZE);
   const matchedOcrPageIndex = Math.min(matchedOcrPage, Math.max(0, matchedOcrPageCount - 1));
   const visibleMatchedOcrEvidence = matchedOcrEvidence.slice(matchedOcrPageIndex * MATCHED_SOURCE_PAGE_SIZE, (matchedOcrPageIndex + 1) * MATCHED_SOURCE_PAGE_SIZE);
@@ -537,13 +539,13 @@ export function Details({ workspaceId, hit, annotations, representations, descri
       {documentText && <p className="muted">{t("Extracted text from the saved original; formatting and page layout are not reproduced.")}</p>}
       <ul>{visibleSegments.map((segment, index) => {
         const metadata = searchSegmentMetadata(segment, t);
-        const evidence = segment.matched_excerpt || segment.matched_text || "";
         const sourceLabel = segment.source_type?.trim() || segment.kind?.trim()
           ? searchSegmentSourceLabel(segment, t)
           : t("Source unavailable");
         return <li key={`${segment.source_type || "source"}-${segment.kind || "segment"}-${segment.ordinal ?? index}-${index}`}>
-          <div className="matched-source-heading"><strong>{sourceLabel}</strong>{metadata.length > 0 && <small>{metadata.join(" · ")}</small>}</div>
-          {evidence.trim() ? <p>{previewUnicodeText(evidence, 280)}</p> : <p className="matched-source-empty">{t("This source segment was returned without a text excerpt.")}</p>}
+          <div className="matched-source-heading"><strong>{sourceLabel}</strong></div>
+          <MatchedSourceText key={`${detailSubjectIdentity}:${segment.source_id || ""}:${segment.semantic_segment_id || ""}`} t={t} segment={segment} />
+          {metadata.length > 0 && <details className="matched-source-details"><summary>{t("Source details")}</summary><p>{metadata.join(" · ")}</p></details>}
         </li>;
       })}</ul>
       {pageCount > 1 && <nav className="matched-source-paging" aria-label={t("Matched-source pages")}>
