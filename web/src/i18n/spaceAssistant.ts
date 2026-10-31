@@ -10,6 +10,7 @@ export const spaceAssistant: Record<string, string> = {
   "The item could not be opened. Your search and draft are preserved.": "暂时无法打开，已保留搜索结果和草稿。",
   "Why this matched": "为什么找到它",
   "View match details": "查看命中详情",
+  "No readable excerpt is available for this source.": "此来源没有可读的命中片段。",
   "No matched excerpt was reported.": "未提供命中片段。",
   "More match details are available in item details.": "更多命中信息可在资料详情中查看。",
   "Enter Photos at {{name}}": "进入照片并定位到 {{name}}",

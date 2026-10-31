@@ -226,14 +226,24 @@ release qualification; current field absence remains DEGRADED under F03.
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | Local OCR bundle and recognition | Real local evidence | Show whether the pinned local model is ready. |
-| OCR text lexical/semantic search | Partial local journey | Reuse existing text search. |
-| OCR text and quality in Details/Notes | UI exists; polish partial | Show provenance and partial/uncertain status. |
-| Original image takeout | Locally joined | Never substitute OCR text for the image. |
+| OCR text lexical/semantic search | Locally delivered 2026-10-31 | Printed-text and real local BGE paraphrase find the captured screenshot. |
+| OCR text and quality in Details/Notes | Locally delivered 2026-10-31 | Readable floating text, exact recognized-text copy, on-demand quality and honest fragment/unknown state. |
+| Original image takeout | Locally verified 2026-10-31 | The 74,634-byte original matched independent input; OCR text never replaces it. |
 | Scanned-PDF OCR/arbitrary history rerun | Out of scope | Use only admitted new capture or ordinary explicit recapture. |
 
 **Reuse and steps:** Reuse `ocr.image.text.v1`, explicit local bundle setup and current artifacts. Present source and quality; retain distinct processing/model digests; never make OCR a save prerequisite.
 
 **Finished looks like:** Save a Chinese screenshot, find it by its printed text and a real-BGE paraphrase, inspect OCR and verify the same original image; missing OCR leaves exact save usable.
+
+**2026-10-31 local outcome:** F05's bounded client loop is Done. The
+[screenshot-text batch](2026-10-30-save-find-use.md#m3-f05-readable-and-reusable-screenshot-text--2026-10-31)
+uses existing schema decoding for readable floating evidence, suppresses opaque
+image-artifact tails, and groups same-source OCR previews without removing the
+original hit. Details copies exact decoded text with honest clipboard denial;
+quality and returned-fragment state remain visible. The whole real OCR/BGE flow
+and exact image takeout passed, including refresh and retained document prose/
+copy. Cross-platform/default packaging, broader recall and field/release
+qualification remain outside this local client closure.
 
 **Dependencies:** OCR-1/2/3 admission. **Scope:** Existing OCR profile and image bounds; no new processor, service or public command. **Sources:** [OCR admission](../../requirements/file-identification-and-extraction.md#ocr-image-text-delivery-admission-2026-10-20), [image-text proposal](../../technical/product-power-image-text-proposal.md).
 

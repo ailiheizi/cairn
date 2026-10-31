@@ -5,6 +5,7 @@ import { abbreviateIdentity, identityBars } from "../identity";
 import { ContentPreview } from "./ContentPreview";
 import { NoteText } from "./NoteText";
 import { MatchedSourceText } from "./MatchedSourceText";
+import { CopyTextButton } from "./CopyTextButton";
 import { command } from "../app/command";
 import { operations } from "../lib/operations";
 import { sameDescribeProfileIdentity, validateDescribeProfile, type DescribeProfile } from "../lib/describeAuthorization";
@@ -565,7 +566,8 @@ export function Details({ workspaceId, hit, annotations, representations, descri
     const confidence = quality?.meanConfidence;
     return <article className="matched-ocr-item" key={`${segment.source_id || "ocr"}-${segment.semantic_segment_id || index}-${segment.ordinal ?? index}`}>
       <div className="matched-ocr-heading"><strong>{t("OCR text")}</strong><span>{stateLabel}</span><small>{searchSegmentSourceLabel(segment, t)}</small></div>
-      {evidence.text ? <><p className="matched-ocr-body">{previewUnicodeText(evidence.text, 6000)}</p>{Array.from(evidence.text).length > 6000 && <p className="matched-ocr-unknown">{t("Showing the first 6,000 characters of this returned OCR text.")}</p>}</> : <p className="matched-ocr-empty">{t("No recognized text was returned.")}</p>}
+      {evidence.text ? <><p className="matched-ocr-body">{previewUnicodeText(evidence.text, 6000)}</p>{Array.from(evidence.text).length > 6000 && <details className="matched-source-passage"><summary>{t("Read returned OCR text")}</summary><p className="matched-source-passage-label">{t("Returned OCR text; recognition may be partial.")}</p><pre>{evidence.text}</pre></details>}<CopyTextButton key={`${detailSubjectIdentity}:${segment.source_id || ""}:${segment.semantic_segment_id || ""}`} text={evidence.text} t={t} label="Copy recognized text" /></> : <p className="matched-ocr-empty">{t("No recognized text was returned.")}</p>}
+      {evidence.text && Array.from(evidence.text).length > 6000 && <p className="matched-ocr-unknown">{t("Showing the first 6,000 characters of this returned OCR text.")}</p>}
       {evidence.returnedFragment && <p className="matched-ocr-unknown">{t("Showing a returned text fragment.")}</p>}
       <details className="matched-ocr-quality">
         <summary>{t("Recognition quality")}</summary>

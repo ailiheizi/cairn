@@ -83,6 +83,15 @@ other passages with the existing previous/next controls; **Source details**
 reveals provenance on demand. These are search-returned passages, not a complete
 document viewer. The original document remains available through Download.
 
+For screenshots, search for printed words or a paraphrase with the available
+local text index. Floating evidence shows recognized text rather than OCR JSON.
+Choose **View match details → Recognized image text → Copy recognized text**
+to reuse the exact returned text. **Recognition quality** is on demand; partial
+text and returned fragments remain labeled, and absent quality is unknown.
+Download still takes out the original image. Recognition uses the installed OCR
+bundle on new captures or ordinary explicit recaptures; missing OCR does not
+prevent exact saving.
+
 ## Adding context
 
 Use the single **Notes** surface for human notes and attributed imported,

@@ -31,6 +31,7 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest locally delivered manual context | F07 / [AIL-41](https://linear.app/ailiheizi/issue/AIL-41) | Open media Notes/tags, preserve context through batch changes and find/use it again |
 | Latest locally delivered continuation | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue a floating query in Library, load later keyword matches, inspect and return with browse anchor/selection retained |
 | Latest M3 document delivery | F04 / [AIL-46](https://linear.app/ailiheizi/issue/AIL-46) | Find neutral-name PDF/DOCX by body or meaning, read/copy returned passages and download exact originals after restart |
+| Latest M3 screenshot delivery | F05 / [AIL-47](https://linear.app/ailiheizi/issue/AIL-47) | Find screenshots by printed words or paraphrase, read/copy recognized text with honest quality, and take out the original image |
 | Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
@@ -190,6 +191,31 @@ next/previous passage behavior. The curated port-4670 profile was untouched.
 This closes the bounded document client card, not full-field or broad-corpus
 recall. Rebuild still reports DEGRADED for absent lexical fields; F03 remains
 active and F05/F06 keep their remaining screenshot/visual delivery work.
+
+## M3 F05 screenshot-text closure — 2026-10-31
+
+F05's admitted local client loop is Done. Floating results reuse the existing
+OCR decoder for readable text, omit opaque image-artifact fragments from default
+prose, and show the most complete returned OCR text once per known source. The
+full hit remains available to explicit Details inspection. Recognized text and
+document passages share exact clipboard copy with failure feedback and stale
+request rejection. Longer returned OCR text can be read on demand; recognition
+state, returned-fragment and unknown-quality labels stay independent.
+
+The [selected F05 journey](../superpowers/plans/2026-10-30-save-find-use.md#m3-f05-readable-and-reusable-screenshot-text--2026-10-31)
+captured one Chinese screenshot into the retained isolated document environment.
+Real local OCR recognized its four declared lines, mean confidence 99.8%, and
+real local BGE found the predeclared paraphrase. Full recognized text and the
+semantic returned fragment each copied exactly; fragment quality remained
+unknown. Refresh found the same saved image. Its 74,634-byte takeout matched
+the independent source. The changed shared code retained ordinary document
+preview and passage copy. A final read-only floating continuation verified that
+opaque JSON tails were hidden and same-source OCR chunks were not repeated.
+
+No processor/model inputs or backend contracts changed. Selected lexical sources
+are 17/17 in this profile, but overall absent-field diagnostics remain DEGRADED.
+F03's broader recall/field work and F06's visual client continuation remain;
+neither the local card nor this evidence closes a core or release gate.
 
 ## F01 save-to-use continuation — 2026-10-31
 

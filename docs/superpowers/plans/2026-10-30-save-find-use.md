@@ -567,3 +567,85 @@ full field presence, all-corpus recall, a new PDF reader, scanned-PDF OCR, model
 redistribution qualification or core/release closure. F03 stays active, and
 F05/F06 retain their screenshot/visual work. The port-4670 demo was not populated
 or restarted by the acceptance run; it serves the updated shared Web build.
+
+## M3 F05 readable and reusable screenshot text — 2026-10-31
+
+Active batch: Phase 4 discovery and admitted first-party client maintenance,
+under content-store §8/9 and OCR-1/2/3. Outcome: capture a neutral-name Chinese
+screenshot, find it from printed text or a paraphrase, read/copy the recognized
+text with honest quality/fragment state, and take out the same original image.
+
+Concrete gaps: floating evidence currently prints the raw OCR JSON envelope,
+while its useful-preview filter skips JSON altogether. Details decodes that
+same OCR schema but has no recognized-text copy action and clips long returned
+text at 6,000 characters. Reuse `searchOcrEvidence`; do not add another parser or
+fetch full originals to display/copy already-returned text.
+
+- [x] In `FloatingSearchResults.tsx`, use the existing OCR decoder for the
+  useful preview and evidence disclosure. Keep malformed/unrecognized structured
+  envelopes out of user-facing prose. Show existing partial/fragment/unknown
+  labels when appropriate; default media title activation stays unchanged.
+- [x] Extract the existing passage clipboard action into one shared
+  `CopyTextButton.tsx`, used by `MatchedSourceText.tsx` and the current OCR
+  Details block. Copy the exact decoded returned text, with visible denial.
+  Preserve recognition state/quality; an optional full returned-text disclosure
+  may extend the existing 6,000-character preview without another read. Reset
+  feedback when its subject/source/text changes. No editor or second Notes
+  record is created.
+- [x] Build then run one `screenshot-find-read-use` journey on the existing
+  isolated environment: ordinary new-image capture, explicit search preparation
+  with installed real OCR/BGE, printed-text and paraphrase search, readable
+  floating evidence, explicit Details, exact copy, quality/fragment disclosure,
+  refresh and exact-original takeout. Reuse earlier unchanged bundle-absence
+  and trust evidence. Root owns the whole journey; diagnose actual failures
+  only, with no broad suite or new harness.
+- [x] Root/Luna review, diff check and existing F05/M3 status update, then
+  commit/push. No schema, endpoint, processor, provider, index dimension, durable
+  record, model download, historical processor rerun, runtime loader or test
+  framework. This grants no full-field/recall or release qualification.
+
+
+Actual local delivery: the floating layer decodes OCR with the existing helper,
+keeps only readable image evidence in prose, and prefers a complete decoded
+record over fragments for the same known source. The original returned hit is
+unchanged for inspection. A shared clipboard component copies the exact returned
+string, reports denial and ignores late feedback after text changes, a newer
+copy or unmount. The existing document passage uses the same helper. OCR keeps
+its short preview and can disclose longer returned text without another read;
+no Notes record, processor or new inference path was created.
+
+The retained F04 port-4671 environment supplied seven existing distractors.
+One neutral-name screenshot was newly captured once, and explicit preparation
+used installed real PP-OCR/BGE/CLIP assets. OCR recognized all four independently
+declared lines with TEXT, four regions, 0.998004 mean confidence, zero low
+confidence regions and no truncation. Printed query `七月十二日` and paraphrase
+`冰箱里的牛奶最迟应该在什么时候喝掉？` found that same source. The full decoded text
+copied exactly; a rejected clipboard write remained a failure. The real BGE
+result contained a shorter returned text fragment: it was readable/copyable as
+that fragment, and its absent quality remained unknown. Refresh found the same
+saved image. Its 74,634-byte download matched independent SHA-256
+`8a2fd4cc149d98b6cca5c6b2a6f2092ac664e57f58935a4849ce4b4b2d06bcfa`.
+The shared preview/copy continuation also found the existing long DOCX by body
+and copied its returned passage correctly. Copy/quality did not add content
+reads. Browser work performed no capture/apply or annotation mutation; the one
+new-image setup capture was not replayed.
+
+Evidence is retained in `dist/f05-20261031/`: independent screenshot and expected
+visible lines, successful capture/preparation, whole browser journey/log,
+decoded text/quality, original, screenshot and final read-only floating tail.
+Visual review after the first journey found a semantic OCR JSON tail that did
+not begin with an opening brace and escaped the initial presentation filter.
+It now remains outside default image prose; other source kinds retain their
+ordinary text path. The final driver initially counted legitimate filename and
+image evidence as extra OCR paragraphs; it was corrected to require exactly one
+full decoded OCR text plus only the independently known filename text. The
+unchanged successful capture/index/copy/download steps were not repeated.
+The tail passed and complete hit evidence still reached Details. Root/Luna diff
+review, final affected Web build, visual review and diff check passed.
+
+F05's local client scope is Done. Selected lexical source coverage is 17/17,
+while overall field absence remains DEGRADED. No model inputs, profile digests,
+processor rules or recovery authority changed; no historical processing or
+first-query download ran. This does not qualify general recall, cross-platform
+model distribution or a release. F03 and F06 retain their stated remaining work.
+The user-facing port-4670 demo was not populated or restarted.
