@@ -274,6 +274,19 @@ No browser exceptions occurred. The built real dark UI screenshot is retained
 at `dist/scrollbar-refinement-20261031.png`; build and diff check passed. This
 is frontend presentation maintenance, not a core phase or media-budget change.
 
+The owner subsequently still saw a native track with two lines. A freshly loaded
+Chrome page measured the two lines at 70px with hidden overflow, but composer
+scrollbar painting had only inherited the shared thin theme. The composer now
+explicitly suppresses both standard and WebKit scrollbar painting/gutter; long
+text keeps ordinary scrolling. The selected fresh-build journey used the exact
+`测试\n测试` input: 70px content/height, no painted bar or gutter. A 593px long
+body stayed bounded at 110px, wheel and keyboard navigation worked, and
+expand/return retained the draft with no browser errors. Evidence is retained in
+`dist/composer-scrollbar-hidden-journey-20261031.log` and
+`dist/composer-two-lines-no-scrollbar-20261031.png`. The user's existing embedded
+tab could not be inspected through the unavailable browser connector, so these
+are fresh Chrome observations, not a claim of inspecting that live tab.
+
 ## M2 F08 saved-search continuation — 2026-10-31
 
 Active batch: admitted Phase 4/5 parallel first-party SavedView ergonomics under
