@@ -13,13 +13,13 @@ import { MaterialListResult } from "./material/MaterialListResult";
 import { FloatingSearchResults } from "./material/FloatingSearchResults";
 import "./SpaceAssistant.css";
 
-export type SpaceAssistantHandle = { focus: () => void; openList: (hit: SearchHit) => void; showResult: (document: MaterialListDocument) => void };
+export type SpaceAssistantHandle = { focus: () => void; openList: (hit: SearchHit) => void; showResult: (document: MaterialListDocument) => void; reviewSave: (document: MaterialListDocument, captures?: File[], signal?: AbortSignal) => Promise<boolean> };
 type Props = {
   ref?: Ref<SpaceAssistantHandle>; t: Translator; workspaceID: string; active: boolean; blocked: boolean; busy: boolean;
   playbackActive: boolean; catalogItems: SearchHit[]; selectedItems: SearchHit[]; notice?: string;
   onSearch: (query: string, onResults: (hits: SearchHit[], coverage?: string) => void) => Promise<boolean>;
   onOpen: (hit: SearchHit, query?: string) => void | Promise<void | boolean>; entryHint?: (hit: SearchHit) => string | undefined; onUse: (document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) => void;
-  onOrganize: (document: MaterialListDocument) => void; onSaveFiles: (files: File[]) => void;
+  onOrganize: (document: MaterialListDocument) => void; onSaveFiles: (files: File[]) => boolean;
 };
 export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, playbackActive, catalogItems, selectedItems, notice, onSearch, onOpen, entryHint, onUse, onOrganize, onSaveFiles }: Props) {
   const input = useRef<HTMLTextAreaElement>(null), panel = useRef<HTMLElement>(null);
@@ -63,7 +63,7 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
     } catch (reason) { if (request.current === token && !abort.signal.aborted) setError(t(reason instanceof Error ? reason.message : "The list could not be read.")); }
     finally { if (request.current === token) setWorking(false); }
   }
-  useImperativeHandle(ref, () => ({ focus, openList: hit => void loadList(hit), showResult: document => { setResult(document); setShowResult(true); setExpanded(false); setOpen(false); setError(""); } }));
+  useImperativeHandle(ref, () => ({ focus, openList: hit => void loadList(hit), showResult: document => { setResult(document); setShowResult(true); setExpanded(false); setOpen(false); setError(""); }, reviewSave }));
   useEffect(() => {
     if (full && !blocked) panel.current?.querySelector<HTMLButtonElement>("button")?.focus();
   }, [full, blocked]);
@@ -124,18 +124,21 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
     } catch (reason) { if (token === request.current && !abort.signal.aborted) { setOpen(true); setError(t(reason instanceof Error ? reason.message : "The selected material could not be read.")); } }
     finally { if (token === request.current) setWorking(false); }
   }
-  async function keepResult() {
-    if (!result || disabled) return;
+  async function reviewSave(document: MaterialListDocument, preparedFiles?: File[], signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted) return false;
     const token = ++request.current; setWorking(true); setError("");
     try {
-      const captures = await materialListFiles(result), json = JSON.stringify(result), file = captures.at(-1)!;
+      const captures = preparedFiles ?? await materialListFiles(document), json = JSON.stringify(document), file = captures.at(-1)!;
       const contentID = await sha256ContentID(new Uint8Array(await file.arrayBuffer()));
-      if (token !== request.current) return;
+      if (token !== request.current || signal?.aborted) return false;
+      if (!onSaveFiles(captures)) { setError(t("The operation could not be completed.")); return false; }
+      setResult(document);
       setPendingSave({ contentID, size: file.size, json }); setShowResult(false); setExpanded(false); setOpen(false);
-      onSaveFiles(captures);
-    } catch (reason) { if (token === request.current) setError(reason instanceof Error ? reason.message : t("The operation could not be completed.")); }
+      return true;
+    } catch (reason) { if (token === request.current) setError(reason instanceof Error ? reason.message : t("The operation could not be completed.")); return false; }
     finally { if (token === request.current) setWorking(false); }
   }
+  function keepResult() { if (result && !disabled) void reviewSave(result); }
   function reviewInput() {
     if (disabled || (!files.length && !draft.trim())) return;
     const captures = [...files];
@@ -171,6 +174,6 @@ export function SpaceAssistant({ ref, t, workspaceID, active, blocked, busy, pla
   if (!active) return null;
   return createPortal(<section ref={panel} className={`space-assistant ${full ? "is-full" : ""} ${open ? "is-open" : ""} ${blocked ? "is-obscured" : ""}`} style={{ "--assistant-player-offset": playbackActive ? "88px" : "0px" } as React.CSSProperties} role={full ? "dialog" : "region"} aria-modal={full && !blocked ? true : undefined} aria-label={t("Find and organize your space")} onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={event => { if (!event.dataTransfer.files.length || disabled) return; event.preventDefault(); event.stopPropagation(); const dropped = Array.from(event.dataTransfer.files); setFiles(value => [...value, ...dropped]); setOpen(true); }}>
     {full && !showResult && <header className="space-assistant-full-header"><button type="button" className="text-button" onClick={returnToComposer}><ArrowLeft size={17} />{t("Return to space")}</button><span>Cairn · {t("Your material")}</span>{result && <button type="button" className="text-button" onClick={() => { setShowResult(true); setExpanded(false); }}>{t("Open result")}</button>}</header>}
-    {showResult && result ? <div className="space-assistant-expanded-content"><MaterialListResult t={t} workspaceID={workspaceID} document={result} catalogItems={catalogItems} saved={saved} busy={disabled} actionsDisabledReason={blocked ? t("Close the current panel before using a saved list.") : undefined} onChange={setResult} onUse={onUse} onOpen={hit => void openHit(hit)} onSave={() => void keepResult()} onEdit={() => { setShowResult(false); setExpanded(false); onOrganize(result); }} onClose={returnToComposer} /></div> : <>{(open || expanded) && <><header className="space-assistant-head"><span><Sparkles size={16} />{t("Find and organize")}</span><div>{!expanded && <button type="button" className="icon-button" aria-label={t("Expand workspace")} onClick={() => setExpanded(true)}><Maximize2 size={16} /></button>}</div></header>{conversation}</>}{composer}</>}
+    {showResult && result ? <div className="space-assistant-expanded-content"><MaterialListResult t={t} workspaceID={workspaceID} document={result} catalogItems={catalogItems} saved={saved} busy={disabled} error={error} actionsDisabledReason={blocked ? t("Close the current panel before using a saved list.") : undefined} onChange={setResult} onUse={onUse} onOpen={hit => void openHit(hit)} onSave={keepResult} onEdit={() => onOrganize(result)} onClose={returnToComposer} /></div> : <>{(open || expanded) && <><header className="space-assistant-head"><span><Sparkles size={16} />{t("Find and organize")}</span><div>{!expanded && <button type="button" className="icon-button" aria-label={t("Expand workspace")} onClick={() => setExpanded(true)}><Maximize2 size={16} /></button>}</div></header>{conversation}</>}{composer}</>}
   </section>, document.body);
 }

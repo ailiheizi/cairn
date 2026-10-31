@@ -197,3 +197,62 @@ The original Linear project and its 28-card document now reflect these outcomes:
 F01 Done for browser intake/use, F03 In Progress with this selected handoff
 delivered and broader field/recall gaps retained, and F28 Done for the current
 documentation version. M2/M3/M10 retain their IDs and explicit remaining limits.
+
+## M1 final result/save handoff — 2026-10-31
+
+Owner requested M1's complete loop before further M2/M3 work. This is one
+admitted Phase 4/5 parallel ML-1/2/3 client maintenance batch: the ordinary list
+and frozen Skill must remain the result used after editing, reviewed saving,
+reopening and verified playback/takeout. No backend, durable format, model call
+semantics, budgets or core/release gate changes.
+
+Decision: both the Skill editor's direct save and the expanded result's save
+use the same transient assistant result/save tracking. The host acknowledges
+whether intake accepted the handoff; refusal must preserve the editor/result,
+and upload preparation never implies confirmed capture. Preserve the prior
+result behind a Skill editor so cancelling returns directly to it. Existing
+JSON snapshot comparison is correct: unchanged saved content remains saved,
+while changed content becomes a new ordinary draft. Do not clear it merely
+because the editor was opened.
+
+- [x] Implement in `SpaceAssistant.tsx`, `MaterialListComposer.tsx`,
+  `MaterialListResult.tsx`, `main.tsx`, and existing translations if needed.
+  Pass the exact document and its prepared files together through a compiled
+  callback; track that list file's digest/length and matching draft JSON. Only
+  current catalog confirmation may mark it saved. Surface save failures in the
+  existing full result and keep the current result intact on host refusal.
+- [x] Build and run one existing-environment `m1-result-save-use` journey:
+  saved material -> exact Skill in editor -> direct review save -> cancel and
+  resume -> one explicit apply -> returned current result -> reload/reopen ->
+  order/context/Skill intact -> supported play and original takeout. Reuse prior
+  real-provider candidate evidence because this change adds no provider path;
+  do not spend another model call merely to validate client handoff. Compare
+  taken-out bytes with independently retained source files.
+- [x] Root and Luna review, `git diff --check`, then update existing M1/F09/F10
+  records with the actual outcome. Root owns one acceptance;
+  no delegate builds a separate test suite. Preserve unrelated worktree files.
+
+Actual outcome: the current Skill-editor document now passes together with its
+generated files through the shared result-save handoff. The host returns an
+accept/refuse result; refusal leaves the editor/result intact. Editor cancellation
+propagates its AbortSignal through the hash/preparation boundary, so a late
+preparation cannot open intake or replace the prior result. The full result also
+shows save errors. Unchanged saved JSON remains saved; revised JSON is a draft.
+
+The existing port-4670 journey created `M1closure20261031` with a literal Skill,
+three occurrences over two independently retained MP3 sources, one explicit
+reviewed apply and no model request. Cancel/reopen retained the same upload/plan;
+the newest result stayed pending until catalog confirmation. Refresh/reopen
+preserved the Skill, order, repetition and reason, and actual verified audio
+advanced. ZIP contained exactly two unique originals, byte-equal to the separate
+3,522,969-byte and 7,084,053-byte source files. Evidence is in ignored
+`dist/m1-20261031/` (journey, receipts, expected snapshot, ZIP, source comparison,
+screenshots). A read-only cancellation tail delayed only local list-byte
+preparation, closed the editor, then released it: zero upload/apply, original
+saved result unchanged. It did not replay successful mutations. Final Web build,
+root/Luna review and diff check passed. Prior ML-3 real-provider evidence remains
+applicable; this change did not alter model execution, grants or candidate rules.
+
+This closes the selected M1 client loop. Continue existing M2 daily-use and M3
+retrieval gaps; no future refresh, general AI, domain service or core/release
+qualification is implied.

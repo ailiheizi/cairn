@@ -82,7 +82,7 @@ type MaterialListComposerHostProps = {
   initialDocument?: MaterialListDocument;
   busy: boolean;
   onClose: () => void;
-  onSaveFiles: (files: File[]) => void;
+  onSaveFiles: (files: File[], document: MaterialListDocument, signal: AbortSignal) => boolean | Promise<boolean>;
   onPreviewResult?: (document: MaterialListDocument) => void;
 };
 
@@ -789,14 +789,14 @@ function App() {
     if (workspaceIDRef.current !== capturedWorkspaceID || !files.length || !isConnected || isUnavailable || !coreStorageReady
       || settingsOpen || addOpen || restoreOpen || exportOpen || verificationOpen || sourceIntakeIsPending()) {
       setNotice({ kind: "warning", text: t("Finish the current source operation before uploading files.") });
-      setMaterialListEditor(undefined);
-      return;
+      return false;
     }
     setMaterialListEditor(undefined);
     pendingPasteFilesRef.current = true;
     setPendingUploadFiles(files);
     setNotice(undefined);
     sources.openAdd();
+    return true;
   }
   function notesTextFileEntryDisabledReason() {
     if (!isConnected) return t("Connect to Cairn before saving text as a file.");
@@ -1502,7 +1502,8 @@ function App() {
         busy={busy}
         onClose={() => setMaterialListEditor(undefined)}
         onPreviewResult={(document) => { setMaterialListEditor(undefined); assistantRef.current?.showResult(document); }}
-        onSaveFiles={(files) => saveMaterialListFiles(files, materialListEditor.workspaceID)}
+        onSaveFiles={(files, document, signal) => workspaceIDRef.current === materialListEditor.workspaceID
+          ? assistantRef.current?.reviewSave(document, files, signal) ?? false : false}
       />
     </div>}
     {addOpen && <SourceDrawer

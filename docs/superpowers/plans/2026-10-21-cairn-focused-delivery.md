@@ -297,6 +297,12 @@ all field coverage, model distribution or core/release gates.
 
 **Finished looks like:** Reuse `dist/material-list-20261021/acceptance/report.md` for save/reload/open/frozen text/original verification; do not rerun just to refresh this plan.
 
+**2026-10-31 M1 closure:** Both direct Skill-editor save and full-result save
+now retain the same current document through reviewed intake. Cancelling the
+editor preserves the prior result; cancellation during preparation cannot start
+late intake. A real reviewed save/reload preserved exact Skill/context and
+repeated order. See the [M1 continuation](2026-10-30-save-find-use.md#m1-final-resultsave-handoff--2026-10-31).
+
 **Dependencies:** None. **Scope:** Existing MaterialList Composer/Reader and ordinary files; no list database, head or AI runner. **Sources:** [ML-1 contract](../../technical/material-list-client-contract.md), [ML-1 delivery](../../technical/product-experience-todo.md#ml-1-material-list-delivery-2026-10-21).
 
 ### F10 · [AIL-6](https://linear.app/ailiheizi/issue/AIL-6) — Play or take out a saved list
@@ -315,6 +321,11 @@ all field coverage, model distribution or core/release gates.
 **Reuse and steps:** Already delivered. Revalidate loaded members; preserve audio order/repetitions under existing limits; use existing unique-target export actions.
 
 **Finished looks like:** Reuse `dist/material-list-20261021/acceptance/ml2/report.md` for real playback/queue progress, ZIP hash checks and unchanged queue when a member is unresolved.
+
+**2026-10-31 M1 closure:** The joined direct-save/reopen journey played the
+ordered repeated list and took out two unique originals, byte-equal to separate
+retained MP3 inputs. No model call or new playback/takeout mechanism was added;
+existing budgets and unresolved-member behavior remain unchanged.
 
 **Dependencies:** F09/R01. **Scope:** Existing Reader, player and export; existing 32 MiB playback and 1,000 queue limits. **Sources:** [ML-2 contract](../../technical/material-list-client-contract.md#use-saved-lists-ml-2), [ML-2 delivery](../../technical/product-experience-todo.md#ml-2-delivery-use-the-saved-result-2026-10-21).
 

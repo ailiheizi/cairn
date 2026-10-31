@@ -98,6 +98,18 @@ and local query success are not whole-product or release completion. Existing
 Backlog cards retain their concrete remaining capability/depth, and completed
 foundations can still be polished when a real use gap appears.
 
+## M1 result-to-save closure — 2026-10-31
+
+Skill-editor direct saving and expanded-result saving now share one transient
+result/save handoff. Cancelling the editor returns to the current result;
+cancelled byte preparation cannot start a later upload. Review can be resumed,
+and only the exact matching catalog result marks the current JSON saved.
+The [M1 continuation](../superpowers/plans/2026-10-30-save-find-use.md#m1-final-resultsave-handoff--2026-10-31)
+records one real save/reload/use journey: ordered repeated audio, literal Skill
+and context survived, verified playback advanced, and ZIP's two unique originals
+matched independent inputs. No new model request or general AI path was added.
+M1's admitted loop is closed; current work returns to existing M2/M3 gaps.
+
 ## F01 save-to-use continuation — 2026-10-31
 
 Ordinary folder/file receipts survive panel close/reopen; stop keeps explicit

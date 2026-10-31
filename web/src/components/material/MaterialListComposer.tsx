@@ -27,7 +27,7 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
   busy: boolean;
   organizer: MaterialOrganizerController;
   onClose: () => void;
-  onSaveFiles: (files: File[]) => void;
+  onSaveFiles: (files: File[], document: MaterialListDocument, signal: AbortSignal) => boolean | Promise<boolean>;
   onPreviewResult?: (document: MaterialListDocument) => void;
 }) {
   const selectionKey = JSON.stringify(subjects.map((item) => [item.subject_ref, item.entry_id, item.content_id, item.logical_size]));
@@ -441,7 +441,8 @@ export function MaterialListComposer({ t, workspaceID, subjects, catalogItems, i
         if (!operationIsCurrent(controller, key)) return;
         const files = await materialListFiles(document);
         if (!operationIsCurrent(controller, key)) return;
-        onSaveFiles(files);
+        const accepted = await onSaveFiles(files, document, controller.signal);
+        if (!accepted && operationIsCurrent(controller, key)) setError(t("The operation could not be completed."));
       } catch (reason) {
         if (operationIsCurrent(controller, key)) setError(t(reason instanceof Error ? reason.message : "Could not prepare the list files."));
       }
