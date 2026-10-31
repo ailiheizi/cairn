@@ -74,6 +74,12 @@ Use the single **Notes** surface for human notes and attributed imported,
 extracted, or model-produced text. Add as many user tags as useful. System
 facets such as file type are shown separately.
 
+In Music, open a track's **⋯ → Notes and tags** to add context without playing
+it. Photos/Videos use their explicit **Details** action. These all open the
+same inspector. For several items, select them and expand **Selection actions
+→ Organize tags**; batch changes retain other tags and Notes. Favorite is the
+ordinary visible `Favorite` tag, shared across these pages.
+
 ## Run locally
 
 From the repository root, start the daemon and its built WebUI with one command:

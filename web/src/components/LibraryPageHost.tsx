@@ -90,7 +90,7 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest,
   />;
 }
 
-function renderMusic({ resultProps, focusedSubjectRef, focusRequest, onFocusSubject, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
+function renderMusic({ resultProps, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onNavigate }: LibraryPageHostProps) {
   return <MusicLibraryExperience
     {...resultProps}
     focusedSubjectRef={focusedSubjectRef}
@@ -101,6 +101,7 @@ function renderMusic({ resultProps, focusedSubjectRef, focusRequest, onFocusSubj
     {...(onPlayTracks ? { onPlayTracks } : {})}
     {...(musicMetadata ? { metadata: musicMetadata } : {})}
     favoriteControls={favoriteControls}
+    onOpenHit={onOpenHit}
     queueControls={musicQueueControls}
     onSelectSubjects={onSelectSubjects}
     onCreateMaterialList={onCreateMaterialList}

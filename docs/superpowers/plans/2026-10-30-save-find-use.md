@@ -344,3 +344,63 @@ ran. Root/Luna review, affected Web build and diff check passed. Untouched paged
 recall and view-backed frozen export retain the prior stated evidence; this is
 the F08 client-entry closure, not arbitrary condition support or core/release
 qualification. M2 still owns F07/F22 and M3 still owns concrete retrieval gaps.
+
+## M2 F07 manual context continuation — 2026-10-31
+
+Active batch: Phase 4/5 parallel admitted first-party client maintenance under
+content-store §8, the one-Notes decision and ordinary TAG/Favorite contracts.
+Goal: explicitly open a media item's existing Notes/tags, retain and reread
+context, organize several selected items and find/use them again.
+
+Concrete gap: ordinary Music-name activation now correctly locates the media
+destination, but its row menu only exposes queue/download actions. Unlike
+Photos/Videos, `renderMusic` does not pass the existing host `onOpenHit` inspector
+callback. Thus a stopped Music item has no direct row action for Notes/tags.
+Add one **Notes and tags** item inside the existing overflow menu; do not change
+normal name activation, start playback, create another editor, or broaden reads.
+
+- [x] Pass optional `onOpenHit(hit)` through `LibraryPageHost` and existing
+  `MusicLibraryProps`; call it from the Music row overflow menu using the same
+  menu-close helper. Keep the existing host Details/Notes/annotation lifecycle.
+- [x] Integrate the complete manual context workflow, fixing only observed
+  connected failures. No new endpoint, durable schema, processor, provider,
+  index dimension, UI surface or test framework. AI description execution is
+  not selected by this manual-context batch.
+- [x] Build then use one `media-context-find-use` journey on the current
+  isolated profile: stopped Music -> explicit Notes/tags -> save/reread/edit
+  long user text and exact tags -> Photo context/Favorite -> selected batch
+  tags -> reread without losing other context -> find and use/take out the
+  original with independent byte comparison. Reuse unchanged prior trust/read
+  evidence; diagnose locally only after an actual failure or changed invariant.
+- [x] Root/Luna diff review and diff check; update existing F07/M2 status with
+  executable outcomes/limits, then commit/push. Root is the single acceptance
+  owner; delegates do not run separate suites. Preserve unrelated files.
+
+Actual local delivery: stopped Music's overflow menu now has a host-owned
+Notes/tags action. The inspector receives the exact row, closes its menu and
+receives focus; name navigation and playback remain separate. Its menu label
+now describes general item actions instead of implying queue-only content.
+
+The current port-4670 workflow saved and revised a literal long Music note,
+reopened all 7,690 UTF-8 bytes exactly, and retained its independent user tag.
+Favorite was toggled and restored to its original false state. Two explicit
+Music selections received one exact batch tag, then had only that tag removed;
+both selections, the other user tag and full note remained. Photo Details saved
+another ordinary user note. A fresh `F07context` query found Summer with returned
+`kind=NOTE`, `source_type=ANNOTATION` and the saved annotation ID: actual note
+coverage, not an inference from filenames or semantic score. Its 7,084,053-byte
+takeout matched the independent MP3 source and its known SHA-256.
+
+Evidence is in `dist/f07-20261031/`: literal expected bodies, successful write
+responses, current-source search response, browser segments, screenshot and
+original. One driver selected the datalist input by textbox role instead of its
+label, then another missed the Photo card's hover disclosure. Each correction
+resumed only the pending tail; the two successful note writes and subsequent
+confirmed tag operations were not replayed. All ten confirmed annotation
+responses succeeded; no original capture/apply, remote AI generation or model
+profile changes occurred. Root/Luna review, Web build and diff check passed.
+Existing unknown-read protections and description provenance remain unchanged.
+
+The admitted manual F07 loop is closed. Optional AI-generated Notes and a new
+history browser were not selected or claimed by this batch. M2's remaining
+function card is F22; M3's broader field/recall work is still open.

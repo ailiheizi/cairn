@@ -252,14 +252,23 @@ all field coverage, model distribution or core/release gates.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
-| User Notes, multi-tags and Favorite | Usable | Keep one Notes surface and ordinary Favorite TAG. |
-| Batch add/remove | Partial local coverage | Preserve selection and report outcomes. |
-| Long text, history and provenance | Partial | Continue reading and expose source when needed. |
+| User Notes, multi-tags and Favorite | Manual local loop delivered | Keep one Notes surface and ordinary Favorite TAG. |
+| Batch add/remove | Selected manual local loop delivered | Preserve selection, other tags and Notes; report outcomes. |
+| Long text, history and provenance | Full current text/source reread proven; new history UI unselected | Continue reading and expose source/revision when needed. |
 | AI-generated Notes | Code exists; user journey unproven | Only join an existing real-profile flow if selected. |
 
 **Reuse and steps:** Reuse `NotesSurface`, annotation operations and shared selection. Preserve user/imported/extracted/model source distinctions; disable mutation on unknown tag reads; reuse Favorite TAG and shared filtering.
 
 **Finished looks like:** Edit Notes, tags and Favorite across Photos/Music, reread without overwriting other tags, reopen long Notes and find the item again.
+
+**2026-10-31 manual-client closure:** Music's overflow now explicitly opens the
+shared Notes/tags inspector without playback or a name-navigation loop. The
+[selected joined journey](2026-10-30-save-find-use.md#m2-f07-manual-context-continuation--2026-10-31)
+saved/revised/reread an exact long note, preserved other context through batch
+tag add/remove, restored Favorite and saved Photo context. A fresh search
+returned the actual NOTE annotation source, and takeout matched original bytes.
+This admitted manual scope is Done. Optional AI description execution and a new
+history browser were not selected; their existence is not claimed as delivery.
 
 **Dependencies:** Existing intake and subject actions. **Scope:** Notes and annotation clients; no weighted claim model (see F12 future subfeature only if admitted). **Sources:** [Notes decision](../../technical/notes-surface-decision.md), [first-party client contract](../../requirements/first-party-client-experiences.md).
 

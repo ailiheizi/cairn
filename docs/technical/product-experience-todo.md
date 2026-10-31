@@ -27,6 +27,9 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest locally delivered baseline | F02 / [AIL-39](https://linear.app/ailiheizi/issue/AIL-39) | Home content, floating input, expanded result and specialist-page entry feel continuous; draft/results survive returns; metadata stays on demand |
 | Latest locally delivered save-to-use | F01 / [AIL-38](https://linear.app/ailiheizi/issue/AIL-38) | Save files/text, understand progress and cancellation, continue review, then find and use the saved material |
 | Latest locally delivered retrieval handoff | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
+| Latest locally delivered common search | F08 / [AIL-42](https://linear.app/ailiheizi/issue/AIL-42) | Name a submitted search, reload, edit/copy and explicitly reopen its current Library results |
+| Latest locally delivered manual context | F07 / [AIL-41](https://linear.app/ailiheizi/issue/AIL-41) | Open media Notes/tags, preserve context through batch changes and find/use it again |
+| Remaining M2 scope | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue large loaded scopes and return to the correct browse position |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
 At most one whole feature enters implementation. F02's bounded baseline is now
@@ -123,10 +126,26 @@ The [selected F08 journey](../superpowers/plans/2026-10-30-save-find-use.md#m2-f
 saved/reloaded a filter-only view, copied and explicitly revised it, superseded a
 late recall through navigation, and took out its one matching original with
 independent byte comparison. Existing paging/export evidence is retained.
-F08's selected client scope is Done; M2 still has F07/F22 gaps, and F03 continues
+F08's selected client scope is Done; at that delivery M2 still had F07/F22 gaps,
+with F07's later manual closure recorded below. F03 continues
 to own broader retrieval coverage. The same batch fixes the reported native
 scrollbar: composer text grows to its existing bound and shared thumbs use the
 active theme while retaining ordinary scroll behavior.
+
+## M2 F07 manual-context closure — 2026-10-31
+
+Music now has an explicit **Notes and tags** action in its row overflow menu,
+using the same host inspector as Photos/Videos. The selected
+[manual context journey](../superpowers/plans/2026-10-30-save-find-use.md#m2-f07-manual-context-continuation--2026-10-31)
+saved, edited and reread a complete long note; preserved unrelated context and
+selection through batch tag add/remove; restored the original Favorite state;
+and saved Photo context. Searching the Music note returned its actual NOTE /
+ANNOTATION source, and original takeout matched independent bytes.
+
+F07's admitted manual client scope is Done. AI-generated Notes were not selected,
+and no new history browser or durable model is implied. M2 now has F22 remaining;
+M3 still owns broader field/recall gaps. No original ingest or remote AI operation
+was added to this context workflow.
 
 ## F01 save-to-use continuation — 2026-10-31
 

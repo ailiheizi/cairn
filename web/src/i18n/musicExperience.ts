@@ -1,4 +1,5 @@
 export const musicExperience: Record<string, string> = {
+  "Notes and tags": "备注与标签",
   "More playback actions": "更多播放操作",
   "Shuffle selected ({{count}})": "随机播放已选曲目（{{count}}）",
   "Shuffle these tracks ({{count}})": "随机播放这些曲目（{{count}}）",

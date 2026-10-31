@@ -9,6 +9,7 @@ import { uniqueSubjectHits } from "../../lib/subjectHits";
 
 type ResultListProps = ComponentProps<typeof ResultList>;
 export type MusicLibraryProps = Pick<ResultListProps, "hits" | "libraryListRef" | "selectionCount" | "rovingRow" | "selectedRef" | "selectionRefs" | "identityCounts" | "tagsBySubject" | "viewMode" | "locale" | "t" | "command" | "workspaceID" | "onRowClick" | "onToggleSelection" | "onKeyDown"> & {
+  onOpenHit?: (hit: SearchHit) => void;
   focusedSubjectRef?: string;
   focusRequest?: number;
   onFocusSubject?: (subjectRef: string) => void;
