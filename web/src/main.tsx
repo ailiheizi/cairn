@@ -445,6 +445,7 @@ function App() {
     browseSessionScopeRef.current = JSON.stringify([
       view.viewMode === "search" ? "search" : view.viewMode === "path" ? "path" : "library",
       view.viewMode === "search" ? lastExecutedQuery : "",
+      search.visualSearchContext?.key ?? "",
       [...library.activeTags].sort(), library.activeSystemFacets,
       library.activeTimelineMonth, library.browseRootID,
       library.browseCrumbs.map((crumb) => crumb.entry_id || crumb.subject_ref),
@@ -1381,8 +1382,10 @@ function App() {
           onLibraryKeyDown={selection.handleLibraryKeyDown}
           onOpenExport={(trigger, explicitSelection) => exportFlow.openExport(trigger, explicitSelection)}
           onClearNotice={() => setNotice(undefined)}
-          onImageSearch={(subjectRef) => void search.runImageSearch(subjectRef)}
-          onVisualTextSearch={(description) => void search.runVisualTextSearch(description)}
+          onImageSearch={search.runImageSearch}
+          onVisualTextSearch={search.runVisualTextSearch}
+          visualSearchContext={search.visualSearchContext}
+          onReturnToAllPhotos={library.clearSearchScope}
           onOpenHit={(hit) => void details.loadDetails(hit)}
           onFocusSearch={() => contentSpace ? assistantRef.current?.focus() : search.focusSearchField()}
           libraryListRef={libraryListRef}

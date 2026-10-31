@@ -7,6 +7,87 @@
 **Goal:** Complete the admitted everyday save-to-use and retrieval handoffs in
 existing F01 then F03, without starting future domain or AI infrastructure.
 
+## M3 F06 scene and reference-image continuity — 2026-10-31
+
+**Active phase:** admitted Phase 4 VIS-1/2/3 and first-party Photos maintenance.
+**Requirement:** the visual-search admission in the content-store contract:
+explicit Chinese scene and saved-image queries use the actual local CLIP
+generation; unavailable inference remains honest; original identity is unchanged.
+**Acceptance owner:** root; Luna implements and executes one selected browser
+journey after integration. Existing model installation evidence is reused.
+
+**Decision:** finish the existing Photos search, rather than introduce another
+search page or a chat result type. Keep a compact accepted-search context in the
+host: scene words or the selected reference's name, returned-result count and a
+return-to-all-photos action. Preserve scene drafts across page switches in the
+existing workspace session. Scope labels must disappear when the actual host
+result set, workspace or refresh generation changes. A new visual answer resets
+local filters/sorting so old local choices cannot conceal the new matches.
+Use the existing current-result browse bookmark for viewer/Details return.
+
+**Implementation:** `app/useSearch.ts`, `main.tsx`, `LibrarySurface.tsx`,
+`LibraryPageHost.tsx`, `PhotoLibraryExperience.tsx`/`.css`,
+`photo/photoTypes.ts`, `photo/PhotoViewer.tsx`, and `i18n/visualSearch.ts` only.
+Expose a viewer action to find similar saved photos (PNG/JPEG, existing identity
+checks); close the viewer only after an accepted response. Keep it open on
+failure and show feedback there. Reuse the existing card and selection actions,
+not a second selection system. No new model, data read authority, upload query,
+schema, endpoint, dimension, processor, runtime loader or backend change.
+
+**One exit:** in the existing isolated local profile, retain independently
+identified neutral-named interior/reference/distractor photos; explicitly build
+the existing image generation once if those images are newly captured. Use a
+Chinese no-text scene query, switch away/back with draft and accepted query
+intact, open a matching photo, find a related image from the viewer, and return
+from viewer/Details to the same search context. Take out the expected original
+and compare all bytes, SHA-256 and length with the independent input. Verify
+real CLIP provider/generation responses, unavailable query preserving existing
+results/reference and ordinary name search/original access in that same journey.
+No broad backend suite or model/cross-platform qualification is implied.
+
+**Delivery: implemented and locally accepted, 2026-10-31.** The selected F06
+client loop is Done. Luna implemented and executed the shared browser journey;
+root reviewed the diff, actual response evidence and final screenshots.
+
+The existing isolated F04 profile received three neutral-name photos in one
+ordinary plan/apply, followed by one explicit index build. The installed bundle
+was reused, with no model download. Real `multimodal-clip` queries identify
+`query.multimodal.onnx-clip-zvec.v1` and READY generation
+`idx_0253759890468be74f74f1d5d6a8d87e` (five images). Chinese scene
+`客厅里白色沙发和木质茶几` ranked the independently expected `a.jpg` first.
+Reference `b.jpg` ranked `b.jpg`, then related interior `a.jpg`, then jewelry
+distractor `c.jpg`, ahead of the other two images. This is the stated local
+corpus result, not a general recall guarantee.
+
+The workflow verified accepted query/draft retention through Library/Home/Photos,
+resetting prior local filters/sort, explicit viewer-to-reference search, Details
+return to the same Photos wall/context, and ordinary filename filtering after
+**All photos**. Labelled client response faults separately demonstrated scene
+and viewer unavailability without replacing the prior results; these faults are
+UI evidence, not real model failures. Both downloaded originals matched their
+independent inputs byte-for-byte:
+
+- `a.jpg`: 77,263 bytes; SHA-256
+  `8333aa943a16cc9d7574cbc4dc9f3ad2118e1e3f2d6cca26605ff440439c15f0`.
+- `c.jpg`: 74,524 bytes; SHA-256
+  `32f8ba24f91e3f6320c97bee99f3e495a1aedd76e733c99cab0adfaf06f71b89`.
+
+Ignored evidence is in `dist/f06-20261031/`: `expected-inputs.json`, the single
+plan/apply and rebuild responses, `journey.mjs`, the resumed read-only
+`resume-tail.mjs`, `journey-result.json`, and
+`similar-results-final.png`/`viewer-unavailable-preserved.png`. Intermediate
+failures are retained: one missing import and one omitted prop handoff were
+fixed; the driver was corrected to return from Details to the wall before
+explicitly reopening the viewer. Failed evidence-summary writes did not replay
+successful capture/download mutations; the final summary records the observed
+assertions and retained files. Only the affected build/failed steps resumed.
+Final Web build, visual review and diff check passed; no broad backend suite ran.
+
+The isolated service was stopped after its PID/config were checked; demo 4670
+was untouched. Overall rebuild still reports DEGRADED for absent lexical fields,
+while BGE is AVAILABLE. F03's remaining coverage/recall work, model distribution,
+license review, cross-platform and core/release qualification remain open.
+
 **Architecture:** Existing SourceDrawer and useSources own the upload/review/
 explicit-apply flow. Keep one transient browser upload draft/receipt on the
 existing sources hook so ordinary files, like pasted text, can resume after a

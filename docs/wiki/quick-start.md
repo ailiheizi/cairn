@@ -92,6 +92,20 @@ Download still takes out the original image. Recognition uses the installed OCR
 bundle on new captures or ordinary explicit recaptures; missing OCR does not
 prevent exact saving.
 
+In **Photos → Scene**, describe what a saved photo shows, then choose **Find**.
+This uses the installed local Chinese-CLIP image generation, independently of
+filenames, OCR and the text embedding space. The compact result strip shows the
+submitted scene or reference photo; editing the input does not relabel those
+results. The scene draft survives switching pages in the same workspace/session.
+Open a saved PNG/JPEG in the viewer and choose **Find similar photos** to use it
+as a reference. A failed query keeps the current photo and results available.
+**Names and tags** filters the current photo matches; **All photos** exits the
+visual result scope and restores the loaded library. A new accepted visual query
+resets local filters and sorting so previous choices cannot hide its matches.
+Download still returns the unchanged original. Model installation and image-index
+building are explicit operator actions; queries do not download models or send
+images to remote inference.
+
 ## Adding context
 
 Use the single **Notes** surface for human notes and attributed imported,

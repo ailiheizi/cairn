@@ -32,6 +32,7 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest locally delivered continuation | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue a floating query in Library, load later keyword matches, inspect and return with browse anchor/selection retained |
 | Latest M3 document delivery | F04 / [AIL-46](https://linear.app/ailiheizi/issue/AIL-46) | Find neutral-name PDF/DOCX by body or meaning, read/copy returned passages and download exact originals after restart |
 | Latest M3 screenshot delivery | F05 / [AIL-47](https://linear.app/ailiheizi/issue/AIL-47) | Find screenshots by printed words or paraphrase, read/copy recognized text with honest quality, and take out the original image |
+| Latest M3 visual delivery | F06 / [AIL-48](https://linear.app/ailiheizi/issue/AIL-48) | Describe a scene or find similar from a saved photo, keep query/draft context through browsing, and take out unchanged originals |
 | Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
@@ -214,8 +215,33 @@ opaque JSON tails were hidden and same-source OCR chunks were not repeated.
 
 No processor/model inputs or backend contracts changed. Selected lexical sources
 are 17/17 in this profile, but overall absent-field diagnostics remain DEGRADED.
-F03's broader recall/field work and F06's visual client continuation remain;
-neither the local card nor this evidence closes a core or release gate.
+F03's broader recall/field work remains. F06's visual continuation was subsequently
+locally delivered as recorded below. Neither local card closes a core or release gate.
+
+## M3 F06 scene/reference-photo closure — 2026-10-31
+
+F06's admitted local client loop is Done. Photos distinguishes an accepted scene
+or reference from its editable draft, retains that draft across workspace-session
+page switches, and resets local filters/sorting for a new visual answer. The
+saved PNG/JPEG viewer can find similar photos directly. Rejected queries preserve
+the previous results/viewer; Details returns to the same Photos wall/context.
+**All photos** restores the loaded scope and ordinary local name/tag filtering.
+
+The [selected F06 journey](../superpowers/plans/2026-10-30-save-find-use.md#m3-f06-scene-and-reference-image-continuity--2026-10-31)
+used real installed Chinese-CLIP and five images, including independently
+identified neutral-name interior/reference/jewelry samples. The Chinese scene
+placed the expected living room first; the bedroom reference returned the related
+living room ahead of the jewelry distractor. Two original downloads (77,263 and
+74,524 bytes) matched independent source bytes and SHA-256. Labelled client faults
+proved unavailable-state preservation; they are not actual model outage evidence.
+The affected Web build and root's diff/screenshot review passed. Existing
+isolation was reused; the three-file capture and image rebuild each ran once.
+
+No backend, model input/profile or read authority changed. BGE is AVAILABLE and
+CLIP READY; absent lexical fields still make overall rebuilding DEGRADED. F03
+retains broader recall/coverage. Distribution/license and core/release gates
+remain open. The demo's port-4670 process and catalog were not restarted or
+repopulated; refreshing the browser loads the shared updated Web build.
 
 ## F01 save-to-use continuation — 2026-10-31
 

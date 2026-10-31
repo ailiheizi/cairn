@@ -44,6 +44,8 @@ export type SearchSuggestion =
 export type PredicateEdit = { index: number; value: string };
 
 export type KeywordBrowsePhase = "available" | "loading-first" | "more" | "loading-more" | "complete" | "bounded" | "first-error" | "more-error" | "stale";
+export type VisualSearchContext = { key: string; kind: "scene" | "image"; description?: string; reference?: SearchHit; count: number };
+
 export type KeywordBrowseState = { query: string; phase: KeywordBrowsePhase; loaded: number; error: string };
 
 type KeywordBrowseCapture = { query: string; request: SearchPlan["request"]; plan: SearchPlan; workspaceID: string; refreshGeneration: number };
@@ -130,9 +132,10 @@ export type SearchFlow = {
   returnToRanked: () => boolean;
   invalidateKeywordBrowse: () => void;
   /** Submits search.query with one selected image as the query material (search by image). */
-  runImageSearch: (subjectRef: string) => Promise<void>;
+  runImageSearch: (subjectRef: string) => Promise<boolean>;
   /** Submits a text description directly to the existing multimodal image dimension. */
-  runVisualTextSearch: (description: string) => Promise<void>;
+  runVisualTextSearch: (description: string) => Promise<boolean>;
+  visualSearchContext?: VisualSearchContext;
   ops: SearchOpsFlow;
 };
 
@@ -259,6 +262,8 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   const keywordBrowseRef = useRef<KeywordBrowseChain | null>(null);
   const keywordBrowseRequestRef = useRef(0);
   const imageSearchInFlightRef = useRef(false);
+  const visualSearchSequenceRef = useRef(0);
+  const [installedVisualContext, setInstalledVisualContext] = useState<{ context: VisualSearchContext; hits: SearchHit[]; workspaceID: string; refreshGeneration: number }>();
   const currentBrowseContextRef = useRef({ workspaceID, refreshGeneration, viewMode });
   currentBrowseContextRef.current = { workspaceID, refreshGeneration, viewMode };
   const localProjectionRef = useRef({
@@ -800,14 +805,14 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
   // `search.query` operation and renders through the same fused pipeline; the
   // image is retrieval material the daemon resolves itself, and this browser
   // never reads or uploads the bytes.
-  async function runMultimodalSearch(input: { imageSubjectRef?: string; description?: string }) {
+  async function runMultimodalSearch(input: { imageSubjectRef?: string; description?: string }): Promise<boolean> {
     const imageSubjectRef = input.imageSubjectRef?.trim() ?? "";
     const description = input.description?.trim() ?? "";
-    if (!imageSubjectRef && !description) return;
-    if (imageSearchInFlightRef.current) return;
-    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return; }
-    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return; }
-    if (!drafts.canLeaveDetailDrafts()) return;
+    if (!imageSubjectRef && !description) return false;
+    if (imageSearchInFlightRef.current) return false;
+    if (!isConnected || !catalogHealthy) { notify({ kind: "error", text: catalogStorageMessage }); return false; }
+    if (!workspaceID) { notify({ kind: "warning", text: t("Add a source first so there is content to search.") }); return false; }
+    if (!drafts.canLeaveDetailDrafts()) return false;
     imageSearchInFlightRef.current = true;
     const searchIntent = library.beginSearchIntent(workspaceID);
     setBusy(true); notify(undefined);
@@ -820,7 +825,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         dimension: "multimodal-clip",
         ...(description ? { query: description } : { image_subject_ref: imageSubjectRef }),
       });
-      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return;
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
       const responseData = response.data as {
         dimension?: string;
         index_generation_ref?: string;
@@ -835,7 +840,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
         || !validGenerationRef) {
         const reason = response.reasons?.map((item) => item.message?.trim()).find(Boolean);
         notify({ kind: "error", text: reason ? `${t("Visual search is unavailable")}: ${t(reason)}` : t("Visual search is unavailable") });
-        return;
+        return false;
       }
       if (!Array.isArray(responseData?.hits) || responseData.hits.some((hit) => !hit || typeof hit !== "object" || Array.isArray(hit) || !String((hit as SearchHit).subject_ref ?? "").trim())) {
         throw new Error(t("The server did not return a usable results page."));
@@ -843,18 +848,23 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
       const loadedItems = library.currentLibraryItems(workspaceID);
       const statusBySubject = new Map(loadedItems.map((item) => [item.subject_ref, item.index_status]));
       const returned = resolveArchiveSelectionSizes(responseData.hits as SearchHit[], loadedItems);
+      const acceptedHits = returned.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") }));
+      const reference = imageSubjectRef ? library.hits.find(hit => hit.subject_ref === imageSubjectRef) ?? loadedItems.find(hit => hit.subject_ref === imageSubjectRef) : undefined;
       invalidateKeywordBrowse();
       drafts.discardDetailDrafts();
-      library.setHits(returned.map((hit) => ({ ...hit, index_status: hit.index_status ?? statusBySubject.get(hit.subject_ref ?? "") })));
+      library.setHits(acceptedHits);
+      setInstalledVisualContext({ hits: acceptedHits, workspaceID, refreshGeneration, context: { key: `${generationRef}:${++visualSearchSequenceRef.current}`, kind: description ? "scene" : "image", ...(description ? { description } : {}), ...(reference ? { reference } : {}), count: acceptedHits.length } });
       // Neither query is a lexical SavedView candidate: keep it out of the
       // shared lexical field and let the Photos form retain its own prompt.
       setLastExecutedQuery("");
       setSelected(undefined); library.setActiveTags([]); library.setActiveSystemFacets({ type: "", format: "", dedup: "", tags: "", index: "" }); library.setActiveTimelineMonth(""); setViewMode("search");
       exportFlow.invalidateForSearch();
       markConnected();
+      return true;
     } catch (error) {
-      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return;
+      if (!library.isCurrentSearchIntent(searchIntent, workspaceID)) return false;
       notify({ kind: "error", text: error instanceof Error ? error.message : t("Search failed") });
+      return false;
     }
     finally {
       imageSearchInFlightRef.current = false;
@@ -862,12 +872,12 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     }
   }
 
-  async function runImageSearch(subjectRef: string) {
-    await runMultimodalSearch({ imageSubjectRef: subjectRef });
+  async function runImageSearch(subjectRef: string): Promise<boolean> {
+    return runMultimodalSearch({ imageSubjectRef: subjectRef });
   }
 
-  async function runVisualTextSearch(description: string) {
-    await runMultimodalSearch({ description });
+  async function runVisualTextSearch(description: string): Promise<boolean> {
+    return runMultimodalSearch({ description });
   }
 
   return {
@@ -895,6 +905,7 @@ export function useSearch({ t, query, setQuery, setLastExecutedQuery, workspaceI
     invalidateKeywordBrowse,
     runImageSearch,
     runVisualTextSearch,
+    visualSearchContext: installedVisualContext && installedVisualContext.workspaceID === workspaceID && installedVisualContext.refreshGeneration === refreshGeneration && installedVisualContext.hits === library.hits && viewMode === "search" ? installedVisualContext.context : undefined,
     ops,
   };
 }

@@ -1,5 +1,5 @@
 import type { DragEvent, MouseEvent, PointerEvent, RefObject } from "react";
-import { ChevronLeft, ChevronRight, Download as DownloadIcon, Image as ImageIcon, Pause, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download as DownloadIcon, Image as ImageIcon, Pause, Play, Search, X } from "lucide-react";
 import { ContentPreview } from "../ContentPreview";
 import { PhotoThumbnail } from "../PhotoThumbnail";
 import { FavoriteButton } from "../FavoriteButton";
@@ -48,6 +48,9 @@ type Props = {
   onStopSlideshow: () => void;
   onSlideshowSecondsChange: (seconds: number) => void;
   slideshowItemSupported: (item: PhotoItem | undefined) => boolean;
+  imageSearchBusy?: boolean;
+  visualSearchError?: string;
+  onSearchSimilar?: () => void;
 };
 
 export function PhotoViewer(props: Props) {
@@ -62,6 +65,7 @@ export function PhotoViewer(props: Props) {
         <div className="photo-viewer__identity"><h2 ref={viewerTitleRef} tabIndex={-1}>{current.hit.name || t("Untitled subject")}</h2><span>{t("{{position}} of {{count}}", { position: activeViewerIndex + 1, count: viewerItems.length })}</span><span className="photo-viewer__selection-count" role="status">{t("{{count}} selected items", { count: selectedPhotoCount })}</span><span className="photo-viewer__modified" role="status">{viewerModifiedLabel}</span></div>
         <div className="photo-viewer__actions">
           <button type="button" aria-pressed={viewerFullscreen} disabled={!fullscreenSupported} onClick={props.onToggleFullscreen}>{t(viewerFullscreen ? "Exit fullscreen" : "Enter fullscreen")}</button>
+          {props.onSearchSimilar && <button type="button" disabled={props.imageSearchBusy} onClick={props.onSearchSimilar}><Search size={15} />{t("Find similar photos")}</button>}
           <button type="button" aria-label={t("Details")} onClick={() => props.onOpenDetails(current)}>{t("Details")}</button>
           {current.hit.entry_type === "REGULAR_FILE" && current.hit.entry_id && current.hit.content_id && <button type="button" onClick={() => downloadOriginal(workspaceID, current.hit.entry_id!, current.hit.name || "download.bin")}><DownloadIcon size={15} />{t("Download original")}</button>}
           <button type="button" className={`photo-viewer__select ${selected ? "is-selected" : ""}`} aria-pressed={selected} aria-label={t(selected ? "Deselect {{name}}" : "Select {{name}}", { name: current.hit.name || t("Untitled subject") })} title={t(selected ? "Deselect {{name}}" : "Select {{name}}", { name: current.hit.name || t("Untitled subject") })} disabled={!current.hit.subject_ref} onFocus={() => current.hit.subject_ref && onFocusSubject?.(current.hit.subject_ref)} onClick={() => props.onToggleSelection(current)}><ImageIcon size={15} />{t(selected ? "Selected" : "Select")}</button>
@@ -72,6 +76,7 @@ export function PhotoViewer(props: Props) {
       </header>
       {!fullscreenSupported && <p className="photo-viewer__fullscreen-message" role="status">{t("Fullscreen is unavailable in this browser.")}</p>}
       {viewerFullscreenMessage && <p className="photo-viewer__fullscreen-message" role="status">{viewerFullscreenMessage}</p>}
+      {props.visualSearchError && <p className="photo-viewer__fullscreen-message" role="alert">{props.visualSearchError}</p>}
       <button type="button" className="photo-viewer__nav photo-viewer__nav--prev" aria-label={t("Previous photo")} disabled={activeViewerIndex <= 0} onClick={() => props.onMove(Math.max(0, activeViewerIndex - 1))}><ChevronLeft /></button>
       <div className="photo-viewer__body" onPointerDown={props.onBeginSwipe} onClickCapture={props.onConsumeSwipeClick} onDragStart={props.onBlockMediaDrag}>
         <ContentPreview key={`${current.hit.entry_id ?? current.hit.subject_ref}:${current.hit.content_id ?? ""}`} variant="inspector" autoOpen directImageControls command={command} locale={locale} workspaceId={workspaceID} entryId={current.hit.entry_id} subjectRef={current.hit.subject_ref} contentId={current.hit.content_id} name={current.hit.name || t("Untitled subject")} logicalSize={current.hit.logical_size} />

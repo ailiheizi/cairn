@@ -11,6 +11,7 @@ import { PhotoExhibition } from "./PhotoExhibition";
 import { PhotoThumbnail } from "./PhotoThumbnail";
 import { OverviewExperience } from "./OverviewExperience";
 import type { AudioTrack } from "../lib/audioPlayback";
+import type { VisualSearchContext } from "../app/useSearch";
 import { allLibraryPageIds, enabledLibraryPageGroups, libraryPageForMode, libraryPages, validateLibraryRendererIDs, type LibraryPageId } from "../lib/libraryViews";
 import type { LibraryPageMode, SearchHit, ViewMode } from "../lib/types";
 import type { MusicMetadataState } from "../lib/musicMetadata";
@@ -51,8 +52,10 @@ export type LibraryPageHostProps = {
   onQueueTrack?: (track: AudioTrack) => void;
   onPlayTracks?: (tracks: AudioTrack[]) => void;
   onSelectSubjects?: (subjects: SearchHit[], mode: "add" | "remove" | "invert") => void;
-  onImageSearch?: (subjectRef: string) => void;
-  onVisualTextSearch?: (description: string) => void;
+  onImageSearch?: (subjectRef: string) => Promise<boolean>;
+  onVisualTextSearch?: (description: string) => Promise<boolean>;
+  visualSearchContext?: VisualSearchContext;
+  onReturnToAllPhotos?: () => void;
   imageSearchBusy?: boolean;
   onDownloadOriginals?: (subjects: SearchHit[]) => void;
   originalTakeoutBusy?: boolean;
@@ -69,7 +72,7 @@ export type LibraryPageHostProps = {
   onNavigate?: (mode: "content" | LibraryPageMode, focusHit?: SearchHit) => void;
 };
 
-function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onImageSearch, onVisualTextSearch, imageSearchBusy }: LibraryPageHostProps) {
+function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest, onFocusSubject, onShowSelectionActions, photoLoading, favoriteControls, onSelectSubjects, onDownloadOriginals, originalTakeoutBusy, onCreateMaterialList, materialListCreationDisabled, onImageSearch, onVisualTextSearch, imageSearchBusy, visualSearchContext, onReturnToAllPhotos }: LibraryPageHostProps) {
   return <PhotoLibraryExperience
     {...resultProps}
     onOpenHit={onOpenHit}
@@ -82,6 +85,8 @@ function renderPhotos({ resultProps, onOpenHit, focusedSubjectRef, focusRequest,
     onSelectSubjects={onSelectSubjects}
     onImageSearch={onImageSearch}
     onVisualTextSearch={onVisualTextSearch}
+    visualSearchContext={visualSearchContext}
+    onReturnToAllPhotos={onReturnToAllPhotos}
     imageSearchBusy={imageSearchBusy}
     onDownloadOriginals={onDownloadOriginals}
     onCreateMaterialList={onCreateMaterialList}

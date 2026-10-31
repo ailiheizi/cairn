@@ -20,6 +20,7 @@ import { formatBytes, formatDedupFacet, formatEntryType, formatFacetValue, media
 import { allLibraryViewIds, libraryPageForMode, type LibraryViewId } from "../lib/libraryViews";
 import { parseSearchQuery, searchPlan } from "../lib/searchops";
 import type { LibraryFlow } from "../app/useLibrary";
+import type { VisualSearchContext } from "../app/useSearch";
 import type { SelectionFlow } from "../app/useSelection";
 import type { SourcesFlow } from "../app/useSources";
 import type { ViewModeFlow } from "../app/useViewMode";
@@ -32,7 +33,7 @@ import "./LibraryWorkflow.css";
 // Every control here changes a browser projection or opens a drawer; none of
 // them writes durable state directly.
 
-export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject, retrievalFlow }: {
+export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView, enabledViews = allLibraryViewIds, library, selection, sources, view, command, selectedRef, showFirstSource, recalledView, lastExecutedQuery, keywordBrowse, onRunKeywordBrowseAction, canReturnToRanked = false, onReturnToRanked, onInvalidateKeywordBrowse, sortAvailable, canOpenExport, isConnected, isUnavailable, coreStorageReady, coreStorageMessage, notice, busy, scopeRestoring = false, scopeRestoreFailed = false, originalTakeoutBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, refresh, onOpenAdd, onViewSource, onRecheckSource, onRowClick, onLibraryKeyDown, onOpenExport, onClearNotice, onImageSearch, onVisualTextSearch, visualSearchContext, onReturnToAllPhotos, onOpenHit, onFocusSearch, libraryListRef, onPlayTrack, onQueueTrack, onPlayTracks, musicMetadata, favoriteControls, musicQueueControls, focusedSubjectRef, focusRequest, onFocusSubject, retrievalFlow }: {
   t: Translator;
   locale: Locale;
   workspaceID: string;
@@ -77,8 +78,10 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
   onOpenExport: (trigger?: EventTarget | null, selection?: SearchHit[]) => void;
   onClearNotice: () => void;
   /** Runs the image-dimension search.query for one selected image subject. */
-  onImageSearch: (subjectRef: string) => void;
-  onVisualTextSearch: (description: string) => void;
+  onImageSearch: (subjectRef: string) => Promise<boolean>;
+  onVisualTextSearch: (description: string) => Promise<boolean>;
+  visualSearchContext?: VisualSearchContext;
+  onReturnToAllPhotos: () => void;
   /** Opens one loaded row through the existing row-open path (the inspector). */
   onOpenHit: (hit: SearchHit) => void;
   /** Focuses the existing library search field without changing its query. */
@@ -515,6 +518,8 @@ export function LibrarySurface({ t, locale, workspaceID, viewMode, onLibraryView
         onSelectSubjects={selection.changeScopeSelection}
         onImageSearch={onImageSearch}
         onVisualTextSearch={onVisualTextSearch}
+        visualSearchContext={visualSearchContext}
+        onReturnToAllPhotos={onReturnToAllPhotos}
         imageSearchBusy={busy}
         onDownloadOriginals={onDownloadOriginals}
         originalTakeoutBusy={originalTakeoutBusy}

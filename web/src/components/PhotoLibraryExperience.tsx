@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Image as ImageIcon, SlidersHorizontal } from "lucide-react";
-import type { DragEvent as ReactDragEvent, FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { useClientBrowseValue } from "../app/ClientBrowseSession";
+import type { DragEvent as ReactDragEvent, FocusEvent as ReactFocusEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useBrowsePositionScopeIdentity, useClientBrowseValue, useWorkspaceBrowseValue } from "../app/ClientBrowseSession";
 import { useBrowsePosition } from "../app/useBrowsePosition";
 import { useResultWindow } from "./ResultWindow";
 import { previewThumbKind } from "./ContentPreview";
@@ -44,7 +44,7 @@ const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_AXIS_RATIO = 1.6;
 
 export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
-  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, focusRequest = 0, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, imageSearchBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
+  const { hits, command, locale, workspaceID, t, selectedRef, selectionRefs, selectionCount = selectionRefs.length, tagsBySubject, rovingRow, onRowClick, onToggleSelection, onOpenHit, focusedSubjectRef, focusRequest = 0, onFocusSubject, onShowSelectionActions, onSelectSubjects, onImageSearch, onVisualTextSearch, visualSearchContext, onReturnToAllPhotos, imageSearchBusy = false, onDownloadOriginals, onCreateMaterialList, materialListCreationDisabled = false, originalTakeoutBusy = false, libraryListRef, onKeyDown, loading = false, error = "", favoriteControls } = props;
   const photoTagStatus = favoriteControls?.status ?? "unavailable";
   const [format, setFormat] = useClientBrowseValue("photos", "format", "all");
   const [photoSortValue, setPhotoSort] = useClientBrowseValue<"library" | "filename" | "size" | "modified">("photos", "sort", "library");
@@ -53,7 +53,8 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerScope, setViewerScope] = useState<"matches" | "selected">("matches");
   const [photoQuery, setPhotoQuery] = useClientBrowseValue("photos", "query", "");
-  const [visualSearchDescription, setVisualSearchDescription] = useState("");
+  const [visualSearchDescription, setVisualSearchDescription] = useWorkspaceBrowseValue("photos:visual-description", "");
+  const [visualSearchError, setVisualSearchError] = useState("");
   const [searchScope, setSearchScope] = useClientBrowseValue<"visual" | "name-tags">("photos", "search-scope", onVisualTextSearch ? "visual" : "name-tags");
   const [selectedPhotoTags, setSelectedPhotoTags] = useClientBrowseValue<string[]>("photos", "tag-filter", []);
   const [onlySelectedPhotos, setOnlySelectedPhotos] = useClientBrowseValue<boolean>("photos", "selected-only", false);
@@ -65,6 +66,12 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   const [slideshowSeconds, setSlideshowSeconds] = useState(5);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [viewerPhotoKey, setViewerPhotoKey] = useState("");
+  const viewerPhotoKeyRef = useRef("");
+  viewerPhotoKeyRef.current = viewerPhotoKey;
+  const visualSearchRequestRef = useRef(0);
+  const browseScopeIdentity = useBrowsePositionScopeIdentity();
+  const visualRequestContextRef = useRef({ workspaceID, contextKey: visualSearchContext?.key, browseScopeIdentity });
+  visualRequestContextRef.current = { workspaceID, contextKey: visualSearchContext?.key, browseScopeIdentity };
   const viewerTitleRef = useRef<HTMLHeadingElement | null>(null);
   const viewerDialogRef = useRef<HTMLElement | null>(null);
   const viewerFullscreenOwnerRef = useRef<HTMLElement | null>(null);
@@ -285,6 +292,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   const [pendingKeyboardFocus, setPendingKeyboardFocus] = useState<PhotoKeyboardFocus | null>(null);
   const localKeyboardFocusRef = useRef<{ key: string; control: "image" | "name" } | null>(null);
   const photoSelectionAnchorRef = useRef<PhotoSelectionAnchor | null>(null);
+  useEffect(() => { setVisualSearchError(""); }, [viewerPhotoKey, visualSearchContext?.key]);
   const activeViewerIndex = viewerIndex == null ? -1 : viewerItems.findIndex((item) => photoItemKey(item) === viewerPhotoKey);
   const current = activeViewerIndex < 0 ? undefined : viewerItems[activeViewerIndex];
   const viewerOpen = viewerIndex !== null && Boolean(current);
@@ -602,6 +610,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
   }
   function closeViewer(restoreFocus = true) {
     const photoKey = viewerPhotoKey;
+    visualSearchRequestRef.current++;
     setSlideshowPlaying(false);
     setViewerIndex(null);
     setViewerScope("matches");
@@ -612,6 +621,31 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     // effect falls back to the search field after the viewer has unmounted.
     pendingReturnIndexRef.current = item?.index ?? -1;
     pendingFocusRef.current = item?.hit.subject_ref ?? "";
+  }
+  async function searchSimilarToCurrentPhoto() {
+    if (!current || !onImageSearch || !current.hit.subject_ref) return;
+    setVisualSearchError("");
+    const token = ++visualSearchRequestRef.current;
+    const key = photoItemKey(current);
+    const requestContext = visualRequestContextRef.current;
+    const accepted = await onImageSearch(current.hit.subject_ref);
+    const currentContext = visualRequestContextRef.current;
+    if (visualSearchRequestRef.current !== token || viewerPhotoKeyRef.current !== key || currentContext.workspaceID !== requestContext.workspaceID) return;
+    if (accepted) closeViewer();
+    else if (currentContext.contextKey === requestContext.contextKey && currentContext.browseScopeIdentity === requestContext.browseScopeIdentity) setVisualSearchError(t("Search did not complete. Your current results are unchanged."));
+  }
+  function submitVisualSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const description = visualSearchDescription.trim();
+    if (!description || !onVisualTextSearch || imageSearchBusy) return;
+    setVisualSearchError("");
+    const token = ++visualSearchRequestRef.current;
+    const requestContext = visualRequestContextRef.current;
+    void onVisualTextSearch(description).then((accepted) => {
+      const currentContext = visualRequestContextRef.current;
+      if (visualSearchRequestRef.current !== token || currentContext.workspaceID !== requestContext.workspaceID || currentContext.contextKey !== requestContext.contextKey || currentContext.browseScopeIdentity !== requestContext.browseScopeIdentity) return;
+      if (!accepted) setVisualSearchError(t("Search did not complete. Your current results are unchanged."));
+    });
   }
   async function toggleViewerFullscreen() {
     const dialog = viewerDialogRef.current;
@@ -848,6 +882,9 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     onFocusSubject={onFocusSubject}
     onShowSelectionActions={onShowSelectionActions}
     onClose={closeViewer}
+    imageSearchBusy={imageSearchBusy}
+    visualSearchError={visualSearchError}
+    onSearchSimilar={onImageSearch && current.hit.entry_type === "REGULAR_FILE" && workspaceID.trim() && current.hit.subject_ref && current.hit.entry_id && current.hit.content_id && /^sha256:[0-9a-f]{64}$/.test(current.hit.content_id) && /\.(jpe?g|png)$/i.test(current.hit.name || current.hit.path?.split(/[\\/]/).at(-1) || "") ? searchSimilarToCurrentPhoto : undefined}
     onToggleFullscreen={() => void toggleViewerFullscreen()}
     onOpenDetails={openDetails}
     onToggleSelection={toggleDisplayedPhotoSelection}
@@ -873,11 +910,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
           <button type="button" aria-pressed={searchScope === "visual"} onClick={() => setSearchScope("visual")}>{t("Scene")}</button>
           <button type="button" aria-pressed={searchScope === "name-tags"} onClick={() => setSearchScope("name-tags")}>{t("Names and tags")}</button>
         </div>}
-        {searchScope === "visual" && onVisualTextSearch ? <form className="photo-library__search-row is-visual" onSubmit={(event) => {
-          event.preventDefault();
-          const description = visualSearchDescription.trim();
-          if (description && !imageSearchBusy) onVisualTextSearch(description);
-        }}>
+        {searchScope === "visual" && onVisualTextSearch ? <form className="photo-library__search-row is-visual" onSubmit={submitVisualSearch}>
           <label className="sr-only" htmlFor="photo-visual-search">{t("Describe a scene")}</label>
           <input ref={searchInputRef} id="photo-visual-search" type="search" value={visualSearchDescription} placeholder={t("A sunset by the sea, a red car")} onChange={(event) => setVisualSearchDescription(event.target.value)} />
           <button type="submit" disabled={imageSearchBusy || !visualSearchDescription.trim()}>{imageSearchBusy ? t("Searching visual matches…") : t("Find")}</button>
@@ -887,6 +920,9 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
           {photoQuery && <button type="button" onClick={() => setPhotoQuery("")}>{t("Clear search")}</button>}
         </div>}
         {onVisualTextSearch && searchScope === "visual" && <p className="photo-library__search-hint">{t("Search indexed photos by what they show.")}</p>}
+        {visualSearchContext && <div className="photo-library__visual-context" role="status"><span>{visualSearchContext.kind === "scene" ? t("Scene results: {{description}}", { description: visualSearchContext.description || t("Unknown scene") }) : t("Similar to {{name}}", { name: visualSearchContext.reference?.name || visualSearchContext.reference?.path?.split(/[\\/]/).at(-1) || t("Reference photo") })} · {t("{{count}} matches", { count: visualSearchContext.count })}</span><button type="button" onClick={onReturnToAllPhotos}>{t("All photos")}</button></div>}
+        {visualSearchContext && searchScope === "name-tags" && <p className="photo-library__search-hint">{t("Names and tags filters apply to these visual matches only.")}</p>}
+        {visualSearchError && <p className="photo-library__search-error" role="alert">{visualSearchError}</p>}
       </section>
       <details className="photo-library__format-filter">
         <summary aria-label={activeFilterCount ? `${t("Filter and display")}: ${t("{{count}} active filters", { count: activeFilterCount })}` : t("Filter and display")} title={t("Filter and display")}>
@@ -992,7 +1028,7 @@ export function PhotoLibraryExperience(props: PhotoLibraryExperienceProps) {
     </header>
     {error && <p className="photo-library__state is-error" role="alert">{t("Photos could not be loaded")}: {error}</p>}
     {loading && <p className="photo-library__state" role="status">{t("Loading photos…")}</p>}
-    {!loading && !error && visibleItems.length === 0 && <div className="photo-library__empty"><ImageIcon size={30} /><strong>{photoEmptyMessage}</strong>{hasLocalPhotoFilters ? <button type="button" onClick={clearPhotoFilters}>{t("Clear photo filters")}</button> : <span>{t("Unsupported image formats remain available as originals from Details.")}</span>}</div>}
+    {!loading && !error && visibleItems.length === 0 && <div className="photo-library__empty"><ImageIcon size={30} /><strong>{photoEmptyMessage}</strong>{hasLocalPhotoFilters ? <button type="button" onClick={clearPhotoFilters}>{t("Clear photo filters")}</button> : <span>{visualSearchContext ? t("Try another scene or clear local photo filters.") : t("Unsupported image formats remain available as originals from Details.")}</span>}</div>}
     <div ref={libraryListRef} tabIndex={-1} onFocusCapture={handlePhotoWallFocusCapture} onKeyDown={handlePhotoWallKeyDown} className={`photo-wall ${wall.containerClass}`} style={wall.containerStyle} data-rendered-from={wall.startIndex} data-rendered-to={wall.endIndex} data-listing-count={visibleItems.length}>
       {mountedItems.map(({ item, position }) => {
         if (!item) {

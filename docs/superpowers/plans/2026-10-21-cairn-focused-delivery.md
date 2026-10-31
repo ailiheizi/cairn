@@ -250,14 +250,14 @@ qualification remain outside this local client closure.
 ### F06 · [AIL-48](https://linear.app/ailiheizi/issue/AIL-48) — Find photos by scene or example image
 <a id="f06"></a><a id="r22"></a>
 
-**Baseline:** Darwin arm64 Chinese-CLIP has real local browser evidence; distribution review and cross-platform qualification remain open. **Outcome:** Search a photo by a description or related reference image.
+**Current delivery (2026-10-31): Done for the admitted local client loop.** Darwin arm64 Chinese-CLIP has real local browser evidence, including the [scene/reference continuation](2026-10-30-save-find-use.md#m3-f06-scene-and-reference-image-continuity--2026-10-31). Distribution review and cross-platform qualification remain open. **Outcome:** Search a photo by a description or related saved reference image, retain the current query while browsing, and take out unchanged originals.
 
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | Local CLIP bundle and image generation | Real local evidence | Explicitly install and build the optional image generation. |
-| Chinese scene-text query | Locally joined | Keep direct access from Photos. |
-| Query by reference image | Locally joined | Make selected-image handoff clear. |
-| Result inspection/original takeout | Locally joined | Keep lexical fallback visible when unavailable. |
+| Chinese scene-text query | Locally delivered | Direct Photos entry, accepted query label and separate workspace-session draft; reset old local filters/sorting for a new answer. |
+| Query by reference image | Locally delivered | Find similar from the saved PNG/JPEG viewer; name the reference, preserve results/viewer on failure. |
+| Result inspection/original takeout | Locally delivered | Details returns to the current photo wall/context; verified original takeout and ordinary name filtering remain usable when a visual query is unavailable. |
 | Face/video indexing | Out of scope | No new dimension. |
 
 **Reuse and steps:** Reuse the pinned Chinese-CLIP profile and Photos query, with BGE in its separate space. Explicitly install/build; expose missing/incompatible/failure states; preserve ordinary search and exact original access.
