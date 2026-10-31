@@ -1,5 +1,6 @@
 export const spaceAssistant: Record<string, string> = {
   "Saved searches": "常用查找",
+  "Continue in Library": "在资料库继续查找",
   "Save this search": "保存这次查找",
   "Close saved searches": "关闭常用查找",
   "Saved search: {{name}}": "已保存查找：{{name}}",

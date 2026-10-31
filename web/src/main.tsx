@@ -744,6 +744,21 @@ function App() {
     view.setPresentationMode("content");
     return true;
   }
+  async function browseFloatingSearch(text: string): Promise<boolean | undefined> {
+    if (busy || drawerOpen || settingsOpen || sourceIntakeIsPending() || !isConnected || !coreStorageReady || !workspaceID) return false;
+    completeUserNavigation();
+    const epoch = navigationEpochRef.current, requestedWorkspace = workspaceID;
+    let superseded = false;
+    const succeeded = await search.runSearch(undefined, text, undefined, () => {
+      if (navigationEpochRef.current !== epoch || workspaceIDRef.current !== requestedWorkspace) { superseded = true; return false; }
+      return true;
+    });
+    if (superseded || navigationEpochRef.current !== epoch || workspaceIDRef.current !== requestedWorkspace) return undefined;
+    if (!succeeded) return false;
+    setQuery(text.trim());
+    view.setPresentationMode("content");
+    return true;
+  }
   function useMaterialList(document: MaterialListDocument, action: MaterialListAction, trigger?: EventTarget | null) {
     const capturedWorkspaceID = workspaceID;
     if (!capturedWorkspaceID || workspaceIDRef.current !== capturedWorkspaceID) return;
@@ -1461,6 +1476,7 @@ function App() {
       catalogItems={library.libraryItems} selectedItems={selection.selectionSubjects} notice={notice?.text}
       onSearch={(text, onResults) => search.runSearch(undefined, text, onResults)}
       savedViews={savedViewFlow} onRecallSavedSearch={recallFloatingSavedSearch}
+      onBrowseSearch={browseFloatingSearch}
       onOpen={(hit, resultQuery) => openLibraryEntry(hit, resultQuery)} entryHint={searchEntryHint} onUse={useMaterialList}
       onOrganize={(document) => openMaterialListEditor([], document)}
       onSaveFiles={(files) => saveMaterialListFiles(files, workspaceID)} />

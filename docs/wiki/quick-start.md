@@ -54,6 +54,12 @@ original. A media result outside the background scope indicates that activation
 opens this search in its dedicated page; only the click performs that fresh
 search/scope handoff. A changed result is refused before replacing the scope.
 
+Choose **Continue in Library** to open the submitted floating query in the full
+Library. Then **Browse matching results** and **Load more matching results**
+continue its keyword/filter matches; **Return to ranked results** restores the
+earlier relevance results. The unsent floating draft remains available. Opening
+Details and returning preserves the shared wall's browse anchor and selection.
+
 Choose **Save this search** below a floating result to review and name its
 submitted keyword/structured conditions. Unsent text and background filters are
 not silently included. Reopen it through **+ → Saved searches**, then explicitly

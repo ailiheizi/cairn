@@ -29,7 +29,8 @@ and the result the user receives. Core phase order remains unchanged.
 | Latest locally delivered retrieval handoff | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete retrieval misses and result-use gaps; show useful results first, matched source and advanced controls on demand |
 | Latest locally delivered common search | F08 / [AIL-42](https://linear.app/ailiheizi/issue/AIL-42) | Name a submitted search, reload, edit/copy and explicitly reopen its current Library results |
 | Latest locally delivered manual context | F07 / [AIL-41](https://linear.app/ailiheizi/issue/AIL-41) | Open media Notes/tags, preserve context through batch changes and find/use it again |
-| Remaining M2 scope | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue large loaded scopes and return to the correct browse position |
+| Latest locally delivered continuation | F22 / [AIL-43](https://linear.app/ailiheizi/issue/AIL-43) | Continue a floating query in Library, load later keyword matches, inspect and return with browse anchor/selection retained |
+| Next active scope | F03 / [AIL-44](https://linear.app/ailiheizi/issue/AIL-44) | Close concrete field/recall gaps in M3 using existing extraction and local search |
 | Alongside each delivery | F28 / [AIL-82](https://linear.app/ailiheizi/issue/AIL-82) | Product definition, current screenshots/walkthrough and Linear agree with what is usable; no separate testing/research project |
 
 At most one whole feature enters implementation. F02's bounded baseline is now
@@ -143,9 +144,29 @@ and saved Photo context. Searching the Music note returned its actual NOTE /
 ANNOTATION source, and original takeout matched independent bytes.
 
 F07's admitted manual client scope is Done. AI-generated Notes were not selected,
-and no new history browser or durable model is implied. M2 now has F22 remaining;
+and no new history browser or durable model is implied. At this delivery M2 still had F22 remaining;
 M3 still owns broader field/recall gaps. No original ingest or remote AI operation
 was added to this context workflow.
+
+## M2 F22 continuation closure — 2026-10-31
+
+Floating results now expose **Continue in Library**, using the submitted query
+and existing host paging. Failure or superseded navigation preserves the draft
+and results. The ordinary result wall now registers with the same subject-based
+browse-position mechanism as Photos/Music, replacing its raw-scroll fallback.
+
+The [selected F22 journey](../superpowers/plans/2026-10-30-save-find-use.md#m2-f22-continue-browsing-and-return--2026-10-31)
+used 230 real captured text files in an isolated profile. Keyword continuation
+loaded 200 then 30 matches; the last file retained selection through Details,
+returned with the same visible subject anchor and remained fully visible. Its
+82-byte takeout matched the independent original. A refused handoff retained the
+draft/results, and superseding navigation rejected a held response. No model
+request ran. Existing large-scale, listing and SavedView evidence remains scoped
+to its original runs; this is not a new performance or release qualification.
+
+F22's bounded client continuation is Done, closing M2's five current function
+cards. M3/F03 remains active for broader field coverage and concrete recall gaps;
+F04–F06 retain their current delivery/qualification boundaries.
 
 ## F01 save-to-use continuation — 2026-10-31
 

@@ -404,3 +404,80 @@ Existing unknown-read protections and description provenance remain unchanged.
 The admitted manual F07 loop is closed. Optional AI-generated Notes and a new
 history browser were not selected or claimed by this batch. M2's remaining
 function card is F22; M3's broader field/recall work is still open.
+
+## M2 F22 continue browsing and return — 2026-10-31
+
+Active batch: Phase 4/5 parallel first-party client maintenance under the shared
+loaded/search scope contract, content-store discovery and SavedView §7.2. The
+user outcome is to continue a submitted floating search in Library, browse
+later matching items, inspect one, return to its position with selection intact,
+and take out the original. This closes an existing connection; no new query,
+pagination authority, endpoint, durable model or runtime package is admitted.
+
+Decision: add one explicit **Continue in Library** action to floating results.
+It runs the submitted query through the existing host `runSearch` and opens the
+existing Library. Do not use an unsent composer draft or background filters.
+The host's ordinary keyword/filter continuation, ranked-results return and
+honest semantic/coverage limits remain visible; this does not paginate semantic
+suggestions or turn returned results into a claim of full coverage. Gate result
+installation by the existing navigation epoch and workspace before mutation.
+Keep the floating draft/results available on failure or return. Share the
+saved-search handoff's local busy/error/collapse wrapper rather than duplicate
+it; leave ordinary result-open semantics unchanged.
+
+- [x] Connect `SpaceAssistant.tsx`, `main.tsx` and existing i18n entries only.
+  Reuse host search and Library paging/position state; do not add another list
+  implementation or change stored search semantics.
+- [x] Repair the observed ordinary-wall return gap in `ResultList.tsx` by
+  registering its existing virtual window with `useBrowsePosition`, as Photos
+  already does. The real 230-file flow retained selection but moved the last
+  item from 673px to 1,014px after closing Details, including after two frames:
+  the unregistered wall fell back to raw scroll offset across layout changes.
+  Bind subject anchors, current presentation/sort signature and existing
+  `revealIndex` for unmounted anchors. Do not add another position registry.
+- [x] Build and run one `continue-find-inspect-return-use` journey with real
+  multi-page data in an isolated existing or reused development profile:
+  floating query -> Library keyword continuation -> later item selection ->
+  Details -> same position/selection -> independently checked original. Include
+  stale-navigation rejection for the new async handoff; reuse untouched saved
+  view and paging evidence rather than repeat a full regression campaign.
+- [x] Root/Luna review and diff check; update the existing F22/M2 records only
+  from observable delivery, then commit/push. Root owns the one journey; no
+  delegated suites or broad backend checks. Preserve unrelated changes.
+
+
+Actual local delivery: the floating query has an explicit Library handoff with
+pre-install navigation/workspace rejection. Its shared wrapper retains the
+public SavedView callback's boolean result while treating superseded work as a
+silent non-navigation. The ordinary result wall registers stable subject anchors
+in the existing browse registry; host query/filter scope and layout/sort changes
+invalidate old positions, while continuation does not discard the anchor.
+
+The current binary captured 230 distinct small original text files into an
+isolated port-4671 profile through one ordinary plan/apply. The port-4670 curated
+demo was not populated or restarted. The real query continued through 200 then
+30 keyword matches. Selecting file 230, opening Details and returning retained
+selection and the same visible subject anchor (offset -51.56px before, -51.77px
+after); the selected file remained fully visible. Its downloaded 82 bytes were
+identical to the independent input, SHA-256
+`2b71c124aaa197017a6303da9371d5608e3256f5ddc6f8512e5a09d91f84180c`.
+A failed handoff preserved results/unsent text; a held real search superseded by
+Home navigation did not install its results. No remote model request ran, and
+this profile honestly reported the unavailable semantic generation.
+
+Evidence remains in `dist/f22-20261031/`: the one successful capture response,
+search page responses, original failure and resumed read-only browser segments,
+return geometry, source/takeout and screenshot. The driver first omitted hover
+before the disclosed selection target. After correcting that, the actual raw
+scroll return failure was reproduced with settled frames and repaired. A strict
+clicked-tile pixel comparison also detected legitimate row-height remeasurement;
+the final check instead proves the same visible subject anchor/offset, selection,
+a fully visible target and exact takeout. It does not claim identical geometry
+for every tile. Only the affected read-only tail was repeated; capture was never
+replayed. The shared-wrapper compile mismatch was corrected without broadening
+its downstream callback. Root/Luna review, final Web build and diff check passed.
+
+F22's admitted client continuation closes M2's current five cards. Retained
+listing/SavedView/large-scale evidence is not requalified by this 230-file flow.
+Unlimited semantic continuation, general performance claims and core/release
+completion remain outside it. M3/F03 continues the concrete field/recall work.

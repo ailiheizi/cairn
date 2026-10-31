@@ -590,13 +590,25 @@ executable UI remains a future design decision, not a shipped F16 subfeature.
 | Subfeature | Current status | Deliver |
 | --- | --- | --- |
 | Windowed rendering/first screen | Historical large-library evidence | Reuse current implementation. |
-| Listing and SavedView continuation | Partial/local evidence | Fix a demonstrated truncated path. |
-| Full-search continuation | Partial; verify current behavior | Do not equate a returned page with whole library. |
-| Details return and selection | Partial | Correct observed lost position/state. |
+| Listing and SavedView continuation | Existing bounded local evidence retained | Reuse current paging; no new scale qualification. |
+| Search continuation | Locally delivered 2026-10-31 | Floating submitted query enters existing Library keyword/filter paging; semantic suggestions remain distinct. |
+| Details return and selection | Locally delivered 2026-10-31 | Ordinary wall reuses subject-anchor restoration; later-file selection and takeout verified. |
 
 **Reuse and steps:** Confirm current listing/search continuation before changing it; repair only real truncation/reordering/selection loss; preserve current virtualization and thumbnail budget; check return behavior on existing Library/Photos/Music/Overview surfaces.
 
 **Finished looks like:** On an existing representative library, continue to a later item, select/open Details, return to the same place and take out that item. Record only the user-visible friction encountered.
+
+**2026-10-31 local outcome:** F22's bounded client scope is Done. A real isolated
+230-file capture continued as 200 + 30 keyword matches; the last file kept its
+selection and returned to the same visible anchor after Details, then its
+82-byte takeout matched the independent source. The previously unregistered
+ordinary wall used raw scroll offsets and displaced the target below the
+viewport. It now uses the existing browse registry, virtual-window reveal and
+scope identity. Failed/superseded floating handoffs preserve local draft/results.
+See the [implementation and actual journey](2026-10-30-save-find-use.md#m2-f22-continue-browsing-and-return--2026-10-31).
+This is not unlimited semantic paging, a fresh scale benchmark or phase/release
+qualification. M2's selected five-card loop is closed; M3 field/recall work stays
+open.
 
 **Dependencies:** Existing Library/scope. **Scope:** No separate benchmark campaign or Linux detour. **Sources:** [historical SP-2 measurements](../../history/product-experience-ledger-through-20261020.md), [first-party client contract](../../requirements/first-party-client-experiences.md).
 

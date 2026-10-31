@@ -5,6 +5,7 @@ import type { Locale, Translator } from "../i18n";
 import { ContentPreview, previewThumbBudget, previewThumbKind } from "./ContentPreview";
 import { PhotoThumbnail } from "./PhotoThumbnail";
 import { useResultWindow } from "./ResultWindow";
+import { useBrowsePosition } from "../app/useBrowsePosition";
 import { exactIdentityKey, formatBytes, formatEntryType, formatFacetValue, mediaClassFromSuffix, previewUnicodeText, searchImageMetadata, searchImageMetadataSummary, searchSegmentSourceLabel, sortableSize } from "../lib/format";
 import { downloadOriginal } from "../lib/contentDownload";
 import type { Command, LibraryLayout, RowClickEvent, SearchHit, SortDirection, SortField, ViewMode } from "../lib/types";
@@ -87,7 +88,7 @@ export function ResultRow({ hit, index, roving, duplicateCount, selected, multiS
   const entryTypeLabel = hit.entry_type === "REGULAR_FILE" ? t("File") : hit.entry_type === "DIRECTORY" ? t("Folder") : hit.entry_type === "SYMLINK" ? t("Symbolic link") : formatEntryType(hit.entry_type, t);
   const metaText = `${sizeLabel} · ${entryTypeLabel}${format ? ` · ${format.toUpperCase()}` : ""}`;
   const visibleTags = userTags.slice(0, 2);
-  return <div className={`result-row ${selected ? "selected" : ""} ${multiSelected ? "multi-selected" : ""} ${showImageThumb ? "has-thumb" : directory ? "is-folder" : "is-file"} ${actionsOpen ? "result-row-actions-open" : ""}`} role="group" aria-label={title} data-result-index={index} onClick={(event) => onRowClick(index, event)}>
+  return <div className={`result-row ${selected ? "selected" : ""} ${multiSelected ? "multi-selected" : ""} ${showImageThumb ? "has-thumb" : directory ? "is-folder" : "is-file"} ${actionsOpen ? "result-row-actions-open" : ""}`} role="group" aria-label={title} data-result-index={index} data-subject-ref={hit.subject_ref || undefined} onClick={(event) => onRowClick(index, event)}>
     <button type="button" className="result-select" role="checkbox" aria-checked={multiSelected} tabIndex={-1} aria-label={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} title={t(multiSelected ? "Deselect {{name}}" : "Select {{name}}", { name: title })} onClick={(event) => { event.stopPropagation(); if (event.shiftKey && onExtendSelection) onExtendSelection(index); else onToggleSelection(index); }} onKeyDown={(event) => {
       // A focused checkbox owns its Enter/Space: it toggles this row once and
       // never bubbles into the list's roving Space/Enter or row-open handling.
@@ -166,6 +167,20 @@ export function ResultList({ hits, libraryListRef, libraryLayout, sortField, sor
   const positions = Math.max(hits.length, Number.isFinite(listingPositions) ? Math.max(0, Math.floor(listingPositions ?? 0)) : 0);
   const window = useResultWindow({ containerRef: libraryListRef, count: positions, loadedCount: hits.length, onNeedMore: onLoadMore });
   const { startIndex, endIndex, revealIndex } = window;
+  useBrowsePosition({
+    slotKey: "library:results",
+    signature: JSON.stringify([libraryLayout, sortField, sortDirection]),
+    containerRef: libraryListRef,
+    ready: window.measured,
+    restoreKey: `${startIndex}:${endIndex}:${window.measured}:${hits.length}`,
+    anchorSelector: ".result-row[data-subject-ref]",
+    onUnresolved: (bookmark) => {
+      const index = hits.findIndex((hit) => hit.subject_ref === bookmark.anchor);
+      if (index < 0) return false;
+      if (index < startIndex || index >= endIndex) revealIndex(index);
+      return true;
+    },
+  });
   const focusWasInList = useRef(false);
   // Arrow keys, Home and End move a roving index over the whole listing, not
   // only over the mounted rows. When the target row is outside the window, the
